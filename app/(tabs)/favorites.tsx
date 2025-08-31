@@ -1,0 +1,314 @@
+import React, { useState, useEffect } from 'react';
+import { View, ScrollView, RefreshControl, Alert } from 'react-native';
+import { useTheme } from '@/theme/ThemeProvider';
+import { useAuthStore } from '@/store/useAuthStore';
+import { supabase } from '@/lib/supabase';
+import { router } from 'expo-router';
+import {
+  Text,
+  SafeAreaWrapper,
+  AppHeader,
+  Container,
+  ProductCard,
+  Grid,
+  EmptyState,
+  ErrorState,
+  LoadingSkeleton,
+  Toast,
+  Button,
+} from '@/components';
+import { Heart, Trash2, ShoppingBag } from 'lucide-react-native';
+
+export default function FavoritesScreen() {
+  const { theme } = useTheme();
+  const { user } = useAuthStore();
+  
+  const [favorites, setFavorites] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      fetchFavorites();
+    }
+  }, [user]);
+
+  const fetchFavorites = async () => {
+    if (!user) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { data, error: fetchError } = await supabase
+        .from('favorites')
+        .select(`
+          *,
+          listings (
+            *,
+            profiles:user_id (
+              id,
+              first_name,
+              last_name,
+              avatar_url,
+              rating,
+              is_verified,
+              account_type
+            ),
+            categories (
+              name,
+              icon
+            )
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (fetchError) {
+        setError(fetchError.message);
+      } else {
+        // Filter out favorites where listing might be deleted
+        const validFavorites = (data || []).filter(fav => fav.listings);
+        setFavorites(validFavorites);
+      }
+    } catch (err) {
+      setError('Failed to load favorites');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchFavorites();
+    setRefreshing(false);
+  };
+
+  const handleRemoveFavorite = async (favoriteId: string, listingTitle: string) => {
+    Alert.alert(
+      'Remove Favorite',
+      `Remove "${listingTitle}" from your favorites?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('favorites')
+                .delete()
+                .eq('id', favoriteId);
+
+              if (error) throw error;
+
+              setFavorites(prev => prev.filter(fav => fav.id !== favoriteId));
+              setToastMessage('Removed from favorites');
+              setShowToast(true);
+            } catch (err) {
+              Alert.alert('Error', 'Failed to remove favorite');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Transform favorites to product format
+  const transformedProducts = favorites.map((favorite) => {
+    const listing = favorite.listings;
+    const seller = listing.profiles;
+    
+    return {
+      id: listing.id,
+      favoriteId: favorite.id,
+      image: listing.images?.[0] || 'https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg',
+      title: listing.title,
+      price: listing.price,
+      seller: {
+        name: `${seller?.first_name} ${seller?.last_name}`,
+        avatar: seller?.avatar_url,
+        rating: seller?.rating || 0,
+        badges: seller?.account_type === 'business' ? ['business'] : [],
+      },
+      badge: listing.boost_expires_at && new Date(listing.boost_expires_at) > new Date() 
+        ? { text: 'Boosted', variant: 'featured' as const }
+        : undefined,
+      location: listing.location,
+      status: listing.status,
+      savedAt: new Date(favorite.created_at).toLocaleDateString(),
+    };
+  });
+
+  if (loading) {
+    return (
+      <SafeAreaWrapper>
+        <AppHeader
+          title="Favorites"
+          showBackButton
+          onBackPress={() => router.back()}
+        />
+        <ScrollView contentContainerStyle={{ padding: theme.spacing.lg }}>
+          <Grid columns={2}>
+            {Array.from({ length: 4 }).map((_, index) => (
+              <LoadingSkeleton
+                key={index}
+                width="100%"
+                height={280}
+                borderRadius={theme.borderRadius.lg}
+              />
+            ))}
+          </Grid>
+        </ScrollView>
+      </SafeAreaWrapper>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaWrapper>
+        <AppHeader
+          title="Favorites"
+          showBackButton
+          onBackPress={() => router.back()}
+        />
+        <ErrorState
+          message={error}
+          onRetry={fetchFavorites}
+        />
+      </SafeAreaWrapper>
+    );
+  }
+
+  return (
+    <SafeAreaWrapper>
+      <AppHeader
+        title="Favorites"
+        showBackButton
+        onBackPress={() => router.back()}
+        rightActions={favorites.length > 0 ? [
+          <Text variant="caption" color="muted">
+            {favorites.length} saved
+          </Text>,
+        ] : []}
+      />
+
+      <View style={{ flex: 1 }}>
+        {transformedProducts.length > 0 ? (
+          <ScrollView
+            contentContainerStyle={{
+              padding: theme.spacing.lg,
+              paddingBottom: theme.spacing.xl,
+            }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor={theme.colors.primary}
+              />
+            }
+          >
+            <Grid columns={2}>
+              {transformedProducts.map((product) => (
+                <View key={product.id} style={{ position: 'relative' }}>
+                  <ProductCard
+                    image={product.image}
+                    title={product.title}
+                    price={product.price}
+                    seller={product.seller}
+                    badge={product.badge}
+                    location={product.location}
+                    layout="grid"
+                    onPress={() => router.push(`/(tabs)/home/${product.id}`)}
+                  />
+
+                  {/* Remove Button */}
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: theme.spacing.sm,
+                      right: theme.spacing.sm,
+                    }}
+                  >
+                    <Button
+                      variant="icon"
+                      icon={<Trash2 size={16} color={theme.colors.error} />}
+                      onPress={() => handleRemoveFavorite(product.favoriteId, product.title)}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        backgroundColor: theme.colors.surface + 'E6',
+                        borderRadius: theme.borderRadius.md,
+                        ...theme.shadows.md,
+                      }}
+                    />
+                  </View>
+
+                  {/* Saved Date */}
+                  <View
+                    style={{
+                      position: 'absolute',
+                      bottom: theme.spacing.sm,
+                      left: theme.spacing.sm,
+                      backgroundColor: theme.colors.surface + 'E6',
+                      borderRadius: theme.borderRadius.sm,
+                      paddingHorizontal: theme.spacing.sm,
+                      paddingVertical: theme.spacing.xs,
+                    }}
+                  >
+                    <Text variant="caption" style={{ fontWeight: '500' }}>
+                      Saved {product.savedAt}
+                    </Text>
+                  </View>
+
+                  {/* Status Indicator */}
+                  {product.status !== 'active' && (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0,0,0,0.7)',
+                        borderRadius: theme.borderRadius.lg,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Badge
+                        text={product.status === 'sold' ? 'SOLD' : 'UNAVAILABLE'}
+                        variant="error"
+                      />
+                    </View>
+                  )}
+                </View>
+              ))}
+            </Grid>
+          </ScrollView>
+        ) : (
+          <EmptyState
+            icon={<Heart size={64} color={theme.colors.text.muted} />}
+            title="No favorites yet"
+            description="Save listings you're interested in to see them here. Tap the heart icon on any listing to add it to your favorites."
+            action={{
+              text: 'Browse Products',
+              onPress: () => router.push('/(tabs)'),
+            }}
+          />
+        )}
+      </View>
+
+      {/* Toast */}
+      <Toast
+        visible={showToast}
+        message={toastMessage}
+        variant="success"
+        onHide={() => setShowToast(false)}
+      />
+    </SafeAreaWrapper>
+  );
+}
