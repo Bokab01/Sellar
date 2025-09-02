@@ -71,6 +71,8 @@ export const dbHelpers = {
     offset?: number;
     userId?: string;
   }) {
+    console.log('getListings called with filters:', filters);
+    
     // First, try the joined query
     let query = supabase
       .from('listings')
@@ -82,10 +84,13 @@ export const dbHelpers = {
           last_name,
           avatar_url,
           rating,
-          is_verified
+          is_verified,
+          account_type,
+          verification_status
         ),
         categories (
           name,
+          slug,
           icon
         )
       `)
@@ -683,7 +688,7 @@ export const dbHelpers = {
     title: string,
     body: string,
     notificationType: string,
-    data?: any,
+    notificationData?: any,
     scheduledFor?: string
   ) {
     const { data, error } = await supabase.rpc('queue_push_notification', {
@@ -691,7 +696,7 @@ export const dbHelpers = {
       p_title: title,
       p_body: body,
       p_notification_type: notificationType,
-      p_data: data || {},
+      p_data: notificationData || {},
       p_scheduled_for: scheduledFor || new Date().toISOString(),
     });
     

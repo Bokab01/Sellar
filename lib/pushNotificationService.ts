@@ -164,7 +164,12 @@ class PushNotificationService {
       const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
       
       if (!projectId) {
-        console.error('Project ID not found. Make sure EAS is configured.');
+        console.warn('Project ID not found. Push notifications will not work in development without EAS configuration.');
+        // Return a mock token for development/testing
+        if (__DEV__) {
+          this.pushToken = 'ExponentPushToken[development-mock-token]';
+          return this.pushToken;
+        }
         return null;
       }
 
@@ -176,6 +181,12 @@ class PushNotificationService {
       return this.pushToken;
     } catch (error) {
       console.error('Error getting push token:', error);
+      // Return a mock token for development if there's an error
+      if (__DEV__) {
+        console.warn('Using mock push token for development');
+        this.pushToken = 'ExponentPushToken[development-mock-token]';
+        return this.pushToken;
+      }
       return null;
     }
   }

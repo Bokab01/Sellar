@@ -128,7 +128,6 @@ export function LinkButton({
         {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: theme.spacing.sm,
           opacity: disabled ? 0.5 : 1,
         },
         style,
@@ -152,6 +151,7 @@ export function LinkButton({
         <ExternalLink
           size={fontSize * 0.8}
           color={colors.textColor}
+          style={{ marginLeft: theme.spacing.sm }}
         />
       )}
 
@@ -159,6 +159,7 @@ export function LinkButton({
         <ChevronRight
           size={fontSize * 0.8}
           color={colors.textColor}
+          style={{ marginLeft: theme.spacing.sm }}
         />
       )}
     </TouchableOpacity>

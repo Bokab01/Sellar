@@ -246,8 +246,8 @@ export default function MyListingsScreen() {
 
         {/* Listings Content */}
         {loading ? (
-          <ScrollView contentContainerStyle={{ padding: theme.spacing.lg }}>
-            <Grid columns={2}>
+          <ScrollView contentContainerStyle={{ paddingBottom: theme.spacing.lg }}>
+            <Grid columns={2} spacing={4}>
               {Array.from({ length: 4 }).map((_, index) => (
                 <LoadingSkeleton
                   key={index}
@@ -261,7 +261,6 @@ export default function MyListingsScreen() {
         ) : filteredListings.length > 0 ? (
           <ScrollView
             contentContainerStyle={{
-              padding: theme.spacing.lg,
               paddingBottom: theme.spacing.xl,
             }}
             refreshControl={
@@ -272,7 +271,7 @@ export default function MyListingsScreen() {
               />
             }
           >
-            <Grid columns={2}>
+            <Grid columns={2} spacing={4}>
               {transformedListings.map((listing) => (
                 <View key={listing.id} style={{ position: 'relative' }}>
                   <ProductCard
@@ -283,6 +282,7 @@ export default function MyListingsScreen() {
                     badge={listing.badge}
                     location={listing.location}
                     layout="grid"
+                    fullWidth={true}
                     onPress={() => router.push(`/(tabs)/home/${listing.id}`)}
                   />
 

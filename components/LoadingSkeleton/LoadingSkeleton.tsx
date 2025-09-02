@@ -68,56 +68,45 @@ export function ProductCardSkeleton() {
       style={{
         backgroundColor: theme.colors.surface,
         borderRadius: theme.borderRadius.lg,
-        padding: theme.spacing.lg,
-        marginBottom: theme.spacing.md,
         ...theme.shadows.md,
+        overflow: 'hidden',
+        height: 320, // Match the new card height
+        marginBottom: theme.spacing.md,
       }}
     >
-      {/* Image skeleton */}
+      {/* Image skeleton - 70% of card height */}
       <LoadingSkeleton
         width="100%"
-        height={200}
-        borderRadius={theme.borderRadius.md}
-        style={{ marginBottom: theme.spacing.lg }}
+        height={224} // 70% of 320
+        style={{ marginBottom: 0 }}
       />
 
-      {/* Title skeleton */}
-      <LoadingSkeleton
-        width="80%"
-        height={20}
-        style={{ marginBottom: theme.spacing.sm }}
-      />
+      {/* Content area - 30% of card height */}
+      <View style={{ padding: theme.spacing.sm, flex: 1, justifyContent: 'space-between' }}>
+        <View>
+          {/* Title skeleton */}
+          <LoadingSkeleton
+            width="90%"
+            height={14}
+            style={{ marginBottom: theme.spacing.xs }}
+          />
+          <LoadingSkeleton
+            width="70%"
+            height={14}
+            style={{ marginBottom: theme.spacing.xs }}
+          />
 
-      {/* Price skeleton */}
-      <LoadingSkeleton
-        width="40%"
-        height={24}
-        style={{ marginBottom: theme.spacing.md }}
-      />
+          {/* Price skeleton */}
+          <LoadingSkeleton
+            width="50%"
+            height={16}
+            style={{ marginBottom: theme.spacing.xs }}
+          />
+        </View>
 
-      {/* Seller info skeleton */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          marginBottom: theme.spacing.lg,
-        }}
-      >
-        <LoadingSkeleton
-          width={32}
-          height={32}
-          borderRadius={16}
-          style={{ marginRight: theme.spacing.md }}
-        />
-        <LoadingSkeleton width="60%" height={16} />
+        {/* Seller name skeleton at bottom */}
+        <LoadingSkeleton width="60%" height={12} />
       </View>
-
-      {/* Button skeleton */}
-      <LoadingSkeleton
-        width="100%"
-        height={44}
-        borderRadius={theme.borderRadius.md}
-      />
     </View>
   );
 }

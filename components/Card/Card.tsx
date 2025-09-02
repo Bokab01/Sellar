@@ -21,7 +21,7 @@ interface ProductCardProps {
   };
   badge?: {
     text: string;
-    variant?: 'new' | 'sold' | 'featured' | 'discount';
+    variant?: 'new' | 'sold' | 'featured' | 'discount' | 'info' | 'success';
   };
   onPress?: () => void;
   onSellerPress?: () => void;
@@ -29,6 +29,7 @@ interface ProductCardProps {
   actionText?: string;
   location?: string;
   layout?: 'default' | 'grid';
+  fullWidth?: boolean; // New prop for full-width mode
 }
 
 export function ProductCard({
@@ -44,24 +45,28 @@ export function ProductCard({
   actionText = 'View',
   location,
   layout = 'default',
+  fullWidth = false,
 }: ProductCardProps) {
   const { theme } = useTheme();
 
   const imageSource = typeof image === 'string' ? { uri: image } : image;
   
   const isGridLayout = layout === 'grid';
-  const imageHeight = isGridLayout ? 140 : 200;
-  const cardPadding = isGridLayout ? theme.spacing.md : theme.spacing.lg;
+  // Increased card height and made image cover 70% of the card
+  const totalCardHeight = isGridLayout ? 320 : 360;
+  const imageHeight = isGridLayout ? totalCardHeight * 0.7 : 200; // 70% for grid, keep default for list
+  const cardPadding = isGridLayout ? theme.spacing.sm : theme.spacing.lg;
 
   return (
     <TouchableOpacity
       onPress={onPress}
       style={{
         backgroundColor: theme.colors.surface,
-        borderRadius: theme.borderRadius.lg,
-        ...theme.shadows.md,
+        borderRadius: fullWidth ? theme.borderRadius.sm : theme.borderRadius.lg,
+        ...(fullWidth ? theme.shadows.sm : theme.shadows.md),
         overflow: 'hidden',
         marginBottom: isGridLayout ? 0 : theme.spacing.md,
+        height: isGridLayout ? totalCardHeight : undefined,
       }}
       activeOpacity={0.95}
     >
@@ -93,25 +98,33 @@ export function ProductCard({
       </View>
 
       {/* Content */}
-      <View style={{ padding: cardPadding }}>
-        <Text 
-          variant={isGridLayout ? 'body' : 'h4'} 
-          numberOfLines={isGridLayout ? 1 : 2}
-          style={{ 
-            marginBottom: theme.spacing.sm,
-            fontSize: isGridLayout ? 14 : undefined,
-            fontWeight: isGridLayout ? '600' : undefined,
-          }}
-        >
-          {title}
-        </Text>
 
-        <PriceDisplay 
-          amount={price} 
-          currency={currency}
-          size={isGridLayout ? 'md' : 'lg'}
-          style={{ marginBottom: isGridLayout ? theme.spacing.sm : theme.spacing.md }}
-        />
+      <View style={{ 
+        padding: cardPadding,
+        flex: isGridLayout ? 1 : undefined,
+        justifyContent: isGridLayout ? 'space-between' : undefined,
+      }}>
+        <View>
+          <Text 
+            variant={isGridLayout ? 'bodySmall' : 'h4'} 
+            numberOfLines={isGridLayout ? 2 : 2}
+            style={{ 
+              marginBottom: isGridLayout ? theme.spacing.xs : theme.spacing.sm,
+              fontSize: isGridLayout ? 13 : undefined,
+              fontWeight: isGridLayout ? '600' : undefined,
+              lineHeight: isGridLayout ? 16 : undefined,
+            }}
+          >
+            {title}
+          </Text>
+
+          <PriceDisplay 
+            amount={price} 
+            currency={currency}
+            size={isGridLayout ? 'sm' : 'lg'}
+            style={{ marginBottom: isGridLayout ? theme.spacing.xs : theme.spacing.md }}
+          />
+        </View>
 
         {location && !isGridLayout && (
           <Text 
@@ -129,7 +142,10 @@ export function ProductCard({
             variant="caption" 
             color="secondary" 
             numberOfLines={1}
-            style={{ marginBottom: theme.spacing.sm }}
+            style={{ 
+              fontSize: 11,
+              marginTop: 'auto', // Push to bottom
+            }}
           >
             {seller.name}
           </Text>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Alert, Platform } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { useAuth } from '@/hooks/useAuth';
+import { useSecureAuth } from '@/hooks/useSecureAuth';
 import { validateSignUpForm } from '@/utils/validation';
 import {
   Text,
@@ -18,7 +18,7 @@ import { Mail, Lock, User, Phone } from 'lucide-react-native';
 
 export default function SignUpScreen() {
   const { theme } = useTheme();
-  const { signUp } = useAuth();
+  const { secureSignUp } = useSecureAuth();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -53,15 +53,17 @@ export default function SignUpScreen() {
     }
 
     setLoading(true);
-    const { error } = await signUp(email.trim(), password, {
+    const result = await secureSignUp({
+      email: email.trim(),
+      password,
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       phone: phone.trim() || undefined,
       location: location || undefined,
     });
     
-    if (error) {
-      Alert.alert('Sign Up Failed', error);
+    if (!result.success) {
+      Alert.alert('Sign Up Failed', result.error || 'Unknown error occurred');
     } else {
       // Navigate to email verification screen
       router.push({
@@ -103,9 +105,9 @@ export default function SignUpScreen() {
             </View>
 
             {/* Sign Up Form */}
-            <View style={{ gap: theme.spacing.lg }}>
-              <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
-                <View style={{ flex: 1 }}>
+            <View>
+              <View style={{ flexDirection: 'row', marginBottom: theme.spacing.lg }}>
+                <View style={{ flex: 1, marginRight: theme.spacing.md }}>
                   <Input
                     label="First Name"
                     placeholder="First name"
@@ -150,6 +152,7 @@ export default function SignUpScreen() {
                 autoCapitalize="none"
                 leftIcon={<Mail size={20} color={theme.colors.text.muted} />}
                 error={errors.email}
+                style={{ marginBottom: theme.spacing.lg }}
               />
 
               <Input
@@ -165,9 +168,10 @@ export default function SignUpScreen() {
                 keyboardType="phone-pad"
                 leftIcon={<Phone size={20} color={theme.colors.text.muted} />}
                 error={errors.phone}
+                style={{ marginBottom: theme.spacing.lg }}
               />
 
-              <View>
+              <View style={{ marginBottom: theme.spacing.lg }}>
                 <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.sm }}>
                   Location (Optional)
                 </Text>
@@ -190,8 +194,8 @@ export default function SignUpScreen() {
                   }
                 }}
                 leftIcon={<Lock size={20} color={theme.colors.text.muted} />}
-                helperText="Must be at least 6 characters"
                 error={errors.password}
+                style={{ marginBottom: theme.spacing.lg }}
               />
 
               <Input
@@ -207,6 +211,7 @@ export default function SignUpScreen() {
                 }}
                 leftIcon={<Lock size={20} color={theme.colors.text.muted} />}
                 error={errors.confirmPassword}
+                style={{ marginBottom: theme.spacing.xl }}
               />
 
               <Button
@@ -223,9 +228,9 @@ export default function SignUpScreen() {
 
             {/* Footer Links */}
             <View style={{ alignItems: 'center', marginTop: theme.spacing['2xl'] }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text variant="body" color="secondary">
-                  Already have an account?
+                  Already have an account?{' '}
                 </Text>
                 <LinkButton
                   variant="primary"

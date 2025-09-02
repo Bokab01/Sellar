@@ -16,6 +16,10 @@ import {
   Input,
   Toast,
   LoadingSkeleton,
+  SecurityDashboard,
+  MFASetup,
+  PrivacySettings,
+  GDPRCompliance,
 } from '@/components';
 import { 
   Moon, 
@@ -47,6 +51,12 @@ export default function SettingsScreen() {
   const [toastMessage, setToastMessage] = useState('');
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [processing, setProcessing] = useState(false);
+  
+  // Security modals
+  const [showSecurityDashboard, setShowSecurityDashboard] = useState(false);
+  const [showMFASetup, setShowMFASetup] = useState(false);
+  const [showPrivacySettings, setShowPrivacySettings] = useState(false);
+  const [showGDPRCompliance, setShowGDPRCompliance] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -275,9 +285,27 @@ export default function SettingsScreen() {
       title: 'Privacy & Security',
       items: [
         {
+          title: 'Security Dashboard',
+          subtitle: 'Monitor your account security and devices',
+          icon: <Shield size={20} color={theme.colors.text.primary} />,
+          onPress: () => setShowSecurityDashboard(true),
+        },
+        {
+          title: 'Two-Factor Authentication',
+          subtitle: 'Add extra security to your account',
+          icon: <Lock size={20} color={theme.colors.text.primary} />,
+          onPress: () => setShowMFASetup(true),
+        },
+        {
+          title: 'Privacy Settings',
+          subtitle: 'Control your privacy and data sharing',
+          icon: <Eye size={20} color={theme.colors.text.primary} />,
+          onPress: () => setShowPrivacySettings(true),
+        },
+        {
           title: 'Phone Number Visibility',
           subtitle: getPhoneVisibilitySubtitle(),
-          icon: <Shield size={20} color={theme.colors.text.primary} />,
+          icon: <Smartphone size={20} color={theme.colors.text.primary} />,
           onPress: () => {
             Alert.alert(
               'Phone Visibility',
@@ -311,6 +339,12 @@ export default function SettingsScreen() {
     {
       title: 'Account & Data',
       items: [
+        {
+          title: 'Data & Privacy Rights',
+          subtitle: 'GDPR compliance and data management',
+          icon: <Shield size={20} color={theme.colors.text.primary} />,
+          onPress: () => setShowGDPRCompliance(true),
+        },
         {
           title: 'Language & Region',
           subtitle: `${settings?.language || 'English'} • ${settings?.currency || 'GHS'}`,
@@ -555,6 +589,54 @@ export default function SettingsScreen() {
             autoCapitalize="characters"
           />
         </View>
+      </AppModal>
+
+      {/* Security Dashboard Modal */}
+      <AppModal
+        visible={showSecurityDashboard}
+        onClose={() => setShowSecurityDashboard(false)}
+        title="Security Dashboard"
+        fullScreen
+      >
+        <SecurityDashboard />
+      </AppModal>
+
+      {/* MFA Setup Modal */}
+      <AppModal
+        visible={showMFASetup}
+        onClose={() => setShowMFASetup(false)}
+        title="Two-Factor Authentication"
+        fullScreen
+      >
+        <MFASetup onMFAStatusChange={(enabled) => {
+          if (enabled) {
+            setToastMessage('Two-factor authentication enabled successfully');
+            setShowToast(true);
+          }
+        }} />
+      </AppModal>
+
+      {/* Privacy Settings Modal */}
+      <AppModal
+        visible={showPrivacySettings}
+        onClose={() => setShowPrivacySettings(false)}
+        title="Privacy Settings"
+        fullScreen
+      >
+        <PrivacySettings onSettingsChange={() => {
+          setToastMessage('Privacy settings updated successfully');
+          setShowToast(true);
+        }} />
+      </AppModal>
+
+      {/* GDPR Compliance Modal */}
+      <AppModal
+        visible={showGDPRCompliance}
+        onClose={() => setShowGDPRCompliance(false)}
+        title="Data & Privacy Rights"
+        fullScreen
+      >
+        <GDPRCompliance />
       </AppModal>
 
       {/* Toast */}

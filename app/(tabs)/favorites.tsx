@@ -151,8 +151,8 @@ export default function FavoritesScreen() {
           showBackButton
           onBackPress={() => router.back()}
         />
-        <ScrollView contentContainerStyle={{ padding: theme.spacing.lg }}>
-          <Grid columns={2}>
+        <ScrollView contentContainerStyle={{ paddingBottom: theme.spacing.lg }}>
+          <Grid columns={2} spacing={4}>
             {Array.from({ length: 4 }).map((_, index) => (
               <LoadingSkeleton
                 key={index}
@@ -200,7 +200,6 @@ export default function FavoritesScreen() {
         {transformedProducts.length > 0 ? (
           <ScrollView
             contentContainerStyle={{
-              padding: theme.spacing.lg,
               paddingBottom: theme.spacing.xl,
             }}
             refreshControl={
@@ -211,7 +210,7 @@ export default function FavoritesScreen() {
               />
             }
           >
-            <Grid columns={2}>
+            <Grid columns={2} spacing={4}>
               {transformedProducts.map((product) => (
                 <View key={product.id} style={{ position: 'relative' }}>
                   <ProductCard
@@ -222,6 +221,7 @@ export default function FavoritesScreen() {
                     badge={product.badge}
                     location={product.location}
                     layout="grid"
+                    fullWidth={true}
                     onPress={() => router.push(`/(tabs)/home/${product.id}`)}
                   />
 

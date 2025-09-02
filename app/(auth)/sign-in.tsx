@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, ScrollView, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { useAuth } from '@/hooks/useAuth';
+import { useSecureAuth } from '@/hooks/useSecureAuth';
 import { validateEmail } from '@/utils/validation';
 import {
   Text,
@@ -16,7 +16,7 @@ import { Mail, Lock, Eye } from 'lucide-react-native';
 
 export default function SignInScreen() {
   const { theme } = useTheme();
-  const { signIn } = useAuth();
+  const { secureSignIn } = useSecureAuth();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,10 +40,19 @@ export default function SignInScreen() {
     }
 
     setLoading(true);
-    const { error } = await signIn(email.trim(), password);
+    const result = await secureSignIn({
+      email: email.trim(),
+      password,
+      rememberDevice: true,
+    });
     
-    if (error) {
-      Alert.alert('Sign In Failed', error);
+    if (!result.success) {
+      if (result.requiresMFA) {
+        Alert.alert('MFA Required', 'Please enter your two-factor authentication code');
+        // In a real app, you'd show an MFA input screen here
+      } else {
+        Alert.alert('Sign In Failed', result.error || 'Unknown error occurred');
+      }
     } else {
       router.replace('/(tabs)');
     }
@@ -73,7 +82,7 @@ export default function SignInScreen() {
             </View>
 
             {/* Sign In Form */}
-            <View style={{ gap: theme.spacing.xl }}>
+            <View>
               <Input
                 label="Email"
                 placeholder="Enter your email"
@@ -87,6 +96,7 @@ export default function SignInScreen() {
                 autoCapitalize="none"
                 leftIcon={<Mail size={20} color={theme.colors.text.muted} />}
                 error={emailError}
+                style={{ marginBottom: theme.spacing.lg }}
               />
 
               <Input
@@ -96,6 +106,7 @@ export default function SignInScreen() {
                 value={password}
                 onChangeText={setPassword}
                 leftIcon={<Lock size={20} color={theme.colors.text.muted} />}
+                style={{ marginBottom: theme.spacing.xl }}
               />
 
               <Button
@@ -111,17 +122,18 @@ export default function SignInScreen() {
             </View>
 
             {/* Footer Links */}
-            <View style={{ alignItems: 'center', marginTop: theme.spacing['2xl'], gap: theme.spacing.lg }}>
+            <View style={{ alignItems: 'center', marginTop: theme.spacing['2xl'] }}>
               <LinkButton
                 variant="underline"
                 href="/(auth)/forgot-password"
+                style={{ marginBottom: theme.spacing.lg }}
               >
                 Forgot your password?
               </LinkButton>
 
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text variant="body" color="secondary">
-                  Don't have an account?
+                  Don't have an account?{' '}
                 </Text>
                 <LinkButton
                   variant="primary"

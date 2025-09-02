@@ -114,3 +114,17 @@ export * from '../lib/offerStateMachine';
 export * from '../lib/listingReservationSystem';
 export * from '../lib/offerAnalytics';
 export * from '../lib/offerBackgroundJobs';
+
+// Security & Privacy Components
+export { SecurityDashboard } from './SecurityDashboard/SecurityDashboard';
+export { MFASetup } from './MFASetup/MFASetup';
+export { PrivacySettings } from './PrivacySettings/PrivacySettings';
+export { GDPRCompliance } from './GDPRCompliance/GDPRCompliance';
+export { ModerationDashboard } from './ModerationDashboard/ModerationDashboard';
+
+// Security Services
+export * from '../lib/securityService';
+export * from '../lib/dataProtectionService';
+export * from '../lib/contentModerationService';
+export * from '../utils/security';
+export * from '../hooks/useSecureAuth';

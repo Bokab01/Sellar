@@ -346,7 +346,7 @@ export default function UserProfileScreen() {
     switch (activeTab) {
       case 'listings':
         return filteredListings.length > 0 ? (
-          <Grid columns={2}>
+          <Grid columns={2} spacing={4}>
             {transformedListings.map((listing) => (
               <ProductCard
                 key={listing.id}
@@ -356,6 +356,7 @@ export default function UserProfileScreen() {
                 seller={listing.seller}
                 location={listing.location}
                 layout="grid"
+                fullWidth={true}
                 onPress={() => router.push(`/(tabs)/home/${listing.id}`)}
               />
             ))}
@@ -736,7 +737,7 @@ export default function UserProfileScreen() {
         </View>
 
         {/* Tab Content */}
-        <View style={{ padding: theme.spacing.lg }}>
+        <View style={{ paddingTop: theme.spacing.lg, paddingBottom: theme.spacing.lg }}>
           {renderTabContent()}
         </View>
       </ScrollView>

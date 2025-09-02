@@ -13,6 +13,8 @@ import {
   extractKeywords,
   type ValidationResult 
 } from '@/utils/listingValidation';
+import { validateListingTitle, validateListingDescription } from '@/utils/validation';
+import { contentModerationService } from '@/lib/contentModerationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -453,6 +455,44 @@ export default function CreateListingScreen() {
       
       if (additionalInfo) {
         listingData.description = `${sanitizedDescription}\n\n📋 ${additionalInfo}`;
+      }
+
+      // Content moderation check
+      console.log('Running content moderation...');
+      const moderationResult = await contentModerationService.moderateContent({
+        id: 'temp-listing-id', // Temporary ID for moderation
+        type: 'listing',
+        content: `${listingData.title}\n\n${listingData.description}`,
+        images: imageUrls,
+        userId: user!.id,
+        metadata: {
+          category: formData.categoryId,
+          price: listingData.price,
+          location: listingData.location,
+        },
+      });
+
+      // Handle moderation results
+      if (!moderationResult.isApproved) {
+        if (moderationResult.requiresManualReview) {
+          Alert.alert(
+            'Content Under Review',
+            'Your listing has been submitted for review due to our content policies. You will be notified once the review is complete.',
+            [{ text: 'OK' }]
+          );
+          // Set status to pending for manual review
+          listingData.status = 'pending';
+        } else {
+          // Content was rejected
+          const flagReasons = moderationResult.flags.map(flag => flag.details).join(', ');
+          Alert.alert(
+            'Content Policy Violation',
+            `Your listing cannot be published due to: ${flagReasons}. Please review and modify your content.`,
+            [{ text: 'OK' }]
+          );
+          setLoading(false);
+          return;
+        }
       }
 
       const { data: listing, error: listingError } = await dbHelpers.createListing(listingData);

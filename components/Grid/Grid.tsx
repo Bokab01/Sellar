@@ -21,7 +21,8 @@ export function Grid({
   const { width: screenWidth } = Dimensions.get('window');
   
   const gridSpacing = spacing ?? theme.spacing.xs;
-  const containerPadding = theme.spacing.lg * 2; // Account for container padding
+  // Use minimal container padding for small spacing values (full-width mode)
+  const containerPadding = (spacing !== undefined && spacing <= 8) ? spacing * 2 : theme.spacing.lg * 2;
   const totalSpacing = gridSpacing * (columns - 1);
   const itemWidth = (screenWidth - containerPadding - totalSpacing) / columns;
 

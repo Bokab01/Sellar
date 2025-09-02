@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl, Image, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl, Image, Alert, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -37,7 +37,8 @@ import {
   MoveHorizontal as MoreHorizontal, 
   MapPin, 
   ChevronDown,
-  Zap
+  Zap,
+  Grid3X3
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 
@@ -59,28 +60,23 @@ export default function HomeScreen() {
     setShowFilters,
   } = useAppStore();
 
-  // Use real listings from database
-  const { 
-    listings: products, 
-    loading, 
-    error, 
-    refreshing, 
-    refresh 
-  } = useListings({
-    search: searchQuery,
-    category: selectedCategories[0], // Use first selected category
-    location: filters.location || currentLocation,
-    priceMin: filters.priceRange.min,
-    priceMax: filters.priceRange.max,
-    condition: filters.condition,
-  });
-
   // Get notifications for badge
   const { unreadCount } = useNotifications();
 
   // Real user credit from database
   const [userCredit, setUserCredit] = useState<number>(0);
   const [creditLoading, setCreditLoading] = useState(true);
+
+  // Category scroll indicator
+  const categoryScrollRef = useRef<ScrollView>(null);
+  const [categoryScrollX, setCategoryScrollX] = useState(0);
+  const [categoryContentWidth, setCategoryContentWidth] = useState(0);
+  const [categoryScrollViewWidth, setCategoryScrollViewWidth] = useState(0);
+
+  // Category counts from database
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
+  const [categoryCountsLoading, setCategoryCountsLoading] = useState(true);
+  const [categoryIdMap, setCategoryIdMap] = useState<Record<string, string>>({});
 
   // Fetch user credit balance
   useEffect(() => {
@@ -117,16 +113,180 @@ export default function HomeScreen() {
     fetchUserCredit();
   }, [user?.id]);
 
+  // Fetch category counts from database
+  useEffect(() => {
+    const fetchCategoryCounts = async () => {
+      try {
+        // First, get all categories from the database
+        const { data: categories, error: categoriesError } = await supabase
+          .from('categories')
+          .select('id, slug')
+          .eq('is_active', true);
+
+        if (categoriesError) {
+          console.error('Failed to fetch categories:', categoriesError);
+          setCategoryCountsLoading(false);
+          return;
+        }
+
+        // Create a mapping of slugs to category IDs
+        const categoryMap: Record<string, string> = {};
+        categories?.forEach((cat: any) => {
+          // Map our frontend category names to database slugs
+          const slugMapping: Record<string, string> = {
+            'electronics': 'electronics',
+            'vehicles': 'vehicles',
+            'home': 'home-garden',
+            'fashion': 'fashion',
+            'books': 'education',
+            'sports': 'health-sports',
+            'services': 'services',
+            'other': 'general'
+          };
+          
+          Object.entries(slugMapping).forEach(([frontendKey, dbSlug]) => {
+            if (cat.slug === dbSlug) {
+              categoryMap[frontendKey] = cat.id;
+            }
+          });
+        });
+
+        // Get counts for each category using category_id
+        const counts: Record<string, number> = {};
+        
+        // Get total count first
+        const { count: totalCount, error: totalError } = await supabase
+          .from('listings')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'active');
+
+        if (!totalError) {
+          counts['total'] = totalCount || 0;
+        }
+
+        // Get counts for each specific category
+        for (const [frontendKey, categoryId] of Object.entries(categoryMap)) {
+          const { count, error } = await supabase
+            .from('listings')
+            .select('*', { count: 'exact', head: true })
+            .eq('category_id', categoryId)
+            .eq('status', 'active');
+
+          if (!error) {
+            counts[frontendKey] = count || 0;
+          } else {
+            counts[frontendKey] = 0;
+          }
+        }
+
+        // For categories not in the database, set to 0
+        const allCategories = ['electronics', 'vehicles', 'home', 'fashion', 'books', 'sports', 'services', 'other'];
+        allCategories.forEach(cat => {
+          if (!(cat in counts)) {
+            counts[cat] = 0;
+          }
+        });
+
+        setCategoryCounts(counts);
+        setCategoryIdMap(categoryMap);
+      } catch (error) {
+        console.error('Failed to fetch category counts:', error);
+      } finally {
+        setCategoryCountsLoading(false);
+      }
+    };
+
+    fetchCategoryCounts();
+  }, []);
+
+  // This will be handled after products is defined
+
   const categories = [
-    { id: 'electronics', label: 'Electronics', icon: <Smartphone size={24} color={theme.colors.primary} />, count: 1250 },
-    { id: 'vehicles', label: 'Vehicles', icon: <Car size={24} color={theme.colors.primary} />, count: 890 },
-    { id: 'home', label: 'Home & Garden', icon: <HomeIcon size={24} color={theme.colors.primary} />, count: 650 },
-    { id: 'fashion', label: 'Fashion', icon: <Shirt size={24} color={theme.colors.primary} />, count: 2100 },
-    { id: 'books', label: 'Books & Media', icon: <Book size={24} color={theme.colors.primary} />, count: 340 },
-    { id: 'sports', label: 'Sports', icon: <Dumbbell size={24} color={theme.colors.primary} />, count: 180 },
-    { id: 'services', label: 'Services', icon: <Briefcase size={24} color={theme.colors.primary} />, count: 420 },
-    { id: 'other', label: 'Other', icon: <MoreHorizontal size={24} color={theme.colors.primary} />, count: 95 },
+    { 
+      id: 'all', 
+      label: 'All', 
+      icon: <Grid3X3 size={24} color={theme.colors.primary} />, 
+      count: categoryCounts.total || 0
+    },
+    { 
+      id: 'electronics', 
+      label: 'Electronics', 
+      icon: <Smartphone size={24} color={theme.colors.primary} />, 
+      count: categoryCounts.electronics || 0 
+    },
+    { 
+      id: 'vehicles', 
+      label: 'Vehicles', 
+      icon: <Car size={24} color={theme.colors.primary} />, 
+      count: categoryCounts.vehicles || 0 
+    },
+    { 
+      id: 'home', 
+      label: 'Home & Garden', 
+      icon: <HomeIcon size={24} color={theme.colors.primary} />, 
+      count: categoryCounts.home || 0 
+    },
+    { 
+      id: 'fashion', 
+      label: 'Fashion', 
+      icon: <Shirt size={24} color={theme.colors.primary} />, 
+      count: categoryCounts.fashion || 0 
+    },
+    { 
+      id: 'books', 
+      label: 'Books & Media', 
+      icon: <Book size={24} color={theme.colors.primary} />, 
+      count: categoryCounts.books || 0 
+    },
+    { 
+      id: 'sports', 
+      label: 'Sports', 
+      icon: <Dumbbell size={24} color={theme.colors.primary} />, 
+      count: categoryCounts.sports || 0 
+    },
+    { 
+      id: 'services', 
+      label: 'Services', 
+      icon: <Briefcase size={24} color={theme.colors.primary} />, 
+      count: categoryCounts.services || 0 
+    },
+    { 
+      id: 'other', 
+      label: 'Other', 
+      icon: <MoreHorizontal size={24} color={theme.colors.primary} />, 
+      count: categoryCounts.other || 0 
+    },
   ];
+
+  // Use real listings from database (after categoryIdMap is available)
+  const selectedCategoryId = selectedCategories.length > 0 && selectedCategories[0] !== 'all' 
+    ? categoryIdMap[selectedCategories[0]] // Use category ID instead of slug
+    : undefined;
+
+  const { 
+    listings: products, 
+    loading, 
+    error, 
+    refreshing, 
+    refresh 
+  } = useListings({
+    search: searchQuery,
+    category: selectedCategoryId,
+    location: filters.location || currentLocation,
+    priceMin: filters.priceRange.min,
+    priceMax: filters.priceRange.max,
+    condition: filters.condition,
+  });
+
+  // Debug logging
+  useEffect(() => {
+    console.log('Home screen - Selected categories:', selectedCategories);
+    console.log('Home screen - Category ID map:', categoryIdMap);
+    console.log('Home screen - Selected category ID:', selectedCategoryId);
+    console.log('Home screen - Products count:', products.length);
+    console.log('Home screen - Loading:', loading);
+    console.log('Home screen - Error:', error);
+  }, [selectedCategories, categoryIdMap, selectedCategoryId, products.length, loading, error]);
 
   // Transform database listings to component format with full-bleed styling
   const transformedProducts = products.map((listing: any) => {
@@ -168,11 +328,18 @@ export default function HomeScreen() {
   });
 
   const handleCategoryToggle = (categoryId: string) => {
-    const isSelected = selectedCategories.includes(categoryId);
-    if (isSelected) {
-      setSelectedCategories(selectedCategories.filter(id => id !== categoryId));
+    if (categoryId === 'all') {
+      // If "All" is selected, clear all categories
+      setSelectedCategories([]);
     } else {
-      setSelectedCategories([...selectedCategories, categoryId]);
+      const isSelected = selectedCategories.includes(categoryId);
+      if (isSelected) {
+        // Remove the category
+        setSelectedCategories(selectedCategories.filter(id => id !== categoryId));
+      } else {
+        // Replace current selection with new category (single selection mode)
+        setSelectedCategories([categoryId]);
+      }
     }
   };
 
@@ -346,25 +513,150 @@ export default function HomeScreen() {
           placeholder="Search for anything..."
         />
 
-        {/* Categories */}
-        <View style={{ paddingVertical: theme.spacing.md }}>
+        {/* Enhanced Categories with Icons and Scroll Indicator */}
+        <View style={{ paddingVertical: theme.spacing.md, position: 'relative' }}>
+          {/* Professional Scroll Indicator - Top Right */}
+          {categoryContentWidth > categoryScrollViewWidth && (
+            <View
+              style={{
+                position: 'absolute',
+                top: theme.spacing.sm,
+                right: theme.spacing.lg,
+                width: screenWidth / 3, // 1/3 of screen width
+                height: 3,
+                backgroundColor: theme.colors.border,
+                borderRadius: 1.5,
+                overflow: 'hidden',
+                zIndex: 10,
+              }}
+            >
+              <View
+                style={{
+                  height: '100%',
+                  backgroundColor: theme.colors.primary,
+                  borderRadius: 1.5,
+                  width: `${Math.min(100, (categoryScrollViewWidth / categoryContentWidth) * 100)}%`,
+                  transform: [
+                    {
+                      translateX: (categoryScrollX / (categoryContentWidth - categoryScrollViewWidth)) * 
+                        ((screenWidth / 3) - ((screenWidth / 3) * (categoryScrollViewWidth / categoryContentWidth))),
+                    },
+                  ],
+                }}
+              />
+            </View>
+          )}
+          
           <ScrollView
+            ref={categoryScrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
+            onScroll={(event) => {
+              setCategoryScrollX(event.nativeEvent.contentOffset.x);
+            }}
+            onContentSizeChange={(width) => {
+              setCategoryContentWidth(width);
+            }}
+            onLayout={(event) => {
+              setCategoryScrollViewWidth(event.nativeEvent.layout.width);
+            }}
+            scrollEventThrottle={16}
             contentContainerStyle={{
               paddingHorizontal: theme.spacing.lg,
-              gap: theme.spacing.md,
+              gap: theme.spacing.sm,
+              alignItems: 'center',
+              paddingTop: theme.spacing.md, // Add top padding to account for indicator
             }}
           >
-            {categories.map((category) => (
-              <Chip
-                key={category.id}
-                text={category.label}
-                variant="filter"
-                selected={selectedCategories.includes(category.id)}
-                onPress={() => handleCategoryToggle(category.id)}
-              />
-            ))}
+            {categories.map((category) => {
+              const isSelected = category.id === 'all' 
+                ? selectedCategories.length === 0 
+                : selectedCategories.includes(category.id);
+              return (
+                <TouchableOpacity
+                  key={category.id}
+                  onPress={() => handleCategoryToggle(category.id)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: theme.spacing.lg,
+                    paddingVertical: theme.spacing.md,
+                    borderRadius: 25, // Pill shape
+                    backgroundColor: isSelected 
+                      ? theme.colors.primary 
+                      : theme.colors.surface,
+                    borderWidth: 1,
+                    borderColor: isSelected 
+                      ? theme.colors.primary 
+                      : theme.colors.border,
+                    gap: theme.spacing.sm,
+                    minHeight: 48,
+                    ...theme.shadows.sm,
+                  }}
+                  activeOpacity={0.7}
+                >
+                  {/* Category Icon */}
+                  <View style={{ 
+                    width: 24, 
+                    height: 24, 
+                    justifyContent: 'center', 
+                    alignItems: 'center' 
+                  }}>
+                    {React.cloneElement(category.icon as React.ReactElement, {
+                      size: 20,
+                      color: isSelected 
+                        ? theme.colors.primaryForeground 
+                        : theme.colors.primary,
+                    } as any)}
+                  </View>
+                  
+                  {/* Category Label */}
+                  <Text
+                    variant="body"
+                    style={{
+                      color: isSelected 
+                        ? theme.colors.primaryForeground 
+                        : theme.colors.text.primary,
+                      fontWeight: isSelected ? '600' : '500',
+                      fontSize: 14,
+                    }}
+                  >
+                    {category.label}
+                  </Text>
+                  
+                  {/* Category Count Badge */}
+                  <View
+                    style={{
+                      backgroundColor: isSelected 
+                        ? theme.colors.primaryForeground + '20' 
+                        : theme.colors.primary + '10',
+                      borderRadius: 12,
+                      paddingHorizontal: theme.spacing.sm,
+                      paddingVertical: 2,
+                      minWidth: 24,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text
+                      variant="caption"
+                      style={{
+                        color: isSelected 
+                          ? theme.colors.primaryForeground 
+                          : theme.colors.primary,
+                        fontSize: 11,
+                        fontWeight: '600',
+                      }}
+                    >
+                      {categoryCountsLoading 
+                        ? '...' 
+                        : category.count > 999 
+                          ? `${Math.floor(category.count / 1000)}k` 
+                          : category.count}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
 
@@ -421,171 +713,23 @@ export default function HomeScreen() {
                 />
               }
             >
-              {/* Custom Grid for Full-Bleed Cards */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  flexWrap: 'wrap',
-                  paddingHorizontal: theme.spacing.md, // Minimal edge margin
-                }}
-              >
-                {transformedProducts.map((product, index) => {
-                  const cardWidth = (screenWidth - (theme.spacing.md * 4)) / 2; // Account for edge margins and gap
-                  
-                  return (
-                    <View
-                      key={product.id}
-                      style={{
-                        width: cardWidth,
-                        marginRight: index % 2 === 0 ? theme.spacing.md : 0,
-                        marginBottom: theme.spacing.md,
-                      }}
-                    >
-                      <TouchableOpacity
-                        onPress={() => router.push(`/(tabs)/home/${product.id}`)}
-                        style={{
-                          backgroundColor: theme.colors.surface,
-                          borderRadius: theme.borderRadius.lg,
-                          overflow: 'hidden',
-                          ...theme.shadows.md,
-                          position: 'relative',
-                        }}
-                        activeOpacity={0.95}
-                      >
-                        {/* Boost Indicator */}
-                        {product.isBoosted && (
-                          <View
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              right: 0,
-                              height: 3,
-                              backgroundColor: theme.colors.warning,
-                              zIndex: 10,
-                            }}
-                          />
-                        )}
-
-                        {/* Image */}
-                        <View style={{ position: 'relative' }}>
-                          <Image
-                            source={{ uri: product.image }}
-                            style={{
-                              width: '100%',
-                              height: 140,
-                              backgroundColor: theme.colors.surfaceVariant,
-                            }}
-                            resizeMode="cover"
-                          />
-                          
-                          {/* Badge Overlay */}
-                          {product.badge && (
-                            <View style={{
-                              position: 'absolute',
-                              top: theme.spacing.sm,
-                              left: theme.spacing.sm,
-                            }}>
-                              <Badge 
-                                variant={product.badge.variant} 
-                                text={product.badge.text} 
-                                size="sm"
-                              />
-                            </View>
-                          )}
-
-                          {/* Boost Badge */}
-                          {product.isBoosted && (
-                            <View style={{
-                              position: 'absolute',
-                              top: theme.spacing.sm,
-                              right: theme.spacing.sm,
-                            }}>
-                              <View
-                                style={{
-                                  backgroundColor: theme.colors.warning,
-                                  borderRadius: theme.borderRadius.sm,
-                                  paddingHorizontal: theme.spacing.sm,
-                                  paddingVertical: theme.spacing.xs,
-                                  flexDirection: 'row',
-                                  alignItems: 'center',
-                                  gap: theme.spacing.xs,
-                                }}
-                              >
-                                <Zap size={12} color={theme.colors.warningForeground} />
-                                <Text
-                                  variant="caption"
-                                  style={{
-                                    color: theme.colors.warningForeground,
-                                    fontSize: 10,
-                                    fontWeight: '600',
-                                  }}
-                                >
-                                  BOOSTED
-                                </Text>
-                              </View>
-                            </View>
-                          )}
-                        </View>
-
-                        {/* Content */}
-                        <View style={{ padding: theme.spacing.md }}>
-                          <Text 
-                            variant="body" 
-                            numberOfLines={2}
-                            style={{ 
-                              marginBottom: theme.spacing.sm,
-                              fontSize: 14,
-                              fontWeight: '600',
-                              lineHeight: 18,
-                            }}
-                          >
-                            {product.title}
-                          </Text>
-
-                          <PriceDisplay 
-                            amount={product.price} 
-                            currency="GHS"
-                            size="md"
-                            style={{ marginBottom: theme.spacing.sm }}
-                          />
-
-                          {/* Seller Info with User Badges */}
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, marginBottom: theme.spacing.sm }}>
-                            <Text 
-                              variant="caption" 
-                              color="secondary" 
-                              numberOfLines={1}
-                              style={{ flex: 1 }}
-                            >
-                              {product.seller.name}
-                            </Text>
-                            
-                            {product.seller.id && (
-                              <CompactUserBadges userId={product.seller.id} maxBadges={1} />
-                            )}
-                          </View>
-
-                          {/* Stats */}
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Text variant="caption" color="muted">
-                              👁️ {product.views}
-                            </Text>
-                            <Text variant="caption" color="muted">
-                              ❤️ {product.favorites}
-                            </Text>
-                            {product.seller.rating > 0 && (
-                              <Text variant="caption" color="muted">
-                                ⭐ {product.seller.rating.toFixed(1)}
-                              </Text>
-                            )}
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    </View>
-                  );
-                })}
-              </View>
+              {/* Full-Width ProductCard Grid */}
+              <Grid columns={2} spacing={4}>
+                {transformedProducts.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    image={product.image}
+                    title={product.title}
+                    price={product.price}
+                    seller={product.seller}
+                    badge={product.badge}
+                    location={product.location}
+                    layout="grid"
+                    fullWidth={true}
+                    onPress={() => router.push(`/(tabs)/home/${product.id}`)}
+                  />
+                ))}
+              </Grid>
             </ScrollView>
           )}
         </View>

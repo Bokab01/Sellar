@@ -2,9 +2,13 @@
  * Comprehensive validation utilities for forms
  */
 
+import { sanitizeInput, validateUserContent, ContentModerator, checkPasswordStrength } from './security';
+
 export interface ValidationResult {
   isValid: boolean;
   error?: string;
+  sanitizedValue?: string;
+  warnings?: string[];
 }
 
 /**
@@ -100,33 +104,50 @@ export function validateEmail(email: string): ValidationResult {
 }
 
 /**
- * Password validation
+ * Enhanced password validation with security checks
  */
 export function validatePassword(password: string): ValidationResult {
   if (!password) {
     return { isValid: false, error: 'Password is required' };
   }
 
-  if (password.length < 6) {
+  // Sanitize password input
+  const sanitizedPassword = sanitizeInput(password);
+  
+  if (sanitizedPassword.length < 6) {
     return { isValid: false, error: 'Password must be at least 6 characters' };
   }
 
-  if (password.length > 128) {
+  if (sanitizedPassword.length > 128) {
     return { isValid: false, error: 'Password is too long' };
   }
 
-  // Check for at least one letter and one number for stronger passwords
-  const hasLetter = /[a-zA-Z]/.test(password);
-  const hasNumber = /\d/.test(password);
+  // Use advanced password strength checking
+  const strengthCheck = checkPasswordStrength(sanitizedPassword);
+  const warnings: string[] = [];
   
-  if (!hasLetter || !hasNumber) {
+  if (!strengthCheck.isStrong) {
+    warnings.push(...strengthCheck.feedback);
+  }
+
+  // Check for common weak passwords
+  const commonPasswords = [
+    'password', '123456', 'password123', 'admin', 'qwerty',
+    'letmein', 'welcome', 'monkey', '1234567890'
+  ];
+  
+  if (commonPasswords.includes(sanitizedPassword.toLowerCase())) {
     return { 
-      isValid: true, // Still valid but with suggestion
-      error: 'Consider adding both letters and numbers for a stronger password'
+      isValid: false, 
+      error: 'This password is too common. Please choose a more secure password.' 
     };
   }
 
-  return { isValid: true };
+  return { 
+    isValid: true, 
+    sanitizedValue: sanitizedPassword,
+    warnings: warnings.length > 0 ? warnings : undefined
+  };
 }
 
 /**
@@ -232,6 +253,127 @@ export function validateSignUpForm(data: {
     isValid: Object.keys(errors).length === 0,
     errors,
   };
+}
+
+/**
+ * Validate and sanitize text content (posts, comments, messages)
+ */
+export function validateTextContent(
+  content: string, 
+  options: {
+    maxLength?: number;
+    minLength?: number;
+    fieldName?: string;
+    allowHtml?: boolean;
+    checkProfanity?: boolean;
+    checkSpam?: boolean;
+  } = {}
+): ValidationResult {
+  const {
+    maxLength = 2000,
+    minLength = 1,
+    fieldName = 'Content',
+    allowHtml = false,
+    checkProfanity = true,
+    checkSpam = true
+  } = options;
+
+  // Use security validation
+  const securityValidation = validateUserContent(content, {
+    maxLength,
+    minLength,
+    allowHtml,
+    fieldName
+  });
+
+  if (!securityValidation.isValid) {
+    return {
+      isValid: false,
+      error: securityValidation.errors[0],
+      warnings: securityValidation.warnings
+    };
+  }
+
+  const warnings: string[] = [...(securityValidation.warnings || [])];
+
+  // Content moderation checks
+  if (checkProfanity || checkSpam) {
+    const moderationResult = ContentModerator.moderateContent(content);
+    
+    if (!moderationResult.isAppropriate) {
+      return {
+        isValid: false,
+        error: `${fieldName} contains inappropriate content: ${moderationResult.issues.join(', ')}`,
+        warnings: moderationResult.suggestions
+      };
+    }
+    
+    if (moderationResult.suggestions.length > 0) {
+      warnings.push(...moderationResult.suggestions);
+    }
+  }
+
+  return {
+    isValid: true,
+    sanitizedValue: securityValidation.sanitizedValue,
+    warnings: warnings.length > 0 ? warnings : undefined
+  };
+}
+
+/**
+ * Validate listing title with security checks
+ */
+export function validateListingTitle(title: string): ValidationResult {
+  return validateTextContent(title, {
+    minLength: 10,
+    maxLength: 100,
+    fieldName: 'Title',
+    allowHtml: false,
+    checkProfanity: true,
+    checkSpam: true
+  });
+}
+
+/**
+ * Validate listing description with security checks
+ */
+export function validateListingDescription(description: string): ValidationResult {
+  return validateTextContent(description, {
+    minLength: 20,
+    maxLength: 2000,
+    fieldName: 'Description',
+    allowHtml: false,
+    checkProfanity: true,
+    checkSpam: true
+  });
+}
+
+/**
+ * Validate chat message content
+ */
+export function validateChatMessage(message: string): ValidationResult {
+  return validateTextContent(message, {
+    minLength: 1,
+    maxLength: 1000,
+    fieldName: 'Message',
+    allowHtml: false,
+    checkProfanity: true,
+    checkSpam: false // Less strict for private messages
+  });
+}
+
+/**
+ * Validate post content for community
+ */
+export function validatePostContent(content: string): ValidationResult {
+  return validateTextContent(content, {
+    minLength: 10,
+    maxLength: 5000,
+    fieldName: 'Post content',
+    allowHtml: true, // Allow basic HTML formatting
+    checkProfanity: true,
+    checkSpam: true
+  });
 }
 
 

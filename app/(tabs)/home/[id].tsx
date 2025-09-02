@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, Image, TouchableOpacity, Alert, Linking, Dimensions } from 'react-native';
+import { View, ScrollView, Image, TouchableOpacity, Alert, Linking, Dimensions, StatusBar } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -23,7 +23,7 @@ import {
   Grid,
   ProductCard,
 } from '@/components';
-import { Heart, Share, MessageCircle, Phone, Flag, Eye, PhoneCall, DollarSign } from 'lucide-react-native';
+import { Heart, Share, MessageCircle, Phone, Flag, Eye, PhoneCall, DollarSign, ArrowLeft } from 'lucide-react-native';
 import { Package } from 'lucide-react-native';
 
 export default function ListingDetailScreen() {
@@ -35,6 +35,8 @@ export default function ListingDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const imageScrollViewRef = React.useRef<ScrollView>(null);
   
   // Contact modals
   const [showContactModal, setShowContactModal] = useState(false);
@@ -143,8 +145,8 @@ export default function ListingDetailScreen() {
 
         // Get profile and category data separately
         const [profileResult, categoryResult] = await Promise.all([
-          supabase.from('profiles').select('id, first_name, last_name, avatar_url, rating, total_sales, total_reviews, is_verified, is_online, last_seen, response_time, location, phone').eq('id', listingData.user_id).single(),
-          supabase.from('categories').select('name, icon').eq('id', listingData.category_id).single()
+          supabase.from('profiles').select('id, first_name, last_name, avatar_url, rating, total_sales, total_reviews, is_verified, is_online, last_seen, response_time, location, phone').eq('id', (listingData as any).user_id).single(),
+          supabase.from('categories').select('name, icon').eq('id', (listingData as any).category_id).single()
         ]);
 
         // Combine the data
@@ -230,10 +232,10 @@ export default function ListingDetailScreen() {
         .insert({
           listing_id: listingId!,
           user_id: user?.id,
-        });
+        } as any);
 
       // Increment counter
-      await supabase.rpc('increment_listing_views', { listing_id: listingId });
+      await supabase.rpc('increment_listing_views', { listing_id: listingId } as any);
     } catch (err) {
       // Silent fail for analytics
     }
@@ -276,7 +278,7 @@ export default function ListingDetailScreen() {
           .order('created_at', { ascending: false })
           .limit(8);
         
-        sellerData = basicSellerData?.map(item => ({
+        sellerData = (basicSellerData as any[])?.map(item => ({
           ...item,
           profiles: listing.profiles // Use the main listing's profile data
         })) || [];
@@ -342,7 +344,7 @@ export default function ListingDetailScreen() {
           .order('created_at', { ascending: false })
           .limit(8);
         
-        similarData = basicSimilarData?.map(item => ({
+        similarData = (basicSimilarData as any[])?.map(item => ({
           ...item,
           profiles: null // We don't have profile data for similar items in fallback
         })) || [];
@@ -395,7 +397,7 @@ export default function ListingDetailScreen() {
           .insert({
             user_id: user.id,
             listing_id: listingId!,
-          });
+          } as any);
         
         setIsFavorited(true);
         showSuccessToast('Added to favorites');
@@ -426,7 +428,7 @@ export default function ListingDetailScreen() {
         .or(`and(participant_1.eq.${user.id},participant_2.eq.${listing.user_id}),and(participant_1.eq.${listing.user_id},participant_2.eq.${user.id})`)
         .maybeSingle();
 
-      let conversationId = existingConv?.id;
+      let conversationId = (existingConv as any)?.id;
 
       if (!conversationId) {
         // Create new conversation
@@ -436,12 +438,12 @@ export default function ListingDetailScreen() {
             listing_id: listingId!,
             participant_1: user.id,
             participant_2: listing.user_id,
-          })
+          } as any)
           .select('id')
           .single();
 
         if (convError) throw convError;
-        conversationId = newConv.id;
+        conversationId = (newConv as any).id;
       }
 
       // Send message
@@ -451,7 +453,7 @@ export default function ListingDetailScreen() {
           conversation_id: conversationId,
           sender_id: user.id,
           content: messageText.trim(),
-        });
+        } as any);
 
       if (messageError) throw messageError;
 
@@ -539,7 +541,7 @@ export default function ListingDetailScreen() {
         .or(`and(participant_1.eq.${user.id},participant_2.eq.${listing.user_id}),and(participant_1.eq.${listing.user_id},participant_2.eq.${user.id})`)
         .maybeSingle();
 
-      let conversationId = existingConv?.id;
+      let conversationId = (existingConv as any)?.id;
 
       if (!conversationId) {
         // Create new conversation
@@ -549,12 +551,12 @@ export default function ListingDetailScreen() {
             listing_id: listingId!,
             participant_1: user.id,
             participant_2: listing.user_id,
-          })
+          } as any)
           .select('id')
           .single();
 
         if (convError) throw convError;
-        conversationId = newConv.id;
+        conversationId = (newConv as any).id;
       }
 
       // Create offer message first
@@ -567,7 +569,7 @@ export default function ListingDetailScreen() {
           sender_id: user.id,
           content: offerContent,
           message_type: 'offer',
-        })
+        } as any)
         .select('id')
         .single();
 
@@ -577,7 +579,7 @@ export default function ListingDetailScreen() {
       const { error: offerError } = await dbHelpers.createOffer({
         listing_id: listingId!,
         conversation_id: conversationId,
-        message_id: message.id,
+        message_id: (message as any).id,
         buyer_id: user.id,
         seller_id: listing.user_id,
         amount,
@@ -674,57 +676,195 @@ export default function ListingDetailScreen() {
 
   const isOwnListing = user?.id === listing.user_id;
   const canMakeOffer = listing.accept_offers && !isOwnListing && !pendingOffer;
+  const screenHeight = Dimensions.get('window').height;
+  const screenWidth = Dimensions.get('window').width;
+  const imageHeight = screenHeight * 0.6; // More than half of screen
 
   return (
-    <SafeAreaWrapper>
-      <AppHeader
-        title="Product Details"
-        showBackButton
-        onBackPress={() => router.back()}
-        rightActions={[
-          <Button
-            variant="icon"
-            icon={<Heart size={20} color={isFavorited ? theme.colors.error : theme.colors.text.primary} fill={isFavorited ? theme.colors.error : 'none'} />}
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      
+      {/* Fixed Header Overlay */}
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          paddingTop: StatusBar.currentHeight || 44,
+          paddingHorizontal: theme.spacing.lg,
+          paddingBottom: theme.spacing.md,
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          zIndex: 1000,
+        }}
+      >
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 4,
+            elevation: 5,
+          }}
+        >
+          <ArrowLeft size={20} color="white" />
+        </TouchableOpacity>
+
+        <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+          <TouchableOpacity
             onPress={toggleFavorite}
-          />,
-          <Button
-            variant="icon"
-            icon={<Share size={20} color={theme.colors.text.primary} />}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              justifyContent: 'center',
+              alignItems: 'center',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 4,
+              elevation: 5,
+            }}
+          >
+            <Heart 
+              size={20} 
+              color={isFavorited ? theme.colors.error : "white"} 
+              fill={isFavorited ? theme.colors.error : 'none'} 
+            />
+          </TouchableOpacity>
+          
+          <TouchableOpacity
             onPress={() => {
-              // TODO: Implement sharing
               Alert.alert('Coming Soon', 'Sharing feature will be available soon');
             }}
-          />,
-        ]}
-      />
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              justifyContent: 'center',
+              alignItems: 'center',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 4,
+              elevation: 5,
+            }}
+          >
+            <Share size={20} color="white" />
+          </TouchableOpacity>
+        </View>
+      </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: theme.spacing.xl }}>
-        {/* Images */}
-        <View style={{ marginBottom: theme.spacing.lg }}>
+      <ScrollView 
+        style={{ flex: 1 }} 
+        contentContainerStyle={{ paddingBottom: 120 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero Image Section */}
+        <View style={{ position: 'relative', height: imageHeight }}>
           {listing.images && listing.images.length > 0 ? (
-            <ScrollView
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-            >
-              {listing.images.map((imageUrl: string, index: number) => (
-                <Image
-                  key={index}
-                  source={{ uri: imageUrl }}
+            <>
+              <ScrollView
+                ref={imageScrollViewRef}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onMomentumScrollEnd={(event) => {
+                  const index = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
+                  setCurrentImageIndex(index);
+                }}
+              >
+                {listing.images.map((imageUrl: string, index: number) => (
+                  <Image
+                    key={index}
+                    source={{ uri: imageUrl }}
+                    style={{
+                      width: screenWidth,
+                      height: imageHeight,
+                      backgroundColor: theme.colors.surfaceVariant,
+                    }}
+                    resizeMode="cover"
+                  />
+                ))}
+              </ScrollView>
+              
+              {/* Image Thumbnails */}
+              {listing.images.length > 1 && (
+                <View
                   style={{
-                    width: Dimensions.get('window').width,
-                    height: 300,
-                    backgroundColor: theme.colors.surfaceVariant,
+                    position: 'absolute',
+                    bottom: theme.spacing.lg,
+                    left: theme.spacing.lg,
+                    right: theme.spacing.lg,
+                    flexDirection: 'row',
+                    gap: theme.spacing.sm,
                   }}
-                  resizeMode="cover"
-                />
-              ))}
-            </ScrollView>
+                >
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    {listing.images.map((imageUrl: string, index: number) => (
+                      <TouchableOpacity
+                        key={index}
+                        onPress={() => {
+                          setCurrentImageIndex(index);
+                          // Scroll main image to selected thumbnail
+                          imageScrollViewRef.current?.scrollTo({ x: index * screenWidth, animated: true });
+                        }}
+                        style={{
+                          width: 60,
+                          height: 60,
+                          borderRadius: theme.borderRadius.md,
+                          overflow: 'hidden',
+                          borderWidth: currentImageIndex === index ? 2 : 0,
+                          borderColor: theme.colors.primary,
+                          opacity: currentImageIndex === index ? 1 : 0.7,
+                        }}
+                      >
+                        <Image
+                          source={{ uri: imageUrl }}
+                          style={{ width: '100%', height: '100%' }}
+                          resizeMode="cover"
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* Image Counter */}
+              {listing.images.length > 1 && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: StatusBar.currentHeight ? StatusBar.currentHeight + 60 : 104,
+                    right: theme.spacing.lg,
+                    backgroundColor: 'rgba(0,0,0,0.6)',
+                    paddingHorizontal: theme.spacing.md,
+                    paddingVertical: theme.spacing.sm,
+                    borderRadius: theme.borderRadius.full,
+                  }}
+                >
+                  <Text variant="caption" style={{ color: 'white', fontWeight: '500' }}>
+                    {currentImageIndex + 1} / {listing.images.length}
+                  </Text>
+                </View>
+              )}
+            </>
           ) : (
             <View
               style={{
                 width: '100%',
-                height: 300,
+                height: imageHeight,
                 backgroundColor: theme.colors.surfaceVariant,
                 justifyContent: 'center',
                 alignItems: 'center',
@@ -736,10 +876,65 @@ export default function ListingDetailScreen() {
             </View>
           )}
         </View>
+        {/* Seller Profile - Moved to top */}
+        {listing.profiles && (
+          <View style={{ 
+            backgroundColor: theme.colors.surface,
+            paddingHorizontal: theme.spacing.lg,
+            paddingVertical: theme.spacing.lg,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.colors.border,
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+              <Avatar
+                name={`${listing.profiles.first_name} ${listing.profiles.last_name}`}
+                source={listing.profiles.avatar_url}
+                size="lg"
+              />
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+                  <Text variant="h4" style={{ fontWeight: '600' }}>
+                    {listing.profiles.first_name} {listing.profiles.last_name}
+                  </Text>
+                  {listing.profiles.is_verified && (
+                    <Badge text="Verified" variant="success" size="sm" />
+                  )}
+                </View>
+                <Text variant="bodySmall" color="secondary" style={{ marginTop: theme.spacing.xs }}>
+                  ⭐ {listing.profiles.rating?.toFixed(1) || '0.0'} ({listing.profiles.total_reviews || 0} reviews)
+                </Text>
+                <Text variant="bodySmall" color="secondary" style={{ marginTop: theme.spacing.xs }}>
+                  📍 {listing.profiles.location}
+                </Text>
+              </View>
+              
+              {/* Call Seller Button */}
+              {!isOwnListing && listing.profiles?.phone && (
+                <TouchableOpacity
+                  onPress={handleCall}
+                  style={{
+                    backgroundColor: theme.colors.primary,
+                    paddingHorizontal: theme.spacing.lg,
+                    paddingVertical: theme.spacing.md,
+                    borderRadius: theme.borderRadius.md,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: theme.spacing.sm,
+                  }}
+                >
+                  <Phone size={16} color={theme.colors.primaryForeground} />
+                  <Text variant="button" style={{ color: theme.colors.primaryForeground }}>
+                    Call seller
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
 
         <View style={{ paddingHorizontal: theme.spacing.lg }}>
           {/* Title and Price */}
-          <View style={{ marginBottom: theme.spacing.lg }}>
+          <View style={{ marginTop: theme.spacing.lg, marginBottom: theme.spacing.lg }}>
             <Text variant="h2" style={{ marginBottom: theme.spacing.md }}>
               {listing.title}
             </Text>
@@ -800,34 +995,6 @@ export default function ListingDetailScreen() {
               📍 {listing.location}
             </Text>
           </View>
-
-          {/* Seller Profile */}
-          {listing.profiles && (
-            <View style={{ marginBottom: theme.spacing.xl }}>
-              <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
-                Seller Information
-              </Text>
-              <UserProfile
-                user={{
-                  id: listing.profiles.id,
-                  name: `${listing.profiles.first_name} ${listing.profiles.last_name}`,
-                  avatar: listing.profiles.avatar_url,
-                  rating: listing.profiles.rating,
-                  reviewCount: listing.profiles.total_reviews,
-                  location: listing.profiles.location,
-                  isVerified: listing.profiles.is_verified,
-                  isOnline: listing.profiles.is_online,
-                  responseTime: listing.profiles.response_time,
-                  totalSales: listing.profiles.total_sales,
-                }}
-                variant="full"
-                showActions={!isOwnListing}
-                onMessage={() => setShowContactModal(true)}
-                onCall={handleCall}
-                onViewProfile={() => router.push(`/(tabs)/profile/${listing.profiles.id}`)}
-              />
-            </View>
-          )}
 
           {/* Stats */}
           <View
@@ -930,8 +1097,8 @@ export default function ListingDetailScreen() {
             {activeRelatedTab === 'seller' ? (
               <View>
                 {sellerListingsLoading ? (
-                  <View style={{ paddingHorizontal: theme.spacing.lg }}>
-                    <Grid columns={2}>
+                  <View>
+                    <Grid columns={2} spacing={4}>
                       {Array.from({ length: 4 }).map((_, index) => (
                         <LoadingSkeleton
                           key={index}
@@ -943,8 +1110,8 @@ export default function ListingDetailScreen() {
                     </Grid>
                   </View>
                 ) : sellerListings.length > 0 ? (
-                  <View style={{ paddingHorizontal: theme.spacing.lg }}>
-                    <Grid columns={2}>
+                  <View>
+                    <Grid columns={2} spacing={4}>
                       {sellerListings.slice(0, 6).map((item) => (
                         <ProductCard
                           key={item.id}
@@ -955,6 +1122,7 @@ export default function ListingDetailScreen() {
                           badge={item.badge}
                           location={item.location}
                           layout="grid"
+                          fullWidth={true}
                           onPress={() => router.push(`/(tabs)/home/${item.id}`)}
                         />
                       ))}
@@ -984,8 +1152,8 @@ export default function ListingDetailScreen() {
             ) : (
               <View>
                 {similarListingsLoading ? (
-                  <View style={{ paddingHorizontal: theme.spacing.lg }}>
-                    <Grid columns={2}>
+                  <View>
+                    <Grid columns={2} spacing={4}>
                       {Array.from({ length: 4 }).map((_, index) => (
                         <LoadingSkeleton
                           key={index}
@@ -997,8 +1165,8 @@ export default function ListingDetailScreen() {
                     </Grid>
                   </View>
                 ) : similarListings.length > 0 ? (
-                  <View style={{ paddingHorizontal: theme.spacing.lg }}>
-                    <Grid columns={2}>
+                  <View>
+                    <Grid columns={2} spacing={4}>
                       {similarListings.slice(0, 6).map((item) => (
                         <ProductCard
                           key={item.id}
@@ -1009,6 +1177,7 @@ export default function ListingDetailScreen() {
                           badge={item.badge}
                           location={item.location}
                           layout="grid"
+                          fullWidth={true}
                           onPress={() => router.push(`/(tabs)/home/${item.id}`)}
                         />
                       ))}
@@ -1043,74 +1212,89 @@ export default function ListingDetailScreen() {
         </View>
       </ScrollView>
 
-      {/* Bottom Actions */}
+      {/* Bottom Tab Actions */}
       {!isOwnListing && (
         <View
           style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
             backgroundColor: theme.colors.surface,
             borderTopWidth: 1,
             borderTopColor: theme.colors.border,
-            padding: theme.spacing.lg,
+            paddingHorizontal: theme.spacing.lg,
+            paddingVertical: theme.spacing.lg,
+            paddingBottom: theme.spacing.lg + (StatusBar.currentHeight ? 0 : 20),
             ...theme.shadows.lg,
           }}
         >
-          <View style={{ gap: theme.spacing.md }}>
-            {/* Primary Actions Row */}
-            <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
-              <Button
-                variant="primary"
-                icon={<MessageCircle size={18} color={theme.colors.primaryForeground} />}
-                onPress={() => setShowContactModal(true)}
-                style={{ flex: 1 }}
+          <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
+            {/* Make an Offer Button */}
+            {canMakeOffer ? (
+              <TouchableOpacity
+                onPress={() => setShowOfferModal(true)}
+                style={{
+                  flex: 1,
+                  backgroundColor: theme.colors.surface,
+                  borderWidth: 1,
+                  borderColor: theme.colors.primary,
+                  borderRadius: theme.borderRadius.md,
+                  paddingVertical: theme.spacing.lg,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: theme.spacing.sm,
+                }}
               >
-                Message
-              </Button>
-              
-              {canMakeOffer && (
-                <Button
-                  variant="secondary"
-                  icon={<DollarSign size={18} color={theme.colors.primary} />}
-                  onPress={() => setShowOfferModal(true)}
-                  style={{ flex: 1 }}
-                >
-                  Make Offer
-                </Button>
-              )}
-
-              {!canMakeOffer && listing.accept_offers && pendingOffer && (
-                <Button
-                  variant="tertiary"
-                  disabled
-                  style={{ flex: 1 }}
-                >
+                <DollarSign size={20} color={theme.colors.primary} />
+                <Text variant="button" style={{ color: theme.colors.primary, fontWeight: '600' }}>
+                  Make an offer
+                </Text>
+              </TouchableOpacity>
+            ) : pendingOffer ? (
+              <TouchableOpacity
+                disabled
+                style={{
+                  flex: 1,
+                  backgroundColor: theme.colors.surfaceVariant,
+                  borderWidth: 1,
+                  borderColor: theme.colors.border,
+                  borderRadius: theme.borderRadius.md,
+                  paddingVertical: theme.spacing.lg,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: theme.spacing.sm,
+                  opacity: 0.6,
+                }}
+              >
+                <DollarSign size={20} color={theme.colors.text.muted} />
+                <Text variant="button" style={{ color: theme.colors.text.muted, fontWeight: '600' }}>
                   Offer Pending
-                </Button>
-              )}
-            </View>
+                </Text>
+              </TouchableOpacity>
+            ) : null}
 
-            {/* Secondary Actions Row */}
-            <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
-              {listing.profiles?.phone && (
-                <Button
-                  variant="tertiary"
-                  icon={<Phone size={18} color={theme.colors.primary} />}
-                  onPress={handleCall}
-                  style={{ flex: 1 }}
-                >
-                  Call Now
-                </Button>
-              )}
-
-              <Button
-                variant={callbackRequested ? "tertiary" : "ghost"}
-                icon={<PhoneCall size={18} color={callbackRequested ? theme.colors.text.muted : theme.colors.primary} />}
-                onPress={callbackRequested ? undefined : () => setShowCallbackModal(true)}
-                disabled={callbackRequested}
-                style={{ flex: 1 }}
-              >
-                {callbackRequested ? 'Callback Requested' : 'Request Callback'}
-              </Button>
-            </View>
+            {/* Message Seller Button */}
+            <TouchableOpacity
+              onPress={() => setShowContactModal(true)}
+              style={{
+                flex: 1,
+                backgroundColor: theme.colors.primary,
+                borderRadius: theme.borderRadius.md,
+                paddingVertical: theme.spacing.lg,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: theme.spacing.sm,
+              }}
+            >
+              <MessageCircle size={20} color={theme.colors.primaryForeground} />
+              <Text variant="button" style={{ color: theme.colors.primaryForeground, fontWeight: '600' }}>
+                Message seller
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -1140,7 +1324,6 @@ export default function ListingDetailScreen() {
             placeholder="Hi! I'm interested in your listing..."
             value={messageText}
             onChangeText={setMessageText}
-            style={{ minHeight: 100 }}
           />
         </View>
       </AppModal>
@@ -1282,6 +1465,6 @@ export default function ListingDetailScreen() {
         variant={toastVariant}
         onHide={() => setShowToast(false)}
       />
-    </SafeAreaWrapper>
+    </View>
   );
 }
