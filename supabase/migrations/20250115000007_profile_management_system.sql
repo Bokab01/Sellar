@@ -200,6 +200,29 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'profiles' AND column_name = 'last_profile_update') THEN
         ALTER TABLE profiles ADD COLUMN last_profile_update TIMESTAMPTZ DEFAULT now();
     END IF;
+    
+    -- Verification Level (if not already exists from core schema)
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'profiles' AND column_name = 'verification_level') THEN
+        ALTER TABLE profiles ADD COLUMN verification_level TEXT DEFAULT 'none' CHECK (verification_level IN ('none', 'phone', 'email', 'identity', 'business'));
+    END IF;
+    
+    -- Account Status (if not already exists from core schema)
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'profiles' AND column_name = 'is_active') THEN
+        ALTER TABLE profiles ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'profiles' AND column_name = 'is_suspended') THEN
+        ALTER TABLE profiles ADD COLUMN is_suspended BOOLEAN DEFAULT FALSE;
+    END IF;
+    
+    -- Business Display Preferences
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'profiles' AND column_name = 'display_business_name') THEN
+        ALTER TABLE profiles ADD COLUMN display_business_name BOOLEAN DEFAULT FALSE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'profiles' AND column_name = 'business_name_priority') THEN
+        ALTER TABLE profiles ADD COLUMN business_name_priority TEXT DEFAULT 'secondary' CHECK (business_name_priority IN ('primary', 'secondary', 'hidden'));
+    END IF;
 END $$;
 
 -- =============================================
@@ -246,6 +269,9 @@ ALTER TABLE social_media_links ENABLE ROW LEVEL SECURITY;
 -- RLS POLICIES - BUSINESS CATEGORIES
 -- =============================================
 
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Anyone can view active business categories" ON business_categories;
+
 -- Anyone can view active business categories
 CREATE POLICY "Anyone can view active business categories" ON business_categories
     FOR SELECT USING (is_active = true);
@@ -253,6 +279,10 @@ CREATE POLICY "Anyone can view active business categories" ON business_categorie
 -- =============================================
 -- RLS POLICIES - PROFILE ACTIVITY LOG
 -- =============================================
+
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Users can view own activity log" ON profile_activity_log;
+DROP POLICY IF EXISTS "System can insert activity logs" ON profile_activity_log;
 
 -- Users can view their own activity log
 CREATE POLICY "Users can view own activity log" ON profile_activity_log
@@ -265,6 +295,10 @@ CREATE POLICY "System can insert activity logs" ON profile_activity_log
 -- =============================================
 -- RLS POLICIES - BUSINESS HOURS
 -- =============================================
+
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Anyone can view business hours" ON business_hours;
+DROP POLICY IF EXISTS "Users can manage own business hours" ON business_hours;
 
 -- Anyone can view business hours for active businesses
 CREATE POLICY "Anyone can view business hours" ON business_hours
@@ -285,6 +319,10 @@ CREATE POLICY "Users can manage own business hours" ON business_hours
 -- =============================================
 -- RLS POLICIES - SOCIAL MEDIA LINKS
 -- =============================================
+
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Anyone can view social media links" ON social_media_links;
+DROP POLICY IF EXISTS "Users can manage own social media links" ON social_media_links;
 
 -- Anyone can view active social media links
 CREATE POLICY "Anyone can view social media links" ON social_media_links
@@ -308,17 +346,20 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Apply triggers to relevant tables
+-- Apply triggers to relevant tables (drop existing first for idempotency)
+DROP TRIGGER IF EXISTS update_business_categories_updated_at ON business_categories;
 CREATE TRIGGER update_business_categories_updated_at
     BEFORE UPDATE ON business_categories
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_business_hours_updated_at ON business_hours;
 CREATE TRIGGER update_business_hours_updated_at
     BEFORE UPDATE ON business_hours
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_social_media_links_updated_at ON social_media_links;
 CREATE TRIGGER update_social_media_links_updated_at
     BEFORE UPDATE ON social_media_links
     FOR EACH ROW

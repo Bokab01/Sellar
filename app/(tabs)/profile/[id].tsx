@@ -26,6 +26,7 @@ import {
   Grid,
   Chip,
   FullUserBadges,
+  UserDisplayName,
 } from '@/components';
 import { 
   MessageCircle, 
@@ -515,12 +516,13 @@ export default function UserProfileScreen() {
 
             <View style={{ alignItems: 'center', marginBottom: theme.spacing.lg }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, marginBottom: theme.spacing.sm }}>
-                <Text variant="h2" style={{ fontWeight: '600' }}>
-                  {fullName}
-                </Text>
-                {profile.is_verified && (
-                  <Badge text="Verified" variant="success" />
-                )}
+                <UserDisplayName
+                  profile={profile}
+                  variant="full"
+                  showBadge={true}
+                  textVariant="h2"
+                  style={{ fontWeight: '600' }}
+                />
               </View>
 
               {/* User Badges */}

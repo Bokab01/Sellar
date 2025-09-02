@@ -32,6 +32,11 @@ export { ReviewSummary, CompactReviewSummary } from './ReviewSummary/ReviewSumma
 export { SupportTicketCard } from './SupportTicketCard/SupportTicketCard';
 export { CreateTicketModal } from './CreateTicketModal/CreateTicketModal';
 export { KnowledgeBaseCard } from './KnowledgeBaseCard/KnowledgeBaseCard';
+
+// Profile Management Components
+export { ProfileEditModal } from './ProfileEditModal/ProfileEditModal';
+export { BusinessProfileSetupModal } from './BusinessProfileSetupModal/BusinessProfileSetupModal';
+export { UserDisplayName, useUserDisplayText } from './UserDisplayName/UserDisplayName';
 export { PostCard } from './PostCard/PostCard';
 export { CommentCard } from './CommentCard/CommentCard';
 

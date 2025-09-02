@@ -8,6 +8,7 @@ import { Avatar } from '@/components/Avatar/Avatar';
 import { Button } from '@/components/Button/Button';
 import { AppModal } from '@/components/Modal/Modal';
 import { Input } from '@/components/Input/Input';
+import { UserDisplayName } from '@/components/UserDisplayName/UserDisplayName';
 import { 
   Heart, 
   MessageCircle, 
@@ -28,6 +29,7 @@ interface PostCardProps {
       avatar?: string;
       rating?: number;
       isVerified?: boolean;
+      profile?: any; // Full profile object for display name logic
     };
     timestamp: string;
     content: string;
@@ -159,14 +161,13 @@ export function PostCard({
               onPress={() => router.push(`/(tabs)/profile/${post.author.id}`)}
               activeOpacity={0.7}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-                <Text variant="body" style={{ fontWeight: '600' }}>
-                  {post.author.name}
-                </Text>
-                {post.author.isVerified && (
-                  <Text style={{ color: theme.colors.primary }}>✓</Text>
-                )}
-              </View>
+              <UserDisplayName
+                profile={post.author.profile}
+                variant="full"
+                showBadge={true}
+                textVariant="body"
+                style={{ fontWeight: '600' }}
+              />
             </TouchableOpacity>
             
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
@@ -364,7 +365,7 @@ export function PostCard({
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
                 <UserMinus size={20} color={theme.colors.text.primary} />
-                <Text variant="body">Follow {post.author.name}</Text>
+                <Text variant="body">Follow {post.author.profile?.display_business_name && post.author.profile?.business_name ? post.author.profile.business_name : post.author.name}</Text>
               </View>
             </Button>
           )}

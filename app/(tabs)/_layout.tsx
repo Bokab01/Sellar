@@ -159,6 +159,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="edit-profile"
+        options={{
+          href: null, // Hide from tab bar
+        }}
+      />
+      <Tabs.Screen
         name="invite"
         options={{
           href: null, // Hide from tab bar

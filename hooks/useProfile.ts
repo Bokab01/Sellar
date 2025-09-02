@@ -58,6 +58,10 @@ export interface UserProfile {
   profile_completion_percentage?: number;
   last_profile_update?: string;
   
+  // Business Display Settings
+  display_business_name?: boolean;
+  business_name_priority?: 'primary' | 'secondary' | 'hidden';
+  
   // Timestamps
   created_at: string;
   updated_at: string;

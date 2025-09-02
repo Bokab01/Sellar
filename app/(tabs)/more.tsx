@@ -36,7 +36,8 @@ import {
   Heart,
   FileText,
   Award,
-  Smartphone
+  Smartphone,
+  Edit3
 } from 'lucide-react-native';
 
 export default function MoreScreen() {
@@ -151,9 +152,15 @@ export default function MoreScreen() {
       items: [
         {
           title: 'My Profile',
-          subtitle: 'View and edit your profile information',
+          subtitle: 'View your public profile',
           icon: <User size={20} color={theme.colors.text.primary} />,
           onPress: () => router.push(`/(tabs)/profile/${user?.id}`),
+        },
+        {
+          title: 'Edit Profile',
+          subtitle: 'Update your profile and business information',
+          icon: <Edit3 size={20} color={theme.colors.text.primary} />,
+          onPress: () => router.push('/(tabs)/edit-profile'),
         },
         {
           title: 'Wallet & Credit',
