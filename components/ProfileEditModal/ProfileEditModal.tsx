@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { Text, Input, Button, AppModal, ImagePicker } from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { Input } from '@/components/Input/Input';
+import { Button } from '@/components/Button/Button';
+import { AppModal } from '@/components/Modal/Modal';
+import { CustomImagePicker as ImagePicker } from '@/components/ImagePicker';
 import { Picker } from '@react-native-picker/picker';
 import { useProfile, useUpdateProfile, UserProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/hooks/useAuth';

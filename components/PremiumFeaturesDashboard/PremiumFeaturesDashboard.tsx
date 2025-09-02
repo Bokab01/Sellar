@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { Text, LoadingSkeleton, Button, Badge, ListItem } from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
+import { Button } from '@/components/Button/Button';
+import { Badge } from '@/components/Badge/Badge';
+import { ListItem } from '@/components/ListItem/ListItem';
 import { 
   Crown, 
   Star, 

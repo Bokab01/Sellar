@@ -2,18 +2,15 @@ import React, { useState } from 'react';
 import { View, ScrollView, RefreshControl } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { router } from 'expo-router';
-import {
-  Text,
-  SafeAreaWrapper,
-  AppHeader,
-  Container,
-  Button,
-  ListItem,
-  Badge,
-  ProfileEditModal,
-  BusinessProfileSetupModal,
-  LoadingSkeleton,
-} from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { SafeAreaWrapper, Container } from '@/components/Layout';
+import { AppHeader } from '@/components/AppHeader/AppHeader';
+import { Button } from '@/components/Button/Button';
+import { ListItem } from '@/components/ListItem/ListItem';
+import { Badge } from '@/components/Badge/Badge';
+import { ProfileEditModal } from '@/components/ProfileEditModal/ProfileEditModal';
+import { BusinessProfileSetupModal } from '@/components/BusinessProfileSetupModal/BusinessProfileSetupModal';
+import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
 import { 
   User, 
   Building, 
