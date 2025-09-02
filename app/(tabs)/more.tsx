@@ -37,13 +37,14 @@ import {
   FileText,
   Award,
   Smartphone,
-  Edit3
+  Edit3,
+  BarChart3
 } from 'lucide-react-native';
 
 export default function MoreScreen() {
   const { theme } = useTheme();
   const { user, signOut } = useAuthStore();
-  const { balance, currentPlan, refreshCredits, refreshSubscription } = useMonetizationStore();
+  const { balance, currentPlan, refreshCredits, refreshSubscription, hasBusinessPlan } = useMonetizationStore();
   
   const [profile, setProfile] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -181,6 +182,13 @@ export default function MoreScreen() {
           icon: <Building size={20} color={theme.colors.primary} />,
           badge: currentPlan ? { text: 'Active', variant: 'success' as const } : undefined,
           onPress: () => router.push('/(tabs)/subscription-plans'),
+        },
+        {
+          title: 'Dashboard',
+          subtitle: hasBusinessPlan() ? 'Business analytics and management' : 'Unlock with business plan',
+          icon: <BarChart3 size={20} color={theme.colors.primary} />,
+          badge: hasBusinessPlan() ? { text: 'Business', variant: 'success' as const } : undefined,
+          onPress: () => router.push('/(tabs)/dashboard'),
         },
         {
           title: 'Feature Marketplace',

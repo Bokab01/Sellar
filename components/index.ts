@@ -37,6 +37,12 @@ export { KnowledgeBaseCard } from './KnowledgeBaseCard/KnowledgeBaseCard';
 export { ProfileEditModal } from './ProfileEditModal/ProfileEditModal';
 export { BusinessProfileSetupModal } from './BusinessProfileSetupModal/BusinessProfileSetupModal';
 export { UserDisplayName, useUserDisplayText } from './UserDisplayName/UserDisplayName';
+
+// Business Dashboard Components
+export { AnalyticsDashboard } from './AnalyticsDashboard/AnalyticsDashboard';
+export { AutoBoostDashboard } from './AutoBoostDashboard/AutoBoostDashboard';
+export { PrioritySupportDashboard } from './PrioritySupportDashboard/PrioritySupportDashboard';
+export { PremiumFeaturesDashboard } from './PremiumFeaturesDashboard/PremiumFeaturesDashboard';
 export { PostCard } from './PostCard/PostCard';
 export { CommentCard } from './CommentCard/CommentCard';
 
