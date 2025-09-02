@@ -20,6 +20,7 @@ import {
   LoadingSkeleton,
   Toast,
   Grid,
+  FeatureActivationModal,
 } from '@/components';
 import { Zap, Package, ShoppingCart, Eye, Target, Settings, Building } from 'lucide-react-native';
 
@@ -36,10 +37,9 @@ export default function FeatureMarketplaceScreen() {
   const { listings: userListings } = useListings({ userId: 'current' }); // TODO: Pass actual user ID
   
   const [selectedCategory, setSelectedCategory] = useState<string>('visibility');
-  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [showActivationModal, setShowActivationModal] = useState(false);
   const [selectedFeature, setSelectedFeature] = useState<any>(null);
   const [selectedListing, setSelectedListing] = useState<string | null>(null);
-  const [purchasing, setPurchasing] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
@@ -74,15 +74,20 @@ export default function FeatureMarketplaceScreen() {
 
     setSelectedFeature({ key: featureKey, ...feature });
     
-    // For listing-specific features, show listing picker
-    if (['pulse_boost_24h', 'mega_pulse_7d', 'category_spotlight_3d', 'ad_refresh'].includes(featureKey)) {
+    // For listing-specific features, check if user has listings
+    if (['pulse_boost_24h', 'mega_pulse_7d', 'category_spotlight_3d', 'ad_refresh', 'auto_refresh_30d', 'direct_whatsapp'].includes(featureKey)) {
       if (userListings.length === 0) {
         Alert.alert('No Listings', 'You need to create a listing first to use this feature.');
         return;
       }
+      
+      // For now, use the first listing (in a real app, you'd show a picker)
+      setSelectedListing(userListings[0]?.id || null);
+    } else {
+      setSelectedListing(null);
     }
     
-    setShowPurchaseModal(true);
+    setShowActivationModal(true);
   };
 
   const handleConfirmPurchase = async () => {
@@ -364,22 +369,35 @@ export default function FeatureMarketplaceScreen() {
         </ScrollView>
       </View>
 
-      {/* Purchase Modal */}
-      <AppModal
-        visible={showPurchaseModal}
-        onClose={() => setShowPurchaseModal(false)}
-        title={`Purchase ${selectedFeature?.name}`}
-        primaryAction={{
-          text: `Unlock with ${selectedFeature?.credits} credits`,
-          onPress: handleConfirmPurchase,
-          loading: purchasing,
+      {/* Feature Activation Modal */}
+      <FeatureActivationModal
+        visible={showActivationModal}
+        onClose={() => {
+          setShowActivationModal(false);
+          setSelectedFeature(null);
+          setSelectedListing(null);
         }}
-        secondaryAction={{
-          text: 'Cancel',
-          onPress: () => setShowPurchaseModal(false),
+        featureKey={selectedFeature?.key || ''}
+        listingId={selectedListing || undefined}
+        listingTitle={userListings.find(l => l.id === selectedListing)?.title}
+        onSuccess={() => {
+          setToastMessage(`${selectedFeature?.name} activated successfully!`);
+          setToastVariant('success');
+          setShowToast(true);
+          refreshCredits();
         }}
-      >
-        {selectedFeature && (
+      />
+
+      {/* Toast */}
+      <Toast
+        visible={showToast}
+        message={toastMessage}
+        variant={toastVariant}
+        onHide={() => setShowToast(false)}
+      />
+    </SafeAreaWrapper>
+  );
+}
           <View style={{ gap: theme.spacing.lg }}>
             <View
               style={{

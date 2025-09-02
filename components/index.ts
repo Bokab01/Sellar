@@ -91,3 +91,7 @@ export {
 // Payment Components
 export { PaymentModal, formatAmount, validateMobileMoneyNumber } from './PaymentModal/PaymentModal';
 export type { PaymentRequest } from './PaymentModal/PaymentModal';
+
+// Feature & Subscription Components
+export { UserBadges, CompactUserBadges, FullUserBadges, BadgeChecker } from './UserBadges/UserBadges';
+export { FeatureActivationModal } from './FeatureActivationModal/FeatureActivationModal';
