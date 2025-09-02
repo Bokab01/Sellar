@@ -1,0 +1,5 @@
+---
+description: Always use custom components in the apps design system
+globs:
+alwaysApply: true
+---

@@ -16,7 +16,7 @@ import {
   LoadingSkeleton,
   Toast,
 } from '@/components';
-import { Bell, MessageCircle, DollarSign, Heart, MessageSquare, UserPlus, Star, Package, CircleAlert as AlertCircle, CircleCheck as CheckCircle2, Trash2 } from 'lucide-react-native';
+import { Bell, MessageCircle, DollarSign, Heart, MessageSquare, UserPlus2, Star, Package, CircleAlert as AlertCircle, CircleCheck as CheckCircle2, Trash2 } from 'lucide-react-native';
 
 export default function NotificationsScreen() {
   const { theme } = useTheme();
@@ -57,7 +57,7 @@ export default function NotificationsScreen() {
       case 'comment':
         return <MessageSquare size={20} color={theme.colors.primary} />;
       case 'follow':
-        return <UserPlus size={20} color={theme.colors.primary} />;
+        return <UserPlus2 size={20} color={theme.colors.primary} />;
       case 'review':
         return <Star size={20} color={theme.colors.warning} />;
       case 'listing':
@@ -183,6 +183,7 @@ export default function NotificationsScreen() {
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
                 tintColor={theme.colors.primary}
+                colors={[theme.colors.primary]}
               />
             }
           >

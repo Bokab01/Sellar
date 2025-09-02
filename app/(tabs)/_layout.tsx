@@ -37,6 +37,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="home"
+        options={{
+          href: null, // Hide from tab bar - this is for the nested stack
+        }}
+      />
+      <Tabs.Screen
         name="inbox"
         options={{
           title: 'Inbox',
@@ -144,6 +150,12 @@ export default function TabLayout() {
         name="invite"
         options={{
           href: null, // Hide from tab bar
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          href: null, // Hide from tab bar - this is for the nested stack
         }}
       />
     </Tabs>

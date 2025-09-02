@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { CREDIT_PACKAGES } from '@/constants/monetization';
 import { router } from 'expo-router';
@@ -15,11 +16,14 @@ import {
   LoadingSkeleton,
   Toast,
   LinearProgress,
+  PaymentModal,
 } from '@/components';
+import type { PaymentRequest } from '@/components';
 import { Zap, Star, Crown, Building, CreditCard, Smartphone } from 'lucide-react-native';
 
 export default function BuyCreditsScreen() {
   const { theme } = useTheme();
+  const { user } = useAuthStore();
   const { 
     balance, 
     loading, 
@@ -32,6 +36,8 @@ export default function BuyCreditsScreen() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentRequest, setPaymentRequest] = useState<PaymentRequest | null>(null);
 
   useEffect(() => {
     refreshCredits();
@@ -52,34 +58,57 @@ export default function BuyCreditsScreen() {
     setSelectedPackage(packageId);
 
     try {
-      const result = await purchaseCredits(packageId);
-      
-      if (result.success && result.paymentUrl) {
-        // TODO: Open payment URL in WebView or external browser
-        // For now, show success message
-        setToastMessage('Redirecting to payment...');
-        setToastVariant('success');
-        setShowToast(true);
-        
-        // Simulate payment completion for demo
-        setTimeout(() => {
-          setToastMessage('Payment completed! Credits added to your account.');
-          setShowToast(true);
-          refreshCredits();
-        }, 3000);
-      } else {
-        setToastMessage(result.error || 'Failed to initialize payment');
-        setToastVariant('error');
-        setShowToast(true);
+      // Find the selected package
+      const selectedPkg = CREDIT_PACKAGES.find(pkg => pkg.id === packageId);
+      if (!selectedPkg) {
+        throw new Error('Package not found');
       }
+
+      // Create payment request
+      const request: PaymentRequest = {
+        amount: selectedPkg.priceGHS,
+        email: user?.email || 'user@example.com',
+        purpose: 'credit_purchase',
+        purpose_id: packageId,
+        metadata: {
+          package_id: packageId,
+          credits: selectedPkg.credits,
+          package_name: selectedPkg.name,
+        },
+      };
+
+      setPaymentRequest(request);
+      setShowPaymentModal(true);
     } catch (error: any) {
-      setToastMessage('Failed to purchase credits');
+      setToastMessage('Failed to initialize payment');
       setToastVariant('error');
       setShowToast(true);
     } finally {
       setPurchasing(false);
       setSelectedPackage(null);
     }
+  };
+
+  const handlePaymentSuccess = (reference: string) => {
+    setToastMessage('Payment successful! Credits will be added to your account shortly.');
+    setToastVariant('success');
+    setShowToast(true);
+    
+    // Refresh credits after a short delay to allow webhook processing
+    setTimeout(() => {
+      refreshCredits();
+    }, 2000);
+  };
+
+  const handlePaymentError = (error: string) => {
+    setToastMessage(error || 'Payment failed. Please try again.');
+    setToastVariant('error');
+    setShowToast(true);
+  };
+
+  const handlePaymentClose = () => {
+    setShowPaymentModal(false);
+    setPaymentRequest(null);
   };
 
   if (loading) {
@@ -355,6 +384,15 @@ export default function BuyCreditsScreen() {
           </View>
         </Container>
       </ScrollView>
+
+      {/* Payment Modal */}
+      <PaymentModal
+        visible={showPaymentModal}
+        onClose={handlePaymentClose}
+        paymentRequest={paymentRequest}
+        onSuccess={handlePaymentSuccess}
+        onError={handlePaymentError}
+      />
 
       {/* Toast */}
       <Toast

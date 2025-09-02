@@ -15,7 +15,7 @@ import {
   Toast,
 } from '@/components';
 import { 
-  UserPlus, 
+  UserPlus2, 
   Share2, 
   MessageCircle, 
   Copy, 

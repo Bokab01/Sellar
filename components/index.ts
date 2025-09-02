@@ -7,6 +7,7 @@ export { Container, SafeAreaWrapper, SafeAreaContainer } from './Layout';
 // Form Components
 export { Button } from './Button/Button';
 export { Input } from './Input/Input';
+export { MultiStepForm, useMultiStepForm } from './MultiStepForm/MultiStepForm';
 
 // Marketplace Components
 export { ProductCard } from './Card/Card';
@@ -34,6 +35,7 @@ export { LoadingSkeleton, ProductCardSkeleton, ChatListSkeleton } from './Loadin
 export { EmptyState } from './EmptyState/EmptyState';
 export { ErrorState } from './ErrorState/ErrorState';
 export { LinearProgress, CircularProgress } from './ProgressIndicator/ProgressIndicator';
+export { StepIndicator } from './StepIndicator/StepIndicator';
 
 // Image Picker
 export { CustomImagePicker } from './ImagePicker';
@@ -54,6 +56,8 @@ export { FilterSheet } from './FilterSheet/FilterSheet';
 
 // Categories & Location
 export { CategoryCard } from './CategoryCard/CategoryCard';
+export { CategoryPicker } from './CategoryPicker/CategoryPicker';
+export { CategoryAttributes } from './CategoryAttributes/CategoryAttributes';
 export { LocationPicker } from './LocationPicker/LocationPicker';
 
 // Product Management
@@ -62,7 +66,28 @@ export { OfferCard } from './OfferCard/OfferCard';
 
 // User Components
 export { UserProfile } from './UserProfile/UserProfile';
+
+
+
 export { MessageInput } from './MessageInput/MessageInput';
 
 // Monetization Components
 export { BusinessBadge } from './BusinessBadge/BusinessBadge';
+
+// Community Components
+export { CommunitySidebar } from './CommunitySidebar/CommunitySidebar';
+export { SidebarToggle } from './SidebarToggle/SidebarToggle';
+
+// Keyboard Avoiding Components
+export { 
+  CustomKeyboardAvoidingView, 
+  KeyboardAwareScrollView, 
+  KeyboardAwareTextInput,
+  HybridKeyboardAvoidingView,
+  useKeyboardState,
+  useInputFocus 
+} from './KeyboardAvoiding';
+
+// Payment Components
+export { PaymentModal, formatAmount, validateMobileMoneyNumber } from './PaymentModal/PaymentModal';
+export type { PaymentRequest } from './PaymentModal/PaymentModal';

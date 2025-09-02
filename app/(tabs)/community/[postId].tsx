@@ -12,6 +12,7 @@ import {
   CommentCard,
   Input,
   Button,
+  Avatar,
   EmptyState,
   ErrorState,
   LoadingSkeleton,
@@ -56,7 +57,7 @@ export default function PostDetailScreen() {
             rating,
             is_verified
           ),
-          listings (
+          listings:listing_id (
             id,
             title,
             price,

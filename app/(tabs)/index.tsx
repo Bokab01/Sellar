@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl, Image, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useAppStore } from '@/store/useAppStore';
 import { useListings } from '@/hooks/useListings';
 import { useNotifications } from '@/hooks/useNotifications';
-import { dbHelpers } from '@/lib/supabase';
+import { dbHelpers, supabase } from '@/lib/supabase';
 import {
   Text,
-  SafeAreaWrapper,
   ProductCard,
   SearchBar,
   CategoryCard,
@@ -20,6 +20,8 @@ import {
   EmptyState,
   LoadingSkeleton,
   BusinessBadge,
+  PriceDisplay,
+  Badge,
 } from '@/components';
 import { 
   Bell, 
@@ -43,6 +45,7 @@ const { width: screenWidth } = Dimensions.get('window');
 export default function HomeScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
+  const insets = useSafeAreaInsets();
   const { 
     currentLocation, 
     setCurrentLocation,
@@ -65,7 +68,7 @@ export default function HomeScreen() {
   } = useListings({
     search: searchQuery,
     category: selectedCategories[0], // Use first selected category
-    location: filters.location,
+    location: filters.location || currentLocation,
     priceMin: filters.priceRange.min,
     priceMax: filters.priceRange.max,
     condition: filters.condition,
@@ -74,8 +77,44 @@ export default function HomeScreen() {
   // Get notifications for badge
   const { unreadCount } = useNotifications();
 
-  // Mock user credit for demo - TODO: Get from monetization store
-  const userCredit = 125.50;
+  // Real user credit from database
+  const [userCredit, setUserCredit] = useState<number>(0);
+  const [creditLoading, setCreditLoading] = useState(true);
+
+  // Fetch user credit balance
+  useEffect(() => {
+    const fetchUserCredit = async () => {
+      if (!user?.id) {
+        setCreditLoading(false);
+        return;
+      }
+
+      try {
+        setCreditLoading(true);
+        
+        // Try to get user credits from the user_credits table
+        const { data: creditData, error: creditError } = await supabase
+          .from('user_credits')
+          .select('balance')
+          .eq('user_id', user.id)
+          .single();
+
+        if (creditError) {
+          console.log('Error fetching user credits:', creditError.message);
+          setUserCredit(0);
+        } else {
+          setUserCredit((creditData as any)?.balance || 0);
+        }
+      } catch (err) {
+        console.log('Failed to fetch user credits:', err);
+        setUserCredit(0);
+      } finally {
+        setCreditLoading(false);
+      }
+    };
+
+    fetchUserCredit();
+  }, [user?.id]);
 
   const categories = [
     { id: 'electronics', label: 'Electronics', icon: <Smartphone size={24} color={theme.colors.primary} />, count: 1250 },
@@ -138,19 +177,24 @@ export default function HomeScreen() {
   const firstName = user?.user_metadata?.first_name || 'User';
 
   return (
-    <SafeAreaWrapper>
-      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-        {/* Header */}
-        <View
-          style={{
-            backgroundColor: theme.colors.surface,
-            paddingHorizontal: theme.spacing.lg,
-            paddingVertical: theme.spacing.md,
-            borderBottomWidth: 1,
-            borderBottomColor: theme.colors.border,
-            ...theme.shadows.sm,
-          }}
-        >
+    <View style={{ 
+      flex: 1, 
+      backgroundColor: theme.colors.background,
+      paddingTop: insets.top,
+      paddingLeft: insets.left,
+      paddingRight: insets.right,
+    }}>
+      {/* Header */}
+      <View
+        style={{
+          backgroundColor: theme.colors.surface,
+          paddingHorizontal: theme.spacing.lg,
+          paddingVertical: theme.spacing.md,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.colors.border,
+          ...theme.shadows.sm,
+        }}
+      >
           {/* Top Row - Profile & Actions */}
           <View
             style={{
@@ -160,117 +204,135 @@ export default function HomeScreen() {
               marginBottom: theme.spacing.md,
             }}
           >
-            {/* Profile Card */}
+            {/* Compact Profile Section */}
             <TouchableOpacity
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                flex: 1,
+                flex: 0.85,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                borderRadius: theme.borderRadius.xl,
+                padding: theme.spacing.xs,
+                backgroundColor: theme.colors.primary + '10',
               }}
               onPress={() => {
-                if (user?.id) {
-                  router.push(`/(tabs)/profile/${user.id}`);
-                }
+                router.push('/(tabs)/wallet');
               }}
               activeOpacity={0.7}
             >
               <Avatar
                 source={user?.user_metadata?.avatar_url}
                 name={`${firstName} ${user?.user_metadata?.last_name || ''}`}
-                size="md"
-                style={{ marginRight: theme.spacing.md }}
+                size="sm"
+                style={{ marginRight: theme.spacing.sm }}
               />
               <View style={{ flex: 1 }}>
-                <Text variant="body" style={{ fontWeight: '600' }}>
-                  Hey, {firstName} 👋
+                <Text variant="body" style={{ fontWeight: '600', marginBottom: 2 }}>
+                  Hey, <Text variant='body' style={{ fontWeight: '600' }}>{firstName}</Text>
                 </Text>
-                <TouchableOpacity
-                  onPress={() => router.push('/(tabs)/wallet')}
-                  activeOpacity={0.7}
-                >
-                  <Text variant="bodySmall" style={{ color: theme.colors.primary }}>
-                    Credit: GHS {userCredit.toFixed(2)}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+                  <Text variant="caption" color="muted" style={{ fontSize: 12 }}>
+                    Welcome back
                   </Text>
-                </TouchableOpacity>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: theme.colors.primary + '10',
+                      borderRadius: theme.borderRadius.md,
+                      paddingHorizontal: theme.spacing.sm,
+                      paddingVertical: 1,
+                    }}
+                  >
+                    <Zap size={10} color={theme.colors.primary} style={{ marginRight: 2 }} />
+                    <Text style={{ 
+                      color: theme.colors.primary, 
+                      fontSize: 10, 
+                      fontWeight: '700' 
+                    }}>
+                      {creditLoading ? '...' : `${Math.floor(userCredit)}`}
+                    </Text>
+                  </View>
+                </View>
               </View>
               <ChevronDown size={16} color={theme.colors.text.muted} />
             </TouchableOpacity>
 
-            {/* Action Buttons */}
-            <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
-              <Button
-                variant="icon"
-                icon={
-                  <View style={{ position: 'relative' }}>
-                    <Bell size={20} color={theme.colors.text.primary} />
-                    {unreadCount > 0 && (
-                      <View
-                        style={{
-                          position: 'absolute',
-                          top: -4,
-                          right: -4,
-                          backgroundColor: theme.colors.error,
-                          borderRadius: 8,
-                          minWidth: 16,
-                          height: 16,
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          paddingHorizontal: 4,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: theme.colors.errorForeground,
-                            fontSize: 10,
-                            fontWeight: '600',
-                          }}
-                        >
-                          {unreadCount > 99 ? '99+' : unreadCount}
-                        </Text>
-                      </View>
-                    )}
+            {/* Compact Action Buttons */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+              {/* Notifications */}
+              <TouchableOpacity
+                style={{
+                  position: 'relative',
+                  padding: theme.spacing.xs,
+                }}
+                onPress={() => router.push('/(tabs)/notifications')}
+                activeOpacity={0.7}
+              >
+                <Bell size={20} color={theme.colors.text.primary} />
+                {unreadCount > 0 && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      right: 0,
+                      backgroundColor: theme.colors.error,
+                      borderRadius: 6,
+                      minWidth: 12,
+                      height: 12,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: '#FFF',
+                        fontSize: 8,
+                        fontWeight: '600',
+                      }}
+                    >
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </Text>
                   </View>
-                }
-                onPress={() => {
-                  // TODO: Navigate to notifications screen
-                  Alert.alert('Coming Soon', 'Notifications screen will be available soon');
-                }}
-              />
-              <Button
-                variant="icon"
-                icon={<Heart size={20} color={theme.colors.text.primary} />}
-                onPress={() => {
-                  // TODO: Navigate to favorites screen
-                  Alert.alert('Coming Soon', 'Favorites screen will be available soon');
-                }}
-              />
+                )}
+              </TouchableOpacity>
+
+              {/* Favorites */}
+              <TouchableOpacity
+                style={{ padding: theme.spacing.xs }}
+                onPress={() => router.push('/(tabs)/favorites')}
+                activeOpacity={0.7}
+              >
+                <Heart size={20} color={theme.colors.text.primary} />
+              </TouchableOpacity>
             </View>
           </View>
 
-          {/* Location */}
+          {/* Compact Location Display */}
           <TouchableOpacity
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              paddingVertical: theme.spacing.sm,
+              marginTop: theme.spacing.xs,
             }}
             activeOpacity={0.7}
             onPress={() => {
               Alert.alert('Coming Soon', 'Location picker will be available soon');
             }}
           >
-            <MapPin size={16} color={theme.colors.primary} />
+            <MapPin size={14} color={theme.colors.text.secondary} />
             <Text
-              variant="bodySmall"
+              variant="caption"
               style={{
-                color: theme.colors.primary,
-                marginLeft: theme.spacing.sm,
+                color: theme.colors.text.secondary,
+                marginLeft: theme.spacing.xs,
                 fontWeight: '500',
               }}
             >
-              📍 {currentLocation}
+              {currentLocation}
             </Text>
-            <ChevronDown size={14} color={theme.colors.primary} style={{ marginLeft: theme.spacing.xs }} />
+            <ChevronDown size={12} color={theme.colors.text.secondary} style={{ marginLeft: theme.spacing.xs }} />
           </TouchableOpacity>
         </View>
 
@@ -330,18 +392,30 @@ export default function HomeScreen() {
                 ))}
               </Grid>
             </View>
+          ) : transformedProducts.length === 0 ? (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: theme.spacing.lg }}>
+              <EmptyState
+                title="No listings found"
+                description="There are no active listings at the moment. Try adjusting your search or filters, or check back later."
+                action={{
+                  text: 'Refresh',
+                  onPress: refresh,
+                }}
+              />
+            </View>
           ) : (
             <ScrollView
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{
                 // Full-bleed implementation: no horizontal padding on container
-                paddingBottom: theme.spacing.xl,
+                paddingBottom: Math.max(theme.spacing.xl, insets.bottom + theme.spacing.md),
               }}
               refreshControl={
                 <RefreshControl
                   refreshing={refreshing}
                   onRefresh={refresh}
                   tintColor={theme.colors.primary}
+                  colors={[theme.colors.primary]}
                 />
               }
             >
@@ -527,12 +601,13 @@ export default function HomeScreen() {
             useAppStore.getState().setFilters({
               priceRange: { min: 0, max: 10000 },
               condition: [],
+              categories: [],
+              location: '',
               sortBy: 'Newest First',
             });
             setSelectedCategories([]);
           }}
         />
       </View>
-    </SafeAreaWrapper>
   );
 }

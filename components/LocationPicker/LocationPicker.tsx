@@ -4,7 +4,9 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { AppModal } from '@/components/Modal/Modal';
 import { Input } from '@/components/Input/Input';
-import { MapPin, Search } from 'lucide-react-native';
+import { Button } from '@/components/Button/Button';
+import { MapPin, Search, ChevronRight, ArrowLeft, Plus } from 'lucide-react-native';
+import { GHANA_REGIONS, MAJOR_CITIES } from '@/constants/ghana';
 
 interface LocationPickerProps {
   value?: string;
@@ -12,6 +14,8 @@ interface LocationPickerProps {
   placeholder?: string;
   style?: any;
 }
+
+type SelectionStep = 'region' | 'city' | 'custom';
 
 export function LocationPicker({
   value,
@@ -22,40 +26,44 @@ export function LocationPicker({
   const { theme } = useTheme();
   const [showPicker, setShowPicker] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [currentStep, setCurrentStep] = useState<SelectionStep>('region');
+  const [selectedRegion, setSelectedRegion] = useState<string>('');
+  const [customCity, setCustomCity] = useState('');
+  const [showCustomInput, setShowCustomInput] = useState(false);
 
-  // Ghana regions and major cities
-  const locations = [
-    'Greater Accra Region',
-    'Ashanti Region', 
-    'Western Region',
-    'Central Region',
-    'Eastern Region',
-    'Northern Region',
-    'Upper East Region',
-    'Upper West Region',
-    'Volta Region',
-    'Brong-Ahafo Region',
-    // Major cities
-    'Accra',
-    'Kumasi',
-    'Tamale',
-    'Takoradi',
-    'Cape Coast',
-    'Sunyani',
-    'Koforidua',
-    'Ho',
-    'Wa',
-    'Bolgatanga',
-  ];
-
-  const filteredLocations = locations.filter(location =>
-    location.toLowerCase().includes(searchText.toLowerCase())
-  );
-
-  const handleLocationSelect = (location: string) => {
-    onLocationSelect(location);
-    setShowPicker(false);
+  const resetPicker = () => {
+    setCurrentStep('region');
+    setSelectedRegion('');
+    setCustomCity('');
+    setShowCustomInput(false);
     setSearchText('');
+  };
+
+  const handleRegionSelect = (region: string) => {
+    setSelectedRegion(region);
+    setCurrentStep('city');
+    setSearchText('');
+  };
+
+  const handleCitySelect = (city: string) => {
+    const fullLocation = `${city}, ${selectedRegion}`;
+    onLocationSelect(fullLocation);
+    setShowPicker(false);
+    resetPicker();
+  };
+
+  const handleCustomCitySubmit = () => {
+    if (customCity.trim()) {
+      const fullLocation = `${customCity.trim()}, ${selectedRegion}`;
+      onLocationSelect(fullLocation);
+      setShowPicker(false);
+      resetPicker();
+    }
+  };
+
+  const handleClose = () => {
+    setShowPicker(false);
+    resetPicker();
   };
 
   return (
@@ -94,49 +102,150 @@ export function LocationPicker({
 
       <AppModal
         visible={showPicker}
-        onClose={() => setShowPicker(false)}
-        title="Select Location"
+        onClose={handleClose}
+        title={
+          currentStep === 'region' 
+            ? "Select Region" 
+            : currentStep === 'city'
+            ? `Cities in ${selectedRegion}`
+            : "Add Custom City"
+        }
         size="lg"
       >
         <View style={{ gap: theme.spacing.lg }}>
-          <Input
-            variant="search"
-            placeholder="Search locations..."
-            value={searchText}
-            onChangeText={setSearchText}
-          />
+          {/* Back Button for City/Custom Steps */}
+          {currentStep !== 'region' && (
+            <Button
+              variant="ghost"
+              icon={<ArrowLeft size={16} />}
+              onPress={() => {
+                if (currentStep === 'custom') {
+                  setCurrentStep('city');
+                  setShowCustomInput(false);
+                } else {
+                  setCurrentStep('region');
+                }
+              }}
+              size="sm"
+            >
+              Back
+            </Button>
+          )}
 
-          <ScrollView style={{ maxHeight: 300 }}>
-            <View style={{ gap: theme.spacing.xs }}>
-              {filteredLocations.map((location) => (
-                <TouchableOpacity
-                  key={location}
-                  onPress={() => handleLocationSelect(location)}
-                  style={{
-                    paddingVertical: theme.spacing.md,
-                    paddingHorizontal: theme.spacing.lg,
-                    borderRadius: theme.borderRadius.md,
-                    backgroundColor: value === location 
-                      ? theme.colors.primary + '10' 
-                      : 'transparent',
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    variant="body"
-                    style={{
-                      color: value === location 
-                        ? theme.colors.primary 
-                        : theme.colors.text.primary,
-                      fontWeight: value === location ? '600' : '400',
-                    }}
-                  >
-                    {location}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+          {/* Search Input */}
+          {currentStep !== 'custom' && (
+            <Input
+              placeholder={
+                currentStep === 'region' 
+                  ? "Search regions..." 
+                  : "Search cities..."
+              }
+              value={searchText}
+              onChangeText={setSearchText}
+              leftIcon={<Search size={20} color={theme.colors.text.muted} />}
+            />
+          )}
+
+          {/* Region Selection */}
+          {currentStep === 'region' && (
+            <ScrollView style={{ maxHeight: 400 }}>
+              <View style={{ gap: theme.spacing.xs }}>
+                {GHANA_REGIONS
+                  .filter(region => 
+                    region.toLowerCase().includes(searchText.toLowerCase())
+                  )
+                  .map((region) => (
+                    <TouchableOpacity
+                      key={region}
+                      onPress={() => handleRegionSelect(region)}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingVertical: theme.spacing.md,
+                        paddingHorizontal: theme.spacing.lg,
+                        borderRadius: theme.borderRadius.md,
+                        backgroundColor: 'transparent',
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text variant="body">{region}</Text>
+                      <ChevronRight size={16} color={theme.colors.text.muted} />
+                    </TouchableOpacity>
+                  ))}
+              </View>
+            </ScrollView>
+          )}
+
+          {/* City Selection */}
+          {currentStep === 'city' && (
+            <>
+              <ScrollView style={{ maxHeight: 350 }}>
+                <View style={{ gap: theme.spacing.xs }}>
+                  {MAJOR_CITIES[selectedRegion]
+                    ?.filter(city => 
+                      city.toLowerCase().includes(searchText.toLowerCase())
+                    )
+                    .map((city) => (
+                      <TouchableOpacity
+                        key={city}
+                        onPress={() => handleCitySelect(city)}
+                        style={{
+                          paddingVertical: theme.spacing.md,
+                          paddingHorizontal: theme.spacing.lg,
+                          borderRadius: theme.borderRadius.md,
+                          backgroundColor: 'transparent',
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Text variant="body">{city}</Text>
+                      </TouchableOpacity>
+                    )) || (
+                    <View style={{ padding: theme.spacing.lg, alignItems: 'center' }}>
+                      <Text variant="body" color="muted">
+                        No cities available for this region
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </ScrollView>
+
+              {/* Add Custom City Button */}
+              <Button
+                variant="secondary"
+                icon={<Plus size={16} />}
+                onPress={() => setCurrentStep('custom')}
+                fullWidth
+              >
+                Add Custom City
+              </Button>
+            </>
+          )}
+
+          {/* Custom City Input */}
+          {currentStep === 'custom' && (
+            <View style={{ gap: theme.spacing.lg }}>
+              <Text variant="body" color="secondary">
+                Enter the name of your city in {selectedRegion}:
+              </Text>
+              
+              <Input
+                placeholder="Enter city name"
+                value={customCity}
+                onChangeText={setCustomCity}
+                autoFocus
+              />
+
+              <Button
+                variant="primary"
+                onPress={handleCustomCitySubmit}
+                disabled={!customCity.trim()}
+                fullWidth
+              >
+                Add City
+              </Button>
             </View>
-          </ScrollView>
+          )}
         </View>
       </AppModal>
     </View>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   TextInput,
   TextInputProps,
@@ -10,6 +10,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { Eye, EyeOff, Search } from 'lucide-react-native';
 import { getFontFamily } from '@/theme/fonts';
+import { useInputFocus } from '@/components/KeyboardAvoiding';
 
 type InputVariant = 'default' | 'search' | 'multiline' | 'password';
 type InputState = 'default' | 'focus' | 'error' | 'disabled';
@@ -41,6 +42,8 @@ export function Input({
   const { theme } = useTheme();
   const [isFocused, setIsFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const inputRef = useRef<TextInput>(null);
+  const focusContext = useInputFocus();
   
   const isDisabled = state === 'disabled' || props.editable === false;
   const hasError = state === 'error' || !!error;
@@ -161,6 +164,7 @@ export function Input({
         {renderLeftIcon()}
         
         <TextInput
+          ref={inputRef}
           style={inputStyles}
           placeholderTextColor={theme.colors.text.muted}
           secureTextEntry={variant === 'password' && !showPassword}
@@ -169,10 +173,16 @@ export function Input({
           editable={!isDisabled}
           onFocus={(e) => {
             setIsFocused(true);
+            if (inputRef.current && focusContext) {
+              focusContext.onInputFocus(inputRef.current);
+            }
             props.onFocus?.(e);
           }}
           onBlur={(e) => {
             setIsFocused(false);
+            if (focusContext) {
+              focusContext.onInputBlur();
+            }
             props.onBlur?.(e);
           }}
           {...props}

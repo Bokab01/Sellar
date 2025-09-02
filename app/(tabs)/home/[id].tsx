@@ -20,6 +20,8 @@ import {
   AppModal,
   Input,
   Toast,
+  Grid,
+  ProductCard,
 } from '@/components';
 import { Heart, Share, MessageCircle, Phone, Flag, Eye, PhoneCall, DollarSign } from 'lucide-react-native';
 import { Package } from 'lucide-react-native';
@@ -90,11 +92,12 @@ export default function ListingDetailScreen() {
       setLoading(true);
       setError(null);
 
-      const { data, error: fetchError } = await supabase
+      // First, try the joined query
+      let { data, error: fetchError } = await supabase
         .from('listings')
         .select(`
           *,
-          profiles:user_id (
+          profiles (
             id,
             first_name,
             last_name,
@@ -117,7 +120,42 @@ export default function ListingDetailScreen() {
         .eq('id', listingId)
         .single();
 
-      if (fetchError) {
+      // If the joined query fails due to schema cache issues, fall back to separate queries
+      if (fetchError && fetchError.message.includes('schema cache')) {
+        console.log('🔄 Falling back to separate queries for listing detail');
+        
+        // Get listing without joins
+        const { data: listingData, error: listingError } = await supabase
+          .from('listings')
+          .select('*')
+          .eq('id', listingId)
+          .single();
+
+        if (listingError) {
+          setError(listingError.message);
+          return;
+        }
+
+        if (!listingData) {
+          setError('Listing not found');
+          return;
+        }
+
+        // Get profile and category data separately
+        const [profileResult, categoryResult] = await Promise.all([
+          supabase.from('profiles').select('id, first_name, last_name, avatar_url, rating, total_sales, total_reviews, is_verified, is_online, last_seen, response_time, location, phone').eq('id', listingData.user_id).single(),
+          supabase.from('categories').select('name, icon').eq('id', listingData.category_id).single()
+        ]);
+
+        // Combine the data
+        const combinedData = {
+          ...listingData,
+          profiles: profileResult.data || null,
+          categories: categoryResult.data || null
+        };
+
+        setListing(combinedData);
+      } else if (fetchError) {
         setError(fetchError.message);
       } else {
         setListing(data);
@@ -207,11 +245,11 @@ export default function ListingDetailScreen() {
     // Fetch seller's other items
     setSellerListingsLoading(true);
     try {
-      const { data: sellerData } = await supabase
+      let { data: sellerData, error: sellerError } = await supabase
         .from('listings')
         .select(`
           *,
-          profiles:user_id (
+          profiles (
             id,
             first_name,
             last_name,
@@ -226,6 +264,23 @@ export default function ListingDetailScreen() {
         .neq('id', listingId)
         .order('created_at', { ascending: false })
         .limit(8);
+
+      // Fallback for schema cache issues
+      if (sellerError && sellerError.message.includes('schema cache')) {
+        const { data: basicSellerData } = await supabase
+          .from('listings')
+          .select('*')
+          .eq('user_id', listing.user_id)
+          .eq('status', 'active')
+          .neq('id', listingId)
+          .order('created_at', { ascending: false })
+          .limit(8);
+        
+        sellerData = basicSellerData?.map(item => ({
+          ...item,
+          profiles: listing.profiles // Use the main listing's profile data
+        })) || [];
+      }
 
       if (sellerData) {
         const transformedSellerItems = sellerData.map((item: any) => ({
@@ -254,11 +309,11 @@ export default function ListingDetailScreen() {
     // Fetch similar items (same category, different seller)
     setSimilarListingsLoading(true);
     try {
-      const { data: similarData } = await supabase
+      let { data: similarData, error: similarError } = await supabase
         .from('listings')
         .select(`
           *,
-          profiles:user_id (
+          profiles (
             id,
             first_name,
             last_name,
@@ -274,6 +329,24 @@ export default function ListingDetailScreen() {
         .neq('id', listingId)
         .order('created_at', { ascending: false })
         .limit(8);
+
+      // Fallback for schema cache issues
+      if (similarError && similarError.message.includes('schema cache')) {
+        const { data: basicSimilarData } = await supabase
+          .from('listings')
+          .select('*')
+          .eq('category_id', listing.category_id)
+          .eq('status', 'active')
+          .neq('user_id', listing.user_id)
+          .neq('id', listingId)
+          .order('created_at', { ascending: false })
+          .limit(8);
+        
+        similarData = basicSimilarData?.map(item => ({
+          ...item,
+          profiles: null // We don't have profile data for similar items in fallback
+        })) || [];
+      }
 
       if (similarData) {
         const transformedSimilarItems = similarData.map((item: any) => ({
@@ -664,6 +737,136 @@ export default function ListingDetailScreen() {
           )}
         </View>
 
+        <View style={{ paddingHorizontal: theme.spacing.lg }}>
+          {/* Title and Price */}
+          <View style={{ marginBottom: theme.spacing.lg }}>
+            <Text variant="h2" style={{ marginBottom: theme.spacing.md }}>
+              {listing.title}
+            </Text>
+            
+            <PriceDisplay
+              amount={listing.price}
+              currency={listing.currency}
+              size="xl"
+              style={{ marginBottom: theme.spacing.md }}
+            />
+
+            <View style={{ flexDirection: 'row', gap: theme.spacing.sm, flexWrap: 'wrap' }}>
+              <Badge text={listing.condition} variant="info" />
+              <Badge text={`${listing.quantity} available`} variant="neutral" />
+              {listing.accept_offers && (
+                <Badge text="Accepts Offers" variant="success" />
+              )}
+            </View>
+          </View>
+
+          {/* Pending Offer Status */}
+          {pendingOffer && (
+            <View
+              style={{
+                backgroundColor: theme.colors.warning + '10',
+                borderColor: theme.colors.warning,
+                borderWidth: 1,
+                borderRadius: theme.borderRadius.md,
+                padding: theme.spacing.lg,
+                marginBottom: theme.spacing.lg,
+              }}
+            >
+              <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.sm }}>
+                💰 Offer Pending
+              </Text>
+              <Text variant="bodySmall" color="secondary">
+                Your offer of GHS {pendingOffer.amount.toLocaleString()} is waiting for the seller's response.
+              </Text>
+            </View>
+          )}
+
+          {/* Description */}
+          <View style={{ marginBottom: theme.spacing.xl }}>
+            <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+              Description
+            </Text>
+            <Text variant="body" style={{ lineHeight: 24 }}>
+              {listing.description}
+            </Text>
+          </View>
+
+          {/* Location */}
+          <View style={{ marginBottom: theme.spacing.xl }}>
+            <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+              Location
+            </Text>
+            <Text variant="body" color="secondary">
+              📍 {listing.location}
+            </Text>
+          </View>
+
+          {/* Seller Profile */}
+          {listing.profiles && (
+            <View style={{ marginBottom: theme.spacing.xl }}>
+              <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+                Seller Information
+              </Text>
+              <UserProfile
+                user={{
+                  id: listing.profiles.id,
+                  name: `${listing.profiles.first_name} ${listing.profiles.last_name}`,
+                  avatar: listing.profiles.avatar_url,
+                  rating: listing.profiles.rating,
+                  reviewCount: listing.profiles.total_reviews,
+                  location: listing.profiles.location,
+                  isVerified: listing.profiles.is_verified,
+                  isOnline: listing.profiles.is_online,
+                  responseTime: listing.profiles.response_time,
+                  totalSales: listing.profiles.total_sales,
+                }}
+                variant="full"
+                showActions={!isOwnListing}
+                onMessage={() => setShowContactModal(true)}
+                onCall={handleCall}
+                onViewProfile={() => router.push(`/(tabs)/profile/${listing.profiles.id}`)}
+              />
+            </View>
+          )}
+
+          {/* Stats */}
+          <View
+            style={{
+              backgroundColor: theme.colors.surfaceVariant,
+              borderRadius: theme.borderRadius.md,
+              padding: theme.spacing.lg,
+              marginBottom: theme.spacing.xl,
+            }}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
+              <View style={{ alignItems: 'center' }}>
+                <Text variant="h4" style={{ fontWeight: '700' }}>
+                  {listing.views_count || 0}
+                </Text>
+                <Text variant="caption" color="muted">
+                  Views
+                </Text>
+              </View>
+              <View style={{ alignItems: 'center' }}>
+                <Text variant="h4" style={{ fontWeight: '700' }}>
+                  {listing.favorites_count || 0}
+                </Text>
+                <Text variant="caption" color="muted">
+                  Favorites
+                </Text>
+              </View>
+              <View style={{ alignItems: 'center' }}>
+                <Text variant="h4" style={{ fontWeight: '700' }}>
+                  {new Date(listing.created_at).toLocaleDateString()}
+                </Text>
+                <Text variant="caption" color="muted">
+                  Listed
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
         {/* Related Items Tabs */}
         <View style={{ marginTop: theme.spacing.xl }}>
           {/* Tab Headers */}
@@ -836,135 +1039,6 @@ export default function ListingDetailScreen() {
                 )}
               </View>
             )}
-          </View>
-        </View>
-        <View style={{ paddingHorizontal: theme.spacing.lg }}>
-          {/* Title and Price */}
-          <View style={{ marginBottom: theme.spacing.lg }}>
-            <Text variant="h2" style={{ marginBottom: theme.spacing.md }}>
-              {listing.title}
-            </Text>
-            
-            <PriceDisplay
-              amount={listing.price}
-              currency={listing.currency}
-              size="xl"
-              style={{ marginBottom: theme.spacing.md }}
-            />
-
-            <View style={{ flexDirection: 'row', gap: theme.spacing.sm, flexWrap: 'wrap' }}>
-              <Badge text={listing.condition} variant="info" />
-              <Badge text={`${listing.quantity} available`} variant="neutral" />
-              {listing.accept_offers && (
-                <Badge text="Accepts Offers" variant="success" />
-              )}
-            </View>
-          </View>
-
-          {/* Pending Offer Status */}
-          {pendingOffer && (
-            <View
-              style={{
-                backgroundColor: theme.colors.warning + '10',
-                borderColor: theme.colors.warning,
-                borderWidth: 1,
-                borderRadius: theme.borderRadius.md,
-                padding: theme.spacing.lg,
-                marginBottom: theme.spacing.lg,
-              }}
-            >
-              <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.sm }}>
-                💰 Offer Pending
-              </Text>
-              <Text variant="bodySmall" color="secondary">
-                Your offer of GHS {pendingOffer.amount.toLocaleString()} is waiting for the seller's response.
-              </Text>
-            </View>
-          )}
-
-          {/* Description */}
-          <View style={{ marginBottom: theme.spacing.xl }}>
-            <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
-              Description
-            </Text>
-            <Text variant="body" style={{ lineHeight: 24 }}>
-              {listing.description}
-            </Text>
-          </View>
-
-          {/* Location */}
-          <View style={{ marginBottom: theme.spacing.xl }}>
-            <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
-              Location
-            </Text>
-            <Text variant="body" color="secondary">
-              📍 {listing.location}
-            </Text>
-          </View>
-
-          {/* Seller Profile */}
-          {listing.profiles && (
-            <View style={{ marginBottom: theme.spacing.xl }}>
-              <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
-                Seller Information
-              </Text>
-              <UserProfile
-                user={{
-                  id: listing.profiles.id,
-                  name: `${listing.profiles.first_name} ${listing.profiles.last_name}`,
-                  avatar: listing.profiles.avatar_url,
-                  rating: listing.profiles.rating,
-                  reviewCount: listing.profiles.total_reviews,
-                  location: listing.profiles.location,
-                  isVerified: listing.profiles.is_verified,
-                  isOnline: listing.profiles.is_online,
-                  responseTime: listing.profiles.response_time,
-                  totalSales: listing.profiles.total_sales,
-                }}
-                variant="full"
-                showActions={!isOwnListing}
-                onMessage={() => setShowContactModal(true)}
-                onCall={handleCall}
-                onViewProfile={() => router.push(`/(tabs)/profile/${listing.profiles.id}`)}
-              />
-            </View>
-          )}
-
-          {/* Stats */}
-          <View
-            style={{
-              backgroundColor: theme.colors.surfaceVariant,
-              borderRadius: theme.borderRadius.md,
-              padding: theme.spacing.lg,
-              marginBottom: theme.spacing.xl,
-            }}
-          >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
-              <View style={{ alignItems: 'center' }}>
-                <Text variant="h4" style={{ fontWeight: '700' }}>
-                  {listing.views_count || 0}
-                </Text>
-                <Text variant="caption" color="muted">
-                  Views
-                </Text>
-              </View>
-              <View style={{ alignItems: 'center' }}>
-                <Text variant="h4" style={{ fontWeight: '700' }}>
-                  {listing.favorites_count || 0}
-                </Text>
-                <Text variant="caption" color="muted">
-                  Favorites
-                </Text>
-              </View>
-              <View style={{ alignItems: 'center' }}>
-                <Text variant="h4" style={{ fontWeight: '700' }}>
-                  {new Date(listing.created_at).toLocaleDateString()}
-                </Text>
-                <Text variant="caption" color="muted">
-                  Listed
-                </Text>
-              </View>
-            </View>
           </View>
         </View>
       </ScrollView>

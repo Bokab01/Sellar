@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, ScrollView, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuth } from '@/hooks/useAuth';
+import { validateEmail } from '@/utils/validation';
 import {
   Text,
   SafeAreaWrapper,
@@ -20,10 +21,21 @@ export default function SignInScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [emailError, setEmailError] = useState('');
 
   const handleSignIn = async () => {
+    // Clear previous errors
+    setEmailError('');
+
     if (!email.trim() || !password.trim()) {
       Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    // Validate email
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
+      setEmailError(emailValidation.error!);
       return;
     }
 
@@ -66,10 +78,15 @@ export default function SignInScreen() {
                 label="Email"
                 placeholder="Enter your email"
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  // Clear error when user starts typing
+                  if (emailError) setEmailError('');
+                }}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 leftIcon={<Mail size={20} color={theme.colors.text.muted} />}
+                error={emailError}
               />
 
               <Input
@@ -97,10 +114,7 @@ export default function SignInScreen() {
             <View style={{ alignItems: 'center', marginTop: theme.spacing['2xl'], gap: theme.spacing.lg }}>
               <LinkButton
                 variant="underline"
-                onPress={() => {
-                  // TODO: Implement forgot password
-                  Alert.alert('Coming Soon', 'Password reset feature will be available soon');
-                }}
+                href="/(auth)/forgot-password"
               >
                 Forgot your password?
               </LinkButton>

@@ -17,6 +17,8 @@ interface AppState {
   filters: {
     priceRange: { min: number; max: number };
     condition: string[];
+    categories: string[];
+    location: string;
     sortBy: string;
   };
   setFilters: (filters: Partial<AppState['filters']>) => void;

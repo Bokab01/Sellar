@@ -26,7 +26,7 @@ import {
 import { 
   MessageCircle, 
   Phone, 
-  UserPlus, 
+  UserPlus2, 
   UserMinus, 
   MapPin, 
   Calendar, 
@@ -627,7 +627,7 @@ export default function UserProfileScreen() {
                   variant={isFollowing ? 'tertiary' : 'primary'}
                   icon={isFollowing ? 
                     <UserMinus size={18} color={theme.colors.primary} /> : 
-                    <UserPlus size={18} color={theme.colors.primaryForeground} />
+                    <UserPlus2 size={18} color={theme.colors.primaryForeground} />
                   }
                   onPress={handleFollow}
                   loading={followLoading}

@@ -1,4 +1,5 @@
 import { corsHeaders } from '../_shared/cors.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 interface PaystackInitializeRequest {
   amount: number; // in pesewas
@@ -15,6 +16,10 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const { amount, email, reference, purpose, purpose_id, channels }: PaystackInitializeRequest = await req.json();
 
     // Validate required fields
@@ -34,16 +39,35 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Get user from Authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Authorization required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid authorization' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Create Paystack transaction record
     const { data: transaction, error: dbError } = await supabase
       .from('paystack_transactions')
       .insert({
-        user_id: (await supabase.auth.getUser()).data.user?.id,
+        user_id: user.id,
         reference,
         amount: amount / 100, // Convert back to GHS
         currency: 'GHS',
-        purpose,
-        purpose_id,
+        payment_method: channels?.includes('mobile_money') ? 'mobile_money' : 'card',
+        purchase_type: purpose,
+        purchase_id: purpose_id,
+        customer_email: email,
         status: 'pending',
       })
       .select()
@@ -84,7 +108,7 @@ Deno.serve(async (req: Request) => {
         .from('paystack_transactions')
         .update({ 
           status: 'failed',
-          gateway_response: paystackData,
+          paystack_response: paystackData,
         })
         .eq('id', transaction.id);
 
@@ -98,7 +122,8 @@ Deno.serve(async (req: Request) => {
     await supabase
       .from('paystack_transactions')
       .update({ 
-        gateway_response: paystackData.data,
+        paystack_reference: paystackData.data.reference,
+        paystack_response: paystackData.data,
       })
       .eq('id', transaction.id);
 

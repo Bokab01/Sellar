@@ -29,7 +29,7 @@ import {
   Star, 
   CreditCard, 
   CircleHelp as HelpCircle, 
-  UserPlus, 
+  UserPlus2, 
   LogOut, 
   Shield,
   Bell,
@@ -105,9 +105,20 @@ export default function MoreScreen() {
           text: 'Sign Out',
           style: 'destructive',
           onPress: async () => {
-            await signOut();
-            setToastMessage('Signed out successfully');
-            setShowToast(true);
+            try {
+              await signOut();
+              setToastMessage('Signed out successfully');
+              setShowToast(true);
+              
+              // Force navigation to auth screen
+              setTimeout(() => {
+                router.replace('/(auth)/welcome');
+              }, 500); // Give time for toast to show
+            } catch (error) {
+              console.error('Sign out error:', error);
+              setToastMessage('Failed to sign out');
+              setShowToast(true);
+            }
           },
         },
       ]
@@ -133,7 +144,6 @@ export default function MoreScreen() {
   const fullName = `${firstName} ${lastName}`.trim();
   const walletBalance = profile?.wallet_balance || 0;
   const creditBalance = profile?.credit_balance || 0;
-  const totalBalance = walletBalance + creditBalance;
 
   const menuSections = [
     {
@@ -147,9 +157,9 @@ export default function MoreScreen() {
         },
         {
           title: 'Wallet & Credit',
-          subtitle: `${balance} credits • GHS ${totalBalance.toFixed(2)} wallet`,
+          subtitle: `${Math.floor(creditBalance)} credits • GHS ${walletBalance.toFixed(2)} wallet`,
           icon: <Wallet size={20} color={theme.colors.success} />,
-          badge: balance > 0 ? { text: `${balance}`, variant: 'success' as const } : undefined,
+          badge: creditBalance > 0 ? { text: `${Math.floor(creditBalance)}`, variant: 'success' as const } : undefined,
           onPress: () => router.push('/(tabs)/wallet'),
         },
         {
@@ -233,7 +243,7 @@ export default function MoreScreen() {
         {
           title: 'Invite Friends',
           subtitle: 'Share Sellar and earn rewards',
-          icon: <UserPlus size={20} color={theme.colors.primary} />,
+          icon: <UserPlus2 size={20} color={theme.colors.primary} />,
           badge: { text: 'Earn GHS 10', variant: 'success' as const },
           onPress: () => router.push('/(tabs)/invite'),
         },
@@ -279,6 +289,7 @@ export default function MoreScreen() {
             refreshing={refreshing}
             onRefresh={handleRefresh}
             tintColor={theme.colors.primary}
+            colors={[theme.colors.primary]}
           />
         }
       >
@@ -316,7 +327,7 @@ export default function MoreScreen() {
                 
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.lg }}>
                   <PriceDisplay
-                    amount={totalBalance}
+                    amount={walletBalance}
                     size="md"
                     currency="GHS"
                   />
@@ -448,7 +459,7 @@ export default function MoreScreen() {
                 paddingVertical: theme.spacing.lg,
               }}
             >
-              <Text style={{ color: theme.colors.error, fontWeight: '600' }}>Sign Out</Text>
+              Sign Out
             </Button>
           </View>
         </Container>

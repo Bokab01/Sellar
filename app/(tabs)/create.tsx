@@ -1,10 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { View, ScrollView, Alert, Dimensions } from 'react-native';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { View, ScrollView, Alert, Pressable, BackHandler } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { dbHelpers, supabase } from '@/lib/supabase';
-import { storageHelpers } from '@/lib/storage';
+import { storageHelpers, STORAGE_BUCKETS } from '@/lib/storage';
+import { 
+  validateListingStep, 
+  createDebouncedValidator, 
+  sanitizeInput,
+  generateSEOFriendlyTitle,
+  extractKeywords,
+  type ValidationResult 
+} from '@/utils/listingValidation';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   Text,
   SafeAreaWrapper,
@@ -17,14 +27,101 @@ import {
   PriceDisplay,
   Stepper,
   LocationPicker,
+  CategoryPicker,
+  CategoryAttributes,
+  StepIndicator,
   Toast,
-  LinearProgress,
   AppModal,
   Badge,
 } from '@/components';
 import { SelectedImage } from '@/components/ImagePicker';
-import { Save, Eye, Zap, Camera, Info } from 'lucide-react-native';
+import { 
+  Camera, 
+  FileText, 
+  Package, 
+  MapPin, 
+  DollarSign, 
+  CheckCircle, 
+  Plus,
+  Info,
+  Eye,
+  ArrowLeft,
+  ArrowRight
+} from 'lucide-react-native';
 import { router } from 'expo-router';
+import { findCategoryById, COMPREHENSIVE_CATEGORIES } from '@/constants/categories';
+import { getCategoryAttributes, hasCategoryAttributes, type CategoryAttribute } from '@/constants/categoryAttributes';
+import { networkUtils } from '@/utils/networkUtils';
+
+
+
+interface ListingFormData {
+  // Images (Step 1)
+  images: SelectedImage[];
+  
+  // Basic Info (Step 2)
+  title: string;
+  description: string;
+  
+  // Category (Step 3)
+  categoryId: string;
+  categoryAttributes: Record<string, string | string[]>;
+  
+  // Details (Step 4)
+  condition: string;
+  price: string;
+  quantity: number;
+  acceptOffers: boolean;
+  
+  // Location (Step 5)
+  location: string;
+}
+
+const STEPS = [
+  {
+    id: 'photos',
+    title: 'Photos',
+    description: 'Add photos of your item',
+    icon: Camera,
+    color: 'primary',
+  },
+  {
+    id: 'basic-info',
+    title: 'Basic Info',
+    description: 'Title and description',
+    icon: FileText,
+    color: 'success',
+  },
+  {
+    id: 'category',
+    title: 'Category & Location',
+    description: 'What and where are you selling?',
+    icon: Package,
+    color: 'warning',
+  },
+  {
+    id: 'details',
+    title: 'Details',
+    description: 'Price and condition',
+    icon: DollarSign,
+    color: 'error',
+  },
+  {
+    id: 'review',
+    title: 'Review',
+    description: 'Review and publish',
+    icon: CheckCircle,
+    color: 'success',
+  },
+] as const;
+
+const CONDITIONS = [
+  { value: 'new', label: 'Brand New', description: 'Never used, in original packaging' },
+  { value: 'like-new', label: 'Like New', description: 'Barely used, excellent condition' },
+  { value: 'good', label: 'Good', description: 'Used but well maintained' },
+  { value: 'fair', label: 'Fair', description: 'Shows wear but fully functional' },
+  { value: 'poor', label: 'Poor', description: 'Significant wear, may need repairs' },
+];
 
 export default function CreateListingScreen() {
   const { theme } = useTheme();
@@ -32,48 +129,118 @@ export default function CreateListingScreen() {
   const { balance, getMaxListings, spendCredits, hasUnlimitedListings } = useMonetizationStore();
   
   // Form state
-  const [images, setImages] = useState<SelectedImage[]>([]);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState('');
-  const [condition, setCondition] = useState('');
-  const [location, setLocation] = useState('');
-  const [quantity, setQuantity] = useState(1);
-  const [acceptOffers, setAcceptOffers] = useState(true);
-  
-  // Categories from database
-  const [categories, setCategories] = useState<any[]>([]);
-  const [userListingsCount, setUserListingsCount] = useState(0);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [formData, setFormData] = useState<ListingFormData>({
+    images: [],
+    title: '',
+    description: '',
+    categoryId: '',
+    categoryAttributes: {},
+    condition: 'good', // Default to valid condition
+    price: '',
+    quantity: 1,
+    acceptOffers: true,
+    location: '',
+  });
   
   // UI state
-  const [showSuccess, setShowSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [showSuccess, setShowSuccess] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [userListingsCount, setUserListingsCount] = useState(0);
   const [showPhotoTips, setShowPhotoTips] = useState(false);
-  const [needsPayment, setNeedsPayment] = useState(false);
-  const [requiredCredits, setRequiredCredits] = useState(0);
-
-  const conditions = [
-    'Brand New', 'Like New', 'Good', 'Fair', 'For Parts'
-  ];
+  
+  // Validation state
+  const [validationResults, setValidationResults] = useState<Record<number, ValidationResult>>({});
+  const [isValidating, setIsValidating] = useState(false);
+  
+  // Performance optimization refs
+  const debouncedValidator = useRef(createDebouncedValidator(300));
+  const formDataRef = useRef(formData);
+  
+  // Autosave state
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const AUTOSAVE_KEY = useMemo(() => `listing_draft_${user?.id || 'anonymous'}`, [user?.id]);
 
   useEffect(() => {
-    fetchCategories();
     checkListingLimits();
+    loadDraft();
   }, []);
 
-  const fetchCategories = async () => {
+  // Load saved draft on component mount
+  const loadDraft = async () => {
     try {
-      const { data, error } = await dbHelpers.getCategories();
-      if (data) {
-        setCategories(data);
+      const savedDraft = await AsyncStorage.getItem(AUTOSAVE_KEY);
+      if (savedDraft) {
+        const draftData = JSON.parse(savedDraft);
+        // Only load if it's not empty
+        if (draftData.title || draftData.description || draftData.images?.length > 0) {
+          Alert.alert(
+            'Draft Found',
+            'You have an unsaved draft. Would you like to continue where you left off?',
+            [
+              { text: 'Start Fresh', onPress: () => clearDraft(), style: 'destructive' },
+              { text: 'Continue', onPress: () => setFormData(draftData) },
+            ]
+          );
+        }
       }
     } catch (error) {
-      console.error('Failed to fetch categories:', error);
+      console.error('Failed to load draft:', error);
     }
   };
+
+  // Save draft to AsyncStorage
+  const saveDraft = useCallback(async (data: ListingFormData) => {
+    try {
+      setIsAutoSaving(true);
+      await AsyncStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
+      setHasUnsavedChanges(false);
+    } catch (error) {
+      console.error('Failed to save draft:', error);
+    } finally {
+      setIsAutoSaving(false);
+    }
+  }, [AUTOSAVE_KEY]);
+
+  // Clear draft from AsyncStorage
+  const clearDraft = useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem(AUTOSAVE_KEY);
+      setHasUnsavedChanges(false);
+    } catch (error) {
+      console.error('Failed to clear draft:', error);
+    }
+  }, [AUTOSAVE_KEY]);
+
+
+
+  // Handle back button and navigation
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (hasUnsavedChanges) {
+          Alert.alert(
+            'Unsaved Changes',
+            'You have unsaved changes. What would you like to do?',
+            [
+              { text: 'Discard', onPress: () => { clearDraft(); router.back(); }, style: 'destructive' },
+              { text: 'Save Draft', onPress: () => { saveDraft(formData); router.back(); } },
+              { text: 'Cancel', style: 'cancel' },
+            ]
+          );
+          return true;
+        }
+        return false;
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
+    }, [hasUnsavedChanges, formData, saveDraft, clearDraft])
+  );
 
   const checkListingLimits = async () => {
     if (!user) return;
@@ -93,39 +260,61 @@ export default function CreateListingScreen() {
     }
   };
 
-  const validateForm = () => {
-    if (!title.trim()) return 'Product title is required';
-    if (title.trim().length < 10) return 'Title must be at least 10 characters';
-    if (!description.trim()) return 'Product description is required';
-    if (description.trim().length < 20) return 'Description must be at least 20 characters';
-    if (!price.trim() || isNaN(Number(price))) return 'Valid price is required';
-    if (Number(price) <= 0) return 'Price must be greater than 0';
-    if (!selectedCategoryId) return 'Please select a category';
-    if (!condition) return 'Please select condition';
-    if (!location) return 'Please select location';
-    if (images.length === 0) return 'At least one image is required';
-    return null;
-  };
+  // Update form data with validation and autosave
+  const updateFormData = useCallback((updates: Partial<ListingFormData>) => {
+    setFormData(prev => {
+      const newData = { ...prev, ...updates };
+      formDataRef.current = newData;
+      return newData;
+    });
+    
+    // Trigger validation and autosave separately to avoid re-render issues
+    setHasUnsavedChanges(true);
+    
+    // Clear existing timeout
+    if (autosaveTimeoutRef.current) {
+      clearTimeout(autosaveTimeoutRef.current);
+    }
+    
+    // Set new timeout for autosave
+    autosaveTimeoutRef.current = setTimeout(() => {
+      const currentData = formDataRef.current;
+      saveDraft(currentData);
+    }, 2000) as any;
+    
+    // Debounced validation
+    setIsValidating(true);
+    debouncedValidator.current(currentStep, formDataRef.current, (result) => {
+      setValidationResults(prev => ({ ...prev, [currentStep]: result }));
+      setIsValidating(false);
+    });
+  }, [currentStep, saveDraft]);
+
+  const validateStep = useCallback((step: number): boolean => {
+    const validation = validationResults[step] || validateListingStep(step, formData);
+    return validation.isValid;
+  }, [formData, validationResults]);
+
+  const canProceed = useMemo(() => validateStep(currentStep), [currentStep, validateStep]);
+
+  const nextStep = useCallback(() => {
+    if (currentStep < STEPS.length - 1 && canProceed) {
+      setCurrentStep(currentStep + 1);
+    }
+  }, [currentStep, canProceed]);
+
+  const previousStep = useCallback(() => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  }, [currentStep]);
 
   const handleSubmit = async () => {
-    const error = validateForm();
-    if (error) {
-      Alert.alert('Validation Error', error);
-      return;
-    }
-
-    if (!user) {
-      Alert.alert('Error', 'You must be logged in to create a listing');
-      return;
-    }
-
     // Check if payment is needed for additional listings
     const maxListings = getMaxListings();
     const needsCredits = !hasUnlimitedListings() && userListingsCount >= maxListings;
     
     if (needsCredits) {
-      setNeedsPayment(true);
-      setRequiredCredits(10);
       setShowPaymentModal(true);
       return;
     }
@@ -136,53 +325,217 @@ export default function CreateListingScreen() {
   const createListing = async () => {
     setLoading(true);
     try {
-      // Upload images first
+      // All connectivity and storage tests passed
+
+      
+      // Check network connectivity first
+      console.log('Checking network connectivity...');
+      const networkStatus = await networkUtils.checkNetworkStatus();
+      
+      if (!networkStatus.isConnected) {
+        throw new Error('No internet connection. Please check your network and try again.');
+      }
+      
+      if (!networkStatus.canReachSupabase) {
+        throw new Error(networkStatus.error || 'Cannot connect to server. Please try again.');
+      }
+      
+      // Test storage connection
+      const storageConnected = await networkUtils.testStorageConnection();
+      if (!storageConnected) {
+        throw new Error('Cannot connect to image storage. Please try again.');
+      }
+      
+      const bucketAccessible = await networkUtils.checkStorageBucket('listing-images');
+      if (!bucketAccessible) {
+        throw new Error('Image storage is not accessible. Please try again later.');
+      }
+      
+      // Skip bucket testing - just try to upload directly
+      // The RLS policies are set up, so authenticated users should be able to upload
+      console.log('Proceeding with image upload (RLS policies should allow authenticated users)...');
+
+      // Storage connectivity verified
+      
+      console.log('All connectivity and storage tests passed');
+      
+      // Upload images first with progress tracking
       let imageUrls: string[] = [];
-      if (images.length > 0) {
-        const uploadResults = await storageHelpers.uploadMultipleImages(
-          images.map(img => img.uri),
-          'images',
-          'listings',
-          user!.id,
-          setUploadProgress
-        );
-        imageUrls = uploadResults.map(result => result.url);
+      if (formData.images.length > 0) {
+        console.log(`Starting upload of ${formData.images.length} images`);
+        setUploadProgress(0);
+        
+        try {
+          // Use the updated storage helper with proper bucket
+          const imageUris = formData.images.map(img => img.uri);
+          const uploadResults = await storageHelpers.uploadMultipleImages(
+            imageUris,
+            STORAGE_BUCKETS.LISTINGS,
+            'listing', // folder name
+            user!.id,
+            (progress) => setUploadProgress(progress)
+          );
+          
+          imageUrls = uploadResults.map(result => result.url);
+          console.log('All images uploaded successfully using simple method');
+        } catch (uploadError) {
+          console.error('Image upload failed:', uploadError);
+          throw new Error(`Failed to upload images: ${uploadError instanceof Error ? uploadError.message : 'Unknown error'}`);
+        }
       }
 
-      // Create listing
-      const { data: listing, error: listingError } = await dbHelpers.createListing({
+      // Sanitize and optimize data
+      const sanitizedTitle = sanitizeInput(formData.title);
+      const sanitizedDescription = sanitizeInput(formData.description);
+      const seoTitle = generateSEOFriendlyTitle(sanitizedTitle, selectedCategory?.name || '');
+      const keywords = extractKeywords(sanitizedTitle, sanitizedDescription);
+
+      // Create listing with optimized data including category attributes
+      // Map category IDs to proper UUIDs or use default
+      const categoryMapping: Record<string, string> = {
+        'electronics': '00000000-0000-4000-8000-000000000001',
+        'fashion': '00000000-0000-4000-8000-000000000002',
+        'home-garden': '00000000-0000-4000-8000-000000000003',
+        'vehicles': '00000000-0000-4000-8000-000000000004',
+        'health-sports': '00000000-0000-4000-8000-000000000005',
+        'business': '00000000-0000-4000-8000-000000000006',
+        'education': '00000000-0000-4000-8000-000000000007',
+        'entertainment': '00000000-0000-4000-8000-000000000008',
+        'food': '00000000-0000-4000-8000-000000000009',
+        'services': '00000000-0000-4000-8000-000000000010',
+      };
+      
+      const DEFAULT_CATEGORY_UUID = '00000000-0000-4000-8000-000000000000'; // General/Other
+      const categoryUUID = categoryMapping[formData.categoryId] || DEFAULT_CATEGORY_UUID;
+      
+      const listingData = {
         user_id: user!.id,
-        title: title.trim(),
-        description: description.trim(),
-        price: Number(price),
+        title: seoTitle,
+        description: sanitizedDescription,
+        price: Number(formData.price),
         currency: 'GHS',
-        category_id: selectedCategoryId,
-        condition,
-        quantity,
-        location,
+        category_id: categoryUUID, // Use mapped category UUID
+        condition: formData.condition,
+        quantity: formData.quantity,
+        location: formData.location,
         images: imageUrls,
-        accept_offers: acceptOffers,
-        status: 'active',
-      });
+        accept_offers: formData.acceptOffers,
+        status: 'active'
+      };
+
+      // Ensure condition is valid, fallback to 'good' if empty or invalid
+      const validConditions = ['new', 'like-new', 'good', 'fair', 'poor'];
+      const finalCondition = validConditions.includes(formData.condition) ? formData.condition : 'good';
+      
+      // Update the listing data with the validated condition
+      listingData.condition = finalCondition;
+
+
+
+      // Enhance description with category attributes for better searchability
+      const attributeText = Object.entries(formData.categoryAttributes || {})
+        .filter(([_, value]) => value && (Array.isArray(value) ? value.length > 0 : value.toString().trim()))
+        .map(([key, value]) => {
+          const attr = getCategoryAttributes(formData.categoryId).find(a => a.id === key);
+          if (!attr) return '';
+          
+          if (Array.isArray(value)) {
+            return `${attr.name}: ${value.join(', ')}`;
+          }
+          return `${attr.name}: ${value}`;
+        })
+        .filter(Boolean)
+        .join(' • ');
+
+      // Add category and attribute information to description
+      const categoryInfo = selectedCategory ? `Category: ${selectedCategory.name}` : '';
+      const additionalInfo = [categoryInfo, attributeText].filter(Boolean).join(' • ');
+      
+      if (additionalInfo) {
+        listingData.description = `${sanitizedDescription}\n\n📋 ${additionalInfo}`;
+      }
+
+      const { data: listing, error: listingError } = await dbHelpers.createListing(listingData);
 
       if (listingError) throw listingError;
+      
+      // Clear draft after successful creation
+      await clearDraft();
       
       setShowSuccess(true);
       
       // Reset form after success
       setTimeout(() => {
-        setImages([]);
-        setTitle('');
-        setDescription('');
-        setPrice('');
-        setSelectedCategoryId('');
-        setCondition('');
-        setLocation('');
-        setQuantity(1);
-        router.replace('/(tabs)');
+        try {
+          // Check if router is available before navigating
+          if (router && typeof router.replace === 'function') {
+            router.replace('/(tabs)');
+          } else {
+            console.log('Router not available, just resetting form');
+            setFormData({
+              images: [],
+              title: '',
+              description: '',
+              categoryId: '',
+              categoryAttributes: {},
+              condition: 'good',
+              price: '',
+              quantity: 1,
+              acceptOffers: true,
+              location: '',
+            });
+            setCurrentStep(0);
+          }
+        } catch (navError) {
+          console.log('Navigation error (safe to ignore):', navError);
+          // Fallback: just reset the form without navigation
+          setFormData({
+            images: [],
+            title: '',
+            description: '',
+            categoryId: '',
+            categoryAttributes: {},
+            condition: 'good',
+            price: '',
+            quantity: 1,
+            acceptOffers: true,
+            location: '',
+          });
+          setCurrentStep(0);
+        }
       }, 2000);
     } catch (error: any) {
-      Alert.alert('Error', 'Failed to create listing. Please try again.');
+      console.error('Listing creation error:', error);
+      
+      let errorMessage = 'Failed to create listing. Please try again.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Network request failed')) {
+          errorMessage = 'Network connection failed. Please check your internet connection and try again.';
+        } else if (error.message.includes('Upload failed')) {
+          errorMessage = 'Failed to upload images. Please check your internet connection and try again.';
+        } else if (error.message.includes('No authenticated session')) {
+          errorMessage = 'Your session has expired. Please sign in again.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      Alert.alert(
+        'Upload Failed',
+        errorMessage,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Retry', 
+            onPress: () => {
+              // Reset progress and retry
+              setUploadProgress(0);
+              createListing();
+            }
+          }
+        ]
+      );
     } finally {
       setLoading(false);
       setUploadProgress(0);
@@ -190,13 +543,20 @@ export default function CreateListingScreen() {
   };
 
   const handlePayForListing = async () => {
+    const requiredCredits = 10;
     if (balance < requiredCredits) {
       Alert.alert(
         'Insufficient Credits',
         `You need ${requiredCredits} credits but only have ${balance}. Would you like to buy more credits?`,
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Buy Credits', onPress: () => router.push('/(tabs)/buy-credits') },
+          { text: 'Buy Credits', onPress: () => {
+            try {
+              router.push('/(tabs)/buy-credits');
+            } catch (e) {
+              console.log('Navigation error:', e);
+            }
+          }},
         ]
       );
       return;
@@ -209,7 +569,6 @@ export default function CreateListingScreen() {
       
       if (result.success) {
         setShowPaymentModal(false);
-        setNeedsPayment(false);
         await createListing();
       } else {
         Alert.alert('Error', result.error || 'Failed to process payment');
@@ -219,258 +578,626 @@ export default function CreateListingScreen() {
     }
   };
 
-  const maxListings = getMaxListings();
-  const isAtLimit = !hasUnlimitedListings() && userListingsCount >= maxListings;
+  const selectedCategory = formData.categoryId ? findCategoryById(COMPREHENSIVE_CATEGORIES, formData.categoryId) : null;
+  const selectedCondition = CONDITIONS.find(c => c.value === formData.condition);
+
+  // Stable input handlers to prevent keyboard dismissal
+  const handleTitleChange = useCallback((text: string) => {
+    updateFormData({ title: text });
+  }, [updateFormData]);
+
+  const handleDescriptionChange = useCallback((text: string) => {
+    updateFormData({ description: text });
+  }, [updateFormData]);
+
+  const handlePriceChange = useCallback((text: string) => {
+    updateFormData({ price: text });
+  }, [updateFormData]);
+
+  const handleImagesChange = useCallback((images: SelectedImage[]) => {
+    updateFormData({ images });
+  }, [updateFormData]);
+
+  const handleCategorySelect = useCallback((categoryId: string) => {
+    // Clear category attributes when category changes
+    updateFormData({ categoryId, categoryAttributes: {} });
+  }, [updateFormData]);
+
+  const handleCategoryAttributeChange = useCallback((attributeId: string, value: string | string[]) => {
+    updateFormData({ 
+      categoryAttributes: { 
+        ...(formData.categoryAttributes || {}), 
+        [attributeId]: value 
+      } 
+    });
+  }, [updateFormData, formData.categoryAttributes]);
+
+  const handleLocationSelect = useCallback((location: string) => {
+    updateFormData({ location });
+  }, [updateFormData]);
+
+  const handleConditionSelect = useCallback((condition: string) => {
+    updateFormData({ condition });
+  }, [updateFormData]);
+
+  const handleQuantityChange = useCallback((quantity: number) => {
+    updateFormData({ quantity });
+  }, [updateFormData]);
+
+  const handleAcceptOffersChange = useCallback((acceptOffers: boolean) => {
+    updateFormData({ acceptOffers });
+  }, [updateFormData]);
+
+  const getStepColor = (colorName: string) => {
+    switch (colorName) {
+      case 'primary': return theme.colors.primary;
+      case 'success': return theme.colors.success;
+      case 'warning': return theme.colors.warning;
+      case 'error': return theme.colors.error;
+      default: return theme.colors.primary;
+    }
+  };
+
+  // Step Components - Memoized to prevent re-renders
+  const PhotosStep = useMemo(() => (
+    <View style={{ gap: theme.spacing.lg }}>
+      
+      <CustomImagePicker
+        limit={8}
+        value={formData.images}
+        onChange={handleImagesChange}
+        disabled={loading}
+      />
+      
+      {loading && uploadProgress > 0 && (
+        <View style={{
+          backgroundColor: theme.colors.surfaceVariant,
+          borderRadius: theme.borderRadius.md,
+          padding: theme.spacing.md,
+        }}>
+          <Text variant="bodySmall" color="secondary" style={{ textAlign: 'center', marginBottom: theme.spacing.sm }}>
+            Uploading images... {Math.round(uploadProgress * 100)}%
+          </Text>
+          <View style={{
+            height: 4,
+            backgroundColor: theme.colors.border,
+            borderRadius: 2,
+            overflow: 'hidden',
+          }}>
+            <View style={{
+              height: '100%',
+              width: `${uploadProgress * 100}%`,
+              backgroundColor: theme.colors.primary,
+            }} />
+          </View>
+        </View>
+      )}
+
+      {formData.images.length === 0 && (
+        <View style={{
+          backgroundColor: theme.colors.warning + '10',
+          borderColor: theme.colors.warning,
+          borderWidth: 1,
+          borderRadius: theme.borderRadius.md,
+          padding: theme.spacing.lg,
+          alignItems: 'center',
+        }}>
+          <Text variant="body" style={{ color: theme.colors.warning, textAlign: 'center' }}>
+            📸 At least one photo is required to continue
+          </Text>
+        </View>
+      )}
+      
+      <View style={{
+        backgroundColor: theme.colors.primary + '10',
+        borderRadius: theme.borderRadius.md,
+        padding: theme.spacing.md,
+        flexDirection: 'row',
+        alignItems: 'center',
+      }}>
+        <Camera size={20} color={theme.colors.primary} style={{ marginRight: theme.spacing.sm }} />
+        <Text variant="bodySmall" style={{ color: theme.colors.primary, flex: 1 }}>
+          Great photos can increase your sales by up to 300%!
+        </Text>
+        <Button
+          variant="ghost"
+          size="sm"
+          onPress={() => setShowPhotoTips(true)}
+        >
+          Tips
+        </Button>
+      </View>
+    </View>
+  ), [formData.images, loading, uploadProgress, theme, handleImagesChange]);
+
+  const BasicInfoStep = useMemo(() => (
+    <View style={{ gap: theme.spacing.lg }}>
+
+      <Input
+        label="Title"
+        placeholder="e.g. White COS Jumper"
+        value={formData.title}
+        onChangeText={handleTitleChange}
+        helper={validationResults[1]?.warnings.title || "Be descriptive and specific (min. 10 characters)"}
+        error={validationResults[1]?.errors.title}
+      />
+
+      <Input
+        variant="multiline"
+        label="Describe your item"
+        placeholder="e.g. only worn a few times, true to size"
+        value={formData.description}
+        onChangeText={handleDescriptionChange}
+        helper={validationResults[1]?.warnings.description || "Include condition, age, reason for selling, etc. (min. 20 characters)"}
+        containerStyle={{ minHeight: 120 }}
+        error={validationResults[1]?.errors.description}
+      />
+
+      <View style={{
+        backgroundColor: theme.colors.success + '10',
+        borderRadius: theme.borderRadius.md,
+        padding: theme.spacing.md,
+      }}>
+        <Text variant="bodySmall" style={{ color: theme.colors.success, textAlign: 'center' }}>
+          💡 Detailed listings get 5x more views!
+        </Text>
+      </View>
+    </View>
+  ), [formData.title, formData.description, validationResults, theme, handleTitleChange, handleDescriptionChange]);
+
+  const CategoryStep = useMemo(() => {
+    const categoryAttributes = formData.categoryId ? getCategoryAttributes(formData.categoryId) : [];
+    const showAttributes = hasCategoryAttributes(formData.categoryId);
+
+    return (
+      <View style={{ gap: theme.spacing.lg }}>
+        <View>
+          <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+            Category
+          </Text>
+          <CategoryPicker
+            value={formData.categoryId}
+            onCategorySelect={handleCategorySelect}
+            placeholder="Select a category"
+          />
+          
+          {selectedCategory && (
+            <View style={{ 
+              backgroundColor: theme.colors.success + '10',
+              padding: theme.spacing.md,
+              borderRadius: theme.borderRadius.md,
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginTop: theme.spacing.sm,
+            }}>
+              <CheckCircle size={20} color={theme.colors.success} style={{ marginRight: theme.spacing.sm }} />
+              <Text variant="body" style={{ color: theme.colors.success }}>
+                Selected: {selectedCategory.name}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Category-specific attributes */}
+        {showAttributes && (
+          <View>
+            <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+              Product Details
+            </Text>
+            <CategoryAttributes
+              attributes={categoryAttributes}
+              values={formData.categoryAttributes}
+              onChange={handleCategoryAttributeChange}
+            />
+          </View>
+        )}
+
+        <View>
+          <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+            Location
+          </Text>
+          <LocationPicker
+            value={formData.location}
+            onLocationSelect={handleLocationSelect}
+            placeholder="Select your location"
+          />
+
+          {formData.location && (
+            <View style={{ 
+              backgroundColor: theme.colors.success + '10',
+              padding: theme.spacing.md,
+              borderRadius: theme.borderRadius.md,
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginTop: theme.spacing.sm,
+            }}>
+              <CheckCircle size={20} color={theme.colors.success} style={{ marginRight: theme.spacing.sm }} />
+              <Text variant="body" style={{ color: theme.colors.success }}>
+                Location: {formData.location}
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  }, [formData.categoryId, formData.location, formData.categoryAttributes, selectedCategory, theme, handleCategorySelect, handleLocationSelect, handleCategoryAttributeChange]);
+
+  const DetailsStep = useMemo(() => (
+    <View style={{ gap: theme.spacing.lg }}>
+
+      <View>
+        <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+          Condition
+        </Text>
+        <View style={{ gap: theme.spacing.sm }}>
+          {CONDITIONS.map((condition) => (
+            <Pressable
+              key={condition.value}
+              onPress={() => handleConditionSelect(condition.value)}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                padding: theme.spacing.md,
+                borderRadius: theme.borderRadius.md,
+                borderWidth: 1,
+                borderColor: formData.condition === condition.value 
+                  ? theme.colors.primary 
+                  : theme.colors.border,
+                backgroundColor: pressed 
+                  ? theme.colors.surfaceVariant 
+                  : formData.condition === condition.value 
+                    ? theme.colors.primary + '10' 
+                    : theme.colors.surface,
+              })}
+            >
+              <View style={{
+                width: 20,
+                height: 20,
+                borderRadius: 10,
+                borderWidth: 2,
+                borderColor: formData.condition === condition.value 
+                  ? theme.colors.primary 
+                  : theme.colors.border,
+                backgroundColor: formData.condition === condition.value 
+                  ? theme.colors.primary 
+                  : 'transparent',
+                marginRight: theme.spacing.md,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                {formData.condition === condition.value && (
+                  <View style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: theme.colors.surface,
+                  }} />
+                )}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text variant="body" style={{ 
+                  fontWeight: '500',
+                  color: formData.condition === condition.value 
+                    ? theme.colors.primary 
+                    : theme.colors.text.primary,
+                  marginBottom: theme.spacing.xs,
+                }}>
+                  {condition.label}
+                </Text>
+                <Text variant="caption" color="muted">
+                  {condition.description}
+                </Text>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      <Input
+        label="Price (GHS)"
+        placeholder="25.00"
+        value={formData.price}
+        onChangeText={handlePriceChange}
+        keyboardType="numeric"
+        helper={validationResults[3]?.warnings.price || "Set a competitive price"}
+        error={validationResults[3]?.errors.price}
+      />
+
+      {formData.price && !isNaN(Number(formData.price)) && Number(formData.price) > 0 && (
+        <View style={{ alignItems: 'center', marginVertical: theme.spacing.md }}>
+          <PriceDisplay amount={Number(formData.price)} size="xl" />
+        </View>
+      )}
+
+      <Stepper
+        value={formData.quantity}
+        onValueChange={handleQuantityChange}
+        min={1}
+        max={99}
+        showLabel
+        label="Quantity Available"
+      />
+
+      <View>
+        <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.md }}>
+          Pricing Options
+        </Text>
+        <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
+          <Chip
+            text="Fixed Price"
+            variant="filter"
+            selected={!formData.acceptOffers}
+            onPress={() => handleAcceptOffersChange(false)}
+          />
+          <Chip
+            text="Accept Offers"
+            variant="filter"
+            selected={formData.acceptOffers}
+            onPress={() => handleAcceptOffersChange(true)}
+          />
+        </View>
+        {formData.acceptOffers && (
+          <Text variant="caption" color="muted" style={{ marginTop: theme.spacing.sm }}>
+            Buyers can negotiate the price with you
+          </Text>
+        )}
+      </View>
+    </View>
+  ), [formData.condition, formData.price, formData.quantity, formData.acceptOffers, validationResults, theme, handleConditionSelect, handlePriceChange, handleQuantityChange, handleAcceptOffersChange]);
+
+
+
+  const ReviewStep = useMemo(() => (
+    <View style={{ gap: theme.spacing.lg }}>
+
+      {/* Preview Card */}
+      <View style={{
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.borderRadius.lg,
+        padding: theme.spacing.lg,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+      }}>
+        {/* Images Preview */}
+        {formData.images.length > 0 && (
+          <View style={{ marginBottom: theme.spacing.md }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+                {formData.images.map((image, index) => (
+                  <View
+                    key={index}
+                    style={{
+                      width: 80,
+                      height: 80,
+                      borderRadius: theme.borderRadius.md,
+                      overflow: 'hidden',
+                      backgroundColor: theme.colors.surfaceVariant,
+                    }}
+                  >
+                    {/* Image would be rendered here */}
+                    <View style={{
+                      flex: 1,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <Text variant="caption">Photo {index + 1}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        )}
+
+        <Text variant="h4" style={{ marginBottom: theme.spacing.sm }}>
+          {formData.title}
+        </Text>
+        
+        <Text variant="body" color="secondary" style={{ marginBottom: theme.spacing.md }}>
+          {formData.description}
+        </Text>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.sm }}>
+          <PriceDisplay amount={Number(formData.price)} size="lg" />
+          {formData.acceptOffers && (
+            <Badge text="Offers accepted" variant="success" style={{ marginLeft: theme.spacing.sm }} />
+          )}
+        </View>
+
+        <View style={{ gap: theme.spacing.xs }}>
+          <Text variant="caption" color="muted">
+            Category: {selectedCategory?.name}
+          </Text>
+          <Text variant="caption" color="muted">
+            Condition: {selectedCondition?.label}
+          </Text>
+          <Text variant="caption" color="muted">
+            Quantity: {formData.quantity}
+          </Text>
+          <Text variant="caption" color="muted">
+            Location: {formData.location}
+          </Text>
+        </View>
+      </View>
+
+      {/* Listing Limit Warning */}
+      {!hasUnlimitedListings() && userListingsCount >= getMaxListings() && (
+        <View style={{
+          backgroundColor: theme.colors.warning + '10',
+          borderColor: theme.colors.warning,
+          borderWidth: 1,
+          padding: theme.spacing.lg,
+          borderRadius: theme.borderRadius.lg,
+        }}>
+          <Text variant="h4" style={{ color: theme.colors.warning, marginBottom: theme.spacing.sm }}>
+            📋 Additional Listing Fee
+          </Text>
+          <Text variant="body" color="secondary" style={{ marginBottom: theme.spacing.md }}>
+            You've reached your limit of {getMaxListings()} active listings. Additional listings cost 10 credits each.
+          </Text>
+          <Text variant="bodySmall" style={{ color: theme.colors.warning }}>
+            Your balance: {balance} credits
+          </Text>
+        </View>
+      )}
+    </View>
+  ), [formData, selectedCategory, selectedCondition, theme, hasUnlimitedListings, userListingsCount, getMaxListings, balance]);
+
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 0: return PhotosStep;
+      case 1: return BasicInfoStep;
+      case 2: return CategoryStep;
+      case 3: return DetailsStep;
+      case 4: return ReviewStep;
+      default: return null;
+    }
+  };
+
+  const currentStepData = STEPS[currentStep];
+  const StepIcon = currentStepData.icon;
 
   return (
     <SafeAreaWrapper>
       <AppHeader
-        title="Create Listing"
+        title="Sell an item"
         showBackButton
-        onBackPress={() => router.back()}
-        rightActions={[
-          <Button
-            variant="icon"
-            icon={<Eye size={20} color={theme.colors.text.primary} />}
-            onPress={() => Alert.alert('Coming Soon', 'Preview feature will be available soon')}
-          />,
-        ]}
+        onBackPress={() => {
+          if (hasUnsavedChanges) {
+            Alert.alert(
+              'Unsaved Changes',
+              'You have unsaved changes. What would you like to do?',
+              [
+                { text: 'Discard', onPress: () => { clearDraft(); router.back(); }, style: 'destructive' },
+                { text: 'Save Draft', onPress: () => { saveDraft(formData); router.back(); } },
+                { text: 'Cancel', style: 'cancel' },
+              ]
+            );
+          } else {
+            router.back();
+          }
+        }}
+
       />
 
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-        <Container>
-          {/* Listing Limit Warning */}
-          {isAtLimit && (
-            <View
-              style={{
-                backgroundColor: theme.colors.warning + '10',
-                borderColor: theme.colors.warning,
-                borderWidth: 1,
-                borderRadius: theme.borderRadius.lg,
-                padding: theme.spacing.lg,
-                marginBottom: theme.spacing.xl,
-              }}
-            >
-              <Text variant="h4" style={{ color: theme.colors.warning, marginBottom: theme.spacing.sm }}>
-                📋 Listing Limit Reached
-              </Text>
-              <Text variant="body" color="secondary" style={{ marginBottom: theme.spacing.md }}>
-                You've reached your limit of {maxListings} active listings. Additional listings cost 10 credits each.
-              </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-                <Text variant="bodySmall" style={{ color: theme.colors.warning }}>
-                  Your balance: {balance} credits
-                </Text>
-                {balance < 10 && (
-                  <Button
-                    variant="ghost"
-                    onPress={() => router.push('/(tabs)/buy-credits')}
-                    size="sm"
-                  >
-                    Buy Credits
-                  </Button>
-                )}
-              </View>
-            </View>
-          )}
-
-          {/* Image Picker */}
-          <View style={{ marginBottom: theme.spacing.xl }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.md }}>
-              <Text variant="h3">Product Photos</Text>
-              <Button
-                variant="ghost"
-                icon={<Camera size={16} color={theme.colors.primary} />}
-                onPress={() => setShowPhotoTips(true)}
-                size="sm"
-              >
-                Photo Tips
-              </Button>
-            </View>
-            
-            <CustomImagePicker
-              limit={8}
-              value={images}
-              onChange={setImages}
-              disabled={loading}
-            />
-            
-            {loading && uploadProgress > 0 && (
-              <View style={{ marginTop: theme.spacing.md }}>
-                <LinearProgress
-                  progress={uploadProgress}
-                  showPercentage
-                />
-                <Text
-                  variant="caption"
-                  color="muted"
-                  style={{ textAlign: 'center', marginTop: theme.spacing.sm }}
-                >
-                  Uploading images... {Math.round(uploadProgress * 100)}%
-                </Text>
-              </View>
+      {/* Autosave Status */}
+      {(isAutoSaving || hasUnsavedChanges || (formData.title || formData.description || formData.images.length > 0)) && (
+        <View style={{
+          paddingHorizontal: theme.spacing.lg,
+          paddingVertical: theme.spacing.sm,
+          backgroundColor: theme.colors.surfaceVariant,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.colors.border,
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+            {isAutoSaving && (
+              <>
+                <View style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: theme.colors.warning,
+                  marginRight: theme.spacing.xs,
+                }} />
+                <Text variant="caption" color="muted">Saving draft...</Text>
+              </>
+            )}
+            {!isAutoSaving && hasUnsavedChanges && (
+              <>
+                <View style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: theme.colors.error,
+                  marginRight: theme.spacing.xs,
+                }} />
+                <Text variant="caption" color="muted">Unsaved changes</Text>
+              </>
+            )}
+            {!isAutoSaving && !hasUnsavedChanges && (formData.title || formData.description || formData.images.length > 0) && (
+              <>
+                <View style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: theme.colors.success,
+                  marginRight: theme.spacing.xs,
+                }} />
+                <Text variant="caption" color="muted">Draft saved</Text>
+              </>
             )}
           </View>
+        </View>
+      )}
 
-          {/* Basic Information */}
-          <View style={{ marginBottom: theme.spacing.xl }}>
-            <Text variant="h3" style={{ marginBottom: theme.spacing.lg }}>
-              Basic Information
-            </Text>
-            
-            <View style={{ gap: theme.spacing.lg }}>
-              <Input
-                label="Product Title"
-                placeholder="e.g., iPhone 14 Pro Max - Excellent Condition"
-                value={title}
-                onChangeText={setTitle}
-                helper="Be descriptive and specific (min. 10 characters)"
-              />
+      <View style={{ flex: 1 }}>
+        {/* Progress Indicator */}
+        <View style={{
+          paddingHorizontal: theme.spacing.lg,
+          paddingVertical: theme.spacing.md,
+          backgroundColor: theme.colors.surface,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.colors.border,
+        }}>
+          <StepIndicator
+            steps={STEPS.map((step, index) => ({
+              title: '', // Remove labels
+              completed: index < currentStep,
+              active: index === currentStep,
+            }))}
+            currentStep={currentStep}
+            showLabels={false}
+          />
+        </View>
 
-              <Input
-                variant="multiline"
-                label="Description"
-                placeholder="Describe your product's condition, features, and any important details..."
-                value={description}
-                onChangeText={setDescription}
-                helper="Include condition, age, reason for selling, etc. (min. 20 characters)"
-                style={{ minHeight: 120 }}
-              />
 
-              <Input
-                label="Price (GHS)"
-                placeholder="0.00"
-                value={price}
-                onChangeText={setPrice}
-                keyboardType="numeric"
-                helper="Set a competitive price"
-              />
 
-              {price && !isNaN(Number(price)) && Number(price) > 0 && (
-                <View style={{ marginTop: -theme.spacing.md }}>
-                  <PriceDisplay amount={Number(price)} size="lg" />
-                </View>
-              )}
-            </View>
+        {/* Step Content */}
+        <ScrollView 
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={{ flex: 1, padding: theme.spacing.lg }}>
+            {renderStepContent()}
           </View>
+        </ScrollView>
 
-          {/* Category Selection */}
-          <View style={{ marginBottom: theme.spacing.xl }}>
-            <Text variant="h4" style={{ marginBottom: theme.spacing.lg }}>
-              Category
-            </Text>
-            
-            <View style={{ 
-              flexDirection: 'row', 
-              flexWrap: 'wrap', 
-              gap: theme.spacing.md 
-            }}>
-              {categories.map((cat) => (
-                <Chip
-                  key={cat.id}
-                  text={cat.name}
-                  variant="category"
-                  selected={selectedCategoryId === cat.id}
-                  onPress={() => setSelectedCategoryId(cat.id)}
-                />
-              ))}
-            </View>
-          </View>
+        {/* Navigation Buttons */}
+        <View style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingHorizontal: theme.spacing.lg,
+          paddingVertical: theme.spacing.lg,
+          backgroundColor: theme.colors.surface,
+          borderTopWidth: 1,
+          borderTopColor: theme.colors.border,
+          gap: theme.spacing.md,
+        }}>
+          <Button
+            variant="secondary"
+            onPress={currentStep === 0 ? () => router.back() : previousStep}
+            disabled={loading}
+            icon={currentStep === 0 ? undefined : <ArrowLeft size={18} color={theme.colors.text.primary} />}
+            style={{ flex: 1 }}
+          >
+            {currentStep === 0 ? 'Cancel' : 'Previous'}
+          </Button>
 
-          {/* Condition Selection */}
-          <View style={{ marginBottom: theme.spacing.xl }}>
-            <Text variant="h4" style={{ marginBottom: theme.spacing.lg }}>
-              Condition
-            </Text>
-            
-            <View style={{ 
-              flexDirection: 'row', 
-              flexWrap: 'wrap', 
-              gap: theme.spacing.md 
-            }}>
-              {conditions.map((cond) => (
-                <Chip
-                  key={cond}
-                  text={cond}
-                  variant="filter"
-                  selected={condition === cond}
-                  onPress={() => setCondition(cond)}
-                />
-              ))}
-            </View>
-          </View>
-
-          {/* Location & Details */}
-          <View style={{ marginBottom: theme.spacing.xl }}>
-            <Text variant="h4" style={{ marginBottom: theme.spacing.lg }}>
-              Location & Details
-            </Text>
-            
-            <View style={{ gap: theme.spacing.lg }}>
-              <LocationPicker
-                value={location}
-                onLocationSelect={setLocation}
-                placeholder="Select your location"
-              />
-
-              <Stepper
-                value={quantity}
-                onValueChange={setQuantity}
-                min={1}
-                max={99}
-                showLabel
-                label="Quantity Available"
-              />
-
-              <View>
-                <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.md }}>
-                  Pricing Options
-                </Text>
-                <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
-                  <Chip
-                    text="Fixed Price"
-                    variant="filter"
-                    selected={!acceptOffers}
-                    onPress={() => setAcceptOffers(false)}
-                  />
-                  <Chip
-                    text="Accept Offers"
-                    variant="filter"
-                    selected={acceptOffers}
-                    onPress={() => setAcceptOffers(true)}
-                  />
-                </View>
-                {acceptOffers && (
-                  <Text variant="caption" color="muted" style={{ marginTop: theme.spacing.sm }}>
-                    Buyers can negotiate the price with you
-                  </Text>
-                )}
-              </View>
-            </View>
-          </View>
-
-          {/* Submit Button */}
-          <View style={{ marginBottom: theme.spacing.xl }}>
-            <Button
-              variant="primary"
-              onPress={handleSubmit}
-              loading={loading}
-              disabled={loading}
-              fullWidth
-              size="lg"
-              icon={<Save size={18} color={theme.colors.primaryForeground} />}
-            >
-              {loading ? 'Creating Listing...' : 'Create Listing'}
-            </Button>
-            
-            {isAtLimit && (
-              <Text variant="caption" color="muted" style={{ textAlign: 'center', marginTop: theme.spacing.md }}>
-                This will cost 10 credits (additional listing fee)
-              </Text>
-            )}
-          </View>
-        </Container>
-      </ScrollView>
+          <Button
+            variant="primary"
+            onPress={currentStep === STEPS.length - 1 ? handleSubmit : nextStep}
+            disabled={!canProceed || loading}
+            loading={loading && currentStep === STEPS.length - 1}
+            icon={currentStep === STEPS.length - 1 ? undefined : <ArrowRight size={18} color={theme.colors.primaryForeground} />}
+            style={{ flex: 1 }}
+          >
+            {currentStep === STEPS.length - 1 ? 'Publish Listing' : 'Next'}
+          </Button>
+        </View>
+      </View>
 
       {/* Payment Modal */}
       <AppModal
@@ -478,95 +1205,82 @@ export default function CreateListingScreen() {
         onClose={() => setShowPaymentModal(false)}
         title="Additional Listing Fee"
         primaryAction={{
-          text: `Pay ${requiredCredits} Credits`,
+          text: `Pay 10 Credits`,
           onPress: handlePayForListing,
           loading: false,
         }}
         secondaryAction={{
           text: 'Buy Credits',
-          onPress: () => {
-            setShowPaymentModal(false);
+                  onPress: () => {
+          setShowPaymentModal(false);
+          try {
             router.push('/(tabs)/buy-credits');
-          },
+          } catch (e) {
+            console.log('Navigation error:', e);
+          }
+        },
         }}
       >
         <View style={{ gap: theme.spacing.lg }}>
-          <View
-            style={{
-              backgroundColor: theme.colors.primary + '10',
-              borderRadius: theme.borderRadius.md,
-              padding: theme.spacing.lg,
-              alignItems: 'center',
-            }}
-          >
+          <View style={{
+            backgroundColor: theme.colors.primary + '10',
+            borderRadius: theme.borderRadius.md,
+            padding: theme.spacing.lg,
+            alignItems: 'center',
+          }}>
             <Text style={{ fontSize: 48, marginBottom: theme.spacing.md }}>📋</Text>
             <Text variant="h4" style={{ fontWeight: '600', marginBottom: theme.spacing.sm }}>
               Listing Limit Reached
             </Text>
             <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
-              You've reached your free listing limit of {maxListings} active listings
+              You've reached your free listing limit of {getMaxListings()} active listings
             </Text>
           </View>
 
-          <View
-            style={{
-              backgroundColor: theme.colors.surfaceVariant,
-              borderRadius: theme.borderRadius.md,
-              padding: theme.spacing.lg,
-            }}
-          >
+          <View style={{
+            backgroundColor: theme.colors.surfaceVariant,
+            borderRadius: theme.borderRadius.md,
+            padding: theme.spacing.lg,
+          }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: theme.spacing.md }}>
               <Text variant="body">Additional listing fee:</Text>
-              <Text variant="body" style={{ fontWeight: '600' }}>
-                {requiredCredits} credits
-              </Text>
+              <Text variant="body" style={{ fontWeight: '600' }}>10 credits</Text>
             </View>
             
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: theme.spacing.md }}>
               <Text variant="body">Your balance:</Text>
-              <Text 
-                variant="body" 
-                style={{ 
-                  fontWeight: '600',
-                  color: balance >= requiredCredits ? theme.colors.success : theme.colors.error,
-                }}
-              >
+              <Text variant="body" style={{ 
+                fontWeight: '600',
+                color: balance >= 10 ? theme.colors.success : theme.colors.error,
+              }}>
                 {balance} credits
               </Text>
             </View>
             
-            {balance >= requiredCredits && (
-              <View
-                style={{
-                  borderTopWidth: 1,
-                  borderTopColor: theme.colors.border,
-                  paddingTop: theme.spacing.md,
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                }}
-              >
-                <Text variant="body" style={{ fontWeight: '600' }}>
-                  After payment:
-                </Text>
-                <Text variant="body" style={{ fontWeight: '600' }}>
-                  {balance - requiredCredits} credits
-                </Text>
+            {balance >= 10 && (
+              <View style={{
+                borderTopWidth: 1,
+                borderTopColor: theme.colors.border,
+                paddingTop: theme.spacing.md,
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+              }}>
+                <Text variant="body" style={{ fontWeight: '600' }}>After payment:</Text>
+                <Text variant="body" style={{ fontWeight: '600' }}>{balance - 10} credits</Text>
               </View>
             )}
           </View>
 
-          {balance < requiredCredits && (
-            <View
-              style={{
-                backgroundColor: theme.colors.error + '10',
-                borderColor: theme.colors.error,
-                borderWidth: 1,
-                borderRadius: theme.borderRadius.md,
-                padding: theme.spacing.md,
-              }}
-            >
+          {balance < 10 && (
+            <View style={{
+              backgroundColor: theme.colors.error + '10',
+              borderColor: theme.colors.error,
+              borderWidth: 1,
+              borderRadius: theme.borderRadius.md,
+              padding: theme.spacing.md,
+            }}>
               <Text variant="bodySmall" style={{ color: theme.colors.error, textAlign: 'center' }}>
-                ⚠️ You need {requiredCredits - balance} more credits to create this listing
+                ⚠️ You need {10 - balance} more credits to create this listing
               </Text>
             </View>
           )}
@@ -635,13 +1349,11 @@ export default function CreateListingScreen() {
             </View>
           </View>
 
-          <View
-            style={{
-              backgroundColor: theme.colors.success + '10',
-              borderRadius: theme.borderRadius.md,
-              padding: theme.spacing.md,
-            }}
-          >
+          <View style={{
+            backgroundColor: theme.colors.success + '10',
+            borderRadius: theme.borderRadius.md,
+            padding: theme.spacing.md,
+          }}>
             <Text variant="bodySmall" style={{ color: theme.colors.success, textAlign: 'center', fontWeight: '500' }}>
               💰 Listings with high-quality photos sell 3x faster!
             </Text>

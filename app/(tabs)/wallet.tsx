@@ -29,7 +29,8 @@ import {
   Gift,
   TrendingUp,
   History,
-  DollarSign
+  DollarSign,
+  UserPlus2
 } from 'lucide-react-native';
 
 export default function WalletScreen() {
@@ -244,7 +245,7 @@ export default function WalletScreen() {
   const walletBalance = profile?.wallet_balance || 0;
   const creditBalance = profile?.credit_balance || 0;
   const pendingBalance = profile?.pending_balance || 0;
-  const totalBalance = walletBalance + creditBalance;
+  const totalWalletBalance = walletBalance + pendingBalance; // Only wallet balances
 
   return (
     <SafeAreaWrapper>
@@ -295,7 +296,7 @@ export default function WalletScreen() {
                 Total Balance
               </Text>
               <PriceDisplay
-                amount={totalBalance}
+                amount={totalWalletBalance}
                 size="xl"
                 currency="GHS"
                 style={{
@@ -352,7 +353,7 @@ export default function WalletScreen() {
                     marginBottom: theme.spacing.xs,
                   }}
                 >
-                  {creditBalance.toFixed(2)}
+                  {Math.floor(creditBalance)}
                 </Text>
                 <Text
                   variant="caption"
@@ -388,7 +389,7 @@ export default function WalletScreen() {
               onPress={() => setShowWithdraw(true)}
               style={{ flex: 1 }}
               size="lg"
-              disabled={totalBalance < 10}
+              disabled={totalWalletBalance < 10}
             >
               Withdraw
             </Button>
@@ -475,7 +476,7 @@ export default function WalletScreen() {
                       alignItems: 'center',
                     }}
                   >
-                    <UserPlus size={24} color={theme.colors.successForeground} />
+                    <UserPlus2 size={24} color={theme.colors.successForeground} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
@@ -597,7 +598,7 @@ export default function WalletScreen() {
             <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.sm }}>
               Available Balance:
             </Text>
-            <PriceDisplay amount={totalBalance} size="lg" />
+            <PriceDisplay amount={totalWalletBalance} size="lg" />
           </View>
 
           <Input
@@ -606,7 +607,7 @@ export default function WalletScreen() {
             value={amount}
             onChangeText={setAmount}
             keyboardType="numeric"
-            helper={`Minimum: GHS 10.00 • Available: GHS ${totalBalance.toFixed(2)}`}
+            helper={`Minimum: GHS 10.00 • Available: GHS ${totalWalletBalance.toFixed(2)}`}
           />
 
           <View

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, ScrollView, TouchableOpacity, Image, RefreshControl } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Image, RefreshControl, Pressable } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useCommunityPosts } from '@/hooks/useCommunity';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -14,6 +14,8 @@ import {
   ErrorState,
   LoadingSkeleton,
   PostCard,
+  CommunitySidebar,
+  SidebarToggle,
 } from '@/components';
 import { Plus, Heart, MessageCircle, Share, MoveHorizontal as MoreHorizontal, Users } from 'lucide-react-native';
 
@@ -21,6 +23,7 @@ export default function CommunityScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
   const { posts, loading, error, refreshing, refresh } = useCommunityPosts();
+  const [sidebarVisible, setSidebarVisible] = useState(false);
 
   // Transform database posts to component format
   const transformedPosts = posts.map((post: any) => ({
@@ -53,13 +56,12 @@ export default function CommunityScreen() {
     <SafeAreaWrapper>
       <AppHeader
         title="Community"
-        rightActions={[
-          <Button
-            variant="icon"
-            icon={<Plus size={20} color={theme.colors.text.primary} />}
-            onPress={() => router.push('/(tabs)/community/create-post')}
-          />,
-        ]}
+        leftAction={
+          <SidebarToggle
+            isOpen={sidebarVisible}
+            onToggle={() => setSidebarVisible(!sidebarVisible)}
+          />
+        }
       />
 
       <View style={{ flex: 1 }}>
@@ -96,6 +98,7 @@ export default function CommunityScreen() {
                 refreshing={refreshing}
                 onRefresh={refresh}
                 tintColor={theme.colors.primary}
+                colors={[theme.colors.primary]}
               />
             }
           >
@@ -121,7 +124,13 @@ export default function CommunityScreen() {
                 <Text variant="body" color="muted" style={{ flex: 1 }}>
                   What's on your mind?
                 </Text>
-                <Plus size={20} color={theme.colors.primary} />
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={<Plus size={16} color="#FFF" />}
+                >
+                  Post
+                </Button>
               </View>
             </TouchableOpacity>
 
@@ -148,6 +157,28 @@ export default function CommunityScreen() {
           />
         )}
       </View>
+
+      {/* Sidebar Overlay */}
+      {sidebarVisible && (
+        <Pressable
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 999,
+          }}
+          onPress={() => setSidebarVisible(false)}
+        />
+      )}
+
+      {/* Community Sidebar */}
+      <CommunitySidebar
+        isVisible={sidebarVisible}
+        onClose={() => setSidebarVisible(false)}
+      />
     </SafeAreaWrapper>
   );
 }

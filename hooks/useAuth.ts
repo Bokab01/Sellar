@@ -3,7 +3,20 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, dbHelpers } from '@/lib/supabase';
 
 export function useAuth() {
-  const { user, session, loading, signIn, signUp, signOut, setUser, setSession, setLoading } = useAuthStore();
+  const { 
+    user, 
+    session, 
+    loading, 
+    signIn, 
+    signUp, 
+    forgotPassword, 
+    resetPassword, 
+    resendVerification, 
+    signOut, 
+    setUser, 
+    setSession, 
+    setLoading 
+  } = useAuthStore();
 
   useEffect(() => {
     // Get initial session
@@ -39,6 +52,9 @@ export function useAuth() {
     loading,
     signIn,
     signUp,
+    forgotPassword,
+    resetPassword,
+    resendVerification,
     signOut,
     isAuthenticated: !!user,
   };

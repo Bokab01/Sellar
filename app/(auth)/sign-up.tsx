@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { View, ScrollView, Alert } from 'react-native';
+import { View, Alert, Platform } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuth } from '@/hooks/useAuth';
+import { validateSignUpForm } from '@/utils/validation';
 import {
   Text,
   SafeAreaWrapper,
@@ -10,6 +11,7 @@ import {
   Button,
   LinkButton,
   LocationPicker,
+  HybridKeyboardAvoidingView,
 } from '@/components';
 import { router } from 'expo-router';
 import { Mail, Lock, User, Phone } from 'lucide-react-native';
@@ -20,20 +22,33 @@ export default function SignUpScreen() {
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleSignUp = async () => {
-    if (!email.trim() || !password.trim() || !firstName.trim() || !lastName.trim()) {
-      Alert.alert('Error', 'Please fill in all required fields');
-      return;
-    }
+    // Clear previous errors
+    setErrors({});
 
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+    // Validate all form fields
+    const validation = validateSignUpForm({
+      email: email.trim(),
+      password,
+      confirmPassword,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      phone: phone.trim(),
+    });
+
+    if (!validation.isValid) {
+      setErrors(validation.errors);
+      // Show the first error in an alert as well
+      const firstError = Object.values(validation.errors)[0];
+      Alert.alert('Validation Error', firstError);
       return;
     }
 
@@ -42,13 +57,17 @@ export default function SignUpScreen() {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       phone: phone.trim() || undefined,
-      location: location || 'Accra, Greater Accra',
+      location: location || undefined,
     });
     
     if (error) {
       Alert.alert('Sign Up Failed', error);
     } else {
-      router.replace('/(tabs)');
+      // Navigate to email verification screen
+      router.push({
+        pathname: '/(auth)/verify-email',
+        params: { email: email.trim() }
+      });
     }
     
     setLoading(false);
@@ -56,13 +75,21 @@ export default function SignUpScreen() {
 
   return (
     <SafeAreaWrapper>
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+      <HybridKeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+        extraScrollHeight={150}
+        contentContainerStyle={{ 
+          flexGrow: 1,
+          paddingBottom: theme.spacing['4xl'],
+        }}
+      >
         <Container>
           <View
             style={{
-              flex: 1,
+              minHeight: '100%',
               justifyContent: 'center',
-              paddingVertical: theme.spacing['2xl'],
+              paddingVertical: theme.spacing['4xl'],
             }}
           >
             {/* Header */}
@@ -83,8 +110,14 @@ export default function SignUpScreen() {
                     label="First Name"
                     placeholder="First name"
                     value={firstName}
-                    onChangeText={setFirstName}
+                    onChangeText={(text) => {
+                      setFirstName(text);
+                      if (errors.firstName) {
+                        setErrors(prev => ({ ...prev, firstName: '' }));
+                      }
+                    }}
                     leftIcon={<User size={20} color={theme.colors.text.muted} />}
+                    error={errors.firstName}
                   />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -92,7 +125,13 @@ export default function SignUpScreen() {
                     label="Last Name"
                     placeholder="Last name"
                     value={lastName}
-                    onChangeText={setLastName}
+                    onChangeText={(text) => {
+                      setLastName(text);
+                      if (errors.lastName) {
+                        setErrors(prev => ({ ...prev, lastName: '' }));
+                      }
+                    }}
+                    error={errors.lastName}
                   />
                 </View>
               </View>
@@ -101,39 +140,73 @@ export default function SignUpScreen() {
                 label="Email"
                 placeholder="Enter your email"
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  if (errors.email) {
+                    setErrors(prev => ({ ...prev, email: '' }));
+                  }
+                }}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 leftIcon={<Mail size={20} color={theme.colors.text.muted} />}
+                error={errors.email}
               />
 
               <Input
                 label="Phone (Optional)"
                 placeholder="Enter your phone number"
                 value={phone}
-                onChangeText={setPhone}
+                onChangeText={(text) => {
+                  setPhone(text);
+                  if (errors.phone) {
+                    setErrors(prev => ({ ...prev, phone: '' }));
+                  }
+                }}
                 keyboardType="phone-pad"
                 leftIcon={<Phone size={20} color={theme.colors.text.muted} />}
+                error={errors.phone}
               />
 
               <View>
                 <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.sm }}>
-                  Location
+                  Location (Optional)
                 </Text>
                 <LocationPicker
                   value={location}
                   onLocationSelect={setLocation}
-                  placeholder="Select your location"
+                  placeholder="Select your location (optional)"
                 />
               </View>
 
               <Input
                 variant="password"
                 label="Password"
-                placeholder="Create a password (min. 6 characters)"
+                placeholder="Create password"
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  if (errors.password) {
+                    setErrors(prev => ({ ...prev, password: '' }));
+                  }
+                }}
                 leftIcon={<Lock size={20} color={theme.colors.text.muted} />}
+                helperText="Must be at least 6 characters"
+                error={errors.password}
+              />
+
+              <Input
+                variant="password"
+                label="Confirm Password"
+                placeholder="Confirm password"
+                value={confirmPassword}
+                onChangeText={(text) => {
+                  setConfirmPassword(text);
+                  if (errors.confirmPassword) {
+                    setErrors(prev => ({ ...prev, confirmPassword: '' }));
+                  }
+                }}
+                leftIcon={<Lock size={20} color={theme.colors.text.muted} />}
+                error={errors.confirmPassword}
               />
 
               <Button
@@ -164,7 +237,7 @@ export default function SignUpScreen() {
             </View>
           </View>
         </Container>
-      </ScrollView>
+      </HybridKeyboardAvoidingView>
     </SafeAreaWrapper>
   );
 }
