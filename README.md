@@ -430,4 +430,5 @@ export function CustomComponent() {
 | `Container` | `padding`, `margin` | Layout container |
 | `CustomImagePicker` | `limit`, `value`, `onChange` | Image selection component |
 
-This design system provides a solid foundation for building consistent, beautiful React Native apps with Expo. The modular structure makes it easy to extend and customize based on your specific needs.
+This design system provides a solid foundation for building consistent, beautiful React Native apps with Expo. The modular structure makes it easy to extend and customize based on your specific needs.#   S e l l a r  
+ 
