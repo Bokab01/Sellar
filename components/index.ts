@@ -128,3 +128,27 @@ export * from '../lib/dataProtectionService';
 export * from '../lib/contentModerationService';
 export * from '../utils/security';
 export * from '../hooks/useSecureAuth';
+
+// Performance Components
+export { OptimizedImage, ListingImage, ProfileImage, CommunityImage } from './OptimizedImage/OptimizedImage';
+export { VirtualizedList, ProductVirtualizedList, ChatVirtualizedList, useVirtualizedList } from './VirtualizedList/VirtualizedList';
+export { LazyComponent, withLazyLoading, createLazyComponent, IntersectionLazyComponent, InteractionLazyComponent } from './LazyComponent/LazyComponent';
+export { OptimizedListingGrid, useOptimizedListingGrid } from './OptimizedListingGrid/OptimizedListingGrid';
+export { 
+  LazyCreateListingScreen, 
+  LazyProfileScreen, 
+  LazySettingsScreen, 
+  LazyMyListingsScreen,
+  MemoryAwareScreen,
+  ProgressiveLoadingWrapper,
+  LazyScreenSection,
+  AdaptiveComponentLoader
+} from './LazyScreens/LazyScreens';
+export { PerformanceDashboard, usePerformanceDashboard } from './PerformanceDashboard/PerformanceDashboard';
+export { IntegrationStatus, useIntegrationStatus } from './IntegrationStatus/IntegrationStatus';
+
+// Performance Services & Hooks
+export * from '../hooks/usePerformanceMonitor';
+export * from '../hooks/useOfflineSync';
+export * from '../lib/offlineStorage';
+export * from '../utils/memoryManager';

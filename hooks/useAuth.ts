@@ -44,7 +44,7 @@ export function useAuth() {
     );
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, []); // Keep empty - Zustand functions are stable
 
   return {
     user,

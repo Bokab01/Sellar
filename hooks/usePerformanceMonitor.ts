@@ -201,7 +201,7 @@ export function usePerformanceMonitor() {
     return unsubscribe;
   }, []);
 
-  // Track component render performance
+  // Track component render performance - only on mount/unmount
   useEffect(() => {
     renderStartTime.current = Date.now();
     
@@ -213,7 +213,7 @@ export function usePerformanceMonitor() {
         timestamp: Date.now(),
       });
     };
-  });
+  }, []); // Add empty dependency array to prevent infinite re-renders
 
   const startTimer = useCallback((key: string) => {
     performanceMonitor.startTimer(key);
@@ -327,7 +327,7 @@ export function useAppStateMonitor() {
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription?.remove();
-  }, [appState, recordEvent]);
+  }, [appState]); // Remove recordEvent from dependencies to prevent circular dependency
 
   return appState;
 }

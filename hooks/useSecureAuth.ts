@@ -3,7 +3,7 @@
  * Enhanced authentication with security features, MFA, and device tracking
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Alert } from 'react-native';
 import { useAuthStore } from '../store/useAuthStore';
 import { securityService, SecurityEvent } from '../lib/securityService';
@@ -50,8 +50,16 @@ export function useSecureAuth() {
   const [loginAttempts, setLoginAttempts] = useState(0);
   const rateLimiter = new RateLimiter(5, 15 * 60 * 1000); // 5 attempts per 15 minutes
 
+  const initializingRef = useRef(false);
+
   useEffect(() => {
-    initializeSecureAuth();
+    // Prevent concurrent initializations
+    if (initializingRef.current) return;
+    
+    initializingRef.current = true;
+    initializeSecureAuth().finally(() => {
+      initializingRef.current = false;
+    });
   }, [user, session]);
 
   useEffect(() => {

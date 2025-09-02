@@ -96,6 +96,7 @@ export default function SignInScreen() {
                 autoCapitalize="none"
                 leftIcon={<Mail size={20} color={theme.colors.text.muted} />}
                 error={emailError}
+
                 style={{ marginBottom: theme.spacing.lg }}
               />
 
@@ -106,6 +107,7 @@ export default function SignInScreen() {
                 value={password}
                 onChangeText={setPassword}
                 leftIcon={<Lock size={20} color={theme.colors.text.muted} />}
+
                 style={{ marginBottom: theme.spacing.xl }}
               />
 

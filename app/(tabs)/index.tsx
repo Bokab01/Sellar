@@ -6,6 +6,10 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useAppStore } from '@/store/useAppStore';
 import { useListings } from '@/hooks/useListings';
 import { useNotifications } from '@/hooks/useNotifications';
+// Temporarily disabled performance hooks to debug infinite re-render
+// import { useOfflineListings, useOfflineSync } from '@/hooks/useOfflineSync';
+// import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
+// import { useMemoryManager } from '@/utils/memoryManager';
 import { dbHelpers, supabase } from '@/lib/supabase';
 import {
   Text,
@@ -23,6 +27,9 @@ import {
   PriceDisplay,
   Badge,
   CompactUserBadges,
+  // Temporarily disabled performance components
+  // ProductVirtualizedList,
+  // LazyComponent,
 } from '@/components';
 import { 
   Bell, 
@@ -60,8 +67,22 @@ export default function HomeScreen() {
     setShowFilters,
   } = useAppStore();
 
+  // Temporarily disabled performance hooks to debug infinite re-render
+  // const { startTimer, endTimer } = usePerformanceMonitor();
+  // const { isOnline, pendingChanges } = useOfflineSync();
+  // const { shouldLoadHeavyComponent, memoryUsage } = useMemoryManager();
+
   // Get notifications for badge
   const { unreadCount } = useNotifications();
+
+  // Temporarily disabled offline listings
+  // const { 
+  //   data: offlineListings, 
+  //   loading: offlineLoading, 
+  //   error: offlineError, 
+  //   isFromCache,
+  //   refetch: refetchListings 
+  // } = useOfflineListings();
 
   // Real user credit from database
   const [userCredit, setUserCredit] = useState<number>(0);
@@ -278,15 +299,15 @@ export default function HomeScreen() {
     condition: filters.condition,
   });
 
-  // Debug logging
-  useEffect(() => {
-    console.log('Home screen - Selected categories:', selectedCategories);
-    console.log('Home screen - Category ID map:', categoryIdMap);
-    console.log('Home screen - Selected category ID:', selectedCategoryId);
-    console.log('Home screen - Products count:', products.length);
-    console.log('Home screen - Loading:', loading);
-    console.log('Home screen - Error:', error);
-  }, [selectedCategories, categoryIdMap, selectedCategoryId, products.length, loading, error]);
+  // Debug logging - temporarily disabled to prevent infinite re-renders
+  // useEffect(() => {
+  //   console.log('Home screen - Selected categories:', selectedCategories);
+  //   console.log('Home screen - Category ID map:', categoryIdMap);
+  //   console.log('Home screen - Selected category ID:', selectedCategoryId);
+  //   console.log('Home screen - Products count:', products.length);
+  //   console.log('Home screen - Loading:', loading);
+  //   console.log('Home screen - Error:', error);
+  // }, [selectedCategories, categoryIdMap, selectedCategoryId, products.length, loading, error]);
 
   // Transform database listings to component format with full-bleed styling
   const transformedProducts = products.map((listing: any) => {

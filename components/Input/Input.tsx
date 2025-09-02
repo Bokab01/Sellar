@@ -25,6 +25,7 @@ interface InputProps extends Omit<TextInputProps, 'style'> {
   rightIcon?: React.ReactNode;
   fullWidth?: boolean;
   containerStyle?: any;
+  style?: any; // Allow style prop for container styling
 }
 
 export function Input({
@@ -37,6 +38,7 @@ export function Input({
   rightIcon,
   fullWidth = true,
   containerStyle,
+  style,
   ...props
 }: InputProps) {
   const { theme } = useTheme();
@@ -71,51 +73,67 @@ export function Input({
       width: fullWidth ? '100%' : 'auto',
     },
     containerStyle,
+    style, // Apply the style prop to the container
   ];
 
-  const inputContainerStyles = [
-    {
-      flexDirection: 'row' as const,
-      alignItems: 'center' as const,
-      borderWidth: 1,
-      borderColor: getBorderColor(),
-      borderRadius: theme.borderRadius.md,
-      backgroundColor: getBackgroundColor(),
-      paddingHorizontal: theme.spacing.md,
-      minHeight: variant === 'multiline' ? 80 : 48,
-    },
-    variant === 'search' && {
+  const inputContainerStyles = {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    borderWidth: 1,
+    borderColor: getBorderColor(),
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: getBackgroundColor(),
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xs, // Add vertical padding for better alignment
+    minHeight: variant === 'multiline' ? 80 : 52, // Slightly increase height for better proportions
+    ...(variant === 'search' && {
       paddingLeft: theme.spacing.sm,
-    },
-  ];
+    }),
+  };
 
-  const inputStyles = [
-    {
-      flex: 1,
-      fontSize: theme.typography.body.fontSize,
-      lineHeight: theme.typography.body.lineHeight,
-      color: isDisabled ? theme.colors.text.muted : theme.colors.text.primary,
-      paddingVertical: theme.spacing.sm,
-    },
-    variant === 'multiline' && {
-      textAlignVertical: 'top' as const,
-      paddingTop: theme.spacing.md,
-    },
-  ];
+  const inputStyles = {
+    flex: 1,
+    fontSize: theme.typography.body.fontSize,
+    lineHeight: theme.typography.body.lineHeight,
+    fontFamily: theme.typography.body.fontFamily,
+    color: isDisabled ? theme.colors.text.muted : theme.colors.text.primary,
+    paddingVertical: variant === 'multiline' ? theme.spacing.md : theme.spacing.sm,
+    paddingHorizontal: 0, // Remove horizontal padding to prevent alignment issues
+    includeFontPadding: false, // Android: Remove extra font padding
+    textAlignVertical: variant === 'multiline' ? 'top' : 'center',
+    height: variant === 'multiline' ? undefined : 40, // Fixed height for single-line inputs
+    ...(variant === 'multiline' && {
+      minHeight: 60,
+    }),
+  };
 
   const renderLeftIcon = () => {
     if (variant === 'search') {
       return (
-        <Search
-          size={20}
-          color={theme.colors.text.muted}
-          style={{ marginRight: theme.spacing.sm }}
-        />
+        <View style={{ 
+          marginRight: theme.spacing.sm,
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: 40, // Match input height
+          width: 24, // Fixed width for consistent alignment
+        }}>
+          <Search
+            size={20}
+            color={theme.colors.text.muted}
+          />
+        </View>
       );
     }
     if (leftIcon) {
       return (
-        <View style={{ marginRight: theme.spacing.sm }}>
+        <View style={{ 
+          marginRight: theme.spacing.sm,
+          alignItems: 'center',
+          justifyContent: variant === 'multiline' ? 'flex-start' : 'center',
+          height: variant === 'multiline' ? 60 : 40, // Match input height
+          width: 24, // Fixed width for consistent alignment
+          paddingTop: variant === 'multiline' ? theme.spacing.md : 0,
+        }}>
           {leftIcon}
         </View>
       );
@@ -128,7 +146,15 @@ export function Input({
       return (
         <TouchableOpacity
           onPress={() => setShowPassword(!showPassword)}
-          style={{ padding: theme.spacing.xs, marginLeft: theme.spacing.sm }}
+          style={{ 
+            padding: theme.spacing.xs, 
+            marginLeft: theme.spacing.sm,
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: variant === 'multiline' ? 60 : 40, // Match input height
+            width: 32, // Slightly wider for touch target
+            paddingTop: variant === 'multiline' ? theme.spacing.md : 0,
+          }}
         >
           {showPassword ? (
             <EyeOff size={20} color={theme.colors.text.muted} />
@@ -140,7 +166,14 @@ export function Input({
     }
     if (rightIcon) {
       return (
-        <View style={{ marginLeft: theme.spacing.sm }}>
+        <View style={{ 
+          marginLeft: theme.spacing.sm,
+          alignItems: 'center',
+          justifyContent: variant === 'multiline' ? 'flex-start' : 'center',
+          height: variant === 'multiline' ? 60 : 40, // Match input height
+          width: 24, // Fixed width for consistent alignment
+          paddingTop: variant === 'multiline' ? theme.spacing.md : 0,
+        }}>
           {rightIcon}
         </View>
       );
@@ -150,6 +183,7 @@ export function Input({
 
   return (
     <View style={containerStyles}>
+      
       {label && (
         <Text
           variant="bodySmall"
@@ -167,6 +201,8 @@ export function Input({
           ref={inputRef}
           style={inputStyles}
           placeholderTextColor={theme.colors.text.muted}
+          selectionColor={theme.colors.primary}
+          cursorColor={theme.colors.primary}
           secureTextEntry={variant === 'password' && !showPassword}
           multiline={variant === 'multiline'}
           numberOfLines={variant === 'multiline' ? 4 : 1}

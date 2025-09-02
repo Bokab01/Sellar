@@ -7,9 +7,12 @@ import { Avatar } from '@/components/Avatar/Avatar';
 import { Badge } from '@/components/Badge/Badge';
 import { PriceDisplay } from '@/components/PriceDisplay/PriceDisplay';
 import { CompactUserBadges } from '@/components/UserBadges/UserBadges';
+import { ListingImage } from '@/components/OptimizedImage/OptimizedImage';
+import { useMemoryManager } from '@/utils/memoryManager';
 
 interface ProductCardProps {
   image: ImageSourcePropType | string;
+  imagePath?: string; // For optimized images from storage
   title: string;
   price: number;
   currency?: string;
@@ -34,6 +37,7 @@ interface ProductCardProps {
 
 export function ProductCard({
   image,
+  imagePath,
   title,
   price,
   currency = 'GHS',
@@ -48,6 +52,7 @@ export function ProductCard({
   fullWidth = false,
 }: ProductCardProps) {
   const { theme } = useTheme();
+  const { shouldLoadHeavyComponent } = useMemoryManager();
 
   const imageSource = typeof image === 'string' ? { uri: image } : image;
   
@@ -72,15 +77,32 @@ export function ProductCard({
     >
       {/* Image Container */}
       <View style={{ position: 'relative' }}>
-        <Image
-          source={imageSource}
-          style={{
-            width: '100%',
-            height: imageHeight,
-            backgroundColor: theme.colors.surfaceVariant,
-          }}
-          resizeMode="cover"
-        />
+        {imagePath ? (
+          <ListingImage
+            path={imagePath}
+            style={{
+              width: '100%',
+              height: imageHeight,
+            }}
+            containerStyle={{
+              backgroundColor: theme.colors.surfaceVariant,
+            }}
+            width={isGridLayout ? 300 : 400}
+            height={imageHeight}
+            resizeMode="cover"
+            enableLazyLoading={shouldLoadHeavyComponent()}
+          />
+        ) : (
+          <Image
+            source={imageSource}
+            style={{
+              width: '100%',
+              height: imageHeight,
+              backgroundColor: theme.colors.surfaceVariant,
+            }}
+            resizeMode="cover"
+          />
+        )}
         
         {badge && (
           <View style={{

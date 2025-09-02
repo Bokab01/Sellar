@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, Image, ImageStyle, ViewStyle, Dimensions } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
+import { Text } from '@/components/Typography/Text';
 import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
 import { imageOptimization, ImageVariant } from '@/lib/imageOptimization';
 
@@ -92,7 +93,7 @@ export function OptimizedImage({
         height: optimalDimensions.height,
         quality,
         format: preferWebP ? 'webp' : 'jpeg',
-        resize: resizeMode,
+        resize: 'cover',
       });
 
       setImageUrl(transformedUrl);
@@ -146,13 +147,11 @@ export function OptimizedImage({
     containerStyle,
   ];
 
-  const imageStyles = [
-    {
-      width: '100%',
-      height: '100%',
-    },
-    style,
-  ];
+  const imageStyles: ImageStyle = {
+    width: '100%' as any,
+    height: '100%' as any,
+    ...style,
+  };
 
   if (!shouldLoad) {
     return (
@@ -175,7 +174,7 @@ export function OptimizedImage({
           {placeholder || (
             <LoadingSkeleton
               width="100%"
-              height="100%"
+              height={height || 200}
               style={{ borderRadius: 0 }}
             />
           )}
@@ -191,8 +190,6 @@ export function OptimizedImage({
           onError={handleImageError}
           // Progressive loading for better UX
           progressiveRenderingEnabled={true}
-          // Cache the image
-          cache="force-cache"
         />
       )}
       
