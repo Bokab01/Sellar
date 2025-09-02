@@ -256,28 +256,57 @@ CREATE TABLE IF NOT EXISTS messages (
     conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE NOT NULL,
     sender_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
     
-    -- Message Content
+    -- Basic required fields
     content TEXT NOT NULL CHECK (char_length(content) >= 1 AND char_length(content) <= 2000),
-    message_type TEXT DEFAULT 'text' CHECK (message_type IN ('text', 'image', 'file', 'offer', 'system')),
-    
-    -- Attachments
-    attachments JSONB DEFAULT '[]'::jsonb,
-    
-    -- Message Status
-    is_read BOOLEAN DEFAULT FALSE,
-    is_edited BOOLEAN DEFAULT FALSE,
-    is_deleted BOOLEAN DEFAULT FALSE,
-    deleted_at TIMESTAMPTZ,
-    
-    -- Offer-specific fields (when message_type = 'offer')
-    offer_amount DECIMAL(10,2),
-    offer_status TEXT CHECK (offer_status IN ('pending', 'accepted', 'rejected', 'expired')),
-    offer_expires_at TIMESTAMPTZ,
     
     -- Timestamps
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Add missing columns to messages table
+DO $$
+BEGIN
+    -- Message type
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'messages' AND column_name = 'message_type') THEN
+        ALTER TABLE messages ADD COLUMN message_type TEXT DEFAULT 'text' CHECK (message_type IN ('text', 'image', 'file', 'offer', 'system'));
+    END IF;
+    
+    -- Attachments
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'messages' AND column_name = 'attachments') THEN
+        ALTER TABLE messages ADD COLUMN attachments JSONB DEFAULT '[]'::jsonb;
+    END IF;
+    
+    -- Message Status
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'messages' AND column_name = 'is_read') THEN
+        ALTER TABLE messages ADD COLUMN is_read BOOLEAN DEFAULT FALSE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'messages' AND column_name = 'is_edited') THEN
+        ALTER TABLE messages ADD COLUMN is_edited BOOLEAN DEFAULT FALSE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'messages' AND column_name = 'is_deleted') THEN
+        ALTER TABLE messages ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'messages' AND column_name = 'deleted_at') THEN
+        ALTER TABLE messages ADD COLUMN deleted_at TIMESTAMPTZ;
+    END IF;
+    
+    -- Offer-specific fields
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'messages' AND column_name = 'offer_amount') THEN
+        ALTER TABLE messages ADD COLUMN offer_amount DECIMAL(10,2);
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'messages' AND column_name = 'offer_status') THEN
+        ALTER TABLE messages ADD COLUMN offer_status TEXT CHECK (offer_status IN ('pending', 'accepted', 'rejected', 'expired'));
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'messages' AND column_name = 'offer_expires_at') THEN
+        ALTER TABLE messages ADD COLUMN offer_expires_at TIMESTAMPTZ;
+    END IF;
+END $$;
 
 -- Add indexes for messages
 CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
@@ -296,25 +325,42 @@ CREATE TABLE IF NOT EXISTS offers (
     buyer_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
     seller_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
     
-    -- Offer Details
+    -- Basic required fields
     amount DECIMAL(10,2) NOT NULL CHECK (amount > 0),
     currency TEXT NOT NULL DEFAULT 'GHS',
-    message TEXT CHECK (char_length(message) <= 500),
-    
-    -- Offer Status
-    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected', 'expired', 'withdrawn')),
-    
-    -- Response Details
-    response_message TEXT CHECK (char_length(response_message) <= 500),
-    responded_at TIMESTAMPTZ,
-    
-    -- Expiry
-    expires_at TIMESTAMPTZ DEFAULT (now() + INTERVAL '7 days'),
     
     -- Timestamps
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Add missing columns to offers table
+DO $$
+BEGIN
+    -- Offer details
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'message') THEN
+        ALTER TABLE offers ADD COLUMN message TEXT CHECK (char_length(message) <= 500);
+    END IF;
+    
+    -- Offer Status
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'status') THEN
+        ALTER TABLE offers ADD COLUMN status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected', 'expired', 'withdrawn'));
+    END IF;
+    
+    -- Response Details
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'response_message') THEN
+        ALTER TABLE offers ADD COLUMN response_message TEXT CHECK (char_length(response_message) <= 500);
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'responded_at') THEN
+        ALTER TABLE offers ADD COLUMN responded_at TIMESTAMPTZ;
+    END IF;
+    
+    -- Expiry
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'offers' AND column_name = 'expires_at') THEN
+        ALTER TABLE offers ADD COLUMN expires_at TIMESTAMPTZ DEFAULT (now() + INTERVAL '7 days');
+    END IF;
+END $$;
 
 -- Add indexes for offers
 CREATE INDEX IF NOT EXISTS idx_offers_listing_id ON offers(listing_id);
@@ -335,41 +381,94 @@ CREATE TABLE IF NOT EXISTS posts (
     -- Post Content
     title TEXT CHECK (char_length(title) >= 5 AND char_length(title) <= 200),
     content TEXT NOT NULL CHECK (char_length(content) >= 10 AND char_length(content) <= 5000),
-    post_type TEXT DEFAULT 'general' CHECK (post_type IN ('general', 'question', 'tip', 'review', 'announcement')),
     
-    -- Optional listing reference (for posts about specific listings)
-    listing_id UUID REFERENCES listings(id) ON DELETE SET NULL,
-    
-    -- Media and Location
-    images JSONB DEFAULT '[]'::jsonb,
-    location TEXT,
-    
-    -- Engagement
-    likes_count INTEGER DEFAULT 0,
-    comments_count INTEGER DEFAULT 0,
-    shares_count INTEGER DEFAULT 0,
-    views_count INTEGER DEFAULT 0,
-    
-    -- Post Status
-    status TEXT DEFAULT 'published' CHECK (status IN ('draft', 'published', 'archived', 'reported', 'removed')),
-    is_pinned BOOLEAN DEFAULT FALSE,
-    is_featured BOOLEAN DEFAULT FALSE,
-    
-    -- Moderation
-    reported_count INTEGER DEFAULT 0,
-    is_moderated BOOLEAN DEFAULT FALSE,
-    moderated_by UUID REFERENCES profiles(id),
-    moderated_at TIMESTAMPTZ,
-    moderation_reason TEXT,
-    
-    -- Tags and Categories
-    tags TEXT[] DEFAULT '{}',
-    category TEXT,
-    
-    -- Timestamps
+    -- Timestamps (basic columns first)
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Add missing columns to posts table
+DO $$
+BEGIN
+    -- Post type
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'posts' AND column_name = 'post_type') THEN
+        ALTER TABLE posts ADD COLUMN post_type TEXT DEFAULT 'general' CHECK (post_type IN ('general', 'question', 'tip', 'review', 'announcement'));
+    END IF;
+    
+    -- Optional listing reference
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'posts' AND column_name = 'listing_id') THEN
+        ALTER TABLE posts ADD COLUMN listing_id UUID REFERENCES listings(id) ON DELETE SET NULL;
+    END IF;
+    
+    -- Media and Location
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'posts' AND column_name = 'images') THEN
+        ALTER TABLE posts ADD COLUMN images JSONB DEFAULT '[]'::jsonb;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'posts' AND column_name = 'location') THEN
+        ALTER TABLE posts ADD COLUMN location TEXT;
+    END IF;
+    
+    -- Engagement
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'posts' AND column_name = 'likes_count') THEN
+        ALTER TABLE posts ADD COLUMN likes_count INTEGER DEFAULT 0;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'posts' AND column_name = 'comments_count') THEN
+        ALTER TABLE posts ADD COLUMN comments_count INTEGER DEFAULT 0;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'posts' AND column_name = 'shares_count') THEN
+        ALTER TABLE posts ADD COLUMN shares_count INTEGER DEFAULT 0;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'posts' AND column_name = 'views_count') THEN
+        ALTER TABLE posts ADD COLUMN views_count INTEGER DEFAULT 0;
+    END IF;
+    
+    -- Post Status
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'posts' AND column_name = 'status') THEN
+        ALTER TABLE posts ADD COLUMN status TEXT DEFAULT 'published' CHECK (status IN ('draft', 'published', 'archived', 'reported', 'removed'));
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'posts' AND column_name = 'is_pinned') THEN
+        ALTER TABLE posts ADD COLUMN is_pinned BOOLEAN DEFAULT FALSE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'posts' AND column_name = 'is_featured') THEN
+        ALTER TABLE posts ADD COLUMN is_featured BOOLEAN DEFAULT FALSE;
+    END IF;
+    
+    -- Moderation
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'posts' AND column_name = 'reported_count') THEN
+        ALTER TABLE posts ADD COLUMN reported_count INTEGER DEFAULT 0;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'posts' AND column_name = 'is_moderated') THEN
+        ALTER TABLE posts ADD COLUMN is_moderated BOOLEAN DEFAULT FALSE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'posts' AND column_name = 'moderated_by') THEN
+        ALTER TABLE posts ADD COLUMN moderated_by UUID REFERENCES profiles(id);
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'posts' AND column_name = 'moderated_at') THEN
+        ALTER TABLE posts ADD COLUMN moderated_at TIMESTAMPTZ;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'posts' AND column_name = 'moderation_reason') THEN
+        ALTER TABLE posts ADD COLUMN moderation_reason TEXT;
+    END IF;
+    
+    -- Tags and Categories
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'posts' AND column_name = 'tags') THEN
+        ALTER TABLE posts ADD COLUMN tags TEXT[] DEFAULT '{}';
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'posts' AND column_name = 'category') THEN
+        ALTER TABLE posts ADD COLUMN category TEXT;
+    END IF;
+END $$;
 
 -- Add indexes for posts
 CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);
@@ -423,31 +522,61 @@ CREATE TABLE IF NOT EXISTS notifications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
     
-    -- Notification Content
+    -- Basic required fields
     title TEXT NOT NULL CHECK (char_length(title) <= 100),
     message TEXT NOT NULL CHECK (char_length(message) <= 500),
-    notification_type TEXT NOT NULL CHECK (notification_type IN (
-        'message', 'offer', 'listing_sold', 'listing_expired', 'payment_received', 
-        'payment_failed', 'post_liked', 'post_commented', 'follow', 'system'
-    )),
-    
-    -- Related Entities
-    related_id UUID, -- ID of related entity (listing, message, post, etc.)
-    related_type TEXT, -- Type of related entity
-    
-    -- Notification Status
-    is_read BOOLEAN DEFAULT FALSE,
-    is_sent BOOLEAN DEFAULT FALSE,
-    
-    -- Delivery Channels
-    sent_push BOOLEAN DEFAULT FALSE,
-    sent_email BOOLEAN DEFAULT FALSE,
-    sent_sms BOOLEAN DEFAULT FALSE,
     
     -- Timestamps
-    created_at TIMESTAMPTZ DEFAULT now(),
-    read_at TIMESTAMPTZ
+    created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Add missing columns to notifications table
+DO $$
+BEGIN
+    -- Notification type
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'notification_type') THEN
+        ALTER TABLE notifications ADD COLUMN notification_type TEXT NOT NULL DEFAULT 'system' CHECK (notification_type IN (
+            'message', 'offer', 'listing_sold', 'listing_expired', 'payment_received', 
+            'payment_failed', 'post_liked', 'post_commented', 'follow', 'system'
+        ));
+    END IF;
+    
+    -- Related Entities
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'related_id') THEN
+        ALTER TABLE notifications ADD COLUMN related_id UUID;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'related_type') THEN
+        ALTER TABLE notifications ADD COLUMN related_type TEXT;
+    END IF;
+    
+    -- Notification Status
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'is_read') THEN
+        ALTER TABLE notifications ADD COLUMN is_read BOOLEAN DEFAULT FALSE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'is_sent') THEN
+        ALTER TABLE notifications ADD COLUMN is_sent BOOLEAN DEFAULT FALSE;
+    END IF;
+    
+    -- Delivery Channels
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'sent_push') THEN
+        ALTER TABLE notifications ADD COLUMN sent_push BOOLEAN DEFAULT FALSE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'sent_email') THEN
+        ALTER TABLE notifications ADD COLUMN sent_email BOOLEAN DEFAULT FALSE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'sent_sms') THEN
+        ALTER TABLE notifications ADD COLUMN sent_sms BOOLEAN DEFAULT FALSE;
+    END IF;
+    
+    -- Additional timestamp
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'read_at') THEN
+        ALTER TABLE notifications ADD COLUMN read_at TIMESTAMPTZ;
+    END IF;
+END $$;
 
 -- Add indexes for notifications
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
@@ -463,37 +592,77 @@ CREATE TABLE IF NOT EXISTS user_settings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL UNIQUE,
     
-    -- Notification Preferences
+    -- Basic preferences
     notifications_enabled BOOLEAN DEFAULT TRUE,
-    push_notifications BOOLEAN DEFAULT TRUE,
-    email_notifications BOOLEAN DEFAULT TRUE,
-    sms_notifications BOOLEAN DEFAULT FALSE,
-    
-    -- Specific Notification Types
-    notify_messages BOOLEAN DEFAULT TRUE,
-    notify_offers BOOLEAN DEFAULT TRUE,
-    notify_sales BOOLEAN DEFAULT TRUE,
-    notify_posts BOOLEAN DEFAULT TRUE,
-    notify_marketing BOOLEAN DEFAULT FALSE,
-    
-    -- Privacy Settings
-    profile_searchable BOOLEAN DEFAULT TRUE,
-    show_online_status BOOLEAN DEFAULT TRUE,
-    allow_friend_requests BOOLEAN DEFAULT TRUE,
-    
-    -- App Preferences
     language TEXT DEFAULT 'en',
     currency TEXT DEFAULT 'GHS',
     timezone TEXT DEFAULT 'Africa/Accra',
-    theme TEXT DEFAULT 'system' CHECK (theme IN ('light', 'dark', 'system')),
     
     -- Timestamps
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- Add missing columns to user_settings table
+DO $$
+BEGIN
+    -- Notification Preferences
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'push_notifications') THEN
+        ALTER TABLE user_settings ADD COLUMN push_notifications BOOLEAN DEFAULT TRUE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'email_notifications') THEN
+        ALTER TABLE user_settings ADD COLUMN email_notifications BOOLEAN DEFAULT TRUE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'sms_notifications') THEN
+        ALTER TABLE user_settings ADD COLUMN sms_notifications BOOLEAN DEFAULT FALSE;
+    END IF;
+    
+    -- Specific Notification Types
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'notify_messages') THEN
+        ALTER TABLE user_settings ADD COLUMN notify_messages BOOLEAN DEFAULT TRUE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'notify_offers') THEN
+        ALTER TABLE user_settings ADD COLUMN notify_offers BOOLEAN DEFAULT TRUE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'notify_sales') THEN
+        ALTER TABLE user_settings ADD COLUMN notify_sales BOOLEAN DEFAULT TRUE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'notify_posts') THEN
+        ALTER TABLE user_settings ADD COLUMN notify_posts BOOLEAN DEFAULT TRUE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'notify_marketing') THEN
+        ALTER TABLE user_settings ADD COLUMN notify_marketing BOOLEAN DEFAULT FALSE;
+    END IF;
+    
+    -- Privacy Settings
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'profile_searchable') THEN
+        ALTER TABLE user_settings ADD COLUMN profile_searchable BOOLEAN DEFAULT TRUE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'show_online_status') THEN
+        ALTER TABLE user_settings ADD COLUMN show_online_status BOOLEAN DEFAULT TRUE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'allow_friend_requests') THEN
+        ALTER TABLE user_settings ADD COLUMN allow_friend_requests BOOLEAN DEFAULT TRUE;
+    END IF;
+    
+    -- Theme with CHECK constraint
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'user_settings' AND column_name = 'theme') THEN
+        ALTER TABLE user_settings ADD COLUMN theme TEXT DEFAULT 'system' CHECK (theme IN ('light', 'dark', 'system'));
+    END IF;
+END $$;
+
 -- Add indexes for user_settings
 CREATE INDEX IF NOT EXISTS idx_user_settings_user_id ON user_settings(user_id);
+
+
 
 -- =============================================
 -- ENABLE ROW LEVEL SECURITY
@@ -507,6 +676,7 @@ ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
+
 
 -- =============================================
 -- BASIC RLS POLICIES (More detailed policies in next migration)
@@ -561,6 +731,8 @@ FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can update own settings" ON user_settings
 FOR UPDATE USING (auth.uid() = user_id);
 
+
+
 -- =============================================
 -- FUNCTIONS AND TRIGGERS
 -- =============================================
@@ -595,6 +767,8 @@ FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_user_settings_updated_at BEFORE UPDATE ON user_settings
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+
 
 -- =============================================
 -- VERIFICATION

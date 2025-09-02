@@ -16,6 +16,9 @@ import {
   Rating,
   ProductCard,
   ReviewCard,
+  ReviewsList,
+  ReviewSummary,
+  CompactReviewSummary,
   EmptyState,
   ErrorState,
   LoadingSkeleton,
@@ -73,14 +76,12 @@ export default function UserProfileScreen() {
     // TODO: Add user filter to useCommunityPosts hook
   });
 
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [reviewsLoading, setReviewsLoading] = useState(false);
+  // Reviews are now handled by ReviewsList component
 
   useEffect(() => {
     if (profileId) {
       fetchProfile();
       checkFollowStatus();
-      fetchReviews();
     }
   }, [profileId]);
 
@@ -124,44 +125,13 @@ export default function UserProfileScreen() {
     }
   };
 
-  const fetchReviews = async () => {
-    try {
-      setReviewsLoading(true);
-      
-      const { data, error } = await supabase
-        .from('reviews')
-        .select(`
-          *,
-          reviewer:reviewer_id (
-            id,
-            first_name,
-            last_name,
-            avatar_url
-          ),
-          listings (
-            title
-          )
-        `)
-        .eq('reviewed_id', profileId)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (!error && data) {
-        setReviews(data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch reviews:', err);
-    } finally {
-      setReviewsLoading(false);
-    }
-  };
+  // Reviews fetching is now handled by useReviews hook in ReviewsList component
 
   const handleRefresh = async () => {
     setRefreshing(true);
     await Promise.all([
       fetchProfile(),
       checkFollowStatus(),
-      fetchReviews(),
       refreshListings(),
       refreshPosts(),
     ]);
@@ -323,21 +293,11 @@ export default function UserProfileScreen() {
     location: listing.location,
   }));
 
-  const transformedReviews = reviews.map((review: any) => ({
-    reviewer: {
-      name: `${review.reviewer?.first_name} ${review.reviewer?.last_name}`,
-      avatar: review.reviewer?.avatar_url,
-    },
-    rating: review.rating,
-    comment: review.comment,
-    timestamp: new Date(review.created_at).toLocaleDateString(),
-    verified: review.is_verified_purchase,
-    helpful: review.helpful_count,
-  }));
+  // Reviews transformation is now handled by ReviewsList component
 
   const tabs = [
     { id: 'listings', label: 'Listings', count: filteredListings.length },
-    { id: 'reviews', label: 'Reviews', count: reviews.length },
+    { id: 'reviews', label: 'Reviews', count: null }, // Count will be handled by ReviewsList
     { id: 'about', label: 'About', count: null },
     { id: 'posts', label: 'Posts', count: filteredPosts.length },
   ];
@@ -370,24 +330,21 @@ export default function UserProfileScreen() {
         );
 
       case 'reviews':
-        return reviewsLoading ? (
-          <View style={{ gap: theme.spacing.md }}>
-            {Array.from({ length: 3 }).map((_, index) => (
-              <LoadingSkeleton key={index} width="100%" height={120} borderRadius={theme.borderRadius.lg} />
-            ))}
+        return (
+          <View>
+            {/* Review Summary */}
+            <ReviewSummary 
+              userId={profileId!} 
+              style={{ marginBottom: theme.spacing.lg }} 
+            />
+            
+            {/* Reviews List */}
+            <ReviewsList
+              userId={profileId}
+              showWriteReview={!isOwnProfile}
+              reviewedUserName={profile ? `${profile.first_name} ${profile.last_name}` : 'User'}
+            />
           </View>
-        ) : transformedReviews.length > 0 ? (
-          <View style={{ gap: theme.spacing.md }}>
-            {transformedReviews.map((review, index) => (
-              <ReviewCard key={index} {...review} />
-            ))}
-          </View>
-        ) : (
-          <EmptyState
-            icon={<Star size={48} color={theme.colors.text.muted} />}
-            title="No reviews yet"
-            description={isOwnProfile ? "You haven't received any reviews yet" : `${profile.first_name} hasn't received any reviews yet`}
-          />
         );
 
       case 'about':
@@ -425,9 +382,7 @@ export default function UserProfileScreen() {
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
                   <Star size={16} color={theme.colors.warning} />
-                  <Text variant="body" color="secondary">
-                    {profile.rating?.toFixed(1) || '0.0'} rating • {profile.total_reviews || 0} reviews
-                  </Text>
+                                  <CompactReviewSummary userId={profileId!} />
                 </View>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
@@ -571,13 +526,7 @@ export default function UserProfileScreen() {
               {/* User Badges */}
               <FullUserBadges userId={profileId} />
 
-              <Rating
-                rating={profile.rating || 0}
-                size="md"
-                showValue
-                showCount
-                reviewCount={profile.total_reviews || 0}
-              />
+              <CompactReviewSummary userId={profileId!} />
 
               {profile.last_seen && !profile.is_online && (
                 <Text variant="caption" color="muted" style={{ marginTop: theme.spacing.sm }}>
@@ -608,12 +557,7 @@ export default function UserProfileScreen() {
                 </Text>
               </View>
               <View style={{ alignItems: 'center' }}>
-                <Text variant="h3" style={{ fontWeight: '700' }}>
-                  {profile.total_reviews || 0}
-                </Text>
-                <Text variant="caption" color="muted">
-                  Reviews
-                </Text>
+                <CompactReviewSummary userId={profileId!} />
               </View>
               <View style={{ alignItems: 'center' }}>
                 <Text variant="h3" style={{ fontWeight: '700' }}>

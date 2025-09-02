@@ -24,6 +24,9 @@ export { ChatBubble } from './ChatBubble/ChatBubble';
 export { ListItem } from './ListItem/ListItem';
 export { Rating } from './Rating/Rating';
 export { ReviewCard } from './ReviewCard/ReviewCard';
+export { ReviewForm } from './ReviewForm/ReviewForm';
+export { ReviewsList } from './ReviewsList/ReviewsList';
+export { ReviewSummary, CompactReviewSummary } from './ReviewSummary/ReviewSummary';
 export { PostCard } from './PostCard/PostCard';
 export { CommentCard } from './CommentCard/CommentCard';
 

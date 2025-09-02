@@ -14,6 +14,9 @@ import {
   PriceDisplay,
   UserProfile,
   ReviewCard,
+  ReviewsList,
+  ReviewSummary,
+  CompactReviewSummary,
   EmptyState,
   ErrorState,
   LoadingSkeleton,
@@ -66,7 +69,7 @@ export default function ListingDetailScreen() {
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
 
   // Related items state
-  const [activeRelatedTab, setActiveRelatedTab] = useState<'seller' | 'similar'>('seller');
+  const [activeRelatedTab, setActiveRelatedTab] = useState<'seller' | 'similar' | 'reviews'>('seller');
   const [sellerListings, setSellerListings] = useState<any[]>([]);
   const [similarListings, setSimilarListings] = useState<any[]>([]);
   const [sellerListingsLoading, setSellerListingsLoading] = useState(false);
@@ -151,7 +154,7 @@ export default function ListingDetailScreen() {
 
         // Combine the data
         const combinedData = {
-          ...listingData,
+          ...(listingData as any),
           profiles: profileResult.data || null,
           categories: categoryResult.data || null
         };
@@ -247,7 +250,7 @@ export default function ListingDetailScreen() {
     // Fetch seller's other items
     setSellerListingsLoading(true);
     try {
-      let { data: sellerData, error: sellerError } = await supabase
+      let { data: sellerData, error: sellerError }: { data: any[] | null, error: any } = await supabase
         .from('listings')
         .select(`
           *,
@@ -278,7 +281,7 @@ export default function ListingDetailScreen() {
           .order('created_at', { ascending: false })
           .limit(8);
         
-        sellerData = (basicSellerData as any[])?.map(item => ({
+        sellerData = (basicSellerData as any[] || []).map(item => ({
           ...item,
           profiles: listing.profiles // Use the main listing's profile data
         })) || [];
@@ -311,7 +314,7 @@ export default function ListingDetailScreen() {
     // Fetch similar items (same category, different seller)
     setSimilarListingsLoading(true);
     try {
-      let { data: similarData, error: similarError } = await supabase
+      let { data: similarData, error: similarError }: { data: any[] | null, error: any } = await supabase
         .from('listings')
         .select(`
           *,
@@ -344,7 +347,7 @@ export default function ListingDetailScreen() {
           .order('created_at', { ascending: false })
           .limit(8);
         
-        similarData = (basicSimilarData as any[])?.map(item => ({
+        similarData = (basicSimilarData as any[] || []).map(item => ({
           ...item,
           profiles: null // We don't have profile data for similar items in fallback
         })) || [];
@@ -900,9 +903,9 @@ export default function ListingDetailScreen() {
                     <Badge text="Verified" variant="success" size="sm" />
                   )}
                 </View>
-                <Text variant="bodySmall" color="secondary" style={{ marginTop: theme.spacing.xs }}>
-                  ⭐ {listing.profiles.rating?.toFixed(1) || '0.0'} ({listing.profiles.total_reviews || 0} reviews)
-                </Text>
+                <View style={{ marginTop: theme.spacing.xs }}>
+                  <CompactReviewSummary userId={listing.profiles.id} />
+                </View>
                 <Text variant="bodySmall" color="secondary" style={{ marginTop: theme.spacing.xs }}>
                   📍 {listing.profiles.location}
                 </Text>
@@ -1090,6 +1093,29 @@ export default function ListingDetailScreen() {
                 Similar Items
               </Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setActiveRelatedTab('reviews')}
+              style={{
+                flex: 1,
+                paddingVertical: theme.spacing.lg,
+                paddingHorizontal: theme.spacing.lg,
+                borderBottomWidth: 2,
+                borderBottomColor: activeRelatedTab === 'reviews' ? theme.colors.primary : 'transparent',
+                alignItems: 'center',
+              }}
+              activeOpacity={0.7}
+            >
+              <Text
+                variant="button"
+                style={{
+                  color: activeRelatedTab === 'reviews' ? theme.colors.primary : theme.colors.text.secondary,
+                  fontWeight: activeRelatedTab === 'reviews' ? '600' : '500',
+                }}
+              >
+                Reviews
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {/* Tab Content */}
@@ -1149,7 +1175,7 @@ export default function ListingDetailScreen() {
                   </View>
                 )}
               </View>
-            ) : (
+            ) : activeRelatedTab === 'similar' ? (
               <View>
                 {similarListingsLoading ? (
                   <View>
@@ -1207,7 +1233,18 @@ export default function ListingDetailScreen() {
                   </View>
                 )}
               </View>
-            )}
+            ) : activeRelatedTab === 'reviews' ? (
+              <View style={{ paddingHorizontal: theme.spacing.lg }}>
+                <ReviewsList
+                  userId={listing?.profiles?.id}
+                  showWriteReview={true}
+                  reviewedUserName={`${listing?.profiles?.first_name} ${listing?.profiles?.last_name}`}
+                  listingId={listingId}
+                  listingTitle={listing?.title}
+                  isVerifiedPurchase={false} // TODO: Check if user has purchased this item
+                />
+              </View>
+            ) : null}
           </View>
         </View>
       </ScrollView>

@@ -124,43 +124,25 @@ CREATE POLICY "Users can view flags on own content" ON content_flags
 CREATE POLICY "System can insert content flags" ON content_flags
     FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
--- Only moderators can update flags (assuming moderator role exists)
-CREATE POLICY "Moderators can update content flags" ON content_flags
-    FOR UPDATE USING (
-        EXISTS (
-            SELECT 1 FROM profiles 
-            WHERE profiles.id = auth.uid() 
-            AND profiles.role = 'moderator'
-        )
-    );
+-- Authenticated users can update content flags (no role system)
+CREATE POLICY "Authenticated users can update content flags" ON content_flags
+    FOR UPDATE USING (auth.role() = 'authenticated');
 
 -- =============================================
 -- MODERATION QUEUE POLICIES
 -- =============================================
 
--- Moderators can view moderation queue
-CREATE POLICY "Moderators can view moderation queue" ON moderation_queue
-    FOR SELECT USING (
-        EXISTS (
-            SELECT 1 FROM profiles 
-            WHERE profiles.id = auth.uid() 
-            AND profiles.role IN ('moderator', 'admin')
-        )
-    );
+-- Authenticated users can view moderation queue (no role system)
+CREATE POLICY "Authenticated users can view moderation queue" ON moderation_queue
+    FOR SELECT USING (auth.role() = 'authenticated');
 
 -- System can insert into moderation queue
 CREATE POLICY "System can insert moderation queue" ON moderation_queue
     FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
--- Moderators can update moderation queue
-CREATE POLICY "Moderators can update moderation queue" ON moderation_queue
-    FOR UPDATE USING (
-        EXISTS (
-            SELECT 1 FROM profiles 
-            WHERE profiles.id = auth.uid() 
-            AND profiles.role IN ('moderator', 'admin')
-        )
-    );
+-- Authenticated users can update moderation queue (no role system)
+CREATE POLICY "Authenticated users can update moderation queue" ON moderation_queue
+    FOR UPDATE USING (auth.role() = 'authenticated');
 
 -- =============================================
 -- RATE LIMIT TRACKING POLICIES
@@ -170,27 +152,7 @@ CREATE POLICY "Moderators can update moderation queue" ON moderation_queue
 CREATE POLICY "System can manage rate limits" ON rate_limit_tracking
     FOR ALL USING (auth.role() IN ('authenticated', 'service_role'));
 
--- =============================================
--- FALLBACK POLICIES FOR MISSING ROLE COLUMN
--- =============================================
 
--- If profiles table doesn't have role column, create more permissive policies
--- for content_flags and moderation_queue
-
--- Alternative policy for content flags if no role system
-DROP POLICY IF EXISTS "Moderators can update content flags" ON content_flags;
-CREATE POLICY "Authenticated users can update content flags" ON content_flags
-    FOR UPDATE USING (auth.role() = 'authenticated');
-
--- Alternative policy for moderation queue if no role system  
-DROP POLICY IF EXISTS "Moderators can view moderation queue" ON moderation_queue;
-DROP POLICY IF EXISTS "Moderators can update moderation queue" ON moderation_queue;
-
-CREATE POLICY "Authenticated users can view moderation queue" ON moderation_queue
-    FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can update moderation queue" ON moderation_queue
-    FOR UPDATE USING (auth.role() = 'authenticated');
 
 -- =============================================
 -- GRANT PERMISSIONS
