@@ -27,6 +27,11 @@ export { ReviewCard } from './ReviewCard/ReviewCard';
 export { ReviewForm } from './ReviewForm/ReviewForm';
 export { ReviewsList } from './ReviewsList/ReviewsList';
 export { ReviewSummary, CompactReviewSummary } from './ReviewSummary/ReviewSummary';
+
+// Support System Components
+export { SupportTicketCard } from './SupportTicketCard/SupportTicketCard';
+export { CreateTicketModal } from './CreateTicketModal/CreateTicketModal';
+export { KnowledgeBaseCard } from './KnowledgeBaseCard/KnowledgeBaseCard';
 export { PostCard } from './PostCard/PostCard';
 export { CommentCard } from './CommentCard/CommentCard';
 

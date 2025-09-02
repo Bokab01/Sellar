@@ -135,10 +135,16 @@ export default function HelpScreen() {
       },
     },
     {
-      title: 'General Support',
-      subtitle: 'Email support • Response within 24 hours',
-      icon: <Mail size={20} color={theme.colors.text.primary} />,
-      onPress: () => setShowContactModal(true),
+      title: 'Support Tickets',
+      subtitle: 'Create and track support requests',
+      icon: <MessageCircle size={20} color={theme.colors.text.primary} />,
+      onPress: () => router.push('/(tabs)/support-tickets'),
+    },
+    {
+      title: 'Knowledge Base',
+      subtitle: 'Browse help articles and guides',
+      icon: <FileText size={20} color={theme.colors.text.primary} />,
+      onPress: () => router.push('/(tabs)/knowledge-base'),
     },
     {
       title: 'Community Help',

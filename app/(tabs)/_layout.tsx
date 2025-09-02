@@ -147,6 +147,18 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="support-tickets"
+        options={{
+          href: null, // Hide from tab bar
+        }}
+      />
+      <Tabs.Screen
+        name="knowledge-base"
+        options={{
+          href: null, // Hide from tab bar
+        }}
+      />
+      <Tabs.Screen
         name="invite"
         options={{
           href: null, // Hide from tab bar
