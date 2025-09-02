@@ -645,6 +645,76 @@ export const dbHelpers = {
     return { data, error };
   },
 
+  // Push notification operations
+  async registerDeviceToken(tokenData: Database['public']['Tables']['device_tokens']['Insert']) {
+    const { data, error } = await supabase
+      .from('device_tokens')
+      .upsert(tokenData, {
+        onConflict: 'user_id,token',
+      })
+      .select()
+      .single();
+    
+    return { data, error };
+  },
+
+  async getDeviceTokens(userId: string) {
+    const { data, error } = await supabase
+      .from('device_tokens')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true);
+    
+    return { data, error };
+  },
+
+  async deactivateDeviceToken(userId: string, token: string) {
+    const { data, error } = await supabase
+      .from('device_tokens')
+      .update({ is_active: false })
+      .eq('user_id', userId)
+      .eq('token', token);
+    
+    return { data, error };
+  },
+
+  async queuePushNotification(
+    userIds: string[],
+    title: string,
+    body: string,
+    notificationType: string,
+    data?: any,
+    scheduledFor?: string
+  ) {
+    const { data, error } = await supabase.rpc('queue_push_notification', {
+      p_user_ids: userIds,
+      p_title: title,
+      p_body: body,
+      p_notification_type: notificationType,
+      p_data: data || {},
+      p_scheduled_for: scheduledFor || new Date().toISOString(),
+    });
+    
+    return { data, error };
+  },
+
+  async getNotificationPreferences(userId: string) {
+    const { data, error } = await supabase.rpc('get_user_notification_preferences', {
+      p_user_id: userId,
+    });
+    
+    return { data, error };
+  },
+
+  async updateNotificationPreferences(userId: string, preferences: any) {
+    const { data, error } = await supabase.rpc('update_notification_preferences', {
+      p_user_id: userId,
+      p_preferences: preferences,
+    });
+    
+    return { data, error };
+  },
+
   // Wallet and transaction operations
   async getTransactions(userId: string, limit = 20, offset = 0) {
     const { data, error } = await supabase

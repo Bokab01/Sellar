@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { BUSINESS_PLANS } from '@/constants/monetization';
 import { router } from 'expo-router';
@@ -15,11 +16,14 @@ import {
   LoadingSkeleton,
   Toast,
   LinearProgress,
+  PaymentModal,
 } from '@/components';
+import type { PaymentRequest } from '@/components';
 import { Building, Star, Crown, Check, Zap, ChartBar as BarChart, Headphones, Award } from 'lucide-react-native';
 
 export default function SubscriptionPlansScreen() {
   const { theme } = useTheme();
+  const { user } = useAuthStore();
   const { 
     currentPlan, 
     entitlements,
@@ -34,6 +38,8 @@ export default function SubscriptionPlansScreen() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentRequest, setPaymentRequest] = useState<PaymentRequest | null>(null);
 
   useEffect(() => {
     refreshSubscription();
@@ -53,26 +59,29 @@ export default function SubscriptionPlansScreen() {
     setSelectedPlan(planId);
 
     try {
-      const result = await subscribeToPlan(planId);
-      
-      if (result.success && result.paymentUrl) {
-        setToastMessage('Redirecting to payment...');
-        setToastVariant('success');
-        setShowToast(true);
-        
-        // Simulate payment completion for demo
-        setTimeout(() => {
-          setToastMessage('Subscription activated successfully!');
-          setShowToast(true);
-          refreshSubscription();
-        }, 3000);
-      } else {
-        setToastMessage(result.error || 'Failed to initialize payment');
-        setToastVariant('error');
-        setShowToast(true);
+      // Find the selected plan
+      const selectedPlan = BUSINESS_PLANS.find(plan => plan.id === planId);
+      if (!selectedPlan) {
+        throw new Error('Plan not found');
       }
+
+      // Create payment request for subscription
+      const request: PaymentRequest = {
+        amount: selectedPlan.priceMonthly, // Use monthly price
+        email: user?.email || 'user@example.com',
+        purpose: 'subscription',
+        purpose_id: planId,
+        metadata: {
+          plan_id: planId,
+          plan_name: selectedPlan.name,
+          billing_cycle: 'monthly',
+        },
+      };
+
+      setPaymentRequest(request);
+      setShowPaymentModal(true);
     } catch (error: any) {
-      setToastMessage('Failed to subscribe to plan');
+      setToastMessage('Failed to initialize payment');
       setToastVariant('error');
       setShowToast(true);
     } finally {
@@ -105,6 +114,28 @@ export default function SubscriptionPlansScreen() {
         },
       ]
     );
+  };
+
+  const handlePaymentSuccess = (reference: string) => {
+    setToastMessage('Payment successful! Your subscription will be activated shortly.');
+    setToastVariant('success');
+    setShowToast(true);
+    
+    // Refresh subscription after a short delay to allow webhook processing
+    setTimeout(() => {
+      refreshSubscription();
+    }, 2000);
+  };
+
+  const handlePaymentError = (error: string) => {
+    setToastMessage(error || 'Payment failed. Please try again.');
+    setToastVariant('error');
+    setShowToast(true);
+  };
+
+  const handlePaymentClose = () => {
+    setShowPaymentModal(false);
+    setPaymentRequest(null);
   };
 
   if (loading) {
@@ -355,6 +386,15 @@ export default function SubscriptionPlansScreen() {
           </View>
         </Container>
       </ScrollView>
+
+      {/* Payment Modal */}
+      <PaymentModal
+        visible={showPaymentModal}
+        onClose={handlePaymentClose}
+        paymentRequest={paymentRequest}
+        onSuccess={handlePaymentSuccess}
+        onError={handlePaymentError}
+      />
 
       {/* Toast */}
       <Toast

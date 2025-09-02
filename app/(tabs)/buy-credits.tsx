@@ -17,6 +17,7 @@ import {
   Toast,
   LinearProgress,
   PaymentModal,
+
 } from '@/components';
 import type { PaymentRequest } from '@/components';
 import { Zap, Star, Crown, Building, CreditCard, Smartphone } from 'lucide-react-native';
@@ -38,6 +39,7 @@ export default function BuyCreditsScreen() {
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentRequest, setPaymentRequest] = useState<PaymentRequest | null>(null);
+
 
   useEffect(() => {
     refreshCredits();
@@ -118,6 +120,23 @@ export default function BuyCreditsScreen() {
           title="Buy Credits"
           showBackButton
           onBackPress={() => router.back()}
+          rightActions={[
+            <TouchableOpacity
+              key="diagnostics"
+              onPress={() => router.push('/(tabs)/paystack-diagnostics')}
+              style={{
+                padding: theme.spacing.sm,
+                backgroundColor: theme.colors.surfaceVariant,
+                borderRadius: theme.borderRadius.md,
+                minWidth: 40,
+                minHeight: 40,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ fontSize: 16 }}>🔧</Text>
+            </TouchableOpacity>
+          ]}
         />
         <ScrollView contentContainerStyle={{ padding: theme.spacing.lg }}>
           <LoadingSkeleton width="100%" height={120} borderRadius={theme.borderRadius.lg} style={{ marginBottom: theme.spacing.xl }} />
@@ -130,12 +149,29 @@ export default function BuyCreditsScreen() {
   }
 
   return (
-    <SafeAreaWrapper>
-      <AppHeader
-        title="Buy Credits"
-        showBackButton
-        onBackPress={() => router.back()}
-      />
+          <SafeAreaWrapper>
+        <AppHeader
+          title="Buy Credits"
+          showBackButton
+          onBackPress={() => router.back()}
+          rightActions={[
+            <TouchableOpacity
+              key="diagnostics"
+              onPress={() => router.push('/(tabs)/paystack-diagnostics')}
+              style={{
+                padding: theme.spacing.sm,
+                backgroundColor: theme.colors.surfaceVariant,
+                borderRadius: theme.borderRadius.md,
+                minWidth: 40,
+                minHeight: 40,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ fontSize: 16 }}>🔧</Text>
+            </TouchableOpacity>
+          ]}
+        />
 
       <ScrollView contentContainerStyle={{ paddingBottom: theme.spacing.xl }}>
         <Container>

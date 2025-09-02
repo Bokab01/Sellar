@@ -1,10 +1,12 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 
 export default function RootLayout() {
   useFrameworkReady();
+  usePushNotifications();
 
   return (
     <ThemeProvider>

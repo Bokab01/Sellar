@@ -22,6 +22,7 @@ import {
   BusinessBadge,
   PriceDisplay,
   Badge,
+  CompactUserBadges,
 } from '@/components';
 import { 
   Bell, 
@@ -152,6 +153,7 @@ export default function HomeScreen() {
       title: listing.title,
       price: listing.price,
       seller: {
+        id: seller?.id,
         name: `${seller?.first_name} ${seller?.last_name}`,
         avatar: seller?.avatar_url,
         rating: seller?.rating || 0,
@@ -548,7 +550,7 @@ export default function HomeScreen() {
                             style={{ marginBottom: theme.spacing.sm }}
                           />
 
-                          {/* Seller Info with Business Badge */}
+                          {/* Seller Info with User Badges */}
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, marginBottom: theme.spacing.sm }}>
                             <Text 
                               variant="caption" 
@@ -559,8 +561,8 @@ export default function HomeScreen() {
                               {product.seller.name}
                             </Text>
                             
-                            {product.seller.badges?.includes('business') && (
-                              <BusinessBadge type="business" size="sm" showIcon={false} />
+                            {product.seller.id && (
+                              <CompactUserBadges userId={product.seller.id} maxBadges={1} />
                             )}
                           </View>
 

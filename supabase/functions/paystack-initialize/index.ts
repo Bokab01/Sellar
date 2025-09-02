@@ -65,7 +65,7 @@ Deno.serve(async (req: Request) => {
         amount: amount / 100, // Convert back to GHS
         currency: 'GHS',
         payment_method: channels?.includes('mobile_money') ? 'mobile_money' : 'card',
-        purchase_type: purpose,
+        purchase_type: purpose === 'credit_purchase' ? 'credit_package' : purpose,
         purchase_id: purpose_id,
         customer_email: email,
         status: 'pending',
@@ -74,8 +74,13 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (dbError) {
+      console.error('Database error:', dbError);
       return new Response(
-        JSON.stringify({ error: 'Failed to create transaction record' }),
+        JSON.stringify({ 
+          error: 'Failed to create transaction record',
+          details: dbError.message,
+          code: dbError.code 
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

@@ -6,6 +6,7 @@ import { Button } from '@/components/Button/Button';
 import { Avatar } from '@/components/Avatar/Avatar';
 import { Badge } from '@/components/Badge/Badge';
 import { PriceDisplay } from '@/components/PriceDisplay/PriceDisplay';
+import { CompactUserBadges } from '@/components/UserBadges/UserBadges';
 
 interface ProductCardProps {
   image: ImageSourcePropType | string;
@@ -13,6 +14,7 @@ interface ProductCardProps {
   price: number;
   currency?: string;
   seller: {
+    id?: string;
     name: string;
     avatar?: string;
     rating?: number;
@@ -148,9 +150,14 @@ export function ProductCard({
               style={{ marginRight: theme.spacing.md }}
             />
             <View style={{ flex: 1 }}>
-              <Text variant="bodySmall" numberOfLines={1}>
-                {seller.name}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs, marginBottom: theme.spacing.xs }}>
+                <Text variant="bodySmall" numberOfLines={1} style={{ flex: 1 }}>
+                  {seller.name}
+                </Text>
+                {seller.id && (
+                  <CompactUserBadges userId={seller.id} maxBadges={1} />
+                )}
+              </View>
               {seller.rating && (
                 <Text variant="caption" color="muted">
                   ⭐ {seller.rating.toFixed(1)}

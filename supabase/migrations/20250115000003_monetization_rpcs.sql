@@ -7,6 +7,18 @@
 -- CREDIT MANAGEMENT FUNCTIONS
 -- =============================================
 
+-- Drop existing functions if they exist (to handle signature changes)
+DROP FUNCTION IF EXISTS get_user_credits(UUID);
+DROP FUNCTION IF EXISTS add_user_credits(UUID, INTEGER, TEXT, TEXT, UUID, TEXT);
+DROP FUNCTION IF EXISTS spend_user_credits(UUID, INTEGER, TEXT, TEXT, UUID);
+DROP FUNCTION IF EXISTS complete_credit_purchase(UUID, TEXT);
+DROP FUNCTION IF EXISTS handle_new_listing(UUID, UUID);
+DROP FUNCTION IF EXISTS purchase_feature(UUID, UUID, TEXT, TEXT, INTEGER, INTEGER);
+DROP FUNCTION IF EXISTS subscribe_to_plan(UUID, TEXT, TEXT, TEXT);
+DROP FUNCTION IF EXISTS get_user_entitlements(UUID);
+DROP FUNCTION IF EXISTS can_create_listing(UUID);
+DROP FUNCTION IF EXISTS get_monetization_dashboard(UUID);
+
 -- Function to get user's current credit balance
 CREATE OR REPLACE FUNCTION get_user_credits(user_uuid UUID DEFAULT auth.uid())
 RETURNS TABLE (

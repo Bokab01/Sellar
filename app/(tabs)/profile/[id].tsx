@@ -22,6 +22,7 @@ import {
   Toast,
   Grid,
   Chip,
+  FullUserBadges,
 } from '@/components';
 import { 
   MessageCircle, 
@@ -565,6 +566,9 @@ export default function UserProfileScreen() {
                   <Badge text="Verified" variant="success" />
                 )}
               </View>
+
+              {/* User Badges */}
+              <FullUserBadges userId={profileId} />
 
               <Rating
                 rating={profile.rating || 0}

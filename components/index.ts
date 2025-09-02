@@ -95,3 +95,22 @@ export type { PaymentRequest } from './PaymentModal/PaymentModal';
 // Feature & Subscription Components
 export { UserBadges, CompactUserBadges, FullUserBadges, BadgeChecker } from './UserBadges/UserBadges';
 export { FeatureActivationModal } from './FeatureActivationModal/FeatureActivationModal';
+
+// Diagnostic Components
+export { PaystackDiagnostics } from './PaystackDiagnostics/PaystackDiagnostics';
+
+// Feature Services
+export * from '../lib/featureActivation';
+export * from '../lib/featureExpiryService';
+export * from '../lib/featureRecommendationEngine';
+export * from '../lib/subscriptionManagement';
+
+// Offer System Components
+export { CounterOfferModal } from './CounterOfferModal/CounterOfferModal';
+export { OfferExpiryTimer, useOfferTimer } from './OfferExpiryTimer/OfferExpiryTimer';
+
+// Offer System Services
+export * from '../lib/offerStateMachine';
+export * from '../lib/listingReservationSystem';
+export * from '../lib/offerAnalytics';
+export * from '../lib/offerBackgroundJobs';

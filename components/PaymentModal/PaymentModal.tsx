@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { View, Modal, Alert } from 'react-native';
-import { Paystack } from 'react-native-paystack-webview';
+import { WebView } from 'react-native-webview';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase } from '@/lib/supabase';
@@ -57,8 +57,18 @@ export function PaymentModal({
       const reference = paymentRequest.reference || generateReference();
       setPaymentReference(reference);
 
+      // Get user session for authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('User not authenticated');
+      }
+
       // Initialize payment via Supabase Edge Function
       const { data, error } = await supabase.functions.invoke('paystack-initialize', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: {
           amount: paymentRequest.amount * 100, // Convert to pesewas
           email: paymentRequest.email,
@@ -231,31 +241,42 @@ export function PaymentModal({
                 </Text>
               </View>
             </View>
-          ) : (
-            <Paystack
-              paystackKey={PAYSTACK_PUBLIC_KEY}
-              billingEmail={paymentRequest.email}
-              amount={paymentRequest.amount * 100} // Amount in pesewas
-              currency="GHS"
-              channels={['card', 'mobile_money', 'ussd', 'bank_transfer']}
-              refNumber={paymentReference || generateReference()}
-              billingName={user?.user_metadata?.first_name || 'User'}
-              phone={user?.user_metadata?.phone || ''}
-              onCancel={handlePaymentCancel}
-              onSuccess={handlePaymentSuccess}
-              onError={handlePaymentError}
+          ) : paymentUrl ? (
+            <WebView
               ref={paystackWebViewRef}
-              activityIndicatorColor={theme.colors.primary}
-              SafeAreaViewContainer={{
-                flex: 1,
-                backgroundColor: theme.colors.background,
+              source={{ uri: paymentUrl }}
+              style={{ flex: 1 }}
+              onNavigationStateChange={(navState) => {
+                // Handle navigation changes to detect success/failure
+                if (navState.url.includes('callback') || navState.url.includes('success')) {
+                  // Payment completed - you can extract reference from URL
+                  const urlParams = new URLSearchParams(navState.url.split('?')[1]);
+                  const reference = urlParams.get('reference') || paymentReference;
+                  if (reference) {
+                    handlePaymentSuccess({ reference });
+                  }
+                } else if (navState.url.includes('cancel') || navState.url.includes('error')) {
+                  handlePaymentCancel();
+                }
               }}
-              modalProps={{
-                animationType: 'slide',
-                transparent: false,
+              onError={(error) => {
+                console.error('WebView error:', error);
+                handlePaymentError(error);
               }}
+              startInLoadingState={true}
+              renderLoading={() => (
+                <View style={{ 
+                  flex: 1, 
+                  justifyContent: 'center', 
+                  alignItems: 'center',
+                  backgroundColor: theme.colors.background 
+                }}>
+                  <LoadingSkeleton width={200} height={20} />
+                  <Text style={{ marginTop: theme.spacing.md }}>Loading payment...</Text>
+                </View>
+              )}
             />
-          )}
+          ) : null}
         </View>
       </SafeAreaWrapper>
     </Modal>

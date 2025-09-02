@@ -666,6 +666,147 @@ export interface Database {
           created_at?: string;
         };
       };
+      device_tokens: {
+        Row: {
+          id: string;
+          user_id: string;
+          token: string;
+          platform: string;
+          device_name: string | null;
+          device_model: string | null;
+          app_version: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          token: string;
+          platform: string;
+          device_name?: string | null;
+          device_model?: string | null;
+          app_version?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          token?: string;
+          platform?: string;
+          device_name?: string | null;
+          device_model?: string | null;
+          app_version?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      push_notification_queue: {
+        Row: {
+          id: string;
+          user_ids: string[];
+          title: string;
+          body: string;
+          notification_type: string;
+          data: any;
+          status: string;
+          attempts: number;
+          max_attempts: number;
+          error_message: string | null;
+          scheduled_for: string;
+          processed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_ids: string[];
+          title: string;
+          body: string;
+          notification_type: string;
+          data?: any;
+          status?: string;
+          attempts?: number;
+          max_attempts?: number;
+          error_message?: string | null;
+          scheduled_for?: string;
+          processed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_ids?: string[];
+          title?: string;
+          body?: string;
+          notification_type?: string;
+          data?: any;
+          status?: string;
+          attempts?: number;
+          max_attempts?: number;
+          error_message?: string | null;
+          scheduled_for?: string;
+          processed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      notification_preferences: {
+        Row: {
+          id: string;
+          user_id: string;
+          push_enabled: boolean;
+          messages_enabled: boolean;
+          offers_enabled: boolean;
+          community_enabled: boolean;
+          system_enabled: boolean;
+          quiet_hours_enabled: boolean;
+          quiet_start_time: string;
+          quiet_end_time: string;
+          instant_notifications: boolean;
+          daily_digest: boolean;
+          weekly_summary: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          push_enabled?: boolean;
+          messages_enabled?: boolean;
+          offers_enabled?: boolean;
+          community_enabled?: boolean;
+          system_enabled?: boolean;
+          quiet_hours_enabled?: boolean;
+          quiet_start_time?: string;
+          quiet_end_time?: string;
+          instant_notifications?: boolean;
+          daily_digest?: boolean;
+          weekly_summary?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          push_enabled?: boolean;
+          messages_enabled?: boolean;
+          offers_enabled?: boolean;
+          community_enabled?: boolean;
+          system_enabled?: boolean;
+          quiet_hours_enabled?: boolean;
+          quiet_start_time?: string;
+          quiet_end_time?: string;
+          instant_notifications?: boolean;
+          daily_digest?: boolean;
+          weekly_summary?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
     Views: {
       [_ in never]: never;
@@ -680,6 +821,30 @@ export interface Database {
           notification_data?: any;
         };
         Returns: string;
+      };
+      queue_push_notification: {
+        Args: {
+          p_user_ids: string[];
+          p_title: string;
+          p_body: string;
+          p_notification_type: string;
+          p_data?: any;
+          p_scheduled_for?: string;
+        };
+        Returns: string;
+      };
+      get_user_notification_preferences: {
+        Args: {
+          p_user_id: string;
+        };
+        Returns: Database['public']['Tables']['notification_preferences']['Row'];
+      };
+      update_notification_preferences: {
+        Args: {
+          p_user_id: string;
+          p_preferences: any;
+        };
+        Returns: Database['public']['Tables']['notification_preferences']['Row'];
       };
     };
     Enums: {

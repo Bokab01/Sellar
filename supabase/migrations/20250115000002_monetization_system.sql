@@ -227,11 +227,12 @@ CREATE TABLE IF NOT EXISTS user_subscriptions (
     
     -- Timestamps
     created_at TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now(),
-    
-    -- Ensure one active subscription per user
-    UNIQUE(user_id) WHERE status = 'active'
+    updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Add unique constraint for one active subscription per user
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_subscriptions_unique_active 
+ON user_subscriptions(user_id) WHERE status = 'active';
 
 -- Add indexes for user_subscriptions
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user_id ON user_subscriptions(user_id);
@@ -269,7 +270,7 @@ CREATE TABLE IF NOT EXISTS paystack_transactions (
     
     -- Related Purchase
     purchase_type TEXT NOT NULL CHECK (purchase_type IN ('credit_package', 'subscription', 'feature')),
-    purchase_id UUID, -- ID of related purchase record
+    purchase_id TEXT, -- ID of related purchase record (can be package name or UUID)
     
     -- Paystack Response Data
     paystack_response JSONB DEFAULT '{}'::jsonb,
@@ -340,6 +341,17 @@ ALTER TABLE plan_entitlements ENABLE ROW LEVEL SECURITY;
 -- BASIC RLS POLICIES
 -- =============================================
 
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Users can view own credits" ON user_credits;
+DROP POLICY IF EXISTS "Users can update own credits" ON user_credits;
+DROP POLICY IF EXISTS "Users can view own credit transactions" ON credit_transactions;
+DROP POLICY IF EXISTS "Users can view own credit purchases" ON credit_purchases;
+DROP POLICY IF EXISTS "Users can view own feature purchases" ON feature_purchases;
+DROP POLICY IF EXISTS "Subscription plans are viewable by everyone" ON subscription_plans;
+DROP POLICY IF EXISTS "Users can view own subscriptions" ON user_subscriptions;
+DROP POLICY IF EXISTS "Users can view own transactions" ON paystack_transactions;
+DROP POLICY IF EXISTS "Plan entitlements are viewable for active plans" ON plan_entitlements;
+
 -- User Credits policies
 CREATE POLICY "Users can view own credits" ON user_credits
 FOR SELECT USING (auth.uid() = user_id);
@@ -370,6 +382,9 @@ FOR SELECT USING (auth.uid() = user_id);
 -- Paystack Transactions policies
 CREATE POLICY "Users can view own transactions" ON paystack_transactions
 FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own transactions" ON paystack_transactions
+FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- Plan Entitlements policies (public read for active plans)
 CREATE POLICY "Plan entitlements are viewable for active plans" ON plan_entitlements
