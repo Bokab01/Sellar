@@ -43,37 +43,79 @@ export default function FavoritesScreen() {
       setLoading(true);
       setError(null);
 
-      const { data, error: fetchError } = await supabase
+      // First, get the favorites
+      const { data: favoritesData, error: fetchError } = await supabase
         .from('favorites')
-        .select(`
-          *,
-          listings (
-            *,
-            profiles:user_id (
-              id,
-              first_name,
-              last_name,
-              avatar_url,
-              rating,
-              is_verified,
-              account_type
-            ),
-            categories (
-              name,
-              icon
-            )
-          )
-        `)
+        .select('id, created_at, listing_id')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (fetchError) {
         setError(fetchError.message);
-      } else {
-        // Filter out favorites where listing might be deleted
-        const validFavorites = (data || []).filter(fav => fav.listings);
-        setFavorites(validFavorites);
+        return;
       }
+
+      if (!favoritesData || favoritesData.length === 0) {
+        setFavorites([]);
+        return;
+      }
+
+      // Get listing IDs
+      const listingIds = favoritesData.map(fav => fav.listing_id);
+
+      // Fetch listings data
+      const { data: listingsData, error: listingsError } = await supabase
+        .from('listings')
+        .select('id, title, description, price, currency, condition, location, images, status, boost_until, user_id, category_id')
+        .in('id', listingIds);
+
+      if (listingsError) {
+        setError(listingsError.message);
+        return;
+      }
+
+      if (!listingsData || listingsData.length === 0) {
+        setFavorites([]);
+        return;
+      }
+
+      // Get unique user IDs and category IDs
+      const userIds = [...new Set(listingsData.map(listing => listing.user_id))];
+      const categoryIds = [...new Set(listingsData.map(listing => listing.category_id).filter(Boolean))];
+
+      // Fetch profiles for sellers
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, avatar_url, rating, is_verified, account_type')
+        .in('id', userIds);
+
+      // Fetch categories
+      const { data: categories } = await supabase
+        .from('categories')
+        .select('id, name, icon')
+        .in('id', categoryIds);
+
+      // Create maps for easy lookup
+      const listingsMap = new Map(listingsData.map(listing => [listing.id, listing]));
+      const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
+      const categoriesMap = new Map(categories?.map(c => [c.id, c]) || []);
+
+      // Combine all the data
+      const combinedFavorites = favoritesData.map(favorite => {
+        const listing = listingsMap.get(favorite.listing_id);
+        if (!listing) return null;
+
+        return {
+          ...favorite,
+          listings: {
+            ...listing,
+            profiles: profilesMap.get(listing.user_id),
+            categories: categoriesMap.get(listing.category_id),
+          }
+        };
+      }).filter(Boolean); // Remove null entries
+
+      setFavorites(combinedFavorites);
     } catch (err) {
       setError('Failed to load favorites');
     } finally {
@@ -125,7 +167,7 @@ export default function FavoritesScreen() {
     return {
       id: listing.id,
       favoriteId: favorite.id,
-      image: listing.images?.[0] || 'https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg',
+      image: listing.images || ['https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg'],
       title: listing.title,
       price: listing.price,
       seller: {
@@ -134,7 +176,7 @@ export default function FavoritesScreen() {
         rating: seller?.rating || 0,
         badges: seller?.account_type === 'business' ? ['business'] : [],
       },
-      badge: listing.boost_expires_at && new Date(listing.boost_expires_at) > new Date() 
+      badge: listing.boost_until && new Date(listing.boost_until) > new Date() 
         ? { text: 'Boosted', variant: 'featured' as const }
         : undefined,
       location: listing.location,

@@ -116,6 +116,15 @@ export default function MyPostsScreen() {
       avatar: user?.user_metadata?.avatar_url,
       rating: 0,
       isVerified: false,
+      profile: {
+        id: user?.id || '',
+        full_name: `${user?.user_metadata?.first_name || 'User'} ${user?.user_metadata?.last_name || ''}`,
+        is_business: false, // For now, assume user posts are not business posts
+        business_name: null,
+        display_business_name: false,
+        business_name_priority: 'hidden',
+        verification_level: 'none',
+      },
     },
     timestamp: new Date(post.created_at).toLocaleString(),
     content: post.content,

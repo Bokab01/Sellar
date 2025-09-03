@@ -9,9 +9,11 @@ import { PriceDisplay } from '@/components/PriceDisplay/PriceDisplay';
 import { CompactUserBadges } from '@/components/UserBadges/UserBadges';
 import { ListingImage } from '@/components/OptimizedImage/OptimizedImage';
 import { useMemoryManager } from '@/utils/memoryManager';
+import { ImageViewer } from '@/components/ImageViewer/ImageViewer';
+import { useImageViewer } from '@/hooks/useImageViewer';
 
 interface ProductCardProps {
-  image: ImageSourcePropType | string;
+  image: ImageSourcePropType | string | string[];
   imagePath?: string; // For optimized images from storage
   title: string;
   price: number;
@@ -33,6 +35,7 @@ interface ProductCardProps {
   location?: string;
   layout?: 'default' | 'grid';
   fullWidth?: boolean; // New prop for full-width mode
+  enableImageViewer?: boolean; // New prop to enable/disable ImageViewer
 }
 
 export function ProductCard({
@@ -50,11 +53,28 @@ export function ProductCard({
   location,
   layout = 'default',
   fullWidth = false,
+  enableImageViewer = true,
 }: ProductCardProps) {
   const { theme } = useTheme();
   const { shouldLoadHeavyComponent } = useMemoryManager();
 
-  const imageSource = typeof image === 'string' ? { uri: image } : image;
+  // Handle different image formats for ImageViewer
+  const images = Array.isArray(image) 
+    ? image.filter(img => typeof img === 'string') as string[]
+    : typeof image === 'string' 
+    ? [image] 
+    : [];
+  
+  const displayImage = Array.isArray(image) ? image[0] : image;
+  const imageSource = typeof displayImage === 'string' ? { uri: displayImage } : displayImage;
+
+  // Initialize ImageViewer hook
+  const {
+    visible: imageViewerVisible,
+    currentIndex: imageViewerIndex,
+    openViewer: openImageViewer,
+    closeViewer: closeImageViewer,
+  } = useImageViewer({ images });
   
   const isGridLayout = layout === 'grid';
   // Increased card height and made image cover 70% of the card
@@ -62,19 +82,27 @@ export function ProductCard({
   const imageHeight = isGridLayout ? totalCardHeight * 0.7 : 200; // 70% for grid, keep default for list
   const cardPadding = isGridLayout ? theme.spacing.sm : theme.spacing.lg;
 
+  const handleLongPress = () => {
+    if (enableImageViewer && images.length > 0) {
+      openImageViewer(0);
+    }
+  };
+
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      style={{
-        backgroundColor: theme.colors.surface,
-        borderRadius: fullWidth ? theme.borderRadius.sm : theme.borderRadius.lg,
-        ...(fullWidth ? theme.shadows.sm : theme.shadows.md),
-        overflow: 'hidden',
-        marginBottom: isGridLayout ? 0 : theme.spacing.md,
-        height: isGridLayout ? totalCardHeight : undefined,
-      }}
-      activeOpacity={0.95}
-    >
+    <>
+      <TouchableOpacity
+        onPress={onPress}
+        onLongPress={handleLongPress}
+        style={{
+          backgroundColor: theme.colors.surface,
+          borderRadius: fullWidth ? theme.borderRadius.sm : theme.borderRadius.lg,
+          ...(fullWidth ? theme.shadows.sm : theme.shadows.md),
+          overflow: 'hidden',
+          marginBottom: isGridLayout ? 0 : theme.spacing.md,
+          height: isGridLayout ? totalCardHeight : undefined,
+        }}
+        activeOpacity={0.95}
+      >
       {/* Image Container */}
       <View style={{ position: 'relative' }}>
         {imagePath ? (
@@ -218,5 +246,16 @@ export function ProductCard({
         )}
       </View>
     </TouchableOpacity>
+
+    {/* Image Viewer */}
+    {enableImageViewer && (
+      <ImageViewer
+        visible={imageViewerVisible}
+        images={images}
+        initialIndex={imageViewerIndex}
+        onClose={closeImageViewer}
+      />
+    )}
+  </>
   );
 }

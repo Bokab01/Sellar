@@ -86,11 +86,11 @@ class FeatureExpiryService {
       .from('listings')
       .update({
         boost_score: 0,
-        boost_expires_at: null,
+        boost_until: null,
         updated_at: now,
       })
-      .not('boost_expires_at', 'is', null)
-      .lt('boost_expires_at', now)
+      .not('boost_until', 'is', null)
+      .lt('boost_until', now)
       .select('id');
 
     if (error) {

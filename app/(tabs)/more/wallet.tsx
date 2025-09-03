@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, ScrollView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useMonetizationStore } from '@/store/useMonetizationStore';
+import { CREDIT_PACKAGES, BUSINESS_PLANS } from '@/constants/monetization';
 import { dbHelpers, supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
 import {
@@ -15,36 +17,36 @@ import {
   ListItem,
   EmptyState,
   LoadingSkeleton,
-  AppModal,
-  Input,
+  CreditBalance,
   Toast,
 } from '@/components';
 import { 
-  Wallet, 
+  Zap, 
   Plus, 
-  Minus, 
-  CreditCard, 
+  ShoppingCart, 
+  Building, 
   ArrowUpRight, 
-  ArrowDownLeft, 
-  Gift,
   TrendingUp,
   History,
-  DollarSign,
-  UserPlus2
+  Gift,
+  Star,
+  Crown,
+  UserPlus
 } from 'lucide-react-native';
 
 export default function WalletScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
+  const { 
+    balance: creditBalance, 
+    loading: creditLoading, 
+    refreshCredits 
+  } = useMonetizationStore();
   
   const [profile, setProfile] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [showAddFunds, setShowAddFunds] = useState(false);
-  const [showWithdraw, setShowWithdraw] = useState(false);
-  const [amount, setAmount] = useState('');
-  const [processing, setProcessing] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
@@ -52,6 +54,7 @@ export default function WalletScreen() {
   useEffect(() => {
     if (user) {
       fetchWalletData();
+      refreshCredits();
     }
   }, [user]);
 
@@ -92,108 +95,14 @@ export default function WalletScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchWalletData();
+    await Promise.all([
+      fetchWalletData(),
+      refreshCredits()
+    ]);
     setRefreshing(false);
   };
 
-  const handleAddFunds = async () => {
-    if (!amount.trim()) {
-      Alert.alert('Error', 'Please enter an amount');
-      return;
-    }
 
-    const fundAmount = Number(amount);
-    if (isNaN(fundAmount) || fundAmount <= 0) {
-      Alert.alert('Error', 'Please enter a valid amount');
-      return;
-    }
-
-    if (fundAmount < 5) {
-      Alert.alert('Error', 'Minimum top-up amount is GHS 5');
-      return;
-    }
-
-    setProcessing(true);
-    try {
-      // TODO: Integrate with Paystack for actual payment processing
-      // For now, simulate successful payment
-      
-      // Create credit transaction
-      await supabase.rpc('create_transaction', {
-        p_user_id: user!.id,
-        p_type: 'credit',
-        p_amount: fundAmount,
-        p_description: `Wallet top-up via mobile money`,
-        p_reference_id: `topup_${Date.now()}`,
-      });
-
-      setShowAddFunds(false);
-      setAmount('');
-      setToastMessage(`GHS ${fundAmount.toFixed(2)} added to your wallet!`);
-      setToastVariant('success');
-      setShowToast(true);
-      
-      // Refresh data
-      await fetchWalletData();
-    } catch (error) {
-      setToastMessage('Failed to add funds. Please try again.');
-      setToastVariant('error');
-      setShowToast(true);
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const handleWithdraw = async () => {
-    if (!amount.trim()) {
-      Alert.alert('Error', 'Please enter an amount');
-      return;
-    }
-
-    const withdrawAmount = Number(amount);
-    if (isNaN(withdrawAmount) || withdrawAmount <= 0) {
-      Alert.alert('Error', 'Please enter a valid amount');
-      return;
-    }
-
-    const availableBalance = (profile?.wallet_balance || 0) + (profile?.credit_balance || 0);
-    if (withdrawAmount > availableBalance) {
-      Alert.alert('Error', 'Insufficient balance');
-      return;
-    }
-
-    if (withdrawAmount < 10) {
-      Alert.alert('Error', 'Minimum withdrawal amount is GHS 10');
-      return;
-    }
-
-    setProcessing(true);
-    try {
-      // Create debit transaction
-      await supabase.rpc('create_transaction', {
-        p_user_id: user!.id,
-        p_type: 'debit',
-        p_amount: withdrawAmount,
-        p_description: `Withdrawal to mobile money`,
-        p_reference_id: `withdraw_${Date.now()}`,
-      });
-
-      setShowWithdraw(false);
-      setAmount('');
-      setToastMessage(`GHS ${withdrawAmount.toFixed(2)} withdrawal initiated!`);
-      setToastVariant('success');
-      setShowToast(true);
-      
-      // Refresh data
-      await fetchWalletData();
-    } catch (error) {
-      setToastMessage('Failed to process withdrawal. Please try again.');
-      setToastVariant('error');
-      setShowToast(true);
-    } finally {
-      setProcessing(false);
-    }
-  };
 
   const getTransactionIcon = (type: string) => {
     switch (type) {
@@ -237,13 +146,32 @@ export default function WalletScreen() {
     );
   }
 
-  const walletBalance = profile?.wallet_balance || 0;
-  const creditBalance = profile?.credit_balance || 0;
-  const pendingBalance = profile?.pending_balance || 0;
-  const totalWalletBalance = walletBalance + pendingBalance; // Only wallet balances
+  const handleTopUp = () => {
+    router.push('/buy-credits');
+  };
+
+  const handleBusinessPlans = () => {
+    router.push('/subscription-plans');
+  };
+
+  const handleFeatureMarketplace = () => {
+    router.push('/feature-marketplace');
+  };
 
   return (
     <SafeAreaWrapper>
+      <AppHeader 
+        title="Credits & Wallet"
+        showBack
+        rightElement={
+          <Button
+            variant="icon"
+            icon={<History size={20} color={theme.colors.text.primary} />}
+            onPress={() => router.push('/transactions')}
+          />
+        }
+      />
+      
       <ScrollView 
         contentContainerStyle={{ paddingBottom: theme.spacing.xl }}
         refreshControl={
@@ -255,131 +183,71 @@ export default function WalletScreen() {
         }
       >
         <Container>
-          {/* Balance Card */}
-           <Button
-            variant="icon"
-            icon={<History size={20} color={theme.colors.text.primary} />}
-            onPress={() => router.push('/transactions')}
+          {/* Credit Balance Component */}
+          <CreditBalance
+            balance={creditBalance}
+            maxCredits={1000}
+            onTopUp={handleTopUp}
+            onBusinessPlans={handleBusinessPlans}
+            loading={creditLoading}
           />
-          <View
-            style={{
-              backgroundColor: theme.colors.primary,
-              borderRadius: theme.borderRadius.lg,
-              padding: theme.spacing.xl,
-              marginBottom: theme.spacing.xl,
-              ...theme.shadows.lg,
-            }}
-          >
-            <View style={{ alignItems: 'center', marginBottom: theme.spacing.lg }}>
-              <Text
-                variant="bodySmall"
-                style={{
-                  color: theme.colors.primaryForeground + 'CC',
-                  marginBottom: theme.spacing.sm,
-                  textTransform: 'uppercase',
-                  letterSpacing: 1,
-                }}
-              >
-                Total Balance
-              </Text>
-              <PriceDisplay
-                amount={totalWalletBalance}
-                size="xl"
-                currency="GHS"
-                style={{
-                  marginBottom: theme.spacing.md,
-                }}
-              />
-              
-              {pendingBalance > 0 && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-                  <Text
-                    variant="caption"
-                    style={{ color: theme.colors.primaryForeground + 'AA' }}
-                  >
-                    + GHS {pendingBalance.toFixed(2)} pending
-                  </Text>
-                </View>
-              )}
-            </View>
 
-            {/* Balance Breakdown */}
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-around',
-                paddingTop: theme.spacing.lg,
-                borderTopWidth: 1,
-                borderTopColor: theme.colors.primaryForeground + '20',
-              }}
-            >
-              <View style={{ alignItems: 'center' }}>
-                <Text
-                  variant="h4"
-                  style={{
-                    color: theme.colors.primaryForeground,
-                    fontWeight: '700',
-                    marginBottom: theme.spacing.xs,
-                  }}
-                >
-                  {walletBalance.toFixed(2)}
-                </Text>
-                <Text
-                  variant="caption"
-                  style={{ color: theme.colors.primaryForeground + 'CC' }}
-                >
-                  Wallet
-                </Text>
-              </View>
-              <View style={{ alignItems: 'center' }}>
-                <Text
-                  variant="h4"
-                  style={{
-                    color: theme.colors.primaryForeground,
-                    fontWeight: '700',
-                    marginBottom: theme.spacing.xs,
-                  }}
-                >
-                  {Math.floor(creditBalance)}
-                </Text>
-                <Text
-                  variant="caption"
-                  style={{ color: theme.colors.primaryForeground + 'CC' }}
-                >
-                  Credits
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Quick Actions */}
-          <View
-            style={{
-              flexDirection: 'row',
-              gap: theme.spacing.md,
-              marginBottom: theme.spacing.xl,
-            }}
-          >
-            <Button
-              variant="primary"
-              icon={<Plus size={18} color={theme.colors.primaryForeground} />}
-              onPress={() => setShowAddFunds(true)}
-              style={{ flex: 1 }}
-              size="lg"
-            >
-              Add Funds
-            </Button>
+          {/* Credit Packages Preview */}
+          <View style={{ marginBottom: theme.spacing.xl }}>
+            <Text variant="h3" style={{ marginBottom: theme.spacing.lg }}>
+              Popular Credit Packages
+            </Text>
             
-            <Button
-              variant="secondary"
-              icon={<Minus size={18} color={theme.colors.primary} />}
-              onPress={() => setShowWithdraw(true)}
-              style={{ flex: 1 }}
-              size="lg"
-              disabled={totalWalletBalance < 10}
-            >
-              Withdraw
-            </Button>
+            <View style={{ gap: theme.spacing.md }}>
+              {CREDIT_PACKAGES.slice(0, 2).map((package_) => (
+                <TouchableOpacity
+                  key={package_.id}
+                  onPress={handleTopUp}
+                  style={{
+                    backgroundColor: theme.colors.surface,
+                    borderRadius: theme.borderRadius.lg,
+                    padding: theme.spacing.lg,
+                    borderWidth: package_.popular ? 2 : 1,
+                    borderColor: package_.popular ? theme.colors.primary : theme.colors.border,
+                    ...theme.shadows.sm,
+                  }}
+                  activeOpacity={0.95}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.xs }}>
+                        <Text variant="h4" style={{ marginRight: theme.spacing.sm }}>
+                          {package_.name}
+                        </Text>
+                        {package_.popular && (
+                          <Badge text="Popular" variant="success" />
+                        )}
+                      </View>
+                      <Text variant="bodySmall" color="muted" style={{ marginBottom: theme.spacing.sm }}>
+                        {package_.description}
+                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Zap size={16} color={theme.colors.primary} style={{ marginRight: theme.spacing.xs }} />
+                        <Text variant="bodyLarge" style={{ fontWeight: '600' }}>
+                          {package_.credits} Credits
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <PriceDisplay 
+                        amount={package_.priceGHS} 
+                        currency="GHS" 
+                        size="lg"
+                        style={{ marginBottom: theme.spacing.xs }}
+                      />
+                      <Text variant="caption" color="muted">
+                        GHS {package_.pricePerCredit.toFixed(3)}/credit
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
 
           {/* Recent Transactions */}
@@ -463,7 +331,7 @@ export default function WalletScreen() {
                       alignItems: 'center',
                     }}
                   >
-                    <UserPlus2 size={24} color={theme.colors.successForeground} />
+                    <UserPlus size={24} color={theme.colors.successForeground} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
@@ -505,111 +373,114 @@ export default function WalletScreen() {
                       Complete Sales
                     </Text>
                     <Text variant="bodySmall" color="secondary">
-                      Earn 2% credit back on every successful sale
+                      Earn 1% cashback in credits on successful sales
                     </Text>
                   </View>
-                  <Badge text="2%" variant="warning" />
+                  <Badge text="1%" variant="warning" />
                 </View>
               </TouchableOpacity>
             </View>
           </View>
+
+          {/* Business Plans Preview */}
+          <View style={{ marginBottom: theme.spacing.xl }}>
+            <Text variant="h3" style={{ marginBottom: theme.spacing.lg }}>
+              Business Plans
+            </Text>
+            
+            <TouchableOpacity
+              onPress={handleBusinessPlans}
+              style={{
+                backgroundColor: theme.colors.surface,
+                borderRadius: theme.borderRadius.lg,
+                padding: theme.spacing.lg,
+                borderWidth: 1,
+                borderColor: theme.colors.primary + '30',
+                ...theme.shadows.sm,
+              }}
+              activeOpacity={0.95}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
+                <View
+                  style={{
+                    backgroundColor: theme.colors.primary + '20',
+                    borderRadius: theme.borderRadius.full,
+                    width: 48,
+                    height: 48,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginRight: theme.spacing.md,
+                  }}
+                >
+                  <Crown size={24} color={theme.colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text variant="h4" style={{ marginBottom: theme.spacing.xs }}>
+                    Pro Business Plan
+                  </Text>
+                  <Text variant="bodySmall" color="muted">
+                    80 credits monthly • Unlimited listings • Auto-boost
+                  </Text>
+                </View>
+                <PriceDisplay amount={250} currency="GHS" size="lg" />
+              </View>
+              <Text variant="caption" color="muted" style={{ textAlign: 'center' }}>
+                Tap to view all business plans →
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Feature Marketplace */}
+          <View style={{ marginBottom: theme.spacing.xl }}>
+            <Text variant="h3" style={{ marginBottom: theme.spacing.lg }}>
+              Spend Your Credits
+            </Text>
+            
+            <TouchableOpacity
+              onPress={handleFeatureMarketplace}
+              style={{
+                backgroundColor: theme.colors.surface,
+                borderRadius: theme.borderRadius.lg,
+                padding: theme.spacing.lg,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                ...theme.shadows.sm,
+              }}
+              activeOpacity={0.95}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
+                <View
+                  style={{
+                    backgroundColor: theme.colors.warning + '20',
+                    borderRadius: theme.borderRadius.full,
+                    width: 48,
+                    height: 48,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginRight: theme.spacing.md,
+                  }}
+                >
+                  <Zap size={24} color={theme.colors.warning} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text variant="h4" style={{ marginBottom: theme.spacing.xs }}>
+                    Feature Marketplace
+                  </Text>
+                  <Text variant="bodySmall" color="muted">
+                    Boost listings • Analytics • Premium features
+                  </Text>
+                </View>
+                <ArrowUpRight size={20} color={theme.colors.text.muted} />
+              </View>
+              <Text variant="caption" color="muted" style={{ textAlign: 'center' }}>
+                Explore premium features →
+              </Text>
+            </TouchableOpacity>
+          </View>
         </Container>
       </ScrollView>
 
-      {/* Add Funds Modal */}
-      <AppModal
-        visible={showAddFunds}
-        onClose={() => setShowAddFunds(false)}
-        title="Add Funds"
-        primaryAction={{
-          text: 'Add Funds',
-          onPress: handleAddFunds,
-          loading: processing,
-        }}
-        secondaryAction={{
-          text: 'Cancel',
-          onPress: () => setShowAddFunds(false),
-        }}
-      >
-        <View style={{ gap: theme.spacing.lg }}>
-          <Text variant="body" color="secondary">
-            Add money to your Sellar wallet using mobile money or bank transfer
-          </Text>
 
-          <Input
-            label="Amount (GHS)"
-            placeholder="Enter amount to add"
-            value={amount}
-            onChangeText={setAmount}
-            keyboardType="numeric"
-            helper="Minimum: GHS 5.00"
-          />
-
-          <View
-            style={{
-              backgroundColor: theme.colors.primary + '10',
-              borderRadius: theme.borderRadius.md,
-              padding: theme.spacing.md,
-            }}
-          >
-            <Text variant="bodySmall" style={{ color: theme.colors.primary, textAlign: 'center' }}>
-              💳 Secure payment via Paystack • No hidden fees
-            </Text>
-          </View>
-        </View>
-      </AppModal>
-
-      {/* Withdraw Modal */}
-      <AppModal
-        visible={showWithdraw}
-        onClose={() => setShowWithdraw(false)}
-        title="Withdraw Funds"
-        primaryAction={{
-          text: 'Withdraw',
-          onPress: handleWithdraw,
-          loading: processing,
-        }}
-        secondaryAction={{
-          text: 'Cancel',
-          onPress: () => setShowWithdraw(false),
-        }}
-      >
-        <View style={{ gap: theme.spacing.lg }}>
-          <View
-            style={{
-              backgroundColor: theme.colors.surfaceVariant,
-              borderRadius: theme.borderRadius.md,
-              padding: theme.spacing.md,
-            }}
-          >
-            <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.sm }}>
-              Available Balance:
-            </Text>
-            <PriceDisplay amount={totalWalletBalance} size="lg" />
-          </View>
-
-          <Input
-            label="Withdrawal Amount (GHS)"
-            placeholder="Enter amount to withdraw"
-            value={amount}
-            onChangeText={setAmount}
-            keyboardType="numeric"
-            helper={`Minimum: GHS 10.00 • Available: GHS ${totalWalletBalance.toFixed(2)}`}
-          />
-
-          <View
-            style={{
-              backgroundColor: theme.colors.warning + '10',
-              borderRadius: theme.borderRadius.md,
-              padding: theme.spacing.md,
-            }}
-          >
-            <Text variant="bodySmall" style={{ color: theme.colors.warning, textAlign: 'center' }}>
-              ⏱️ Withdrawals are processed within 1-3 business days
-            </Text>
-          </View>
-        </View>
-      </AppModal>
 
       {/* Toast */}
       <Toast

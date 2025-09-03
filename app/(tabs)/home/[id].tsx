@@ -25,7 +25,9 @@ import {
   Toast,
   Grid,
   ProductCard,
+  ImageViewer,
 } from '@/components';
+import { useImageViewer } from '@/hooks/useImageViewer';
 import { Heart, Share, MessageCircle, Phone, Flag, Eye, PhoneCall, DollarSign, ArrowLeft } from 'lucide-react-native';
 import { Package } from 'lucide-react-native';
 
@@ -74,6 +76,17 @@ export default function ListingDetailScreen() {
   const [similarListings, setSimilarListings] = useState<any[]>([]);
   const [sellerListingsLoading, setSellerListingsLoading] = useState(false);
   const [similarListingsLoading, setSimilarListingsLoading] = useState(false);
+
+  // Image viewer
+  const images = listing?.images || [];
+  const {
+    visible: imageViewerVisible,
+    currentIndex: imageViewerIndex,
+    openViewer: openImageViewer,
+    closeViewer: closeImageViewer,
+    shareImage,
+    downloadImage,
+  } = useImageViewer({ images, initialIndex: currentImageIndex });
 
   useEffect(() => {
     if (listingId) {
@@ -298,7 +311,7 @@ export default function ListingDetailScreen() {
             avatar: item.profiles?.avatar_url,
             rating: item.profiles?.rating || 0,
           },
-          badge: item.boost_expires_at && new Date(item.boost_expires_at) > new Date() 
+          badge: item.boost_until && new Date(item.boost_until) > new Date() 
             ? { text: 'Boosted', variant: 'featured' as const }
             : undefined,
           location: item.location,
@@ -364,7 +377,7 @@ export default function ListingDetailScreen() {
             avatar: item.profiles?.avatar_url,
             rating: item.profiles?.rating || 0,
           },
-          badge: item.boost_expires_at && new Date(item.boost_expires_at) > new Date() 
+          badge: item.boost_until && new Date(item.boost_until) > new Date() 
             ? { text: 'Boosted', variant: 'featured' as const }
             : undefined,
           location: item.location,
@@ -789,16 +802,21 @@ export default function ListingDetailScreen() {
                 }}
               >
                 {listing.images.map((imageUrl: string, index: number) => (
-                  <Image
+                  <TouchableOpacity
                     key={index}
-                    source={{ uri: imageUrl }}
-                    style={{
-                      width: screenWidth,
-                      height: imageHeight,
-                      backgroundColor: theme.colors.surfaceVariant,
-                    }}
-                    resizeMode="cover"
-                  />
+                    onPress={() => openImageViewer(index)}
+                    activeOpacity={0.9}
+                  >
+                    <Image
+                      source={{ uri: imageUrl }}
+                      style={{
+                        width: screenWidth,
+                        height: imageHeight,
+                        backgroundColor: theme.colors.surfaceVariant,
+                      }}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
                 ))}
               </ScrollView>
               
@@ -1501,6 +1519,14 @@ export default function ListingDetailScreen() {
         message={toastMessage}
         variant={toastVariant}
         onHide={() => setShowToast(false)}
+      />
+
+      {/* Image Viewer */}
+      <ImageViewer
+        visible={imageViewerVisible}
+        images={images}
+        initialIndex={imageViewerIndex}
+        onClose={closeImageViewer}
       />
     </View>
   );

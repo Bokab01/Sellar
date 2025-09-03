@@ -41,12 +41,24 @@ export function Text({
     }
   };
 
+  const typographyVariant = theme.typography[variant];
+  
+  // Safety check to prevent fontSize errors
+  if (!typographyVariant) {
+    console.warn(`Typography variant "${variant}" not found in theme`);
+    return (
+      <RNText style={[{ color: getTextColor(color) }, style]} {...props}>
+        {children}
+      </RNText>
+    );
+  }
+
   const textStyle = [
     {
-      fontSize: theme.typography[variant].fontSize,
-      lineHeight: theme.typography[variant].lineHeight,
-      fontFamily: theme.typography[variant].fontFamily,
-      letterSpacing: theme.typography[variant].letterSpacing,
+      fontSize: typographyVariant.fontSize || 16,
+      lineHeight: typographyVariant.lineHeight || 24,
+      fontFamily: typographyVariant.fontFamily || 'System',
+      letterSpacing: typographyVariant.letterSpacing || 0,
       color: getTextColor(color),
     },
     style,

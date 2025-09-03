@@ -34,6 +34,7 @@ export default function CommunityScreen() {
       avatar: post.profiles?.avatar_url,
       rating: post.profiles?.rating || 0,
       isVerified: post.profiles?.is_verified,
+      profile: post.profiles, // Add the full profile object for UserDisplayName
     },
     timestamp: new Date(post.created_at).toLocaleString(),
     content: post.content,

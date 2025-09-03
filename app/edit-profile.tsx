@@ -1,16 +1,17 @@
-import React, { useState } from 'react';
-import { View, ScrollView, RefreshControl } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, ScrollView, RefreshControl, TouchableOpacity, Alert, Image } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { router } from 'expo-router';
 import { Text } from '@/components/Typography/Text';
 import { SafeAreaWrapper, Container } from '@/components/Layout';
 import { AppHeader } from '@/components/AppHeader/AppHeader';
 import { Button } from '@/components/Button/Button';
-import { ListItem } from '@/components/ListItem/ListItem';
+import { Input } from '@/components/Input/Input';
 import { Badge } from '@/components/Badge/Badge';
-import { ProfileEditModal } from '@/components/ProfileEditModal/ProfileEditModal';
-import { BusinessProfileSetupModal } from '@/components/BusinessProfileSetupModal/BusinessProfileSetupModal';
+import { Avatar } from '@/components/Avatar/Avatar';
+import { LocationPicker } from '@/components/LocationPicker/LocationPicker';
 import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
+import { Toast } from '@/components/Toast/Toast';
 import { 
   User, 
   Building, 
@@ -25,29 +26,116 @@ import {
   Edit3,
   Plus,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Save,
+  ChevronDown,
+  ChevronUp,
+  Camera
 } from 'lucide-react-native';
 import { 
   useProfile, 
+  useUpdateProfile,
   useProfileCompletion, 
   useSocialMediaLinks,
   useBusinessHours 
 } from '@/hooks/useProfile';
 import { useAuth } from '@/hooks/useAuth';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
+import { BusinessProfileSetupModal } from '@/components/BusinessProfileSetupModal/BusinessProfileSetupModal';
+import * as ImagePicker from 'expo-image-picker';
+import { Image as ImageIcon } from 'lucide-react-native';
 
 export default function EditProfileScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const { profile, loading, refetch } = useProfile();
+  const { updateProfile, loading: updating } = useUpdateProfile();
   const { completion } = useProfileCompletion();
-  const { links } = useSocialMediaLinks();
-  const { businessHours } = useBusinessHours();
   const { hasBusinessPlan } = useMonetizationStore();
 
-  const [showProfileEditModal, setShowProfileEditModal] = useState(false);
-  const [showBusinessSetupModal, setShowBusinessSetupModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
+  const [showBusinessSetupModal, setShowBusinessSetupModal] = useState(false);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+
+  // Collapsible sections state
+  const [expandedSections, setExpandedSections] = useState({
+    personal: true,
+    contact: false,
+    professional: false,
+    business: false,
+    privacy: false,
+  });
+
+  // Form state
+  const [formData, setFormData] = useState({
+    first_name: '',
+    last_name: '',
+    username: '',
+    email: '',
+    phone: '',
+    bio: '',
+    location: '',
+    professional_title: '',
+    years_of_experience: '',
+    preferred_contact_method: 'app',
+    response_time_expectation: 'within_hours',
+    phone_visibility: 'contacts',
+    email_visibility: 'private',
+    show_online_status: true,
+    show_last_seen: true,
+    // Business fields
+    business_name: '',
+    business_type: '',
+    business_description: '',
+    business_phone: '',
+    business_email: '',
+    business_website: '',
+    display_business_name: false,
+    business_name_priority: 'secondary',
+  });
+
+  const [avatar, setAvatar] = useState<string | null>(null);
+
+  // Initialize form with profile data
+  useEffect(() => {
+    if (profile) {
+      // Split full name into first and last name
+      const nameParts = (profile.full_name || '').split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      setFormData({
+        first_name: firstName,
+        last_name: lastName,
+        username: profile.username || '',
+        email: profile.email || '',
+        phone: profile.phone || '',
+        bio: profile.bio || '',
+        location: profile.location || '',
+        professional_title: profile.professional_title || '',
+        years_of_experience: profile.years_of_experience?.toString() || '',
+        preferred_contact_method: (profile.preferred_contact_method as 'email' | 'phone' | 'app' | 'whatsapp') || 'app',
+        response_time_expectation: profile.response_time_expectation || 'within_hours',
+        phone_visibility: profile.phone_visibility || 'contacts',
+        email_visibility: profile.email_visibility || 'private',
+        show_online_status: profile.show_online_status ?? true,
+        show_last_seen: profile.show_last_seen ?? true,
+        // Business fields
+        business_name: profile.business_name || '',
+        business_type: profile.business_type || '',
+        business_description: profile.business_description || '',
+        business_phone: profile.business_phone || '',
+        business_email: profile.business_email || '',
+        business_website: profile.business_website || '',
+        display_business_name: profile.display_business_name ?? false,
+        business_name_priority: profile.business_name_priority || 'secondary',
+      });
+      setAvatar(profile.avatar_url || null);
+    }
+  }, [profile]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -55,9 +143,52 @@ export default function EditProfileScreen() {
     setRefreshing(false);
   };
 
-  const handleProfileUpdated = () => {
-    setShowProfileEditModal(false);
-    refetch();
+  const handleSave = async () => {
+    if (!formData.first_name.trim()) {
+      Alert.alert('Error', 'Please enter your first name');
+      return;
+    }
+
+    try {
+      const fullName = `${formData.first_name.trim()} ${formData.last_name.trim()}`.trim();
+      
+      const updateData = {
+        ...formData,
+        full_name: fullName,
+        years_of_experience: formData.years_of_experience ? parseInt(formData.years_of_experience) : undefined,
+        avatar_url: avatar || undefined,
+        preferred_contact_method: formData.preferred_contact_method as 'email' | 'phone' | 'app' | 'whatsapp',
+        response_time_expectation: formData.response_time_expectation as 'within_hours' | 'within_minutes' | 'within_day' | 'within_week',
+        phone_visibility: formData.phone_visibility as 'public' | 'contacts' | 'private',
+        email_visibility: formData.email_visibility as 'public' | 'contacts' | 'private',
+        business_name_priority: formData.business_name_priority as 'secondary' | 'primary' | 'hidden',
+      };
+
+      // Remove first_name and last_name from update data as they're not in the profile schema
+      delete (updateData as any).first_name;
+      delete (updateData as any).last_name;
+
+      await updateProfile(updateData);
+      setToastMessage('Profile updated successfully!');
+      setToastVariant('success');
+      setShowToast(true);
+      await refetch();
+    } catch (error: any) {
+      setToastMessage(error.message || 'Failed to update profile');
+      setToastVariant('error');
+      setShowToast(true);
+    }
+  };
+
+  const updateFormField = (field: string, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
   };
 
   const handleBusinessProfileCreated = () => {
@@ -65,27 +196,15 @@ export default function EditProfileScreen() {
     refetch();
   };
 
+  const handleAvatarSelected = (uri: string) => {
+    setAvatar(uri);
+    setShowAvatarPicker(false);
+  };
+
   const getCompletionColor = () => {
     if (completion.percentage >= 80) return theme.colors.success;
     if (completion.percentage >= 50) return theme.colors.warning;
     return theme.colors.error;
-  };
-
-  const getVerificationBadge = () => {
-    if (!profile) return null;
-
-    switch (profile.verification_level) {
-      case 'business':
-        return { text: 'Business Verified', variant: 'success' as const };
-      case 'identity':
-        return { text: 'ID Verified', variant: 'success' as const };
-      case 'phone':
-        return { text: 'Phone Verified', variant: 'warning' as const };
-      case 'email':
-        return { text: 'Email Verified', variant: 'warning' as const };
-      default:
-        return { text: 'Unverified', variant: 'error' as const };
-    }
   };
 
   if (loading && !profile) {
@@ -97,7 +216,7 @@ export default function EditProfileScreen() {
           onBackPress={() => router.back()}
         />
         <Container>
-          <LoadingSkeleton count={6} height={80} />
+          <LoadingSkeleton />
         </Container>
       </SafeAreaWrapper>
     );
@@ -119,16 +238,14 @@ export default function EditProfileScreen() {
             gap: theme.spacing.lg,
           }}>
             <AlertCircle size={48} color={theme.colors.error} />
-            <Text variant="h3" style={{ textAlign: 'center' }}>
+            <Text style={{ fontSize: 24, fontWeight: '600', textAlign: 'center' }}>
               Profile Not Found
             </Text>
-            <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
+            <Text style={{ color: theme.colors.text.secondary, textAlign: 'center' }}>
               Unable to load your profile information.
             </Text>
             <Button variant="primary" onPress={refetch}>
-              <Text variant="body" style={{ color: theme.colors.surface }}>
-                Try Again
-              </Text>
+              Try Again
             </Button>
           </View>
         </Container>
@@ -136,39 +253,91 @@ export default function EditProfileScreen() {
     );
   }
 
+  const renderCollapsibleSection = (
+    key: keyof typeof expandedSections,
+    title: string,
+    icon: React.ReactNode,
+    content: React.ReactNode
+  ) => {
+    const isExpanded = expandedSections[key];
+    
+    return (
+      <View style={{
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.borderRadius.lg,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        marginBottom: theme.spacing.md,
+        overflow: 'hidden',
+      }}>
+        <TouchableOpacity
+          onPress={() => toggleSection(key)}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: theme.spacing.lg,
+            backgroundColor: isExpanded ? theme.colors.surfaceVariant : 'transparent',
+          }}
+          activeOpacity={0.7}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+            {icon}
+            <Text style={{ fontSize: 16, fontWeight: '600' }}>{title}</Text>
+          </View>
+          {isExpanded ? (
+            <ChevronUp size={20} color={theme.colors.text.muted} />
+          ) : (
+            <ChevronDown size={20} color={theme.colors.text.muted} />
+          )}
+        </TouchableOpacity>
+        
+        {isExpanded && (
+          <View style={{ padding: theme.spacing.lg, paddingTop: 0 }}>
+            {content}
+          </View>
+        )}
+      </View>
+    );
+  };
+
   return (
     <SafeAreaWrapper>
       <AppHeader
         title="Edit Profile"
         showBackButton
         onBackPress={() => router.back()}
-        rightElement={
+        rightActions={[
           <Button
-            variant="ghost"
-            size="small"
-            onPress={() => setShowProfileEditModal(true)}
+            key="save"
+            variant="primary"
+            size="sm"
+            onPress={handleSave}
+            loading={updating}
+            icon={<Save size={16} color="#FFFFFF" />}
           >
-            <Edit3 size={20} color={theme.colors.primary} />
+            Save
           </Button>
-        }
+        ]}
       />
 
       <ScrollView
+        style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: theme.spacing.xl }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
-        <Container>
-          {/* Profile Completion */}
+        <Container style={{ paddingTop: theme.spacing.lg }}>
+          {/* Profile Completion Header */}
           <View
             style={{
               backgroundColor: theme.colors.surface,
               borderRadius: theme.borderRadius.lg,
               padding: theme.spacing.lg,
-              marginBottom: theme.spacing.xl,
               borderWidth: 1,
               borderColor: theme.colors.border,
+              marginBottom: theme.spacing.xl,
               ...theme.shadows.sm,
             }}
           >
@@ -178,7 +347,7 @@ export default function EditProfileScreen() {
               alignItems: 'center',
               marginBottom: theme.spacing.md,
             }}>
-              <Text variant="h4">Profile Completion</Text>
+              <Text style={{ fontSize: 18, fontWeight: '600' }}>Profile Completion</Text>
               <Badge 
                 text={`${completion.percentage}%`}
                 variant={completion.percentage >= 80 ? 'success' : completion.percentage >= 50 ? 'warning' : 'error'}
@@ -190,7 +359,6 @@ export default function EditProfileScreen() {
               height: 8,
               backgroundColor: theme.colors.surfaceVariant,
               borderRadius: 4,
-              marginBottom: theme.spacing.md,
             }}>
               <View style={{
                 height: '100%',
@@ -199,273 +367,410 @@ export default function EditProfileScreen() {
                 borderRadius: 4,
               }} />
             </View>
+          </View>
 
-            {completion.suggestions.length > 0 && (
-              <View>
-                <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.sm }}>
-                  Suggestions to improve your profile:
-                </Text>
-                {completion.suggestions.slice(0, 2).map((suggestion, index) => (
-                  <Text key={index} variant="bodySmall" color="muted" style={{ marginBottom: theme.spacing.xs }}>
-                    • {suggestion}
-                  </Text>
-                ))}
+          {/* Avatar Section */}
+          <View style={{
+            alignItems: 'center',
+            marginBottom: theme.spacing.xl,
+          }}>
+            <TouchableOpacity
+              onPress={() => setShowAvatarPicker(true)}
+              style={{
+                position: 'relative',
+                marginBottom: theme.spacing.sm,
+              }}
+              activeOpacity={0.7}
+            >
+              <Avatar
+                source={avatar || undefined}
+                name={`${formData.first_name} ${formData.last_name}`.trim() || 'User'}
+                size="xl"
+                showBorder
+              />
+              <View style={{
+                position: 'absolute',
+                bottom: 0,
+                right: 0,
+                backgroundColor: theme.colors.primary,
+                borderRadius: 16,
+                padding: 8,
+                borderWidth: 2,
+                borderColor: theme.colors.surface,
+              }}>
+                <Camera size={16} color="#FFFFFF" />
               </View>
-            )}
-          </View>
-
-          {/* Basic Profile Information */}
-          <View style={{ marginBottom: theme.spacing.xl }}>
-            <Text variant="h3" style={{ marginBottom: theme.spacing.lg }}>
-              Profile Information
+            </TouchableOpacity>
+            <Text style={{ fontSize: 14, color: theme.colors.text.muted }}>
+              Tap to change profile photo
             </Text>
-
-            <View
-              style={{
-                backgroundColor: theme.colors.surface,
-                borderRadius: theme.borderRadius.lg,
-                overflow: 'hidden',
-                borderWidth: 1,
-                borderColor: theme.colors.border,
-                ...theme.shadows.sm,
-              }}
-            >
-              <ListItem
-                title="Personal Details"
-                description={`${profile.full_name || 'No name set'} • ${profile.email || 'No email'}`}
-                leftIcon={<User size={20} color={theme.colors.text.primary} />}
-                rightIcon={<Edit3 size={16} color={theme.colors.text.muted} />}
-                onPress={() => setShowProfileEditModal(true)}
-                showChevron
-              />
-
-              <ListItem
-                title="Contact Information"
-                description={`${profile.phone || 'No phone'} • ${profile.location || 'No location'}`}
-                leftIcon={<Phone size={20} color={theme.colors.text.primary} />}
-                rightIcon={<Edit3 size={16} color={theme.colors.text.muted} />}
-                onPress={() => setShowProfileEditModal(true)}
-                showChevron
-                style={{ borderTopWidth: 1, borderTopColor: theme.colors.border }}
-              />
-
-              <ListItem
-                title="Professional Info"
-                description={profile.professional_title || 'Add your professional title'}
-                leftIcon={<Briefcase size={20} color={theme.colors.text.primary} />}
-                rightIcon={<Edit3 size={16} color={theme.colors.text.muted} />}
-                onPress={() => setShowProfileEditModal(true)}
-                showChevron
-                style={{ borderTopWidth: 1, borderTopColor: theme.colors.border }}
-              />
-
-              <ListItem
-                title="Verification Status"
-                description={`${profile.verification_level || 'none'} verification`}
-                leftIcon={<Shield size={20} color={theme.colors.text.primary} />}
-                badge={getVerificationBadge()}
-                onPress={() => router.push('/verification')}
-                showChevron
-                style={{ borderTopWidth: 1, borderTopColor: theme.colors.border }}
-              />
-            </View>
           </View>
 
-          {/* Business Profile Section */}
-          <View style={{ marginBottom: theme.spacing.xl }}>
-            <View style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: theme.spacing.lg,
-            }}>
-              <Text variant="h3">Business Profile</Text>
-              {hasBusinessPlan() && (
-                <Badge text="Business Plan" variant="success" size="small" />
-              )}
+          {/* Collapsible Sections */}
+          {renderCollapsibleSection(
+            'personal',
+            'Personal Information',
+            <User size={20} color={theme.colors.primary} />,
+            <View style={{ gap: theme.spacing.lg }}>
+              <Input
+                label="First Name *"
+                value={formData.first_name}
+                onChangeText={(value) => updateFormField('first_name', value)}
+                placeholder="Enter your first name"
+              />
+
+              <Input
+                label="Last Name"
+                value={formData.last_name}
+                onChangeText={(value) => updateFormField('last_name', value)}
+                placeholder="Enter your last name"
+              />
+
+              <Input
+                label="Username"
+                value={formData.username}
+                onChangeText={(value) => updateFormField('username', value)}
+                placeholder="Choose a unique username"
+              />
+
+              <Input
+                label="Bio"
+                value={formData.bio}
+                onChangeText={(value) => updateFormField('bio', value)}
+                placeholder="Tell others about yourself"
+                multiline
+                numberOfLines={4}
+              />
             </View>
+          )}
 
-            <View
-              style={{
-                backgroundColor: theme.colors.surface,
-                borderRadius: theme.borderRadius.lg,
-                overflow: 'hidden',
-                borderWidth: 1,
-                borderColor: theme.colors.border,
-                ...theme.shadows.sm,
-              }}
-            >
-              {profile.is_business ? (
+          {renderCollapsibleSection(
+            'contact',
+            'Contact Information',
+            <Phone size={20} color={theme.colors.primary} />,
+            <View style={{ gap: theme.spacing.lg }}>
+              <Input
+                label="Email"
+                value={formData.email}
+                onChangeText={(value) => updateFormField('email', value)}
+                placeholder="Enter your email"
+                keyboardType="email-address"
+              />
+
+              <Input
+                label="Phone Number"
+                value={formData.phone}
+                onChangeText={(value) => updateFormField('phone', value)}
+                placeholder="Enter your phone number"
+                keyboardType="phone-pad"
+              />
+
+              <View>
+                <Text style={{ 
+                  fontSize: 14, 
+                  fontWeight: '500', 
+                  marginBottom: theme.spacing.sm,
+                  color: theme.colors.text.primary 
+                }}>
+                  Location
+                </Text>
+                <LocationPicker
+                  value={formData.location}
+                  onLocationSelect={(location) => updateFormField('location', location)}
+                  placeholder="Select your location"
+                />
+              </View>
+            </View>
+          )}
+
+          {renderCollapsibleSection(
+            'professional',
+            'Professional Information',
+            <Briefcase size={20} color={theme.colors.primary} />,
+            <View style={{ gap: theme.spacing.lg }}>
+              <Input
+                label="Professional Title"
+                value={formData.professional_title}
+                onChangeText={(value) => updateFormField('professional_title', value)}
+                placeholder="e.g. Software Developer, Teacher"
+              />
+
+              <Input
+                label="Years of Experience"
+                value={formData.years_of_experience}
+                onChangeText={(value) => updateFormField('years_of_experience', value)}
+                placeholder="Enter years of experience"
+                keyboardType="numeric"
+              />
+            </View>
+          )}
+
+          {renderCollapsibleSection(
+            'business',
+            'Business Profile',
+            <Building size={20} color={theme.colors.primary} />,
+            <View style={{ gap: theme.spacing.lg }}>
+              {profile?.is_business ? (
                 <>
-                  <ListItem
-                    title="Business Information"
-                    description={`${profile.business_name || 'No business name'} • ${profile.business_type || 'No type set'}`}
-                    leftIcon={<Building size={20} color={theme.colors.success} />}
-                    badge={{ text: 'Active', variant: 'success' }}
-                    rightIcon={<Edit3 size={16} color={theme.colors.text.muted} />}
-                    onPress={() => setShowProfileEditModal(true)}
-                    showChevron
+                  <Input
+                    label="Business Name"
+                    value={formData.business_name}
+                    onChangeText={(value) => updateFormField('business_name', value)}
+                    placeholder="Enter your business name"
                   />
 
-                  <ListItem
-                    title="Business Hours"
-                    description={businessHours ? 'Hours configured' : 'Set your business hours'}
-                    leftIcon={<Clock size={20} color={theme.colors.text.primary} />}
-                    rightIcon={<Edit3 size={16} color={theme.colors.text.muted} />}
-                    onPress={() => router.push('/(tabs)/business-hours')}
-                    showChevron
-                    style={{ borderTopWidth: 1, borderTopColor: theme.colors.border }}
+                  <Input
+                    label="Business Description"
+                    value={formData.business_description}
+                    onChangeText={(value) => updateFormField('business_description', value)}
+                    placeholder="Describe your business"
+                    multiline
+                    numberOfLines={3}
                   />
 
-                  <ListItem
-                    title="Social Media Links"
-                    description={`${links.length} link${links.length !== 1 ? 's' : ''} added`}
-                    leftIcon={<User size={20} color={theme.colors.text.primary} />}
-                    rightIcon={<Edit3 size={16} color={theme.colors.text.muted} />}
-                    onPress={() => router.push('/(tabs)/social-links')}
-                    showChevron
-                    style={{ borderTopWidth: 1, borderTopColor: theme.colors.border }}
+                  <Input
+                    label="Business Type"
+                    value={formData.business_type}
+                    onChangeText={(value) => updateFormField('business_type', value)}
+                    placeholder="e.g. Retail, Service, Manufacturing"
                   />
+
+                  <Input
+                    label="Business Phone"
+                    value={formData.business_phone}
+                    onChangeText={(value) => updateFormField('business_phone', value)}
+                    placeholder="Business phone number"
+                    keyboardType="phone-pad"
+                  />
+
+                  <Input
+                    label="Business Email"
+                    value={formData.business_email}
+                    onChangeText={(value) => updateFormField('business_email', value)}
+                    placeholder="Business email address"
+                    keyboardType="email-address"
+                  />
+
+                  <Input
+                    label="Business Website"
+                    value={formData.business_website}
+                    onChangeText={(value) => updateFormField('business_website', value)}
+                    placeholder="https://www.yourbusiness.com"
+                    keyboardType="url"
+                  />
+
+                  {/* Business Name Display Toggle */}
+                  {formData.business_name && (
+                    <View style={{
+                      backgroundColor: theme.colors.surfaceVariant,
+                      borderRadius: theme.borderRadius.lg,
+                      padding: theme.spacing.lg,
+                      borderWidth: 1,
+                      borderColor: theme.colors.border,
+                    }}>
+                      <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: theme.spacing.sm }}>
+                        Business Name Display
+                      </Text>
+                      
+                      <View style={{
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        paddingVertical: theme.spacing.sm,
+                      }}>
+                        <View style={{ flex: 1, marginRight: theme.spacing.md }}>
+                          <Text style={{ fontSize: 14, marginBottom: 4 }}>Show business name publicly</Text>
+                          <Text style={{ fontSize: 12, color: theme.colors.text.muted }}>
+                            Display "{formData.business_name}" on your posts, listings, and profile
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => updateFormField('display_business_name', !formData.display_business_name)}
+                          style={{
+                            backgroundColor: formData.display_business_name ? theme.colors.primary : theme.colors.border,
+                            borderRadius: 16,
+                            paddingHorizontal: 16,
+                            paddingVertical: 8,
+                            minWidth: 60,
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Text style={{
+                            color: formData.display_business_name ? '#FFFFFF' : theme.colors.text.muted,
+                            fontSize: 12,
+                            fontWeight: '600',
+                          }}>
+                            {formData.display_business_name ? 'ON' : 'OFF'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
                 </>
               ) : (
-                <ListItem
-                  title="Activate Business Profile"
-                  description={hasBusinessPlan() ? 'Free with your business plan' : '50 credits - Get business badge & features'}
-                  leftIcon={<Building size={20} color={theme.colors.primary} />}
-                  badge={hasBusinessPlan() ? { text: 'FREE', variant: 'success' } : { text: '50 Credits', variant: 'warning' }}
-                  rightIcon={<Plus size={16} color={theme.colors.primary} />}
-                  onPress={() => setShowBusinessSetupModal(true)}
-                  showChevron
-                />
+                <View style={{
+                  backgroundColor: theme.colors.surfaceVariant,
+                  borderRadius: theme.borderRadius.lg,
+                  padding: theme.spacing.xl,
+                  borderWidth: 1,
+                  borderColor: theme.colors.border,
+                  alignItems: 'center',
+                  gap: theme.spacing.md,
+                }}>
+                  <Building size={48} color={theme.colors.primary} />
+                  <Text style={{ fontSize: 18, fontWeight: '600', textAlign: 'center' }}>
+                    Upgrade to Business
+                  </Text>
+                  <Text style={{ color: theme.colors.text.secondary, textAlign: 'center' }}>
+                    Unlock business features, analytics, and professional tools
+                  </Text>
+                  
+                  {hasBusinessPlan() ? (
+                    <Button
+                      variant="primary"
+                      onPress={() => setShowBusinessSetupModal(true)}
+                      icon={<Crown size={16} color="#FFFFFF" />}
+                    >
+                      Setup Business Profile
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      onPress={() => router.push('/subscription-plans')}
+                      icon={<Crown size={16} color={theme.colors.primary} />}
+                    >
+                      View Business Plans
+                    </Button>
+                  )}
+                </View>
               )}
             </View>
-          </View>
+          )}
 
-          {/* Privacy & Settings */}
-          <View style={{ marginBottom: theme.spacing.xl }}>
-            <Text variant="h3" style={{ marginBottom: theme.spacing.lg }}>
-              Privacy & Settings
-            </Text>
-
-            <View
-              style={{
-                backgroundColor: theme.colors.surface,
-                borderRadius: theme.borderRadius.lg,
-                overflow: 'hidden',
-                borderWidth: 1,
-                borderColor: theme.colors.border,
-                ...theme.shadows.sm,
-              }}
-            >
-              <ListItem
-                title="Privacy Settings"
-                description="Control who can see your information"
-                leftIcon={<Shield size={20} color={theme.colors.text.primary} />}
-                rightIcon={<Edit3 size={16} color={theme.colors.text.muted} />}
-                onPress={() => setShowProfileEditModal(true)}
-                showChevron
-              />
-
-              <ListItem
-                title="Account Settings"
-                description="Manage your account preferences"
-                leftIcon={<Settings size={20} color={theme.colors.text.primary} />}
-                onPress={() => router.push('/(tabs)/settings')}
-                showChevron
-                style={{ borderTopWidth: 1, borderTopColor: theme.colors.border }}
-              />
-            </View>
-          </View>
-
-          {/* Quick Actions */}
-          <View style={{
-            flexDirection: 'row',
-            gap: theme.spacing.md,
-          }}>
-            <View style={{ flex: 1 }}>
-              <Button
-                variant="primary"
-                onPress={() => setShowProfileEditModal(true)}
-              >
-                <Edit3 size={18} color={theme.colors.surface} />
-                <Text 
-                  variant="body" 
-                  style={{ 
-                    color: theme.colors.surface, 
-                    marginLeft: theme.spacing.sm,
-                    fontWeight: '600',
-                  }}
-                >
-                  Edit Profile
+          {renderCollapsibleSection(
+            'privacy',
+            'Privacy Settings',
+            <Shield size={20} color={theme.colors.primary} />,
+            <View style={{ gap: theme.spacing.lg }}>
+              <View>
+                <Text style={{ marginBottom: theme.spacing.sm, fontWeight: '600' }}>
+                  Contact Preferences
                 </Text>
-              </Button>
-            </View>
-
-            {!profile.is_business && (
-              <View style={{ flex: 1 }}>
-                <Button
-                  variant="outline"
-                  onPress={() => setShowBusinessSetupModal(true)}
-                >
-                  <Building size={18} color={theme.colors.primary} />
-                  <Text 
-                    variant="body" 
-                    style={{ 
-                      color: theme.colors.primary, 
-                      marginLeft: theme.spacing.sm,
-                      fontWeight: '600',
-                    }}
-                  >
-                    Go Business
-                  </Text>
-                </Button>
+                <Text style={{ fontSize: 12, color: theme.colors.text.muted, marginBottom: theme.spacing.md }}>
+                  Choose how others can contact you
+                </Text>
+                
+                {/* Add privacy controls here */}
+                <Text style={{ color: theme.colors.text.muted }}>
+                  Privacy settings will be available in the next update
+                </Text>
               </View>
-            )}
-          </View>
-
-          {/* Profile Tips */}
-          <View
-            style={{
-              backgroundColor: theme.colors.surfaceVariant,
-              borderRadius: theme.borderRadius.lg,
-              padding: theme.spacing.lg,
-              marginTop: theme.spacing.xl,
-            }}
-          >
-            <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
-              Profile Tips
-            </Text>
-            
-            <View style={{ gap: theme.spacing.sm }}>
-              <Text variant="bodySmall" color="muted">
-                • Complete profiles get 3x more views and messages
-              </Text>
-              <Text variant="bodySmall" color="muted">
-                • Business profiles build trust and credibility
-              </Text>
-              <Text variant="bodySmall" color="muted">
-                • Verification badges increase response rates
-              </Text>
-              <Text variant="bodySmall" color="muted">
-                • Regular updates keep your profile fresh
-              </Text>
             </View>
-          </View>
+          )}
         </Container>
       </ScrollView>
 
-      {/* Profile Edit Modal */}
-      <ProfileEditModal
-        visible={showProfileEditModal}
-        onClose={() => setShowProfileEditModal(false)}
-        onProfileUpdated={handleProfileUpdated}
-      />
+      {/* Avatar Picker Modal */}
+      {showAvatarPicker && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+        }}>
+          <View style={{
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.borderRadius.lg,
+            padding: theme.spacing.xl,
+            margin: theme.spacing.xl,
+            width: '80%',
+            maxWidth: 400,
+          }}>
+            <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: theme.spacing.lg, textAlign: 'center' }}>
+              Change Profile Photo
+            </Text>
+            
+            <View style={{ gap: theme.spacing.md }}>
+              <Button
+                variant="primary"
+                icon={<Camera size={20} color="#FFFFFF" />}
+                onPress={async () => {
+                  // Handle camera
+                  const { status } = await ImagePicker.requestCameraPermissionsAsync();
+                  if (status === 'granted') {
+                    const result = await ImagePicker.launchCameraAsync({
+                      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                      allowsEditing: true,
+                      aspect: [1, 1],
+                      quality: 0.8,
+                    });
+                    
+                    if (!result.canceled && result.assets[0]) {
+                      setAvatar(result.assets[0].uri);
+                    }
+                  }
+                  setShowAvatarPicker(false);
+                }}
+                fullWidth
+              >
+                Take Photo
+              </Button>
+              
+              <Button
+                variant="secondary"
+                icon={<ImageIcon size={20} color={theme.colors.primary} />}
+                onPress={async () => {
+                  // Handle gallery
+                  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                  if (status === 'granted') {
+                    const result = await ImagePicker.launchImageLibraryAsync({
+                      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                      allowsEditing: true,
+                      aspect: [1, 1],
+                      quality: 0.8,
+                    });
+                    
+                    if (!result.canceled && result.assets[0]) {
+                      setAvatar(result.assets[0].uri);
+                    }
+                  }
+                  setShowAvatarPicker(false);
+                }}
+                fullWidth
+              >
+                Choose from Gallery
+              </Button>
+              
+              <Button
+                variant="ghost"
+                onPress={() => setShowAvatarPicker(false)}
+                fullWidth
+              >
+                Cancel
+              </Button>
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* Business Profile Setup Modal */}
       <BusinessProfileSetupModal
         visible={showBusinessSetupModal}
         onClose={() => setShowBusinessSetupModal(false)}
         onBusinessProfileCreated={handleBusinessProfileCreated}
+      />
+
+      {/* Toast */}
+      <Toast
+        visible={showToast}
+        message={toastMessage}
+        variant={toastVariant}
+        onHide={() => setShowToast(false)}
       />
     </SafeAreaWrapper>
   );

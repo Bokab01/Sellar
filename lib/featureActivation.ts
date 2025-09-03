@@ -135,7 +135,7 @@ class FeatureActivationService {
       .from('listings')
       .update({
         boost_score: boostScore,
-        boost_expires_at: expiresAt.toISOString(),
+        boost_until: expiresAt.toISOString(),
         boosted_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -339,9 +339,9 @@ class FeatureActivationService {
       .from('listings')
       .update({
         boost_score: 0,
-        boost_expires_at: null,
+        boost_until: null,
       })
-      .lt('boost_expires_at', now);
+      .lt('boost_until', now);
 
     // Clear expired spotlights from listings
     await supabase

@@ -315,7 +315,7 @@ export default function HomeScreen() {
     const badges = [];
     
     // Add boost badge if listing is boosted
-    if (listing.boost_expires_at && new Date(listing.boost_expires_at) > new Date()) {
+    if (listing.boost_until && new Date(listing.boost_until) > new Date()) {
       badges.push({ text: 'Boosted', variant: 'featured' as const });
     }
     
@@ -330,7 +330,7 @@ export default function HomeScreen() {
 
     return {
       id: listing.id,
-      image: listing.images?.[0] || 'https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg',
+      image: listing.images || ['https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg'],
       title: listing.title,
       price: listing.price,
       seller: {
@@ -344,7 +344,7 @@ export default function HomeScreen() {
       location: listing.location,
       views: listing.views_count || 0,
       favorites: listing.favorites_count || 0,
-      isBoosted: listing.boost_expires_at && new Date(listing.boost_expires_at) > new Date(),
+      isBoosted: listing.boost_until && new Date(listing.boost_until) > new Date(),
     };
   });
 

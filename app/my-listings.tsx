@@ -164,7 +164,7 @@ export default function MyListingsScreen() {
 
   const transformedListings = filteredListings.map((listing: any) => ({
     id: listing.id,
-    image: listing.images?.[0] || 'https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg',
+    image: listing.images || ['https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg'],
     title: listing.title,
     price: listing.price,
     seller: {

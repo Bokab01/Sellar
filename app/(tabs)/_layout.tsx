@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { View } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { Chrome as Home, MessageCircle, Plus, Users, MoveHorizontal as MoreHorizontal } from 'lucide-react-native';
+import { MessageCircle, Plus, Users, EllipsisVertical, House } from 'lucide-react-native';
 
 export default function TabLayout() {
   const { theme } = useTheme();
@@ -32,16 +32,11 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ size, color }) => (
-            <Home size={size} color={color} />
+            <House size={size} color={color} />
           ),
         }}
       />
-   {/*    <Tabs.Screen
-        name="home"
-        options={{
-          href: null, // Hide from tab bar - this is for the nested stack
-        }}
-      /> */}
+
       <Tabs.Screen
         name="inbox"
         options={{
@@ -51,6 +46,7 @@ export default function TabLayout() {
           ),
         }}
       />
+
       <Tabs.Screen
         name="create"
         options={{
@@ -74,6 +70,7 @@ export default function TabLayout() {
           tabBarLabel: () => null,
         }}
       />
+
       <Tabs.Screen
         name="community"
         options={{
@@ -83,105 +80,16 @@ export default function TabLayout() {
           ),
         }}
       />
+
       <Tabs.Screen
         name="more"
         options={{
           title: 'More',
           tabBarIcon: ({ size, color }) => (
-            <MoreHorizontal size={size} color={color} />
+            <EllipsisVertical size={size} color={color} />
           ),
         }}
       />
-     {/*  <Tabs.Screen
-        name="buy-credits"
-        options={{
-          href: null, // Hide from tab bar
-        }}
-      />
-      <Tabs.Screen
-        name="subscription-plans"
-        options={{
-          href: null, // Hide from tab bar
-        }}
-      />
-      <Tabs.Screen
-        name="feature-marketplace"
-        options={{
-          href: null, // Hide from tab bar
-        }}
-      />
-      <Tabs.Screen
-        name="wallet"
-        options={{
-          href: null, // Hide from tab bar
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          href: null, // Hide from tab bar
-        }}
-      />
-      <Tabs.Screen
-        name="my-listings"
-        options={{
-          href: null, // Hide from tab bar
-        }}
-      />
-      <Tabs.Screen
-        name="notifications"
-        options={{
-          href: null, // Hide from tab bar
-        }}
-      />
-      <Tabs.Screen
-        name="favorites"
-        options={{
-          href: null, // Hide from tab bar
-        }}
-      />
-      <Tabs.Screen
-        name="help"
-        options={{
-          href: null, // Hide from tab bar
-        }}
-      />
-      <Tabs.Screen
-        name="support-tickets"
-        options={{
-          href: null, // Hide from tab bar
-        }}
-      />
-      <Tabs.Screen
-        name="knowledge-base"
-        options={{
-          href: null, // Hide from tab bar
-        }}
-      />
-      <Tabs.Screen
-        name="edit-profile"
-        options={{
-          href: null, // Hide from tab bar
-        }}
-      />
-      <Tabs.Screen
-        name="dashboard"
-        options={{
-          href: null, // Hide from tab bar
-        }}
-      />
-      <Tabs.Screen
-        name="invite"
-        options={{
-          href: null, // Hide from tab bar
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          href: null, // Hide from tab bar - this is for the nested stack
-        }}
-      />  */}
     </Tabs>
   );
 }

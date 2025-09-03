@@ -29,6 +29,7 @@ export const dbHelpers = {
         id: userId,
         first_name: userData.firstName,
         last_name: userData.lastName,
+        full_name: `${userData.firstName} ${userData.lastName}`.trim(), // Add full_name field
         phone: userData.phone || null,
         location: userData.location || 'Accra, Greater Accra',
       })
@@ -334,9 +335,15 @@ export const dbHelpers = {
           id,
           first_name,
           last_name,
+          full_name,
           avatar_url,
           rating,
-          is_verified
+          is_verified,
+          is_business,
+          business_name,
+          display_business_name,
+          business_name_priority,
+          verification_level
         ),
         listings:listing_id (
           id,

@@ -21,6 +21,12 @@ export default function MoreLayout() {
         },
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.text.muted,
+        tabBarIndicatorStyle: {
+          backgroundColor: theme.colors.primary,
+        },
+        tabBarIndicatorContainerStyle: {
+          backgroundColor: theme.colors.surface,
+        },
         tabBarLabelStyle: {
           fontSize: 13,
           fontWeight: '500',

@@ -53,9 +53,15 @@ export default function PostDetailScreen() {
             id,
             first_name,
             last_name,
+            full_name,
             avatar_url,
             rating,
-            is_verified
+            is_verified,
+            is_business,
+            business_name,
+            display_business_name,
+            business_name_priority,
+            verification_level
           ),
           listings:listing_id (
             id,
@@ -305,6 +311,7 @@ export default function PostDetailScreen() {
       avatar: post.profiles?.avatar_url,
       rating: post.profiles?.rating || 0,
       isVerified: post.profiles?.is_verified,
+      profile: post.profiles, // Add the full profile object for UserDisplayName
     },
     timestamp: new Date(post.created_at).toLocaleString(),
     content: post.content,

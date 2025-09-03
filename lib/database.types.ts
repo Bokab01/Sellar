@@ -109,7 +109,7 @@ export interface Database {
           status: string;
           views_count: number;
           favorites_count: number;
-          boost_expires_at: string | null;
+          boost_until: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -129,7 +129,7 @@ export interface Database {
           status?: string;
           views_count?: number;
           favorites_count?: number;
-          boost_expires_at?: string | null;
+          boost_until?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -149,7 +149,7 @@ export interface Database {
           status?: string;
           views_count?: number;
           favorites_count?: number;
-          boost_expires_at?: string | null;
+          boost_until?: string | null;
           created_at?: string;
           updated_at?: string;
         };
