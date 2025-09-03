@@ -1157,7 +1157,7 @@ export default function ListingDetailScreen() {
                     {sellerListings.length > 6 && (
                       <Button
                         variant="tertiary"
-                        onPress={() => router.push(`/(tabs)/profile/${listing.user_id}`)}
+                        onPress={() => router.push(`/profile/${listing.user_id}`)}
                         fullWidth
                         style={{ marginTop: theme.spacing.lg, marginHorizontal: theme.spacing.lg }}
                       >

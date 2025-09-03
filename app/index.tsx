@@ -37,8 +37,8 @@ export default function IndexScreen() {
 
   // Redirect based on authentication state
   if (user) {
-    return <Redirect href="/(tabs)" />;
+    return <Redirect href="/(tabs)/home" />;
   } else {
-    return <Redirect href="/(auth)/welcome" />;
+    return <Redirect href="/(auth)/sign-in" />;
   }
 }

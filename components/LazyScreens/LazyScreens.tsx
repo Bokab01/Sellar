@@ -13,7 +13,7 @@ export const LazyCreateListingScreen = createLazyComponent(
 );
 
 export const LazyProfileScreen = createLazyComponent(
-  () => import('../../app/(tabs)/profile/[id]'),
+  () => import('../../app/profile/[id]'),
   {
     fallback: <LoadingSkeleton width="100%" height={500} />,
     height: 500,
@@ -21,7 +21,7 @@ export const LazyProfileScreen = createLazyComponent(
 );
 
 export const LazySettingsScreen = createLazyComponent(
-  () => import('../../app/(tabs)/settings'),
+  () => import('../../app/(tabs)/more/settings'),
   {
     fallback: <LoadingSkeleton width="100%" height={400} />,
     height: 400,
@@ -29,7 +29,7 @@ export const LazySettingsScreen = createLazyComponent(
 );
 
 export const LazyMyListingsScreen = createLazyComponent(
-  () => import('../../app/(tabs)/my-listings'),
+  () => import('../../app/my-listings'),
   {
     fallback: <LoadingSkeleton width="100%" height={500} />,
     height: 500,

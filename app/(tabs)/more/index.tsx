@@ -130,7 +130,6 @@ export default function MoreScreen() {
   if (loading) {
     return (
       <SafeAreaWrapper>
-        <AppHeader title="More" />
         <ScrollView contentContainerStyle={{ padding: theme.spacing.lg }}>
           <LoadingSkeleton width="100%" height={120} borderRadius={theme.borderRadius.lg} style={{ marginBottom: theme.spacing.xl }} />
           {Array.from({ length: 4 }).map((_, index) => (
@@ -155,53 +154,53 @@ export default function MoreScreen() {
           title: 'My Profile',
           subtitle: 'View your public profile',
           icon: <User size={20} color={theme.colors.text.primary} />,
-          onPress: () => router.push(`/(tabs)/profile/${user?.id}`),
+          onPress: () => router.push(`/profile/${user?.id}`),
         },
         {
           title: 'Edit Profile',
           subtitle: 'Update your profile and business information',
           icon: <Edit3 size={20} color={theme.colors.text.primary} />,
-          onPress: () => router.push('/(tabs)/edit-profile'),
+          onPress: () => router.push('/edit-profile'),
         },
         {
           title: 'Wallet & Credit',
           subtitle: `${Math.floor(creditBalance)} credits • GHS ${walletBalance.toFixed(2)} wallet`,
           icon: <Wallet size={20} color={theme.colors.success} />,
           badge: creditBalance > 0 ? { text: `${Math.floor(creditBalance)}`, variant: 'success' as const } : undefined,
-          onPress: () => router.push('/(tabs)/wallet'),
+          onPress: () => router.push('/(tabs)/more/wallet'),
         },
         {
           title: 'Buy Credits',
           subtitle: 'Purchase credits for premium features',
           icon: <ShoppingCart size={20} color={theme.colors.primary} />,
-          onPress: () => router.push('/(tabs)/buy-credits'),
+          onPress: () => router.push('/buy-credits'),
         },
         {
           title: 'Business Plans',
           subtitle: currentPlan ? `${currentPlan.subscription_plans?.name} Plan` : 'Unlock business features',
           icon: <Building size={20} color={theme.colors.primary} />,
           badge: currentPlan ? { text: 'Active', variant: 'success' as const } : undefined,
-          onPress: () => router.push('/(tabs)/subscription-plans'),
+          onPress: () => router.push('/subscription-plans'),
         },
         {
           title: 'Dashboard',
           subtitle: hasBusinessPlan() ? 'Business analytics and management' : 'Unlock with business plan',
           icon: <BarChart3 size={20} color={theme.colors.primary} />,
           badge: hasBusinessPlan() ? { text: 'Business', variant: 'success' as const } : undefined,
-          onPress: () => router.push('/(tabs)/dashboard'),
+          onPress: () => router.push('/(tabs)/more/dashboard'),
         },
         {
           title: 'Feature Marketplace',
           subtitle: 'Boost your listings and unlock tools',
           icon: <Zap size={20} color={theme.colors.warning} />,
-          onPress: () => router.push('/(tabs)/feature-marketplace'),
+          onPress: () => router.push('/feature-marketplace'),
         },
         {
           title: 'Verification',
           subtitle: getVerificationSubtitle(),
           icon: <Shield size={20} color={getVerificationColor()} />,
           badge: getVerificationBadge(),
-          onPress: () => router.push('/(tabs)/verification'),
+          onPress: () => router.push('/verification'),
         },
       ],
     },
@@ -212,25 +211,19 @@ export default function MoreScreen() {
           title: 'My Listings',
           subtitle: 'Manage your active, sold, and draft listings',
           icon: <Package size={20} color={theme.colors.text.primary} />,
-          onPress: () => router.push('/(tabs)/my-listings'),
+          onPress: () => router.push('/my-listings'),
         },
         {
           title: 'Reviews & Ratings',
           subtitle: `${profile?.total_reviews || 0} reviews • ${(profile?.rating || 0).toFixed(1)} rating`,
           icon: <Star size={20} color={theme.colors.warning} />,
-          onPress: () => router.push('/(tabs)/reviews'),
+          onPress: () => router.push('/reviews'),
         },
         {
           title: 'Transaction History',
           subtitle: `${transactions.length} recent transactions`,
           icon: <CreditCard size={20} color={theme.colors.text.primary} />,
-          onPress: () => router.push('/(tabs)/transactions'),
-        },
-        {
-          title: 'Favorites',
-          subtitle: 'Your saved listings and searches',
-          icon: <Heart size={20} color={theme.colors.error} />,
-          onPress: () => router.push('/(tabs)/favorites'),
+          onPress: () => router.push('/transactions'),
         },
       ],
     },
@@ -241,26 +234,26 @@ export default function MoreScreen() {
           title: 'Settings',
           subtitle: 'App preferences, privacy, and notifications',
           icon: <Settings size={20} color={theme.colors.text.primary} />,
-          onPress: () => router.push('/(tabs)/settings'),
+          onPress: () => router.push('/(tabs)/more/settings'),
         },
-        {
+        /* {
           title: 'Notifications',
           subtitle: 'Manage your notification preferences',
           icon: <Bell size={20} color={theme.colors.text.primary} />,
-          onPress: () => router.push('/(tabs)/notifications'),
-        },
+          onPress: () => router.push('/notifications'),
+        }, */
         {
           title: 'Help & Support',
           subtitle: 'FAQ, contact support, and app guides',
           icon: <HelpCircle size={20} color={theme.colors.text.primary} />,
-          onPress: () => router.push('/(tabs)/help'),
+          onPress: () => router.push('/help'),
         },
         {
           title: 'Invite Friends',
           subtitle: 'Share Sellar and earn rewards',
           icon: <UserPlus2 size={20} color={theme.colors.primary} />,
           badge: { text: 'Earn GHS 10', variant: 'success' as const },
-          onPress: () => router.push('/(tabs)/invite'),
+          onPress: () => router.push('/invite'),
         },
       ],
     },
@@ -295,7 +288,6 @@ export default function MoreScreen() {
 
   return (
     <SafeAreaWrapper>
-      <AppHeader title="More" />
 
       <ScrollView 
         contentContainerStyle={{ flexGrow: 1 }}
