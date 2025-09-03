@@ -161,7 +161,7 @@ export function CreditBalance({
         </Button>
         
         <Button
-          variant="outline"
+          variant="tertiary"
           onPress={onBusinessPlans}
           style={[styles.actionButton, { borderColor: theme.colors.primary }]}
           icon={<Building size={20} color={theme.colors.primary} />}
@@ -240,7 +240,6 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 4,
   },
   valueContainer: {
     width: '100%',

@@ -115,14 +115,14 @@ export function KnowledgeBaseCard({
               key={index}
               text={tag} 
               variant="default" 
-              size="small"
+              size="sm"
             />
           ))}
           {article.tags.length > 3 && (
             <Badge 
               text={`+${article.tags.length - 3} more`} 
               variant="default" 
-              size="small"
+              size="sm"
             />
           )}
         </View>
@@ -180,7 +180,7 @@ export function KnowledgeBaseCard({
           <Badge 
             text={getCategoryLabel(article.category)} 
             variant="default" 
-            size="small"
+            size="sm"
           />
         )}
       </View>

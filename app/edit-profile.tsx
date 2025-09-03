@@ -435,7 +435,7 @@ export default function EditProfileScreen() {
                 borderRadius: 4,
               }} />
             </View>
-          </View>
+            </View>
 
           {/* Avatar Section */}
           <View style={{
@@ -471,7 +471,7 @@ export default function EditProfileScreen() {
             </TouchableOpacity>
             <Text style={{ fontSize: 14, color: theme.colors.text.muted }}>
               Tap to change profile photo
-            </Text>
+                  </Text>
           </View>
 
           {/* Collapsible Sections */}
@@ -723,10 +723,10 @@ export default function EditProfileScreen() {
                   {formData.business_name && (
                     <View style={{
                       backgroundColor: theme.colors.surfaceVariant,
-                      borderRadius: theme.borderRadius.lg,
+                borderRadius: theme.borderRadius.lg,
                       padding: theme.spacing.lg,
-                      borderWidth: 1,
-                      borderColor: theme.colors.border,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
                     }}>
                       <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: theme.spacing.sm }}>
                         Business Name Display
@@ -763,20 +763,20 @@ export default function EditProfileScreen() {
                             {formData.display_business_name ? 'ON' : 'OFF'}
                           </Text>
                         </TouchableOpacity>
-                      </View>
-                    </View>
+            </View>
+          </View>
                   )}
                 </>
               ) : (
-                <View style={{
+          <View style={{
                   backgroundColor: theme.colors.surfaceVariant,
                   borderRadius: theme.borderRadius.lg,
                   padding: theme.spacing.xl,
                   borderWidth: 1,
                   borderColor: theme.colors.border,
                   alignItems: 'center',
-                  gap: theme.spacing.md,
-                }}>
+            gap: theme.spacing.md,
+          }}>
                   <Building size={48} color={theme.colors.primary} />
                   <Text style={{ fontSize: 18, fontWeight: '600', textAlign: 'center' }}>
                     Upgrade to Business
@@ -786,8 +786,8 @@ export default function EditProfileScreen() {
                   </Text>
                   
                   {hasBusinessPlan() ? (
-                    <Button
-                      variant="primary"
+              <Button
+                variant="primary"
                   onPress={() => setShowBusinessSetupModal(true)}
                       icon={<Crown size={16} color="#FFFFFF" />}
                     >
@@ -830,7 +830,7 @@ export default function EditProfileScreen() {
                     <TouchableOpacity
                       key={option.value}
                       onPress={() => updateFormField('phone_visibility', option.value)}
-                      style={{
+                  style={{ 
                         backgroundColor: formData.phone_visibility === option.value 
                           ? theme.colors.primary 
                           : theme.colors.surfaceVariant,
@@ -851,11 +851,11 @@ export default function EditProfileScreen() {
                         fontWeight: '500',
                       }}>
                         {option.label}
-                      </Text>
+                </Text>
                     </TouchableOpacity>
                   ))}
             </View>
-          </View>
+            </View>
 
               <View>
                 <Text style={{ 
@@ -875,7 +875,7 @@ export default function EditProfileScreen() {
                     <TouchableOpacity
                       key={option.value}
                       onPress={() => updateFormField('email_visibility', option.value)}
-                      style={{
+                    style={{ 
                         backgroundColor: formData.email_visibility === option.value 
                           ? theme.colors.primary 
                           : theme.colors.surfaceVariant,
@@ -896,16 +896,16 @@ export default function EditProfileScreen() {
                         fontWeight: '500',
                       }}>
                         {option.label}
-            </Text>
+                  </Text>
                     </TouchableOpacity>
                   ))}
-                </View>
               </View>
+          </View>
 
               <View style={{
-                backgroundColor: theme.colors.surfaceVariant,
-                borderRadius: theme.borderRadius.lg,
-                padding: theme.spacing.lg,
+              backgroundColor: theme.colors.surfaceVariant,
+              borderRadius: theme.borderRadius.lg,
+              padding: theme.spacing.lg,
                 borderWidth: 1,
                 borderColor: theme.colors.border,
               }}>
@@ -943,7 +943,7 @@ export default function EditProfileScreen() {
                       fontWeight: '600',
                     }}>
                       {formData.show_online_status ? 'ON' : 'OFF'}
-                    </Text>
+            </Text>
                   </TouchableOpacity>
                 </View>
 
@@ -957,7 +957,7 @@ export default function EditProfileScreen() {
                     <Text style={{ fontSize: 14, marginBottom: 4 }}>Show last seen</Text>
                     <Text style={{ fontSize: 12, color: theme.colors.text.muted }}>
                       Display when you were last active
-                    </Text>
+              </Text>
                   </View>
                   <TouchableOpacity
                     onPress={() => updateFormField('show_last_seen', !formData.show_last_seen)}
@@ -979,8 +979,8 @@ export default function EditProfileScreen() {
                     </Text>
                   </TouchableOpacity>
                 </View>
-              </View>
             </View>
+          </View>
           )}
         </Container>
       </ScrollView>

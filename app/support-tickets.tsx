@@ -29,7 +29,8 @@ export default function SupportTicketsScreen() {
   };
 
   const handleTicketPress = (ticketId: string) => {
-    router.push(`/(tabs)/support-ticket/${ticketId}`);
+    // Navigate to ticket details - route will be created later
+    console.log('Navigate to ticket:', ticketId);
   };
 
   const handleTicketCreated = () => {
@@ -46,7 +47,11 @@ export default function SupportTicketsScreen() {
           onBackPress={() => router.back()}
         />
         <Container>
-          <LoadingSkeleton count={3} height={120} />
+          <View style={{ gap: theme.spacing.md }}>
+            <LoadingSkeleton height={120} />
+            <LoadingSkeleton height={120} />
+            <LoadingSkeleton height={120} />
+          </View>
         </Container>
       </SafeAreaWrapper>
     );
@@ -58,10 +63,11 @@ export default function SupportTicketsScreen() {
         title="Support Tickets"
         showBackButton
         onBackPress={() => router.back()}
-        rightElement={
+        rightActions={[
           <Button
+            key="create"
             variant="ghost"
-            size="small"
+            size="sm"
             onPress={() => setShowCreateModal(true)}
             style={{
               paddingHorizontal: theme.spacing.md,
@@ -69,7 +75,7 @@ export default function SupportTicketsScreen() {
           >
             <Plus size={20} color={theme.colors.primary} />
           </Button>
-        }
+        ]}
       />
 
       <ScrollView
@@ -97,23 +103,14 @@ export default function SupportTicketsScreen() {
 
             <Button
               variant="primary"
-              size="medium"
+              size="md"
               onPress={() => setShowCreateModal(true)}
               style={{
                 paddingHorizontal: theme.spacing.lg,
               }}
+              icon={<Plus size={18} color={theme.colors.surface} />}
             >
-              <Plus size={18} color={theme.colors.surface} />
-              <Text 
-                variant="body" 
-                style={{ 
-                  color: theme.colors.surface, 
-                  marginLeft: theme.spacing.sm,
-                  fontWeight: '600',
-                }}
-              >
-                New Ticket
-              </Text>
+              New Ticket
             </Button>
           </View>
 
@@ -172,44 +169,38 @@ export default function SupportTicketsScreen() {
             <View style={{ gap: theme.spacing.sm }}>
               <Button
                 variant="ghost"
-                size="medium"
-                onPress={() => router.push('/(tabs)/knowledge-base')}
+                size="md"
+                onPress={() => router.push('/knowledge-base')}
                 style={{
                   justifyContent: 'flex-start',
                   paddingHorizontal: 0,
                 }}
               >
-                <Text variant="body" style={{ color: theme.colors.primary }}>
-                  📚 Browse Knowledge Base
-                </Text>
+                📚 Browse Knowledge Base
               </Button>
               
               <Button
                 variant="ghost"
-                size="medium"
-                onPress={() => router.push('/(tabs)/help')}
+                size="md"
+                onPress={() => router.push('/help')}
                 style={{
                   justifyContent: 'flex-start',
                   paddingHorizontal: 0,
                 }}
               >
-                <Text variant="body" style={{ color: theme.colors.primary }}>
-                  ❓ View FAQ
-                </Text>
+                ❓ View FAQ
               </Button>
               
               <Button
                 variant="ghost"
-                size="medium"
+                size="md"
                 onPress={() => router.push('/(tabs)/community')}
                 style={{
                   justifyContent: 'flex-start',
                   paddingHorizontal: 0,
                 }}
               >
-                <Text variant="body" style={{ color: theme.colors.primary }}>
-                  👥 Ask Community
-                </Text>
+                👥 Ask Community
               </Button>
             </View>
           </View>

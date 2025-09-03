@@ -33,6 +33,20 @@ export { SupportTicketCard } from './SupportTicketCard/SupportTicketCard';
 export { CreateTicketModal } from './CreateTicketModal/CreateTicketModal';
 export { KnowledgeBaseCard } from './KnowledgeBaseCard/KnowledgeBaseCard';
 
+// Verification System Components
+export { 
+  VerificationBadge, 
+  CompactVerificationBadge, 
+  TrustScoreDisplay, 
+  VerificationStatusIndicator 
+} from './VerificationBadge/VerificationBadge';
+export { DocumentUpload, MultiDocumentUpload } from './DocumentUpload/DocumentUpload';
+export { 
+  VerificationStatusTracker, 
+  CompactVerificationStatus, 
+  VerificationActivityFeed 
+} from './VerificationStatusTracker/VerificationStatusTracker';
+
 // Profile Management Components
 export { ProfileEditModal } from './ProfileEditModal/ProfileEditModal';
 export { BusinessProfileSetupModal } from './BusinessProfileSetupModal/BusinessProfileSetupModal';
@@ -181,3 +195,9 @@ export * from '../utils/memoryManager';
 
 // Search Hooks
 export * from '../hooks/useSmartSearch';
+
+// Verification Hooks
+export * from '../hooks/useVerification';
+
+// Verification Services
+export * from '../lib/verificationService';

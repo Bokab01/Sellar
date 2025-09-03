@@ -160,18 +160,6 @@ export default function WalletScreen() {
 
   return (
     <SafeAreaWrapper>
-      <AppHeader 
-        title="Credits & Wallet"
-        showBack
-        rightElement={
-          <Button
-            variant="icon"
-            icon={<History size={20} color={theme.colors.text.primary} />}
-            onPress={() => router.push('/transactions')}
-          />
-        }
-      />
-      
       <ScrollView 
         contentContainerStyle={{ paddingBottom: theme.spacing.xl }}
         refreshControl={

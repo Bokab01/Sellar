@@ -193,7 +193,7 @@ export function SupportTicketCard({ ticket, onPress }: SupportTicketCardProps) {
         right: theme.spacing.sm,
       }}>
         <Badge 
-          text={ticket.category.replace('_', ' ')} 
+          text={ticket.category.replace('_', ' ').toUpperCase()} 
           variant="default" 
           size="small"
         />
