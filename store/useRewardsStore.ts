@@ -65,7 +65,7 @@ interface RewardsStore {
   fetchAvailableRewards: () => Promise<void>;
   claimAnniversaryBonus: () => Promise<RewardResult>;
   claimReferralBonus: (refereeId: string, referralCode?: string) => Promise<RewardResult>;
-  subscribeToRewards: (onRewardReceived?: (reward: CommunityReward) => void) => () => void;
+  subscribeToRewards: (userId: string, onRewardReceived?: (reward: CommunityReward) => void) => () => void;
   getRewardProgress: (achievementType: string) => ProgressInfo;
   
   // Utility
@@ -330,8 +330,11 @@ export const useRewardsStore = create<RewardsStore>((set, get) => ({
   },
 
   // Subscribe to real-time reward updates
-  subscribeToRewards: (onRewardReceived?: (reward: CommunityReward) => void) => {
-    const { data: { user } } = supabase.auth.getUser();
+  subscribeToRewards: (userId: string, onRewardReceived?: (reward: CommunityReward) => void) => {
+    if (!userId) {
+      // Return a no-op unsubscribe function if no user ID
+      return () => {};
+    }
     
     const subscription = supabase
       .channel('user_rewards_changes')
@@ -339,7 +342,7 @@ export const useRewardsStore = create<RewardsStore>((set, get) => ({
         event: 'INSERT',
         schema: 'public',
         table: 'community_rewards',
-        filter: `user_id=eq.${user?.id}`
+        filter: `user_id=eq.${userId}`
       }, (payload) => {
         const reward = payload.new as CommunityReward;
         

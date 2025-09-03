@@ -22,21 +22,22 @@ interface RewardsProviderProps {
 }
 
 export function RewardsProvider({ children }: RewardsProviderProps) {
-  const { user } = useAuthStore();
+  const { user, loading } = useAuthStore();
   const { subscribeToRewards } = useRewardsStore();
   const [currentReward, setCurrentReward] = useState<CommunityReward | null>(null);
   const [notificationVisible, setNotificationVisible] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
+    // Don't subscribe if still loading or no user
+    if (loading || !user?.id) return;
 
     // Subscribe to real-time reward updates
-    const unsubscribe = subscribeToRewards((reward) => {
+    const unsubscribe = subscribeToRewards(user.id, (reward) => {
       showRewardNotification(reward);
     });
 
     return unsubscribe;
-  }, [user]);
+  }, [user?.id, loading]);
 
   const showRewardNotification = (reward: CommunityReward) => {
     setCurrentReward(reward);

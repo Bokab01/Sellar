@@ -27,6 +27,11 @@ export function SplashScreenManager({ isAppReady, onAnimationComplete }: SplashS
   const scaleAnim = useSharedValue(1);
   const logoOpacity = useSharedValue(1);
 
+  // Safety check for theme
+  if (!theme) {
+    return null;
+  }
+
   useEffect(() => {
     if (isAppReady) {
       // Start the exit animation
