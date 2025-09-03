@@ -1,0 +1,415 @@
+[1mdiff --git a/app/(tabs)/more/dashboard.tsx b/app/(tabs)/more/dashboard.tsx[m
+[1mnew file mode 100644[m
+[1mindex 0000000..d4cdf83[m
+[1m--- /dev/null[m
+[1m+++ b/app/(tabs)/more/dashboard.tsx[m
+[36m@@ -0,0 +1,508 @@[m
+[32m+[m[32mimport React, { useState, useEffect } from 'react';[m
+[32m+[m[32mimport { View, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';[m
+[32m+[m[32mimport { useTheme } from '@/theme/ThemeProvider';[m
+[32m+[m[32mimport { router } from 'expo-router';[m
+[32m+[m[32mimport { Text } from '@/components/Typography/Text';[m
+[32m+[m[32mimport { SafeAreaWrapper, Container } from '@/components/Layout';[m
+[32m+[m[32mimport { AppHeader } from '@/components/AppHeader/AppHeader';[m
+[32m+[m[32mimport { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';[m
+[32m+[m[32mimport { EmptyState } from '@/components/EmptyState/EmptyState';[m
+[32m+[m[32mimport { Badge } from '@/components/Badge/Badge';[m
+[32m+[m[32mimport { Button } from '@/components/Button/Button';[m
+[32m+[m[32mimport {[m[41m [m
+[32m+[m[32m  BarChart3,[m[41m [m
+[32m+[m[32m  Zap,[m[41m [m
+[32m+[m[32m  HeadphonesIcon,[m
+[32m+[m[32m  Crown,[m
+[32m+[m[32m  TrendingUp,[m
+[32m+[m[32m  Settings,[m
+[32m+[m[32m  Users,[m
+[32m+[m[32m  MessageSquare,[m
+[32m+[m[32m  Star,[m
+[32m+[m[32m  ArrowUpRight,[m
+[32m+[m[32m  Lock,[m
+[32m+[m[32m  ArrowUpRight as Upgrade[m
+[32m+[m[32m} from 'lucide-react-native';[m
+[32m+[m[32mimport { useMonetizationStore } from '@/store/useMonetizationStore';[m
+[32m+[m[32mimport { useAuth } from '@/hooks/useAuth';[m
+[32m+[m
+[32m+[m[32m// Import dashboard components with direct imports to avoid circular dependencies[m
+[32m+[m[32mimport { AnalyticsDashboard } from '@/components/AnalyticsDashboard/AnalyticsDashboard';[m
+[32m+[m[32mimport { AutoBoostDashboard } from '@/components/AutoBoostDashboard/AutoBoostDashboard';[m
+[32m+[m[32mimport { PrioritySupportDashboard } from '@/components/PrioritySupportDashboard/PrioritySupportDashboard';[m
+[32m+[m[32mimport { PremiumFeaturesDashboard } from '@/components/PremiumFeaturesDashboard/PremiumFeaturesDashboard';[m
+[32m+[m
+[32m+[m[32mtype DashboardTab = 'overview' | 'analytics' | 'autoboost' | 'support' | 'premium';[m
+[32m+[m
+[32m+[m[32minterface TabConfig {[m
+[32m+[m[32m  id: DashboardTab;[m
+[32m+[m[32m  label: string;[m
+[32m+[m[32m  icon: React.ReactNode;[m
+[32m+[m[32m  requiredTier: 'starter' | 'pro' | 'premium' | 'free';[m
+[32m+[m[32m  badge?: string;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexport default function BusinessDashboardScreen() {[m
+[32m+[m[32m  const { theme } = useTheme();[m
+[32m+[m[32m  const { user } = useAuth();[m
+[32m+[m[32m  const {[m[41m [m
+[32m+[m[32m    currentSubscription,[m[41m [m
+[32m+[m[32m    hasBusinessPlan,[m[41m [m
+[32m+[m[32m    refreshSubscription,[m
+[32m+[m[32m    entitlements[m[41m [m
+[32m+[m[32m  } = useMonetizationStore();[m
+[32m+[m
+[32m+[m[32m  const [activeTab, setActiveTab] = useState<DashboardTab>('overview');[m
+[32m+[m[32m  const [refreshing, setRefreshing] = useState(false);[m
+[32m+[m[32m  const [loading, setLoading] = useState(true);[m
+[32m+[m
+[32m+[m[32m  // Get current plan tier[m
+[32m+[m[32m  const getCurrentTier = (): 'free' | 'starter' | 'pro' | 'premium' => {[m
+[32m+[m[32m    if (!hasBusinessPlan()) return 'free';[m
+[32m+[m[41m    [m
+[32m+[m[32m    const planName = currentSubscription?.subscription_plans?.name?.toLowerCase();[m
+[32m+[m[32m    if (planName?.includes('premium')) return 'premium';[m
+[32m+[m[32m    if (planName?.includes('pro')) return 'pro';[m
+[32m+[m[32m    if (planName?.includes('starter')) return 'starter';[m
+[32m+[m[32m    return 'free';[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  const currentTier = getCurrentTier();[m
+[32m+[m
+[32m+[m[32m  // Define available tabs based on subscription tier[m
+[32m+[m[32m  const availableTabs: TabConfig[] = [[m
+[32m+[m[32m    {[m
+[32m+[m[32m      id: 'overview',[m
+[32m+[m[32m      label: 'Overview',[m
+[32m+[m[32m      icon: <BarChart3 size={18} color={theme.colors.text.primary} />,[m
+[32m+[m[32m      requiredTier: 'free',[m
+[32m+[m[32m    },[m
+[32m+[m[32m  ];[m
+[32m+[m
+[32m+[m[32m  // Add tabs based on tier[m
+[32m+[m[32m  if (currentTier !== 'free') {[m
+[32m+[m[32m    availableTabs.push({[m
+[32m+[m[32m      id: 'analytics',[m
+[32m+[m[32m      label: 'Analytics',[m
+[32m+[m[32m      icon: <TrendingUp size={18} color={theme.colors.text.primary} />,[m
+[32m+[m[32m      requiredTier: 'starter',[m
+[32m+[m[32m      badge: currentTier === 'starter' ? 'Basic' : currentTier === 'pro' ? 'Advanced' : 'Full',[m
+[32m+[m[32m    });[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  if (currentTier === 'pro' || currentTier === 'premium') {[m
+[32m+[m[32m    availableTabs.push({[m
+[32m+[m[32m      id: 'autoboost',[m
+[32m+[m[32m      label: 'Auto-boost',[m
+[32m+[m[32m      icon: <Zap size={18} color={theme.colors.warning} />,[m
+[32m+[m[32m      requiredTier: 'pro',[m
+[32m+[m[32m    });[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  if (currentTier === 'premium') {[m
+[32m+[m[32m    availableTabs.push({[m
+[32m+[m[32m      id: 'support',[m
+[32m+[m[32m      label: 'Priority Support',[m
+[32m+[m[32m      icon: <HeadphonesIcon size={18} color={theme.colors.success} />,[m
+[32m+[m[32m      requiredTier: 'premium',[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    availableTabs.push({[m
+[32m+[m[32m      id: 'premium',[m
+[32m+[m[32m      label: 'Premium Features',[m
+[32m+[m[32m      icon: <Crown size={18} color={theme.colors.primary} />,[m
+[32m+[m[32m      requiredTier: 'premium',[m
+[32m+[m[32m    });[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  useEffect(() => {[m
+[32m+[m[32m    const initializeDashboard = async () => {[m
+[32m+[m[32m      try {[m
+[32m+[m[32m        setLoading(true);[m
+[32m+[m[32m        await refreshSubscription();[m
+[32m+[m[32m      } catch (error) {[m
+[32m+[m[32m        console.error('Failed to initialize dashboard:', error);[m
+[32m+[m[32m      } finally {[m
+[32m+[m[32m        setLoading(false);[m
+[32m+[m[32m      }[m
+[32m+[m[32m    };[m
+[32m+[m
+[32m+[m[32m    initializeDashboard();[m
+[32m+[m[32m  }, [refreshSubscription]);[m
+[32m+[m
+[32m+[m[32m  const handleRefresh = async () => {[m
+[32m+[m[32m    setRefreshing(true);[m
+[32m+[m[32m    try {[m
+[32m+[m[32m      await refreshSubscription();[m
+[32m+[m[32m    } catch (error) {[m
+[32m+[m[32m      console.error('Failed to refresh dashboard:', error);[m
+[32m+[m[32m    } finally {[m
+[32m+[m[32m      setRefreshing(false);[m
+[32m+[m[32m    }[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  // Render tab bar[m
+[32m+[m[32m  const renderTabBar = () => ([m
+[32m+[m[32m    <ScrollView[m
+[32m+[m[32m      horizontal[m
+[32m+[m[32m      showsHorizontalScrollIndicator={false}[m
+[32m+[m[32m      style={{[m
+[32m+[m[32m        backgroundColor: theme.colors.surface,[m
+[32m+[m[32m        borderBottomWidth: 1,[m
+[32m+[m[32m        borderBottomColor: theme.colors.border,[m
+[32m+[m[32m      }}[m
+[32m+[m[32m      contentContainerStyle={{ paddingHorizontal: theme.spacing.lg }}[m
+[32m+[m[32m    >[m
+[32m+[m[32m      {availableTabs.map((tab) => {[m
+[32m+[m[32m        const isActive = activeTab === tab.id;[m
+[32m+[m[41m        [m
+[32m+[m[32m        return ([m
+[32m+[m[32m          <TouchableOpacity[m
+[32m+[m[32m            key={tab.id}[m
+[32m+[m[32m            onPress={() => setActiveTab(tab.id)}[m
+[32m+[m[32m            style={{[m
+[32m+[m[32m              paddingVertical: theme.spacing.md,[m
+[32m+[m[32m              paddingHorizontal: theme.spacing.lg,[m
+[32m+[m[32m              marginRight: theme.spacing.sm,[m
+[32m+[m[32m              backgroundColor: isActive ? theme.colors.primary + '15' : 'transparent',[m
+[32m+[m[32m              borderRadius: theme.borderRadius.md,[m
+[32m+[m[32m              borderColor: isActive ? theme.colors.primary + '30' : 'transparent',[m
+[32m+[m[32m              borderWidth: 1,[m
+[32m+[m[32m              flexDirection: 'row',[m
+[32m+[m[32m              alignItems: 'center',[m
+[32m+[m[32m              gap: theme.spacing.xs,[m
+[32m+[m[32m            }}[m
+[32m+[m[32m          >[m
+[32m+[m[32m            {tab.icon}[m
+[32m+[m[32m            <Text[m
+[32m+[m[32m              variant="bodySmall"[m
+[32m+[m[32m              style={{[m
+[32m+[m[32m                color: isActive ? theme.colors.primary : theme.colors.text.primary,[m
+[32m+[m[32m                fontWeight: isActive ? '600' : '400',[m
+[32m+[m[32m              }}[m
+[32m+[m[32m            >[m
+[32m+[m[32m              {tab.label}[m
+[32m+[m[32m            </Text>[m
+[32m+[m[32m            {tab.badge && ([m
+[32m+[m[32m              <Badge[m
+[32m+[m[32m                text={tab.badge}[m
+[32m+[m[32m                variant="info"[m
+[32m+[m[32m              />[m
+[32m+[m[32m            )}[m
+[32m+[m[32m          </TouchableOpacity>[m
+[32m+[m[32m        );[m
+[32m+[m[32m      })}[m
+[32m+[m[32m    </ScrollView>[m
+[32m+[m[32m  );[m
+[32m+[m
+[32m+[m[32m  // Render tab content[m
+[32m+[m[32m  const renderTabContent = () => {[m
+[32m+[m[32m    if (loading) {[m
+[32m+[m[32m      return ([m
+[32m+[m[32m        <View style={{ padding: theme.spacing.lg, gap: theme.spacing.lg }}>[m
+[32m+[m[32m          <LoadingSkeleton height={120} />[m
+[32m+[m[32m          <LoadingSkeleton height={120} />[m
+[32m+[m[32m          <LoadingSkeleton height={120} />[m
+[32m+[m[32m        </View>[m
+[32m+[m[32m      );[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    switch (activeTab) {[m
+[32m+[m[32m      case 'overview':[m
+[32m+[m[32m        return renderOverviewTab();[m
+[32m+[m[32m      case 'analytics':[m
+[32m+[m[32m        return <AnalyticsDashboard tier={currentTier === 'free' ? 'starter' : currentTier} />;[m
+[32m+[m[32m      case 'autoboost':[m
+[32m+[m[32m        return <AutoBoostDashboard />;[m
+[32m+[m[32m      case 'support':[m
+[32m+[m[32m        return <PrioritySupportDashboard />;[m
+[32m+[m[32m      case 'premium':[m
+[32m+[m[32m        return <PremiumFeaturesDashboard />;[m
+[32m+[m[32m      default:[m
+[32m+[m[32m        return renderOverviewTab();[m
+[32m+[m[32m    }[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  // Render overview tab[m
+[32m+[m[32m  const renderOverviewTab = () => {[m
+[32m+[m[32m    if (currentTier === 'free') {[m
+[32m+[m[32m      return ([m
+[32m+[m[32m        <Container style={{ paddingTop: theme.spacing.xl }}>[m
+[32m+[m[32m          <View style={{[m
+[32m+[m[32m            backgroundColor: theme.colors.surface,[m
+[32m+[m[32m            borderRadius: theme.borderRadius.lg,[m
+[32m+[m[32m            padding: theme.spacing.xl,[m
+[32m+[m[32m            alignItems: 'center',[m
+[32m+[m[32m            marginBottom: theme.spacing.lg,[m
+[32m+[m[32m            borderWidth: 1,[m
+[32m+[m[32m            borderColor: theme.colors.border,[m
+[32m+[m[32m          }}>[m
+[32m+[m[32m            <Crown size={48} color={theme.colors.primary} style={{ marginBottom: theme.spacing.lg }} />[m
+[32m+[m[41m            [m
+[32m+[m[32m            <Text variant="h3" style={{[m[41m [m
+[32m+[m[32m              textAlign: 'center',[m[41m [m
+[32m+[m[32m              marginBottom: theme.spacing.md,[m
+[32m+[m[32m              fontWeight: '600',[m
+[32m+[m[32m            }}>[m
+[32m+[m[32m              Unlock Business Features[m
+[32m+[m[32m            </Text>[m
+[32m+[m[41m            [m
+[32m+[m[32m            <Text variant="body" color="secondary" style={{[m[41m [m
+[32m+[m[32m              textAlign: 'center',[m[41m [m
+[32m+[m[32m              marginBottom: theme.spacing.xl,[m
+[32m+[m[32m              lineHeight: 24,[m
+[32m+[m[32m            }}>[m
+[32m+[m[32m              Get access to powerful business tools, analytics, and priority support with a business plan.[m
+[32m+[m[32m            </Text>[m
+[32m+[m
+[32m+[m[32m            <View style={{ gap: theme.spacing.md, width: '100%' }}>[m
+[32m+[m[32m              <View style={{[m
+[32m+[m[32m                flexDirection: 'row',[m
+[32m+[m[32m                alignItems: 'center',[m
+[32m+[m[32m                paddingVertical: theme.spacing.sm,[m
+[32m+[m[32m              }}>[m
+[32m+[m[32m                <BarChart3 size={20} color={theme.colors.success} />[m
+[32m+[m[32m                <Text variant="body" style={{ marginLeft: theme.spacing.md }}>[m
+[32m+[m[32m                  Business analytics & insights[m
+[32m+[m[32m                </Text>[m
+[32m+[m[32m              </View>[m
+[32m+[m
+[32m+[m[32m              <View style={{[m
+[32m+[m[32m                flexDirection: 'row',[m
+[32m+[m[32m                alignItems: 'center',[m
+[32m+[m[32m                paddingVertical: theme.spacing.sm,[m
+[32m+[m[32m              }}>[m
+[32m+[m[32m                <Zap size={20} color={theme.colors.warning} />[m
+[32m+[m[32m                <Text variant="body" style={{ marginLeft: theme.spacing.md }}>[m
+[32m+[m[32m                  Auto-boost for listings[m
+[32m+[m[32m                </Text>[m
+[32m+[m[32m              </View>[m
+[32m+[m
+[32m+[m[32m              <View style={{[m
+[32m+[m[32m                flexDirection: 'row',[m
+[32m+[m[32m                alignItems: 'center',[m
+[32m+[m[32m                paddingVertical: theme.spacing.sm,[m
+[32m+[m[32m              }}>[m
+[32m+[m[32m                <HeadphonesIcon size={20} color={theme.colors.primary} />[m
+[32m+[m[32m                <Text variant="body" style={{ marginLeft: theme.spacing.md }}>[m
+[32m+[m[32m                  Priority customer support[m
+[32m+[m[32m                </Text>[m
+[32m+[m[32m              </View>[m
+[32m+[m[32m            </View>[m
+[32m+[m
+[32m+[m[32m            <Button[m
+[32m+[m[32m              variant="primary"[m
+[32m+[m[32m              onPress={() => router.push('/subscription-plans')}[m
+[32m+[m[32m              style={{[m[41m [m
+[32m+[m[32m                marginTop: theme.spacing.xl,[m
+[32m+[m[32m                width: '100%',[m
+[32m+[m[32m              }}[m
+[32m+[m[32m            >[m
+[32m+[m[32m              <Upgrade size={18} color={theme.colors.surface} />[m
+[32m+[m[32m              <Text variant="body" style={{[m[41m [m
+[32m+[m[32m                color: theme.colors.surface,[m[41m [m
+[32m+[m[32m                marginLeft: theme.spacing.sm,[m
+[32m+[m[32m                fontWeight: '600',[m
+[32m+[m[32m              }}>[m
+[32m+[m[32m                View Business Plans[m
+[32m+[m[32m              </Text>[m
+[32m+[m[32m            </Button>[m
+[32m+[m[32m          </View>[m
+[32m+[m[32m        </Container>[m
+[32m+[m[32m      );[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // Business plan overview[m
+[32m+[m[32m    const planName = currentSubscription?.subscription_plans?.name || 'Business Plan';[m
+[32m+[m[41m    [m
+[32m+[m[32m    return ([m
+[32m+[m[32m      <Container style={{ paddingTop: theme.spacing.lg }}>[m
+[32m+[m[32m        <ScrollView showsVerticalScrollIndicator={false}>[m
+[32m+[m[32m          {/* Plan Status Card */}[m
+[32m+[m[32m          <View style={{[m
+[32m+[m[32m            backgroundColor: theme.colors.surface,[m
+[32m+[m[32m            borderRadius: theme.borderRadius.lg,[m
+[32m+[m[32m            padding: theme.spacing.lg,[m
+[32m+[m[32m            marginBottom: theme.spacing.lg,[m
+[32m+[m[32m            borderWidth: 1,[m
+[32m+[m[32m            borderColor: theme.colors.border,[m
+[32m+[m[32m          }}>[m
+[32m+[m[32m            <View style={{[m
+[32m+[m[32m              flexDirection: 'row',[m
+[32m+[m[32m              justifyContent: 'space-between',[m
+[32m+[m[32m              alignItems: 'center',[m
+[32m+[m[32m              marginBottom: theme.spacing.md,[m
+[32m+[m[32m            }}>[m
+[32m+[m[32m              <Text variant="h4">{planName}</Text>[m
+[32m+[m[32m              <Badge[m[41m [m
+[32m+[m[32m                text="Active"[m[41m [m
+[32m+[m[32m                variant="success"[m[41m [m
+[32m+[m[32m              />[m
+[32m+[m[32m            </View>[m
+[32m+[m
+[32m+[m[32m            <View style={{[m
+[32m+[m[32m              flexDirection: 'row',[m
+[32m+[m[32m              justifyContent: 'space-between',[m
+[32m+[m[32m              marginBottom: theme.spacing.lg,[m
+[32m+[m[32m            }}>[m
+[32m+[m[32m              <View>[m
+[32m+[m[32m                <Text variant="bodySmall" color="muted">Monthly Credits</Text>[m
+[32m+[m[32m                <Text variant="h4" style={{ fontWeight: '600' }}>[m
+[32m+[m[32m                  {entitlements.monthlyCredits || 0}[m
+[32m+[m[32m                </Text>[m
+[32m+[m[32m              </View>[m
+[32m+[m[41m              [m
+[32m+[m[32m              <View>[m
+[32m+[m[32m                <Text variant="bodySmall" color="muted">Max Listings</Text>[m
+[32m+[m[32m                <Text variant="h4" style={{ fontWeight: '600' }}>[m
+[32m+[m[32m                  {entitlements.maxListings ? entitlements.maxListings : '∞'}[m
+[32m+[m[32m                </Text>[m
+[32m+[m[32m              </View>[m
+[32m+[m[41m              [m
+[32m+[m[32m              <View>[m
+[32m+[m[32m                <Text variant="bodySmall" color="muted">Analytics</Text>[m
+[32m+[m[32m                <Text variant="h4" style={{ fontWeight: '600', textTransform: 'capitalize' }}>[m
+[32m+[m[32m                  {entitlements.analyticsLevel || 'None'}[m
+[32m+[m[32m                </Text>[m
+[32m+[m[32m              </View>[m
+[32m+[m[32m            </View>[m
+[32m+[m
+[32m+[m[32m            <Button[m
+[32m+[m[32m              variant="secondary"[m
+[32m+[m[32m              onPress={() => router.push('/(tabs)/subscription-plans')}[m
+[32m+[m[32m              style={{ width: '100%' }}[m
+[32m+[m[32m            >[m
+[32m+[m[32m              <Settings size={18} color={theme.colors.primary} />[m
+[32m+[m[32m              <Text variant="body" style={{[m[41m [m
+[32m+[m[32m                color: theme.colors.primary,[m[41m [m
+[32m+[m[32m                marginLeft: theme.spacing.sm,[m
+[32m+[m[32m              }}>[m
+[32m+[m[32m                Manage Subscription[m
+[32m+[m[32m              </Text>[m
+[32m+[m[32m            </Button>[m
+[32m+[m[32m          </View>[m
+[32m+[m
+[32m+[m[32m          {/* Quick Stats */}[m
+[32m+[m[32m          <View style={{[m
+[32m+[m[32m            flexDirection: 'row',[m
+[32m+[m[32m            gap: theme.spacing.md,[m
+[32m+[m[32m            marginBottom: theme.spacing.lg,[m
+[32m+[m[32m          }}>[m
+[32m+[m[32m            <View style={{[m
+[32m+[m[32m              flex: 1,[m
+[32m+[m[32m              backgroundColor: theme.colors.surface,[m
+[32m+[m[32m              borderRadius: theme.borderRadius.lg,[m
+[32m+[m[32m              padding: theme.spacing.lg,[m
+[32m+[m[32m              alignItems: 'center',[m
+[32m+[m[32m              borderWidth: 1,[m
+[32m+[m[32m              borderColor: theme.colors.border,[m
+[32m+[m[32m            }}>[m
+[32m+[m[32m              <Users size={24} color={theme.colors.primary} />[m
+[32m+[m[32m              <Text variant="h4" style={{ fontWeight: '600', marginTop: theme.spacing.sm }}>[m
+[32m+[m[32m                0[m
+[32m+[m[32m              </Text>[m
+[32m+[m[32m              <Text variant="bodySmall" color="muted">[m
+[32m+[m[32m                Profile Views[m
+[32m+[m[32m              </Text>[m
+[32m+[m[32m            </View>[m
+[32m+[m
+[32m+[m[32m   
