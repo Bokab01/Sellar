@@ -83,7 +83,26 @@ export default function VerificationScreen() {
   };
 
   const handleStartVerification = (type: string) => {
-    router.push(`/verification/start?type=${type}`);
+    // Route to specific verification screens for better UX
+    switch (type) {
+      case 'phone':
+        router.push('/verification/phone');
+        break;
+      case 'email':
+        router.push('/verification/email');
+        break;
+      case 'identity':
+        router.push('/verification/identity');
+        break;
+      case 'business':
+        router.push('/verification/business');
+        break;
+      case 'address':
+        router.push('/verification/address');
+        break;
+      default:
+        router.push(`/verification/start?type=${type}`);
+    }
   };
 
   const handleViewRequest = (request: VerificationRequest) => {
@@ -94,6 +113,11 @@ export default function VerificationScreen() {
     const completedTypes = requests
       .filter(r => r.status === 'approved')
       .map(r => r.verification_type);
+    
+    // Also check if email is verified through auth (signup process)
+    if (status?.email_verified) {
+      completedTypes.push('email');
+    }
     
     return templates.filter(t => !completedTypes.includes(t.verification_type));
   };
@@ -210,8 +234,67 @@ export default function VerificationScreen() {
               Your Verifications
             </Text>
 
-            {requests.length > 0 ? (
+            {(requests.length > 0 || status?.email_verified) ? (
               <View style={{ gap: theme.spacing.md }}>
+                {/* Show email verification from signup if not in requests */}
+                {status?.email_verified && !requests.some(r => r.verification_type === 'email') && (
+                  <View
+                    key="email-signup"
+                    style={{
+                      backgroundColor: theme.colors.surface,
+                      borderRadius: theme.borderRadius.lg,
+                      padding: theme.spacing.lg,
+                      borderWidth: 1,
+                      borderColor: theme.colors.border,
+                      ...theme.shadows.sm,
+                    }}
+                  >
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: theme.spacing.md,
+                    }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {getVerificationIcon('email')}
+                        <Text variant="h4" style={{ marginLeft: theme.spacing.sm }}>
+                          {formatVerificationType('email')}
+                        </Text>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {getStatusIcon('approved')}
+                        <Text 
+                          variant="bodySmall" 
+                          style={{ 
+                            marginLeft: theme.spacing.xs,
+                            color: getVerificationStatusColor('approved'),
+                            fontWeight: '600',
+                          }}
+                        >
+                          {formatVerificationStatus('approved')}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.md }}>
+                      Verified during account signup {status.email_verified_at ? new Date(status.email_verified_at).toLocaleDateString() : ''}
+                    </Text>
+
+                    <View
+                      style={{
+                        backgroundColor: theme.colors.success + '10',
+                        borderRadius: theme.borderRadius.md,
+                        padding: theme.spacing.md,
+                      }}
+                    >
+                      <Text variant="bodySmall" style={{ color: theme.colors.success }}>
+                        ✓ Email verified through account confirmation
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
                 {requests.map((request) => (
                   <View
                     key={request.id}

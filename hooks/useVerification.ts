@@ -110,6 +110,11 @@ export function useVerificationRequests() {
     setError(null);
 
     try {
+      // Sync email verification status from auth first
+      await supabase.rpc('sync_email_verification_from_auth', {
+        user_uuid: user.id
+      });
+
       const { data, error: fetchError } = await supabase
         .from('user_verification')
         .select(`
@@ -437,6 +442,13 @@ export function useUserVerificationStatus(userId?: string) {
     setError(null);
 
     try {
+      // First sync email verification status from auth if this is the current user
+      if (targetUserId === user?.id) {
+        await supabase.rpc('sync_email_verification_from_auth', {
+          user_uuid: targetUserId
+        });
+      }
+
       const { data, error: fetchError } = await supabase
         .from('profiles')
         .select(`
@@ -649,6 +661,16 @@ export function useEmailVerification() {
     setError(null);
 
     try {
+      // First check if email is already verified through Supabase Auth
+      const { data: authUser } = await supabase.auth.getUser();
+      if (authUser.user?.email_confirmed_at) {
+        // Email is already verified through auth, sync the status
+        await supabase.rpc('sync_email_verification_from_auth', {
+          user_uuid: user.id
+        });
+        throw new Error('Email is already verified through your account signup');
+      }
+
       // Generate verification token
       const token = crypto.randomUUID();
       
