@@ -32,7 +32,7 @@ export default function CommunityScreen() {
     id: post.id,
     author: {
       id: post.profiles?.id,
-      name: `${post.profiles?.first_name} ${post.profiles?.last_name}`,
+      name: `${post.profiles?.first_name || 'User'} ${post.profiles?.last_name || ''}`,
       avatar: post.profiles?.avatar_url,
       rating: post.profiles?.rating || 0,
       isVerified: post.profiles?.is_verified,

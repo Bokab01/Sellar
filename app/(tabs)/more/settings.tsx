@@ -223,7 +223,7 @@ export default function SettingsScreen() {
       items: [
         {
           title: 'Theme',
-          subtitle: `Currently using ${themeMode === 'system' ? `System (${isDarkMode ? 'Dark' : 'Light'})` : themeMode} theme`,
+          subtitle: `Currently using ${themeMode === 'system' ? `System (${isDarkMode ? 'Dark' : 'Light'})` : (themeMode || 'Default')} theme`,
           icon: <Smartphone size={20} color={theme.colors.text.primary} />,
           onPress: () => {}, // Handled by theme options below
           customContent: (

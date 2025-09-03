@@ -77,7 +77,7 @@ export function PriceDisplay({
     }
   };
 
-  const formattedPrice = showCurrency ? formatPrice(amount, currency) : amount.toLocaleString();
+  const formattedPrice = showCurrency ? formatPrice(amount || 0, currency) : (amount || 0).toLocaleString();
   const formattedOriginalPrice = originalPrice && showCurrency 
     ? formatPrice(originalPrice, currency) 
     : originalPrice?.toLocaleString();

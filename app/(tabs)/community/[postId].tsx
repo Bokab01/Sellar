@@ -307,7 +307,7 @@ export default function PostDetailScreen() {
     id: post.id,
     author: {
       id: post.profiles?.id,
-      name: `${post.profiles?.first_name} ${post.profiles?.last_name}`,
+      name: `${post.profiles?.first_name || 'User'} ${post.profiles?.last_name || ''}`,
       avatar: post.profiles?.avatar_url,
       rating: post.profiles?.rating || 0,
       isVerified: post.profiles?.is_verified,
@@ -334,7 +334,7 @@ export default function PostDetailScreen() {
     id: comment.id,
     author: {
       id: comment.profiles?.id,
-      name: `${comment.profiles?.first_name} ${comment.profiles?.last_name}`,
+      name: `${comment.profiles?.first_name || 'User'} ${comment.profiles?.last_name || ''}`,
       avatar: comment.profiles?.avatar_url,
       isVerified: comment.profiles?.is_verified,
     },
@@ -349,7 +349,7 @@ export default function PostDetailScreen() {
       id: reply.id,
       author: {
         id: reply.profiles?.id,
-        name: `${reply.profiles?.first_name} ${reply.profiles?.last_name}`,
+        name: `${reply.profiles?.first_name || 'User'} ${reply.profiles?.last_name || ''}`,
         avatar: reply.profiles?.avatar_url,
         isVerified: reply.profiles?.is_verified,
       },

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { View, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
 import Animated, {
   useSharedValue,
@@ -13,7 +13,10 @@ import Animated, {
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { Button } from '@/components/Button/Button';
-import { Zap, Plus, Building } from 'lucide-react-native';
+import { CompactTransactionCard } from '@/components/TransactionCard/TransactionCard';
+import { useTransactions } from '@/hooks/useTransactions';
+import { Zap, Plus, Building, History, ArrowRight } from 'lucide-react-native';
+import { router } from 'expo-router';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -23,6 +26,7 @@ interface CreditBalanceProps {
   onTopUp?: () => void;
   onBusinessPlans?: () => void;
   loading?: boolean;
+  showRecentTransactions?: boolean;
 }
 
 export function CreditBalance({
@@ -31,8 +35,13 @@ export function CreditBalance({
   onTopUp,
   onBusinessPlans,
   loading = false,
+  showRecentTransactions = true,
 }: CreditBalanceProps) {
   const { theme } = useTheme();
+  
+  // Get recent transactions
+  const { transactions } = useTransactions({ limit: 3 });
+  const recentTransactions = transactions.slice(0, 3);
   
   // Animation values
   const scaleValue = useSharedValue(0);
@@ -183,6 +192,63 @@ export function CreditBalance({
           </Text>
         </View>
       </Animated.View>
+
+      {/* Recent Transactions */}
+      {showRecentTransactions && recentTransactions.length > 0 && (
+        <Animated.View style={[{ width: '100%', marginTop: 24 }, buttonContainerAnimatedStyle]}>
+          {/* Section Header */}
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 16,
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <History size={20} color={theme.colors.text.primary} />
+              <Text 
+                variant="h4"
+                style={{
+                  marginLeft: 8,
+                }}
+              >
+                Recent Activity
+              </Text>
+            </View>
+            
+            <TouchableOpacity
+              onPress={() => router.push('/transactions')}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: 4,
+                paddingHorizontal: 8,
+              }}
+            >
+              <Text 
+                variant="bodySmall"
+                style={{
+                  color: theme.colors.primary,
+                  marginRight: 4,
+                }}
+              >
+                View All
+              </Text>
+              <ArrowRight size={16} color={theme.colors.primary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Transaction List */}
+          <View style={{ gap: 8 }}>
+            {recentTransactions.map((transaction) => (
+              <CompactTransactionCard
+                key={transaction.id}
+                transaction={transaction}
+                onPress={(t) => router.push('/transactions')}
+              />
+            ))}
+          </View>
+        </Animated.View>
+      )}
     </Animated.View>
   );
 }

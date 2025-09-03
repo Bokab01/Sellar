@@ -7,6 +7,8 @@ import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { IntegrationStatus } from '@/components/IntegrationStatus/IntegrationStatus';
 import { ThemeProvider } from '@/theme/ThemeProvider';
+import { RewardsProvider } from '@/components/RewardsProvider/RewardsProvider';
+import { SplashScreenManager, useSplashScreen } from '@/components/SplashScreen';
 import { useEffect } from 'react';
 import { securityService } from '@/lib/securityService';
 import { offlineStorage } from '@/lib/offlineStorage';
@@ -19,6 +21,9 @@ export default function RootLayout() {
   // Initialize performance monitoring
   const { startTimer, endTimer } = usePerformanceMonitor();
   const { isOnline, pendingChanges } = useOfflineSync();
+  
+  // Splash screen management
+  const { isAppReady, showCustomSplash, handleAppReady, handleAnimationComplete } = useSplashScreen();
 
   // Initialize all services
   useEffect(() => {
@@ -55,6 +60,8 @@ export default function RootLayout() {
         console.error('Failed to initialize services:', error);
       } finally {
         endTimer(initTimer, 'navigation', { screen: 'app_initialization' });
+        // Mark app as ready after services are initialized
+        handleAppReady();
       }
     };
 
@@ -73,33 +80,44 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="profile/[id]"  />
-        <Stack.Screen name="buy-credits"  />
-        <Stack.Screen name="edit-profile"  />
-        <Stack.Screen name="feature-marketplace"  />
-        <Stack.Screen name="help"  />
-        <Stack.Screen name="invite"  />
-        <Stack.Screen name="knowledge-base"  />
-        <Stack.Screen name="my-listings"  />
-        <Stack.Screen name="notification-settings"  />
-        <Stack.Screen name="notifications"  />
-        <Stack.Screen name="paystack-diagnostics" />
-        <Stack.Screen name="search"  />
-        <Stack.Screen name="subscription-plans"  />
-        <Stack.Screen name="support-tickets"  />
-        <Stack.Screen name="favorites"  />
-        <Stack.Screen name="reviews"  />
-        <Stack.Screen name="transactions"  />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-      
-      {/* Development Integration Status - Temporarily disabled */}
-      {/* <IntegrationStatus visible={__DEV__} position="top-right" /> */}
+      <RewardsProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="profile/[id]"  />
+          <Stack.Screen name="buy-credits"  />
+          <Stack.Screen name="edit-profile"  />
+          <Stack.Screen name="feature-marketplace"  />
+          <Stack.Screen name="help"  />
+          <Stack.Screen name="invite"  />
+          <Stack.Screen name="knowledge-base"  />
+          <Stack.Screen name="my-listings"  />
+          <Stack.Screen name="my-rewards"  />
+          <Stack.Screen name="notification-settings"  />
+          <Stack.Screen name="notifications"  />
+          <Stack.Screen name="paystack-diagnostics" />
+          <Stack.Screen name="search"  />
+          <Stack.Screen name="subscription-plans"  />
+          <Stack.Screen name="support-tickets"  />
+          <Stack.Screen name="favorites"  />
+          <Stack.Screen name="reviews"  />
+          <Stack.Screen name="transactions"  />
+          <Stack.Screen name="+not-found" />
+        </Stack>
+        <StatusBar style="auto" />
+        
+        {/* Development Integration Status - Temporarily disabled */}
+        {/* <IntegrationStatus visible={__DEV__} position="top-right" /> */}
+        
+        {/* Professional Splash Screen with Dark Mode Support */}
+        {showCustomSplash && (
+          <SplashScreenManager
+            isAppReady={isAppReady}
+            onAnimationComplete={handleAnimationComplete}
+          />
+        )}
+      </RewardsProvider>
     </ThemeProvider>
   );
 }

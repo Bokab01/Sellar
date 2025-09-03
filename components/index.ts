@@ -47,6 +47,19 @@ export {
   VerificationActivityFeed 
 } from './VerificationStatusTracker/VerificationStatusTracker';
 
+// Transaction System Components
+export { 
+  TransactionCard, 
+  CompactTransactionCard, 
+  TransactionListItem 
+} from './TransactionCard/TransactionCard';
+export { TransactionFilters } from './TransactionFilters/TransactionFilters';
+
+// Rewards System Components
+export { RewardNotification, CompactRewardNotification } from './RewardNotification/RewardNotification';
+export { RewardsTracker } from './RewardsTracker/RewardsTracker';
+export { RewardsProvider, useRewardsContext } from './RewardsProvider/RewardsProvider';
+
 // Profile Management Components
 export { ProfileEditModal } from './ProfileEditModal/ProfileEditModal';
 export { BusinessProfileSetupModal } from './BusinessProfileSetupModal/BusinessProfileSetupModal';
@@ -71,8 +84,11 @@ export { LinearProgress, CircularProgress } from './ProgressIndicator/ProgressIn
 export { StepIndicator } from './StepIndicator/StepIndicator';
 
 // Image Picker
-export { CustomImagePicker } from './ImagePicker';
-export type { SelectedImage } from './ImagePicker';
+export { CustomImagePicker, ModernImagePicker } from './ImagePicker';
+export type { SelectedImage, MediaAsset } from './ImagePicker';
+
+// Splash Screen
+export { SplashScreenManager, useSplashScreen } from './SplashScreen';
 
 // Grid Layout
 export { Grid } from './Grid/Grid';

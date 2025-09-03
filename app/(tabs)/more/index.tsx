@@ -142,7 +142,7 @@ export default function MoreScreen() {
 
   const firstName = user?.user_metadata?.first_name || profile?.first_name || 'User';
   const lastName = user?.user_metadata?.last_name || profile?.last_name || '';
-  const fullName = `${firstName} ${lastName}`.trim();
+  const fullName = `${firstName || 'User'} ${lastName || ''}`.trim() || 'User';
   const walletBalance = profile?.wallet_balance || 0;
   const creditBalance = profile?.credit_balance || 0;
 
@@ -174,6 +174,12 @@ export default function MoreScreen() {
           subtitle: 'Purchase credits for premium features',
           icon: <ShoppingCart size={20} color={theme.colors.primary} />,
           onPress: () => router.push('/buy-credits'),
+        },
+        {
+          title: 'My Rewards',
+          subtitle: 'Track your credits and achievements',
+          icon: <Award size={20} color={theme.colors.warning} />,
+          onPress: () => router.push('/my-rewards'),
         },
         {
           title: 'Business Plans',

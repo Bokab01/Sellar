@@ -273,7 +273,7 @@ export default function WalletScreen() {
                   <ListItem
                     key={transaction.id}
                     title={transaction.description}
-                    subtitle={transaction.related_listing?.title || `${transaction.type} transaction`}
+                    subtitle={transaction.related_listing?.title || `${transaction.type || 'Unknown'} transaction`}
                     timestamp={new Date(transaction.created_at).toLocaleDateString()}
                     rightIcon={getTransactionIcon(transaction.type)}
                     style={{

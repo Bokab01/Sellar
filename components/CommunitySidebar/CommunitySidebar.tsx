@@ -321,7 +321,7 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
               />
               <View style={{ marginLeft: theme.spacing.md, flex: 1 }}>
                 <Text variant="body" style={{ fontWeight: '600' }}>
-                  {profile?.first_name || user.user_metadata?.first_name} {profile?.last_name || user.user_metadata?.last_name}
+                  {(profile?.first_name || user.user_metadata?.first_name || 'User')} {(profile?.last_name || user.user_metadata?.last_name || '')}
                 </Text>
                 <Text variant="caption" color="muted">Your Profile</Text>
               </View>
@@ -353,10 +353,10 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
                       </Text>
                     </View>
                     <Text variant="h3" color="primary" style={{ fontWeight: '700' }}>
-                      {userCredits.balance?.toLocaleString() || '0'}
+                      {(userCredits.balance || 0).toLocaleString()}
                     </Text>
                     <Text variant="caption" color="muted">
-                      Lifetime earned: {userCredits.lifetime_earned?.toLocaleString() || '0'}
+                      Lifetime earned: {(userCredits.lifetime_earned || 0).toLocaleString()}
                     </Text>
                   </View>
                 )}

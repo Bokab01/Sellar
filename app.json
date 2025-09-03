@@ -4,35 +4,72 @@
     "slug": "sellar",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/icon/icon-light.png",
     "scheme": "sellar",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splashscreen/splashscreen-light.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.sellar.app"
+      "bundleIdentifier": "com.sellar.app",
+      "icon": "./assets/icon/icon-light.png",
+      "splash": {
+        "image": "./assets/splashscreen/splashscreen-light.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff",
+        "dark": {
+          "image": "./assets/splashscreen/splashscreen-dark.png",
+          "backgroundColor": "#000000"
+        }
+      },
+      "userInterfaceStyle": "automatic"
     },
     "android": {
       "package": "com.sellar.app",
+      "icon": "./assets/icon/icon-light.png",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#ffffff"
-      }
+        "foregroundImage": "./assets/icon/icon-light.png",
+        "backgroundColor": "#8000ff",
+        "monochromeImage": "./assets/icon/icon-light.png"
+      },
+      "splash": {
+        "image": "./assets/splashscreen/splashscreen-light.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff",
+        "dark": {
+          "image": "./assets/splashscreen/splashscreen-dark.png",
+          "backgroundColor": "#000000"
+        }
+      },
+      "userInterfaceStyle": "automatic"
     },
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/icon/icon-light.png"
     },
     "plugins": [
       "expo-router",
       "expo-font",
       "expo-web-browser",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splashscreen/splashscreen-light.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ]
     ],
     "notification": {
-      "icon": "./assets/images/icon.png",
-      "color": "#000000",
+      "icon": "./assets/icon/icon-light.png",
+      "color": "#8000ff",
       "androidMode": "default",
       "androidCollapsedTitle": "#{unread_notifications} new notifications"
     },

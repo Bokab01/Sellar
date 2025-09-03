@@ -154,7 +154,7 @@ export default function TrendingTopicsScreen() {
         const transformedData = (data || []).map((post: any) => ({
           id: post.id,
           content: post.content,
-          author_name: `${post.profiles?.first_name || 'User'} ${post.profiles?.last_name || ''}`,
+          author_name: `${post.profiles?.first_name || 'User'} ${post.profiles?.last_name || ''}`.trim(),
           author_avatar: post.profiles?.avatar_url,
           likes_count: post.likes_count || 0,
           comments_count: post.comments_count || 0,

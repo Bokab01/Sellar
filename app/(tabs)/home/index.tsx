@@ -337,7 +337,7 @@ export default function HomeScreen() {
       price: listing.price,
       seller: {
         id: seller?.id,
-        name: `${seller?.first_name} ${seller?.last_name}`,
+        name: `${seller?.first_name || 'User'} ${seller?.last_name || ''}`,
         avatar: seller?.avatar_url,
         rating: seller?.rating || 0,
         badges: seller?.account_type === 'business' ? ['business'] : [],

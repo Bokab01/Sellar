@@ -294,7 +294,7 @@ export default function CommunityEventsScreen() {
                     <Users size={16} color={theme.colors.text.muted} />
                     <Text variant="body" style={{ marginLeft: theme.spacing.sm }}>
                       {event.attendees_count} attending
-                      {event.max_attendees && ` • ${event.max_attendees - event.attendees_count} spots left`}
+                      {event.max_attendees ? ` • ${event.max_attendees - event.attendees_count} spots left` : ''}
                     </Text>
                   </View>
                 </View>
