@@ -3,6 +3,7 @@ import { View, ScrollView, TouchableOpacity, Image, RefreshControl, Pressable } 
 import { useTheme } from '@/theme/ThemeProvider';
 import { useCommunityPosts } from '@/hooks/useCommunity';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useProfile } from '@/hooks/useProfile';
 import { router } from 'expo-router';
 import {
   Text,
@@ -22,6 +23,7 @@ import { Plus, Heart, MessageCircle, Share, MoveHorizontal as MoreHorizontal, Us
 export default function CommunityScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
+  const { profile } = useProfile();
   const { posts, loading, error, refreshing, refresh } = useCommunityPosts();
   const [sidebarVisible, setSidebarVisible] = useState(false);
 
@@ -118,8 +120,8 @@ export default function CommunityScreen() {
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
                 <Avatar 
-                  source={user?.user_metadata?.avatar_url}
-                  name={`${user?.user_metadata?.first_name || 'User'} ${user?.user_metadata?.last_name || ''}`}
+                  source={profile?.avatar_url || user?.user_metadata?.avatar_url}
+                  name={`${profile?.first_name || user?.user_metadata?.first_name || 'User'} ${profile?.last_name || user?.user_metadata?.last_name || ''}`}
                   size="sm" 
                 />
                 <Text variant="body" color="muted" style={{ flex: 1 }}>

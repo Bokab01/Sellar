@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useAppStore } from '@/store/useAppStore';
 import { useListings } from '@/hooks/useListings';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useProfile } from '@/hooks/useProfile';
 // Temporarily disabled performance hooks to debug infinite re-render
 // import { useOfflineListings, useOfflineSync } from '@/hooks/useOfflineSync';
 // import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
@@ -54,6 +55,7 @@ const { width: screenWidth } = Dimensions.get('window');
 export default function HomeScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
+  const { profile } = useProfile();
   const insets = useSafeAreaInsets();
   const { 
     currentLocation, 
@@ -364,7 +366,9 @@ export default function HomeScreen() {
     }
   };
 
-  const firstName = user?.user_metadata?.first_name || 'User';
+  const firstName = profile?.first_name || user?.user_metadata?.first_name || 'User';
+  const lastName = profile?.last_name || user?.user_metadata?.last_name || '';
+  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
 
   return (
     <View style={{ 
@@ -412,8 +416,8 @@ export default function HomeScreen() {
               activeOpacity={0.7}
             >
               <Avatar
-                source={user?.user_metadata?.avatar_url}
-                name={`${firstName} ${user?.user_metadata?.last_name || ''}`}
+                source={avatarUrl}
+                name={`${firstName} ${lastName}`}
                 size="sm"
                 style={{ marginRight: theme.spacing.sm }}
               />

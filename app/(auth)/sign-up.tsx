@@ -3,6 +3,7 @@ import { View, Alert, Platform } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useSecureAuth } from '@/hooks/useSecureAuth';
 import { validateSignUpForm } from '@/utils/validation';
+import { checkMultipleUniqueness } from '@/utils/uniquenessValidation';
 import {
   Text,
   SafeAreaWrapper,
@@ -33,46 +34,73 @@ export default function SignUpScreen() {
   const handleSignUp = async () => {
     // Clear previous errors
     setErrors({});
-
-    // Validate all form fields
-    const validation = validateSignUpForm({
-      email: email.trim(),
-      password,
-      confirmPassword,
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      phone: phone.trim(),
-    });
-
-    if (!validation.isValid) {
-      setErrors(validation.errors);
-      // Show the first error in an alert as well
-      const firstError = Object.values(validation.errors)[0];
-      Alert.alert('Validation Error', firstError);
-      return;
-    }
-
     setLoading(true);
-    const result = await secureSignUp({
-      email: email.trim(),
-      password,
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      phone: phone.trim() || undefined,
-      location: location || undefined,
-    });
-    
-    if (!result.success) {
-      Alert.alert('Sign Up Failed', result.error || 'Unknown error occurred');
-    } else {
-      // Navigate to email verification screen
-      router.push({
-        pathname: '/(auth)/verify-email',
-        params: { email: email.trim() }
+
+    try {
+      // Step 1: Validate all form fields
+      const validation = validateSignUpForm({
+        email: email.trim(),
+        password,
+        confirmPassword,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        phone: phone.trim(),
       });
+
+      if (!validation.isValid) {
+        setErrors(validation.errors);
+        const firstError = Object.values(validation.errors)[0];
+        Alert.alert('Validation Error', firstError);
+        setLoading(false);
+        return;
+      }
+
+      // Step 2: Check uniqueness of email and phone
+      const uniquenessCheck = await checkMultipleUniqueness({
+        email: email.trim(),
+        phone: phone.trim() || undefined,
+      });
+
+      if (!uniquenessCheck.isValid) {
+        setErrors(uniquenessCheck.errors);
+        const firstError = Object.values(uniquenessCheck.errors)[0];
+        Alert.alert('Registration Error', firstError);
+        setLoading(false);
+        return;
+      }
+
+      // Step 3: Proceed with signup
+      const result = await secureSignUp({
+        email: email.trim(),
+        password,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        phone: phone.trim() || undefined,
+        location: location || undefined,
+      });
+      
+      if (!result.success) {
+        // Handle specific signup errors
+        if (result.error?.includes('already registered') || result.error?.includes('already exists')) {
+          setErrors({ email: 'This email address is already registered. Please sign in instead.' });
+          Alert.alert('Account Exists', 'This email address is already registered. Please sign in instead.');
+        } else {
+          Alert.alert('Sign Up Failed', result.error || 'Unknown error occurred');
+        }
+      } else {
+        // Navigate to email verification screen
+        router.push({
+          pathname: '/(auth)/verify-email',
+          params: { email: email.trim() }
+        });
+      }
+      
+    } catch (error) {
+      console.error('Signup error:', error);
+      Alert.alert('Sign Up Failed', 'An unexpected error occurred. Please try again.');
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
   return (

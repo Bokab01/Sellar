@@ -58,12 +58,14 @@ export function useCommunityPosts(options: { following?: boolean; limit?: number
     if (!user) return { error: 'Not authenticated' };
 
     try {
-      const { data, error } = await dbHelpers.createPost({
+      const postData = {
         user_id: user.id,
         content,
         images,
         listing_id: listingId,
-      });
+      };
+      
+      const { data, error } = await dbHelpers.createPost(postData);
 
       if (error) {
         return { error: error.message };

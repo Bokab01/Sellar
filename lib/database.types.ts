@@ -20,6 +20,26 @@ export interface Database {
           response_time: string;
           created_at: string;
           updated_at: string;
+          // Professional fields
+          professional_title: string | null;
+          years_of_experience: number | null;
+          // Contact preferences
+          preferred_contact_method: 'app' | 'phone' | 'email' | 'whatsapp';
+          response_time_expectation: 'within_minutes' | 'within_hours' | 'within_day' | 'within_week';
+          // Privacy settings
+          phone_visibility: 'public' | 'contacts' | 'private';
+          email_visibility: 'public' | 'contacts' | 'private';
+          show_online_status: boolean;
+          show_last_seen: boolean;
+          // Business fields
+          business_name: string | null;
+          business_type: string | null;
+          business_description: string | null;
+          business_phone: string | null;
+          business_email: string | null;
+          business_website: string | null;
+          display_business_name: boolean;
+          business_name_priority: 'primary' | 'secondary' | 'hidden';
         };
         Insert: {
           id: string;
@@ -39,6 +59,26 @@ export interface Database {
           response_time?: string;
           created_at?: string;
           updated_at?: string;
+          // Professional fields
+          professional_title?: string | null;
+          years_of_experience?: number | null;
+          // Contact preferences
+          preferred_contact_method?: 'app' | 'phone' | 'email' | 'whatsapp';
+          response_time_expectation?: 'within_minutes' | 'within_hours' | 'within_day' | 'within_week';
+          // Privacy settings
+          phone_visibility?: 'public' | 'contacts' | 'private';
+          email_visibility?: 'public' | 'contacts' | 'private';
+          show_online_status?: boolean;
+          show_last_seen?: boolean;
+          // Business fields
+          business_name?: string | null;
+          business_type?: string | null;
+          business_description?: string | null;
+          business_phone?: string | null;
+          business_email?: string | null;
+          business_website?: string | null;
+          display_business_name?: boolean;
+          business_name_priority?: 'primary' | 'secondary' | 'hidden';
         };
         Update: {
           id?: string;
@@ -58,6 +98,26 @@ export interface Database {
           response_time?: string;
           created_at?: string;
           updated_at?: string;
+          // Professional fields
+          professional_title?: string | null;
+          years_of_experience?: number | null;
+          // Contact preferences
+          preferred_contact_method?: 'app' | 'phone' | 'email' | 'whatsapp';
+          response_time_expectation?: 'within_minutes' | 'within_hours' | 'within_day' | 'within_week';
+          // Privacy settings
+          phone_visibility?: 'public' | 'contacts' | 'private';
+          email_visibility?: 'public' | 'contacts' | 'private';
+          show_online_status?: boolean;
+          show_last_seen?: boolean;
+          // Business fields
+          business_name?: string | null;
+          business_type?: string | null;
+          business_description?: string | null;
+          business_phone?: string | null;
+          business_email?: string | null;
+          business_website?: string | null;
+          display_business_name?: boolean;
+          business_name_priority?: 'primary' | 'secondary' | 'hidden';
         };
       };
       categories: {

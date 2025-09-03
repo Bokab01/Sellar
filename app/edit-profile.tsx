@@ -42,6 +42,8 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { BusinessProfileSetupModal } from '@/components/BusinessProfileSetupModal/BusinessProfileSetupModal';
+import { validateName, validateUsername } from '@/utils/validation';
+import { checkMultipleUniqueness } from '@/utils/uniquenessValidation';
 import * as ImagePicker from 'expo-image-picker';
 import { Image as ImageIcon } from 'lucide-react-native';
 
@@ -99,6 +101,7 @@ export default function EditProfileScreen() {
 
   const [avatar, setAvatar] = useState<string | null>(null);
 
+
   // Initialize form with profile data
   useEffect(() => {
     if (profile) {
@@ -144,12 +147,61 @@ export default function EditProfileScreen() {
   };
 
   const handleSave = async () => {
+    // Basic validation
     if (!formData.first_name.trim()) {
       Alert.alert('Error', 'Please enter your first name');
       return;
     }
 
+    // Validate names
+    const firstNameValidation = validateName(formData.first_name, 'First name');
+    if (!firstNameValidation.isValid) {
+      Alert.alert('Validation Error', firstNameValidation.error!);
+      return;
+    }
+
+    const lastNameValidation = validateName(formData.last_name, 'Last name');
+    if (!lastNameValidation.isValid) {
+      Alert.alert('Validation Error', lastNameValidation.error!);
+      return;
+    }
+
+    // Validate username if provided
+    if (formData.username.trim()) {
+      const usernameValidation = validateUsername(formData.username);
+      if (!usernameValidation.isValid) {
+        Alert.alert('Validation Error', usernameValidation.error!);
+        return;
+      }
+    }
+
     try {
+      // Check uniqueness for fields that changed
+      const fieldsToCheck: { email?: string; username?: string; phone?: string } = {};
+      
+      if (formData.email.trim() && formData.email.trim() !== profile?.email) {
+        fieldsToCheck.email = formData.email.trim();
+      }
+      
+      if (formData.username.trim() && formData.username.trim() !== profile?.username) {
+        fieldsToCheck.username = formData.username.trim();
+      }
+      
+      if (formData.phone.trim() && formData.phone.trim() !== profile?.phone) {
+        fieldsToCheck.phone = formData.phone.trim();
+      }
+
+      // Only check uniqueness if there are fields to check
+      if (Object.keys(fieldsToCheck).length > 0) {
+        const uniquenessCheck = await checkMultipleUniqueness(fieldsToCheck, user?.id);
+        
+        if (!uniquenessCheck.isValid) {
+          const firstError = Object.values(uniquenessCheck.errors)[0];
+          Alert.alert('Update Error', firstError);
+          return;
+        }
+      }
+
       const fullName = `${formData.first_name.trim()} ${formData.last_name.trim()}`.trim();
       
       const updateData = {
@@ -174,7 +226,23 @@ export default function EditProfileScreen() {
       setShowToast(true);
       await refetch();
     } catch (error: any) {
-      setToastMessage(error.message || 'Failed to update profile');
+      console.error('Profile update error:', error);
+      
+      // Handle specific database constraint errors
+      if (error.message?.includes('unique') || error.message?.includes('duplicate')) {
+        if (error.message.includes('username')) {
+          setToastMessage('This username is already taken. Please choose a different one.');
+        } else if (error.message.includes('email')) {
+          setToastMessage('This email address is already registered.');
+        } else if (error.message.includes('phone')) {
+          setToastMessage('This phone number is already registered.');
+        } else {
+          setToastMessage('Some information is already in use. Please check your details.');
+        }
+      } else {
+        setToastMessage(error.message || 'Failed to update profile');
+      }
+      
       setToastVariant('error');
       setShowToast(true);
     }
@@ -245,7 +313,7 @@ export default function EditProfileScreen() {
               Unable to load your profile information.
             </Text>
             <Button variant="primary" onPress={refetch}>
-              Try Again
+                Try Again
             </Button>
           </View>
         </Container>
@@ -478,9 +546,9 @@ export default function EditProfileScreen() {
                   value={formData.location}
                   onLocationSelect={(location) => updateFormField('location', location)}
                   placeholder="Select your location"
-                />
-              </View>
+              />
             </View>
+          </View>
           )}
 
           {renderCollapsibleSection(
@@ -502,6 +570,98 @@ export default function EditProfileScreen() {
                 placeholder="Enter years of experience"
                 keyboardType="numeric"
               />
+
+              <View>
+                <Text style={{ 
+                  fontSize: 14, 
+                  fontWeight: '500', 
+                  marginBottom: theme.spacing.sm,
+                  color: theme.colors.text.primary 
+                }}>
+                  Preferred Contact Method
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+                  {[
+                    { value: 'app', label: 'In-App' },
+                    { value: 'phone', label: 'Phone' },
+                    { value: 'email', label: 'Email' },
+                    { value: 'whatsapp', label: 'WhatsApp' },
+                  ].map((option) => (
+                    <TouchableOpacity
+                      key={option.value}
+                      onPress={() => updateFormField('preferred_contact_method', option.value)}
+                      style={{
+                        backgroundColor: formData.preferred_contact_method === option.value 
+                          ? theme.colors.primary 
+                          : theme.colors.surfaceVariant,
+                        borderRadius: theme.borderRadius.md,
+                        paddingHorizontal: theme.spacing.md,
+                        paddingVertical: theme.spacing.sm,
+                        borderWidth: 1,
+                        borderColor: formData.preferred_contact_method === option.value 
+                          ? theme.colors.primary 
+                          : theme.colors.border,
+                      }}
+                    >
+                      <Text style={{
+                        color: formData.preferred_contact_method === option.value 
+                          ? '#FFFFFF' 
+                          : theme.colors.text.primary,
+                        fontSize: 14,
+                        fontWeight: '500',
+                      }}>
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+            </View>
+
+              <View>
+                <Text style={{ 
+                  fontSize: 14, 
+                  fontWeight: '500', 
+                  marginBottom: theme.spacing.sm,
+                  color: theme.colors.text.primary 
+                }}>
+                  Response Time Expectation
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+                  {[
+                    { value: 'within_minutes', label: 'Within Minutes' },
+                    { value: 'within_hours', label: 'Within Hours' },
+                    { value: 'within_day', label: 'Within a Day' },
+                    { value: 'within_week', label: 'Within a Week' },
+                  ].map((option) => (
+                    <TouchableOpacity
+                      key={option.value}
+                      onPress={() => updateFormField('response_time_expectation', option.value)}
+              style={{
+                        backgroundColor: formData.response_time_expectation === option.value 
+                          ? theme.colors.primary 
+                          : theme.colors.surfaceVariant,
+                        borderRadius: theme.borderRadius.md,
+                        paddingHorizontal: theme.spacing.md,
+                        paddingVertical: theme.spacing.sm,
+                borderWidth: 1,
+                        borderColor: formData.response_time_expectation === option.value 
+                          ? theme.colors.primary 
+                          : theme.colors.border,
+                      }}
+                    >
+                      <Text style={{
+                        color: formData.response_time_expectation === option.value 
+                          ? '#FFFFFF' 
+                          : theme.colors.text.primary,
+                        fontSize: 14,
+                        fontWeight: '500',
+                      }}>
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
             </View>
           )}
 
@@ -628,7 +788,7 @@ export default function EditProfileScreen() {
                   {hasBusinessPlan() ? (
                     <Button
                       variant="primary"
-                      onPress={() => setShowBusinessSetupModal(true)}
+                  onPress={() => setShowBusinessSetupModal(true)}
                       icon={<Crown size={16} color="#FFFFFF" />}
                     >
                       Setup Business Profile
@@ -653,17 +813,172 @@ export default function EditProfileScreen() {
             <Shield size={20} color={theme.colors.primary} />,
             <View style={{ gap: theme.spacing.lg }}>
               <View>
-                <Text style={{ marginBottom: theme.spacing.sm, fontWeight: '600' }}>
-                  Contact Preferences
+                <Text style={{ 
+                  fontSize: 14, 
+                  fontWeight: '500', 
+                  marginBottom: theme.spacing.sm,
+                  color: theme.colors.text.primary 
+                }}>
+                  Phone Visibility
                 </Text>
-                <Text style={{ fontSize: 12, color: theme.colors.text.muted, marginBottom: theme.spacing.md }}>
-                  Choose how others can contact you
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+                  {[
+                    { value: 'public', label: 'Public' },
+                    { value: 'contacts', label: 'Contacts Only' },
+                    { value: 'private', label: 'Private' },
+                  ].map((option) => (
+                    <TouchableOpacity
+                      key={option.value}
+                      onPress={() => updateFormField('phone_visibility', option.value)}
+                      style={{
+                        backgroundColor: formData.phone_visibility === option.value 
+                          ? theme.colors.primary 
+                          : theme.colors.surfaceVariant,
+                        borderRadius: theme.borderRadius.md,
+                        paddingHorizontal: theme.spacing.md,
+                        paddingVertical: theme.spacing.sm,
+                        borderWidth: 1,
+                        borderColor: formData.phone_visibility === option.value 
+                          ? theme.colors.primary 
+                          : theme.colors.border,
+                      }}
+                    >
+                      <Text style={{
+                        color: formData.phone_visibility === option.value 
+                          ? '#FFFFFF' 
+                          : theme.colors.text.primary,
+                        fontSize: 14,
+                        fontWeight: '500',
+                      }}>
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+            </View>
+          </View>
+
+              <View>
+                <Text style={{ 
+                  fontSize: 14, 
+                  fontWeight: '500', 
+                  marginBottom: theme.spacing.sm,
+                  color: theme.colors.text.primary 
+                }}>
+                  Email Visibility
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+                  {[
+                    { value: 'public', label: 'Public' },
+                    { value: 'contacts', label: 'Contacts Only' },
+                    { value: 'private', label: 'Private' },
+                  ].map((option) => (
+                    <TouchableOpacity
+                      key={option.value}
+                      onPress={() => updateFormField('email_visibility', option.value)}
+                      style={{
+                        backgroundColor: formData.email_visibility === option.value 
+                          ? theme.colors.primary 
+                          : theme.colors.surfaceVariant,
+                        borderRadius: theme.borderRadius.md,
+                        paddingHorizontal: theme.spacing.md,
+                        paddingVertical: theme.spacing.sm,
+                        borderWidth: 1,
+                        borderColor: formData.email_visibility === option.value 
+                          ? theme.colors.primary 
+                          : theme.colors.border,
+                      }}
+                    >
+                      <Text style={{
+                        color: formData.email_visibility === option.value 
+                          ? '#FFFFFF' 
+                          : theme.colors.text.primary,
+                        fontSize: 14,
+                        fontWeight: '500',
+                      }}>
+                        {option.label}
+            </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={{
+                backgroundColor: theme.colors.surfaceVariant,
+                borderRadius: theme.borderRadius.lg,
+                padding: theme.spacing.lg,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+              }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: theme.spacing.md }}>
+                  Online Status
                 </Text>
                 
-                {/* Add privacy controls here */}
-                <Text style={{ color: theme.colors.text.muted }}>
-                  Privacy settings will be available in the next update
-                </Text>
+                <View style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingVertical: theme.spacing.sm,
+                  marginBottom: theme.spacing.sm,
+                }}>
+                  <View style={{ flex: 1, marginRight: theme.spacing.md }}>
+                    <Text style={{ fontSize: 14, marginBottom: 4 }}>Show when I'm online</Text>
+                    <Text style={{ fontSize: 12, color: theme.colors.text.muted }}>
+                      Let others see when you're active
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => updateFormField('show_online_status', !formData.show_online_status)}
+                    style={{
+                      backgroundColor: formData.show_online_status ? theme.colors.primary : theme.colors.border,
+                      borderRadius: 16,
+                      paddingHorizontal: 16,
+                      paddingVertical: 8,
+                      minWidth: 60,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{
+                      color: formData.show_online_status ? '#FFFFFF' : theme.colors.text.muted,
+                      fontSize: 12,
+                      fontWeight: '600',
+                    }}>
+                      {formData.show_online_status ? 'ON' : 'OFF'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingVertical: theme.spacing.sm,
+                }}>
+                  <View style={{ flex: 1, marginRight: theme.spacing.md }}>
+                    <Text style={{ fontSize: 14, marginBottom: 4 }}>Show last seen</Text>
+                    <Text style={{ fontSize: 12, color: theme.colors.text.muted }}>
+                      Display when you were last active
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => updateFormField('show_last_seen', !formData.show_last_seen)}
+                    style={{
+                      backgroundColor: formData.show_last_seen ? theme.colors.primary : theme.colors.border,
+                      borderRadius: 16,
+                      paddingHorizontal: 16,
+                      paddingVertical: 8,
+                      minWidth: 60,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{
+                      color: formData.show_last_seen ? '#FFFFFF' : theme.colors.text.muted,
+                      fontSize: 12,
+                      fontWeight: '600',
+                    }}>
+                      {formData.show_last_seen ? 'ON' : 'OFF'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           )}
@@ -720,8 +1035,8 @@ export default function EditProfileScreen() {
               >
                 Take Photo
               </Button>
-              
-              <Button
+
+                <Button
                 variant="secondary"
                 icon={<ImageIcon size={20} color={theme.colors.primary} />}
                 onPress={async () => {
@@ -744,7 +1059,7 @@ export default function EditProfileScreen() {
                 fullWidth
               >
                 Choose from Gallery
-              </Button>
+                </Button>
               
               <Button
                 variant="ghost"

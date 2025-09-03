@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, ScrollView, TouchableOpacity, Dimensions, Animated, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
 import {
@@ -66,6 +67,7 @@ const SIDEBAR_WIDTH = Math.min(320, screenWidth * 0.85);
 export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) {
   const { theme } = useTheme();
   const { user } = useAuthStore();
+  const { profile } = useProfile();
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [userCredits, setUserCredits] = useState<UserCredits | null>(null);
   const [trendingUsers, setTrendingUsers] = useState<TrendingUser[]>([]);
@@ -313,13 +315,13 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
               <Avatar
-                source={user.user_metadata?.avatar_url}
-                name={`${user.user_metadata?.first_name || 'User'} ${user.user_metadata?.last_name || ''}`}
+                source={profile?.avatar_url || user.user_metadata?.avatar_url}
+                name={`${profile?.first_name || user.user_metadata?.first_name || 'User'} ${profile?.last_name || user.user_metadata?.last_name || ''}`}
                 size="md"
               />
               <View style={{ marginLeft: theme.spacing.md, flex: 1 }}>
                 <Text variant="body" style={{ fontWeight: '600' }}>
-                  {user.user_metadata?.first_name} {user.user_metadata?.last_name}
+                  {profile?.first_name || user.user_metadata?.first_name} {profile?.last_name || user.user_metadata?.last_name}
                 </Text>
                 <Text variant="caption" color="muted">Your Profile</Text>
               </View>

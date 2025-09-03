@@ -25,6 +25,7 @@ interface ImagePickerProps {
   onUploadComplete?: (urls: string[]) => void;
   disabled?: boolean;
   style?: any;
+  title?: string;
 }
 
 export function CustomImagePicker({
@@ -35,6 +36,7 @@ export function CustomImagePicker({
   onUploadComplete,
   disabled = false,
   style,
+  title = "Product Images",
 }: ImagePickerProps) {
   const { theme } = useTheme();
   const { uploading, progress, error: uploadError, uploadMultiple } = useImageUpload({
@@ -193,7 +195,7 @@ export function CustomImagePicker({
         }}
       >
         <Text variant="h4">
-          Product Images
+          {title}
         </Text>
         <View
           style={{

@@ -201,6 +201,59 @@ export function validatePhoneNumber(phone: string): ValidationResult {
 }
 
 /**
+ * Username validation
+ */
+export function validateUsername(username: string): ValidationResult {
+  if (!username || !username.trim()) {
+    return { isValid: false, error: 'Username is required' };
+  }
+
+  const trimmedUsername = username.trim().toLowerCase();
+
+  if (trimmedUsername.length < 3) {
+    return { isValid: false, error: 'Username must be at least 3 characters' };
+  }
+
+  if (trimmedUsername.length > 30) {
+    return { isValid: false, error: 'Username must be less than 30 characters' };
+  }
+
+  // Username can only contain letters, numbers, underscores, and hyphens
+  const usernameRegex = /^[a-zA-Z0-9_-]+$/;
+  if (!usernameRegex.test(trimmedUsername)) {
+    return { 
+      isValid: false, 
+      error: 'Username can only contain letters, numbers, underscores, and hyphens' 
+    };
+  }
+
+  // Cannot start or end with underscore or hyphen
+  if (trimmedUsername.startsWith('_') || trimmedUsername.startsWith('-') || 
+      trimmedUsername.endsWith('_') || trimmedUsername.endsWith('-')) {
+    return { 
+      isValid: false, 
+      error: 'Username cannot start or end with underscore or hyphen' 
+    };
+  }
+
+  // Check for reserved usernames
+  const reservedUsernames = [
+    'admin', 'administrator', 'root', 'system', 'api', 'www', 'mail', 'ftp',
+    'support', 'help', 'info', 'contact', 'about', 'terms', 'privacy',
+    'sellar', 'seller', 'buyer', 'user', 'guest', 'anonymous', 'null', 'undefined'
+  ];
+
+  if (reservedUsernames.includes(trimmedUsername)) {
+    return { 
+      isValid: false, 
+      error: 'This username is reserved. Please choose a different one.' 
+    };
+  }
+
+  return { isValid: true, sanitizedValue: trimmedUsername };
+}
+
+/**
  * Validate all form fields at once
  */
 export function validateSignUpForm(data: {
@@ -210,6 +263,7 @@ export function validateSignUpForm(data: {
   firstName: string;
   lastName: string;
   phone?: string;
+  username?: string;
 }): { isValid: boolean; errors: Record<string, string> } {
   const errors: Record<string, string> = {};
 
@@ -239,6 +293,14 @@ export function validateSignUpForm(data: {
   const lastNameValidation = validateName(data.lastName, 'Last name');
   if (!lastNameValidation.isValid) {
     errors.lastName = lastNameValidation.error!;
+  }
+
+  // Validate username (optional during signup, but validate if provided)
+  if (data.username) {
+    const usernameValidation = validateUsername(data.username);
+    if (!usernameValidation.isValid) {
+      errors.username = usernameValidation.error!;
+    }
   }
 
   // Validate phone (optional)
