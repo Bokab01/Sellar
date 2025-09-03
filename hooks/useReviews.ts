@@ -94,11 +94,6 @@ export function useReviews(options: {
             full_name,
             avatar_url,
             username
-          ),
-          listing:listings(
-            id,
-            title,
-            images
           )
         `)
         .order('created_at', { ascending: false });
@@ -137,6 +132,30 @@ export function useReviews(options: {
           ...review,
           user_helpful_vote: userVotes.has(review.id)
         }));
+      }
+
+      // Fetch listing information separately if needed
+      if (data && data.length > 0) {
+        const listingIds = data.filter(r => r.listing_id).map(r => r.listing_id);
+        if (listingIds.length > 0) {
+          try {
+            const { data: listings } = await supabase
+              .from('listings')
+              .select('id, title, images')
+              .in('id', listingIds);
+
+            if (listings) {
+              const listingsMap = new Map(listings.map(l => [l.id, l]));
+              reviewsWithVotes = reviewsWithVotes.map(review => ({
+                ...review,
+                listing: review.listing_id ? listingsMap.get(review.listing_id) : null
+              }));
+            }
+          } catch (listingError) {
+            console.warn('Could not fetch listing information:', listingError);
+            // Continue without listing info - this is not critical
+          }
+        }
       }
 
       if (reset) {
@@ -271,11 +290,6 @@ export function useCreateReview() {
             full_name,
             avatar_url,
             username
-          ),
-          listing:listings(
-            id,
-            title,
-            images
           )
         `)
         .single();
@@ -329,11 +343,6 @@ export function useUpdateReview() {
             full_name,
             avatar_url,
             username
-          ),
-          listing:listings(
-            id,
-            title,
-            images
           )
         `)
         .single();

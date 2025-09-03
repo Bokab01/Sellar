@@ -201,11 +201,83 @@ BEGIN
 END $$;
 
 -- =============================================
--- LISTINGS TABLE (Already exists, but ensure completeness)
+-- CATEGORIES TABLE
 -- =============================================
 
--- The listings table was already created in setup-listings-table.sql
--- Ensure it has all necessary fields for Phase 1
+-- Create categories table for listings
+CREATE TABLE IF NOT EXISTS categories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    slug TEXT UNIQUE NOT NULL,
+    icon TEXT,
+    parent_id UUID REFERENCES categories(id) ON DELETE CASCADE,
+    sort_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Insert default categories
+INSERT INTO categories (id, name, slug, icon, sort_order) VALUES
+    ('00000000-0000-4000-8000-000000000001', 'Electronics & Technology', 'electronics', 'smartphone', 1),
+    ('00000000-0000-4000-8000-000000000002', 'Fashion & Beauty', 'fashion', 'shirt', 2),
+    ('00000000-0000-4000-8000-000000000003', 'Home & Garden', 'home-garden', 'home', 3),
+    ('00000000-0000-4000-8000-000000000004', 'Vehicles & Transportation', 'vehicles', 'car', 4),
+    ('00000000-0000-4000-8000-000000000005', 'Health & Sports', 'health-sports', 'heart', 5),
+    ('00000000-0000-4000-8000-000000000006', 'Business & Industrial', 'business', 'briefcase', 6),
+    ('00000000-0000-4000-8000-000000000007', 'Education & Books', 'education', 'book', 7),
+    ('00000000-0000-4000-8000-000000000008', 'Entertainment & Media', 'entertainment', 'music', 8),
+    ('00000000-0000-4000-8000-000000000009', 'Food & Agriculture', 'food', 'coffee', 9),
+    ('00000000-0000-4000-8000-000000000010', 'Services', 'services', 'tool', 10),
+    ('00000000-0000-4000-8000-000000000000', 'General/Other', 'general', 'tag', 99)
+ON CONFLICT (slug) DO NOTHING;
+
+-- Create indexes for categories
+CREATE INDEX IF NOT EXISTS idx_categories_slug ON categories(slug);
+CREATE INDEX IF NOT EXISTS idx_categories_parent_id ON categories(parent_id);
+CREATE INDEX IF NOT EXISTS idx_categories_is_active ON categories(is_active);
+
+-- =============================================
+-- LISTINGS TABLE
+-- =============================================
+
+-- Create listings table with proper references to profiles
+CREATE TABLE IF NOT EXISTS listings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    title TEXT NOT NULL CHECK (length(title) >= 3 AND length(title) <= 200),
+    description TEXT NOT NULL CHECK (length(description) >= 10 AND length(description) <= 5000),
+    price DECIMAL(12,2) NOT NULL CHECK (price >= 0),
+    currency TEXT NOT NULL DEFAULT 'GHS' CHECK (currency IN ('GHS', 'USD', 'EUR', 'GBP')),
+    category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+    condition TEXT NOT NULL CHECK (condition IN ('new', 'like-new', 'good', 'fair', 'poor')),
+    quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+    location TEXT NOT NULL CHECK (length(location) >= 2 AND length(location) <= 200),
+    images JSONB DEFAULT '[]'::jsonb,
+    accept_offers BOOLEAN NOT NULL DEFAULT false,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'sold', 'inactive', 'pending')),
+    views INTEGER DEFAULT 0,
+    featured BOOLEAN DEFAULT false,
+    featured_until TIMESTAMPTZ,
+    boost_level INTEGER DEFAULT 0 CHECK (boost_level >= 0 AND boost_level <= 3),
+    boost_until TIMESTAMPTZ,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    
+    -- Constraints
+    CONSTRAINT listings_title_not_empty CHECK (trim(title) != ''),
+    CONSTRAINT listings_description_not_empty CHECK (trim(description) != ''),
+    CONSTRAINT listings_location_not_empty CHECK (trim(location) != '')
+);
+
+-- Create indexes for listings
+CREATE INDEX IF NOT EXISTS idx_listings_user_id ON listings(user_id);
+CREATE INDEX IF NOT EXISTS idx_listings_category_id ON listings(category_id);
+CREATE INDEX IF NOT EXISTS idx_listings_status ON listings(status);
+CREATE INDEX IF NOT EXISTS idx_listings_created_at ON listings(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_listings_price ON listings(price);
+CREATE INDEX IF NOT EXISTS idx_listings_featured ON listings(featured, created_at DESC) WHERE featured = true;
 
 -- =============================================
 -- CONVERSATIONS TABLE (Chat System)

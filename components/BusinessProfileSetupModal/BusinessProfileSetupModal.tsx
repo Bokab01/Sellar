@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { Text, Input, Button, AppModal, Badge } from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { Input } from '@/components/Input/Input';
+import { Button } from '@/components/Button/Button';
+import { AppModal } from '@/components/Modal/Modal';
+import { Badge } from '@/components/Badge/Badge';
 import { Picker } from '@react-native-picker/picker';
 import { 
   useBusinessCategories, 

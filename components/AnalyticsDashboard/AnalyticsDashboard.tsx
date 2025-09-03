@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, Dimensions } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { Text, LoadingSkeleton, EmptyState, Button, Badge } from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
+import { EmptyState } from '@/components/EmptyState/EmptyState';
+import { Button } from '@/components/Button/Button';
+import { Badge } from '@/components/Badge/Badge';
 import { 
   TrendingUp, 
   Eye, 

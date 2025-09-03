@@ -18,6 +18,10 @@ interface SubscriptionState {
 }
 
 interface MonetizationState extends CreditState, SubscriptionState {
+  // Aliases for backward compatibility
+  creditBalance: number;
+  currentSubscription: any | null;
+  
   // Credit actions
   refreshCredits: () => Promise<void>;
   purchaseCredits: (packageId: string) => Promise<{ success: boolean; error?: string; paymentUrl?: string }>;
@@ -39,6 +43,7 @@ interface MonetizationState extends CreditState, SubscriptionState {
   getAnalyticsTier: () => 'none' | 'basic' | 'advanced' | 'full';
   hasPrioritySupport: () => boolean;
   hasAutoBoost: () => boolean;
+  hasBusinessPlan: () => boolean;
 }
 
 export const useMonetizationStore = create<MonetizationState>((set, get) => ({
@@ -55,6 +60,14 @@ export const useMonetizationStore = create<MonetizationState>((set, get) => ({
   // Loading states
   loading: false,
   error: null,
+
+  // Aliases for backward compatibility
+  get creditBalance() {
+    return get().balance;
+  },
+  get currentSubscription() {
+    return get().currentPlan;
+  },
 
   // Credit actions
   refreshCredits: async () => {
@@ -373,5 +386,18 @@ export const useMonetizationStore = create<MonetizationState>((set, get) => ({
   hasAutoBoost: () => {
     const { entitlements } = get();
     return entitlements.auto_boost || false;
+  },
+
+  hasBusinessPlan: () => {
+    const { currentPlan, entitlements } = get();
+    
+    // Check if user has an active business plan subscription
+    if (currentPlan && currentPlan.status === 'active') {
+      const planName = currentPlan.subscription_plans?.name?.toLowerCase();
+      return planName?.includes('business') || planName?.includes('starter') || planName?.includes('pro') || planName?.includes('premium');
+    }
+    
+    // Check entitlements for business features
+    return entitlements.business_features || false;
   },
 }));

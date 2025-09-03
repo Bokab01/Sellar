@@ -96,6 +96,14 @@ export const lightTheme: Theme = {
     successForeground: '#ffffff',
     warning: colorPalette.warning[600],
     warningForeground: '#ffffff',
+    
+    // Additional color properties that might be missing
+    primaryContainer: colorPalette.primary[100],
+    secondaryContainer: colorPalette.secondary[100],
+    errorContainer: colorPalette.error[100],
+    successContainer: colorPalette.success[100],
+    warningContainer: colorPalette.warning[100],
+    textMuted: colorPalette.neutral[500],
   },
   typography: baseTypography,
   spacing: baseSpacing,
@@ -147,6 +155,14 @@ export const darkTheme: Theme = {
     successForeground: '#ffffff',
     warning: colorPalette.warning[500],
     warningForeground: '#ffffff',
+    
+    // Additional color properties that might be missing
+    primaryContainer: colorPalette.primary[800],
+    secondaryContainer: colorPalette.secondary[800],
+    errorContainer: colorPalette.error[800],
+    successContainer: colorPalette.success[800],
+    warningContainer: colorPalette.warning[800],
+    textMuted: colorPalette.neutral[400],
   },
   typography: baseTypography,
   spacing: baseSpacing,

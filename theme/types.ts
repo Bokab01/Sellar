@@ -94,6 +94,16 @@ export interface ThemeColors {
   successForeground: string;
   warning: string;
   warningForeground: string;
+  
+  // Container colors
+  primaryContainer: string;
+  secondaryContainer: string;
+  errorContainer: string;
+  successContainer: string;
+  warningContainer: string;
+  
+  // Additional text colors
+  textMuted: string;
 }
 
 export interface Typography {

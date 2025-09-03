@@ -72,6 +72,10 @@ export { LinkButton } from './LinkButton/LinkButton';
 // Search & Filters
 export { SearchBar } from './SearchBar/SearchBar';
 export { FilterSheet } from './FilterSheet/FilterSheet';
+export { SmartSearchBar } from './SmartSearchBar/SmartSearchBar';
+export { SmartSearchFilters } from './SearchFilters/SearchFilters';
+export { SearchResults } from './SearchResults/SearchResults';
+export { QuickSearch } from './QuickSearch/QuickSearch';
 
 // Categories & Location
 export { CategoryCard } from './CategoryCard/CategoryCard';
@@ -123,6 +127,7 @@ export * from '../lib/featureActivation';
 export * from '../lib/featureExpiryService';
 export * from '../lib/featureRecommendationEngine';
 export * from '../lib/subscriptionManagement';
+export * from '../lib/smartSearchService';
 
 // Offer System Components
 export { CounterOfferModal } from './CounterOfferModal/CounterOfferModal';
@@ -171,3 +176,6 @@ export * from '../hooks/usePerformanceMonitor';
 export * from '../hooks/useOfflineSync';
 export * from '../lib/offlineStorage';
 export * from '../utils/memoryManager';
+
+// Search Hooks
+export * from '../hooks/useSmartSearch';

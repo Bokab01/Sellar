@@ -2,16 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { View, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { router } from 'expo-router';
-import {
-  Text,
-  SafeAreaWrapper,
-  AppHeader,
-  Container,
-  LoadingSkeleton,
-  EmptyState,
-  Badge,
-  Button,
-} from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { SafeAreaWrapper, Container } from '@/components/Layout';
+import { AppHeader } from '@/components/AppHeader/AppHeader';
+import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
+import { EmptyState } from '@/components/EmptyState/EmptyState';
+import { Badge } from '@/components/Badge/Badge';
+import { Button } from '@/components/Button/Button';
 import { 
   BarChart3, 
   Zap, 
@@ -24,12 +21,12 @@ import {
   Star,
   ArrowUpRight,
   Lock,
-  Upgrade
+  ArrowUpRight as Upgrade
 } from 'lucide-react-native';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { useAuth } from '@/hooks/useAuth';
 
-// Import dashboard components (we'll create these)
+// Import dashboard components with direct imports to avoid circular dependencies
 import { AnalyticsDashboard } from '@/components/AnalyticsDashboard/AnalyticsDashboard';
 import { AutoBoostDashboard } from '@/components/AutoBoostDashboard/AutoBoostDashboard';
 import { PrioritySupportDashboard } from '@/components/PrioritySupportDashboard/PrioritySupportDashboard';
@@ -73,75 +70,75 @@ export default function BusinessDashboardScreen() {
   const currentTier = getCurrentTier();
 
   // Define available tabs based on subscription tier
-  const getAvailableTabs = (): TabConfig[] => {
-    const baseTabs: TabConfig[] = [
-      {
-        id: 'overview',
-        label: 'Overview',
-        icon: <BarChart3 size={18} color={theme.colors.text.primary} />,
-        requiredTier: 'free',
-      },
-    ];
+  const availableTabs: TabConfig[] = [
+    {
+      id: 'overview',
+      label: 'Overview',
+      icon: <BarChart3 size={18} color={theme.colors.text.primary} />,
+      requiredTier: 'free',
+    },
+  ];
 
-    // Analytics tab - available for all business plans
-    if (currentTier !== 'free') {
-      baseTabs.push({
-        id: 'analytics',
-        label: 'Analytics',
-        icon: <TrendingUp size={18} color={theme.colors.text.primary} />,
-        requiredTier: 'starter',
-        badge: currentTier === 'starter' ? 'Basic' : currentTier === 'pro' ? 'Advanced' : 'Full',
-      });
-    }
+  // Add tabs based on tier
+  if (currentTier !== 'free') {
+    availableTabs.push({
+      id: 'analytics',
+      label: 'Analytics',
+      icon: <TrendingUp size={18} color={theme.colors.text.primary} />,
+      requiredTier: 'starter',
+      badge: currentTier === 'starter' ? 'Basic' : currentTier === 'pro' ? 'Advanced' : 'Full',
+    });
+  }
 
-    // Auto-boost tab - available for Pro and Premium
-    if (currentTier === 'pro' || currentTier === 'premium') {
-      baseTabs.push({
-        id: 'autoboost',
-        label: 'Auto-boost',
-        icon: <Zap size={18} color={theme.colors.warning} />,
-        requiredTier: 'pro',
-      });
-    }
+  if (currentTier === 'pro' || currentTier === 'premium') {
+    availableTabs.push({
+      id: 'autoboost',
+      label: 'Auto-boost',
+      icon: <Zap size={18} color={theme.colors.warning} />,
+      requiredTier: 'pro',
+    });
+  }
 
-    // Priority Support tab - available for Premium only
-    if (currentTier === 'premium') {
-      baseTabs.push({
-        id: 'support',
-        label: 'Priority Support',
-        icon: <HeadphonesIcon size={18} color={theme.colors.success} />,
-        requiredTier: 'premium',
-      });
+  if (currentTier === 'premium') {
+    availableTabs.push({
+      id: 'support',
+      label: 'Priority Support',
+      icon: <HeadphonesIcon size={18} color={theme.colors.success} />,
+      requiredTier: 'premium',
+    });
 
-      baseTabs.push({
-        id: 'premium',
-        label: 'Premium Features',
-        icon: <Crown size={18} color={theme.colors.primary} />,
-        requiredTier: 'premium',
-      });
-    }
+    availableTabs.push({
+      id: 'premium',
+      label: 'Premium Features',
+      icon: <Crown size={18} color={theme.colors.primary} />,
+      requiredTier: 'premium',
+    });
+  }
 
-    return baseTabs;
-  };
-
-  const availableTabs = getAvailableTabs();
-
-  // Initialize data
   useEffect(() => {
     const initializeDashboard = async () => {
-      setLoading(true);
-      await refreshSubscription();
-      setLoading(false);
+      try {
+        setLoading(true);
+        await refreshSubscription();
+      } catch (error) {
+        console.error('Failed to initialize dashboard:', error);
+      } finally {
+        setLoading(false);
+      }
     };
 
     initializeDashboard();
-  }, []);
+  }, [refreshSubscription]);
 
-  // Handle refresh
   const handleRefresh = async () => {
     setRefreshing(true);
-    await refreshSubscription();
-    setRefreshing(false);
+    try {
+      await refreshSubscription();
+    } catch (error) {
+      console.error('Failed to refresh dashboard:', error);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   // Render tab bar
@@ -154,10 +151,7 @@ export default function BusinessDashboardScreen() {
         borderBottomWidth: 1,
         borderBottomColor: theme.colors.border,
       }}
-      contentContainerStyle={{
-        paddingHorizontal: theme.spacing.lg,
-        paddingVertical: theme.spacing.sm,
-      }}
+      contentContainerStyle={{ paddingHorizontal: theme.spacing.lg }}
     >
       {availableTabs.map((tab) => {
         const isActive = activeTab === tab.id;
@@ -167,24 +161,24 @@ export default function BusinessDashboardScreen() {
             key={tab.id}
             onPress={() => setActiveTab(tab.id)}
             style={{
+              paddingVertical: theme.spacing.md,
+              paddingHorizontal: theme.spacing.lg,
+              marginRight: theme.spacing.sm,
+              backgroundColor: isActive ? theme.colors.primary + '15' : 'transparent',
+              borderRadius: theme.borderRadius.md,
+              borderColor: isActive ? theme.colors.primary + '30' : 'transparent',
+              borderWidth: 1,
               flexDirection: 'row',
               alignItems: 'center',
-              paddingHorizontal: theme.spacing.md,
-              paddingVertical: theme.spacing.sm,
-              marginRight: theme.spacing.sm,
-              borderRadius: theme.borderRadius.md,
-              backgroundColor: isActive ? theme.colors.primary + '15' : 'transparent',
-              borderWidth: isActive ? 1 : 0,
-              borderColor: isActive ? theme.colors.primary + '30' : 'transparent',
+              gap: theme.spacing.xs,
             }}
           >
             {tab.icon}
             <Text
               variant="bodySmall"
               style={{
-                marginLeft: theme.spacing.xs,
-                fontWeight: isActive ? '600' : '400',
                 color: isActive ? theme.colors.primary : theme.colors.text.primary,
+                fontWeight: isActive ? '600' : '400',
               }}
             >
               {tab.label}
@@ -192,9 +186,7 @@ export default function BusinessDashboardScreen() {
             {tab.badge && (
               <Badge
                 text={tab.badge}
-                variant="secondary"
-                size="small"
-                style={{ marginLeft: theme.spacing.xs }}
+                variant="info"
               />
             )}
           </TouchableOpacity>
@@ -208,7 +200,9 @@ export default function BusinessDashboardScreen() {
     if (loading) {
       return (
         <View style={{ padding: theme.spacing.lg, gap: theme.spacing.lg }}>
-          <LoadingSkeleton count={3} height={120} />
+          <LoadingSkeleton height={120} />
+          <LoadingSkeleton height={120} />
+          <LoadingSkeleton height={120} />
         </View>
       );
     }
@@ -217,7 +211,7 @@ export default function BusinessDashboardScreen() {
       case 'overview':
         return renderOverviewTab();
       case 'analytics':
-        return <AnalyticsDashboard tier={currentTier} />;
+        return <AnalyticsDashboard tier={currentTier === 'free' ? 'starter' : currentTier} />;
       case 'autoboost':
         return <AutoBoostDashboard />;
       case 'support':
@@ -229,7 +223,7 @@ export default function BusinessDashboardScreen() {
     }
   };
 
-  // Overview tab content
+  // Render overview tab
   const renderOverviewTab = () => {
     if (currentTier === 'free') {
       return (
@@ -239,6 +233,7 @@ export default function BusinessDashboardScreen() {
             borderRadius: theme.borderRadius.lg,
             padding: theme.spacing.xl,
             alignItems: 'center',
+            marginBottom: theme.spacing.lg,
             borderWidth: 1,
             borderColor: theme.colors.border,
           }}>
@@ -255,9 +250,9 @@ export default function BusinessDashboardScreen() {
             <Text variant="body" color="secondary" style={{ 
               textAlign: 'center', 
               marginBottom: theme.spacing.xl,
-              lineHeight: 22,
+              lineHeight: 24,
             }}>
-              Get access to powerful analytics, auto-boost, priority support, and more with a business plan.
+              Get access to powerful business tools, analytics, and priority support with a business plan.
             </Text>
 
             <View style={{ gap: theme.spacing.md, width: '100%' }}>
@@ -373,7 +368,7 @@ export default function BusinessDashboardScreen() {
             </View>
 
             <Button
-              variant="outline"
+              variant="secondary"
               onPress={() => router.push('/(tabs)/subscription-plans')}
               style={{ width: '100%' }}
             >
@@ -462,7 +457,6 @@ export default function BusinessDashboardScreen() {
                   borderColor: theme.colors.border,
                   flexDirection: 'row',
                   alignItems: 'center',
-                  justifyContent: 'space-between',
                 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
@@ -473,19 +467,18 @@ export default function BusinessDashboardScreen() {
                     </Text>
                     <Text variant="bodySmall" color="muted">
                       {tab.id === 'analytics' && 'View detailed business insights'}
-                      {tab.id === 'autoboost' && 'Automatically boost your listings'}
+                      {tab.id === 'autoboost' && 'Automatically promote your listings'}
                       {tab.id === 'support' && 'Get priority customer support'}
-                      {tab.id === 'premium' && 'Access premium business features'}
+                      {tab.id === 'premium' && 'Access exclusive premium features'}
                     </Text>
+                    {tab.badge && (
+                      <Badge
+                        text={tab.badge}
+                        variant="info"
+                        style={{ marginTop: theme.spacing.xs }}
+                      />
+                    )}
                   </View>
-                  {tab.badge && (
-                    <Badge
-                      text={tab.badge}
-                      variant="secondary"
-                      size="small"
-                      style={{ marginRight: theme.spacing.sm }}
-                    />
-                  )}
                 </View>
                 <ArrowUpRight size={20} color={theme.colors.text.muted} />
               </TouchableOpacity>
@@ -502,11 +495,6 @@ export default function BusinessDashboardScreen() {
         title="Business Dashboard"
         showBackButton
         onBackPress={() => router.back()}
-        rightElement={
-          <TouchableOpacity onPress={handleRefresh}>
-            <Settings size={20} color={theme.colors.text.primary} />
-          </TouchableOpacity>
-        }
       />
 
       <View style={{ flex: 1 }}>
