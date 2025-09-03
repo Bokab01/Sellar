@@ -407,7 +407,7 @@ export default function HomeScreen() {
                 backgroundColor: theme.colors.primary + '10',
               }}
               onPress={() => {
-                router.push('/(tabs)/wallet');
+                router.push('/(tabs)/more');
               }}
               activeOpacity={0.7}
             >
@@ -457,7 +457,7 @@ export default function HomeScreen() {
                   position: 'relative',
                   padding: theme.spacing.xs,
                 }}
-                onPress={() => router.push('/(tabs)/notifications')}
+                onPress={() => router.push('/notifications')}
                 activeOpacity={0.7}
               >
                 <Bell size={20} color={theme.colors.text.primary} />
@@ -491,7 +491,7 @@ export default function HomeScreen() {
               {/* Favorites */}
               <TouchableOpacity
                 style={{ padding: theme.spacing.xs }}
-                onPress={() => router.push('/(tabs)/favorites')}
+                onPress={() => router.push('/favorites')}
                 activeOpacity={0.7}
               >
                 <Heart size={20} color={theme.colors.text.primary} />

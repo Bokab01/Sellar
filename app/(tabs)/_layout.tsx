@@ -28,7 +28,7 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="home"
         options={{
           title: 'Home',
           tabBarIcon: ({ size, color }) => (
@@ -36,12 +36,12 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
+   {/*    <Tabs.Screen
         name="home"
         options={{
           href: null, // Hide from tab bar - this is for the nested stack
         }}
-      />
+      /> */}
       <Tabs.Screen
         name="inbox"
         options={{
@@ -92,7 +92,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
+     {/*  <Tabs.Screen
         name="buy-credits"
         options={{
           href: null, // Hide from tab bar
@@ -181,7 +181,7 @@ export default function TabLayout() {
         options={{
           href: null, // Hide from tab bar - this is for the nested stack
         }}
-      />
+      />  */}
     </Tabs>
   );
 }

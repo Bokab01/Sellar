@@ -264,7 +264,7 @@ export default function EditProfileScreen() {
                 description={`${profile.verification_level || 'none'} verification`}
                 leftIcon={<Shield size={20} color={theme.colors.text.primary} />}
                 badge={getVerificationBadge()}
-                onPress={() => router.push('/(tabs)/verification')}
+                onPress={() => router.push('/verification')}
                 showChevron
                 style={{ borderTopWidth: 1, borderTopColor: theme.colors.border }}
               />

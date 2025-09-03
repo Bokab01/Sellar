@@ -592,7 +592,7 @@ export default function CreateListingScreen() {
           { text: 'Cancel', style: 'cancel' },
           { text: 'Buy Credits', onPress: () => {
             try {
-              router.push('/(tabs)/buy-credits');
+              router.push('/buy-credits');
             } catch (e) {
               console.log('Navigation error:', e);
             }
@@ -1254,7 +1254,7 @@ export default function CreateListingScreen() {
                   onPress: () => {
           setShowPaymentModal(false);
           try {
-            router.push('/(tabs)/buy-credits');
+            router.push('/buy-credits');
           } catch (e) {
             console.log('Navigation error:', e);
           }

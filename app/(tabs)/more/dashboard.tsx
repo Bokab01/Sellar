@@ -292,7 +292,7 @@ export default function BusinessDashboardScreen() {
 
             <Button
               variant="primary"
-              onPress={() => router.push('/(tabs)/subscription-plans')}
+              onPress={() => router.push('/subscription-plans')}
               style={{ 
                 marginTop: theme.spacing.xl,
                 width: '100%',
@@ -491,13 +491,7 @@ export default function BusinessDashboardScreen() {
 
   return (
     <SafeAreaWrapper>
-      <AppHeader
-        title="Business Dashboard"
-        showBackButton
-        onBackPress={() => router.back()}
-      />
-
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, marginTop: theme.spacing.md }}>
         {renderTabBar()}
         
         <ScrollView

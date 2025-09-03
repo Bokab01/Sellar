@@ -226,11 +226,6 @@ export default function WalletScreen() {
   if (loading) {
     return (
       <SafeAreaWrapper>
-        <AppHeader
-          title="Wallet"
-          showBackButton
-          onBackPress={() => router.back()}
-        />
         <ScrollView contentContainerStyle={{ padding: theme.spacing.lg }}>
           <LoadingSkeleton width="100%" height={150} borderRadius={theme.borderRadius.lg} style={{ marginBottom: theme.spacing.xl }} />
           <LoadingSkeleton width="100%" height={200} borderRadius={theme.borderRadius.lg} style={{ marginBottom: theme.spacing.lg }} />
@@ -249,19 +244,6 @@ export default function WalletScreen() {
 
   return (
     <SafeAreaWrapper>
-      <AppHeader
-        title="Wallet & Credit"
-        showBackButton
-        onBackPress={() => router.back()}
-        rightActions={[
-          <Button
-            variant="icon"
-            icon={<History size={20} color={theme.colors.text.primary} />}
-            onPress={() => router.push('/(tabs)/transactions')}
-          />,
-        ]}
-      />
-
       <ScrollView 
         contentContainerStyle={{ paddingBottom: theme.spacing.xl }}
         refreshControl={
@@ -274,6 +256,11 @@ export default function WalletScreen() {
       >
         <Container>
           {/* Balance Card */}
+           <Button
+            variant="icon"
+            icon={<History size={20} color={theme.colors.text.primary} />}
+            onPress={() => router.push('/transactions')}
+          />
           <View
             style={{
               backgroundColor: theme.colors.primary,

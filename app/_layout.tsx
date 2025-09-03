@@ -75,8 +75,25 @@ export default function RootLayout() {
     <ThemeProvider>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="profile/[id]"  />
+        <Stack.Screen name="buy-credits"  />
+        <Stack.Screen name="edit-profile"  />
+        <Stack.Screen name="feature-marketplace"  />
+        <Stack.Screen name="help"  />
+        <Stack.Screen name="invite"  />
+        <Stack.Screen name="knowledge-base"  />
+        <Stack.Screen name="my-listings"  />
+        <Stack.Screen name="notification-settings"  />
+        <Stack.Screen name="notifications"  />
+        <Stack.Screen name="paystack-diagnostics" />
+        <Stack.Screen name="search"  />
+        <Stack.Screen name="subscription-plans"  />
+        <Stack.Screen name="support-tickets"  />
+        <Stack.Screen name="favorites"  />
+        <Stack.Screen name="reviews"  />
+        <Stack.Screen name="transactions"  />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />

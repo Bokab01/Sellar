@@ -168,11 +168,6 @@ export default function SettingsScreen() {
   if (loading) {
     return (
       <SafeAreaWrapper>
-        <AppHeader
-          title="Settings"
-          showBackButton
-          onBackPress={() => router.back()}
-        />
         <ScrollView contentContainerStyle={{ padding: theme.spacing.lg }}>
           {Array.from({ length: 6 }).map((_, index) => (
             <LoadingSkeleton key={index} width="100%" height={200} borderRadius={theme.borderRadius.lg} style={{ marginBottom: theme.spacing.lg }} />
@@ -380,12 +375,6 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaWrapper>
-      <AppHeader
-        title="Settings"
-        showBackButton
-        onBackPress={() => router.back()}
-      />
-
       <ScrollView 
         contentContainerStyle={{ paddingBottom: theme.spacing.xl }}
         refreshControl={

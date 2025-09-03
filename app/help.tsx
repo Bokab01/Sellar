@@ -128,7 +128,7 @@ export default function HelpScreen() {
             'Get fast-track support with WhatsApp Business access and 2-hour response guarantee.',
             [
               { text: 'Cancel', style: 'cancel' },
-              { text: 'Upgrade', onPress: () => router.push('/(tabs)/subscription-plans') },
+              { text: 'Upgrade', onPress: () => router.push('/subscription-plans') },
             ]
           );
         }
@@ -138,13 +138,13 @@ export default function HelpScreen() {
       title: 'Support Tickets',
       subtitle: 'Create and track support requests',
       icon: <MessageCircle size={20} color={theme.colors.text.primary} />,
-      onPress: () => router.push('/(tabs)/support-tickets'),
+      onPress: () => router.push('/support-tickets'),
     },
     {
       title: 'Knowledge Base',
       subtitle: 'Browse help articles and guides',
       icon: <FileText size={20} color={theme.colors.text.primary} />,
-      onPress: () => router.push('/(tabs)/knowledge-base'),
+      onPress: () => router.push('/knowledge-base'),
     },
     {
       title: 'Community Help',
