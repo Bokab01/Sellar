@@ -75,7 +75,7 @@ export function SplashScreenManager({ isAppReady, onAnimationComplete }: SplashS
     ? require('../../assets/splashscreen/splashscreen-dark.png')
     : require('../../assets/splashscreen/splashscreen-light.png');
 
-  const backgroundColor = isDarkMode ? '#000000' : '#ffffff';
+  const backgroundColor = isDarkMode ? theme.colors.background : theme.colors.background;
 
   // Early return for app not ready
   if (!isAppReady) {

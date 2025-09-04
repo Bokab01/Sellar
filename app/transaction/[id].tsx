@@ -424,7 +424,7 @@ export default function TransactionDetailsScreen() {
               variant="primary"
               size="lg"
               onPress={handleShare}
-              icon={<Share2 size={20} color={theme.colors.white} />}
+              icon={<Share2 size={20} color={theme.colors.primaryForeground} />}
               style={{ flex: 1 }}
             >
               Share Details

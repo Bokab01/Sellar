@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, ScrollView, RefreshControl } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
 import {
@@ -36,6 +37,7 @@ interface MyPost {
 export default function MyPostsScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
+  const { profile } = useProfile();
   const [posts, setPosts] = useState<MyPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -107,19 +109,30 @@ export default function MyPostsScreen() {
   //     }
   //   };
 
-  // Transform posts to PostCard format
+  // Transform posts to PostCard format with enhanced features
   const transformedPosts = posts.map((post) => ({
     id: post.id,
+    type: (post as any).type || (post.listing ? 'listing' : 'general'), // Determine post type
     author: {
       id: user?.id || '',
-      name: `${user?.user_metadata?.first_name || 'User'} ${user?.user_metadata?.last_name || ''}`,
-      avatar: user?.user_metadata?.avatar_url,
-      rating: 0,
-      isVerified: false,
-      profile: {
+      name: profile?.full_name || `${user?.user_metadata?.first_name || 'User'} ${user?.user_metadata?.last_name || ''}`,
+      avatar: profile?.avatar_url || user?.user_metadata?.avatar_url,
+      rating: (profile as any)?.rating_average || 0, // Use actual rating_average from profile
+      reviewCount: (profile as any)?.rating_count || (profile as any)?.total_reviews || 0, // Use actual review count
+      isVerified: profile?.is_verified || false,
+      location: profile?.location, // Use actual location from profile
+      profile: profile ? {
+        id: profile.id,
+        full_name: profile.full_name,
+        is_business: profile.is_business || false,
+        business_name: profile.business_name,
+        display_business_name: profile.display_business_name,
+        business_name_priority: profile.business_name_priority,
+        verification_level: profile.verification_level,
+      } : {
         id: user?.id || '',
         full_name: `${user?.user_metadata?.first_name || 'User'} ${user?.user_metadata?.last_name || ''}`,
-        is_business: false, // For now, assume user posts are not business posts
+        is_business: false,
         business_name: null,
         display_business_name: false,
         business_name_priority: 'hidden',

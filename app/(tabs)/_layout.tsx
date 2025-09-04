@@ -10,6 +10,8 @@ export default function TabLayout() {
   // Memoize screen options to prevent unnecessary re-renders
   const screenOptions = useMemo(() => ({
     headerShown: false,
+    // Add consistent background to prevent flashing
+    sceneContainerStyle: { backgroundColor: theme.colors.background },
     tabBarStyle: {
       backgroundColor: theme.colors.surface,
       borderTopColor: theme.colors.border,
@@ -17,6 +19,9 @@ export default function TabLayout() {
       paddingBottom: 8,
       paddingTop: 8,
       height: 70,
+      // Prevent tab bar flashing
+      elevation: 0,
+      shadowOpacity: 0,
     },
     tabBarActiveTintColor: theme.colors.primary,
     tabBarInactiveTintColor: theme.colors.text.muted,
@@ -25,6 +30,9 @@ export default function TabLayout() {
       fontWeight: '500' as const,
       marginTop: 4,
     },
+    // Optimize animations
+    animationEnabled: true,
+    animationTypeForReplace: 'push',
   }), [theme]);
 
   return (

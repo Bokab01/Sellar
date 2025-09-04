@@ -66,12 +66,52 @@ export function validateEmail(email: string): ValidationResult {
     return { isValid: false, error: 'Email domain is too long' };
   }
 
-  // Check for valid TLD
+  // Check for valid TLD and domain structure
   const domainParts = domainPart.split('.');
   const tld = domainParts[domainParts.length - 1];
   
   if (tld.length < 2) {
     return { isValid: false, error: 'Please enter a valid email domain' };
+  }
+
+  // Validate TLD contains only letters (no numbers in TLD)
+  if (!/^[a-zA-Z]+$/.test(tld)) {
+    return { isValid: false, error: 'Please enter a valid email domain' };
+  }
+
+  // Check for valid domain structure (must have at least domain.tld)
+  if (domainParts.length < 2) {
+    return { isValid: false, error: 'Please enter a valid email domain' };
+  }
+
+  // Validate each domain part
+  for (const part of domainParts) {
+    if (part.length === 0) {
+      return { isValid: false, error: 'Please enter a valid email domain' };
+    }
+    
+    // Domain parts should not start or end with hyphen
+    if (part.startsWith('-') || part.endsWith('-')) {
+      return { isValid: false, error: 'Please enter a valid email domain' };
+    }
+    
+    // Domain parts should contain only letters, numbers, and hyphens
+    if (!/^[a-zA-Z0-9-]+$/.test(part)) {
+      return { isValid: false, error: 'Please enter a valid email domain' };
+    }
+  }
+
+  // Check against list of known valid TLDs (common ones)
+  const validTLDs = [
+    'com', 'org', 'net', 'edu', 'gov', 'mil', 'int', 'co', 'io', 'me', 'tv', 'info', 'biz',
+    'name', 'pro', 'aero', 'asia', 'cat', 'coop', 'jobs', 'mobi', 'museum', 'tel', 'travel',
+    // Country codes
+    'us', 'uk', 'ca', 'au', 'de', 'fr', 'jp', 'cn', 'in', 'br', 'ru', 'it', 'es', 'nl', 'gh',
+    'ng', 'za', 'ke', 'eg', 'ma', 'tz', 'ug', 'zw', 'mw', 'zm', 'bw', 'sz', 'ls', 'na', 'ao'
+  ];
+
+  if (!validTLDs.includes(tld.toLowerCase())) {
+    return { isValid: false, error: 'Please enter a valid email domain (e.g., gmail.com, yahoo.com)' };
   }
 
   // Check for common typos in popular domains
@@ -91,12 +131,35 @@ export function validateEmail(email: string): ValidationResult {
     }
   }
 
-  // Check for suspicious patterns
+  // Check for suspicious patterns and common fake domains
   if (domainPart.endsWith('.como') || domainPart.endsWith('.con')) {
     const suggestedDomain = domainPart.replace(/\.(como|con)$/, '.com');
     return { 
       isValid: false, 
       error: `Did you mean ${localPart}@${suggestedDomain}?` 
+    };
+  }
+
+  // Check for obviously fake or test domains
+  const suspiciousDomains = [
+    'example.com', 'test.com', 'fake.com', 'invalid.com', 'dummy.com',
+    'sample.com', 'demo.com', 'temp.com', 'temporary.com', 'placeholder.com',
+    'grail.com', 'fake.org', 'test.org', 'example.org', 'invalid.org'
+  ];
+
+  if (suspiciousDomains.includes(domainPart.toLowerCase())) {
+    return { 
+      isValid: false, 
+      error: 'Please enter a real email address' 
+    };
+  }
+
+  // Additional validation for single-word domains (often fake)
+  const domainName = domainParts[domainParts.length - 2]; // Get the main domain part
+  if (domainName && domainName.length < 3) {
+    return { 
+      isValid: false, 
+      error: 'Please enter a valid email domain' 
     };
   }
 

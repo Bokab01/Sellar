@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 import { Theme } from './types';
 import { lightTheme, darkTheme } from './themes';
+import { ThemeStorage } from './ThemeStorage';
 
 interface ThemeContextType {
   theme: Theme;
@@ -9,6 +10,7 @@ interface ThemeContextType {
   toggleTheme: () => void;
   setThemeMode: (mode: 'light' | 'dark' | 'system') => void;
   themeMode: 'light' | 'dark' | 'system';
+  isThemeReady: boolean;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -19,9 +21,36 @@ interface ThemeProviderProps {
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
   const systemColorScheme = useColorScheme();
-  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system');
-
   
+  // Initialize with cached theme for immediate availability
+  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>(() => {
+    return ThemeStorage.getThemeSync();
+  });
+  
+  const [isThemeReady, setIsThemeReady] = useState(() => {
+    return ThemeStorage.isReady();
+  });
+
+  // Initialize theme storage if not already ready
+  useEffect(() => {
+    if (!ThemeStorage.isReady()) {
+      ThemeStorage.initialize().then(() => {
+        const cachedTheme = ThemeStorage.getThemeSync();
+        setThemeMode(cachedTheme);
+        setIsThemeReady(true);
+      });
+    } else {
+      setIsThemeReady(true);
+    }
+  }, []);
+
+  // Save theme preference when it changes
+  useEffect(() => {
+    if (isThemeReady) {
+      ThemeStorage.saveTheme(themeMode);
+    }
+  }, [themeMode, isThemeReady]);
+
   const isDarkMode = themeMode === 'system' 
     ? systemColorScheme === 'dark'
     : themeMode === 'dark';
@@ -36,13 +65,21 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     });
   }, []);
 
+  const handleSetThemeMode = useCallback((mode: 'light' | 'dark' | 'system') => {
+    setThemeMode(mode);
+  }, []);
+
   const value: ThemeContextType = useMemo(() => ({
     theme,
     isDarkMode,
     toggleTheme,
-    setThemeMode,
+    setThemeMode: handleSetThemeMode,
     themeMode,
-  }), [theme, isDarkMode, toggleTheme, themeMode]); // Remove setThemeMode from dependencies as it's a state setter
+    isThemeReady,
+  }), [theme, isDarkMode, toggleTheme, handleSetThemeMode, themeMode, isThemeReady]);
+
+  // Render immediately with cached theme to prevent flashing
+  // The theme will update when storage is ready if needed
 
   return (
     <ThemeContext.Provider value={value}>

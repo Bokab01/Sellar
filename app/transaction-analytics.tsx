@@ -424,7 +424,7 @@ export default function TransactionAnalyticsScreen() {
               variant="primary"
               size="lg"
               onPress={() => router.push('/transactions')}
-              icon={<BarChart3 size={20} color={theme.colors.white} />}
+              icon={<BarChart3 size={20} color={theme.colors.primaryForeground} />}
               style={{ flex: 1 }}
             >
               View All Transactions

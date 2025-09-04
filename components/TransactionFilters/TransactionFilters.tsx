@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, ScrollView } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { Text, Button, Input, Modal } from '@/components';
+import { Text, Button, Input, AppModal } from '@/components';
 import { Filter, Calendar, Search, X } from 'lucide-react-native';
 import { TransactionType, TransactionStatus } from '@/hooks/useTransactions';
 import { useTransactionCategories } from '@/hooks/useTransactions';
@@ -11,7 +11,7 @@ import {
   getDateRangePresets 
 } from '@/lib/transactionService';
 
-export interface TransactionFilters {
+export interface TransactionFiltersState {
   type?: TransactionType;
   status?: TransactionStatus;
   category?: string;
@@ -23,8 +23,8 @@ export interface TransactionFilters {
 }
 
 interface TransactionFiltersProps {
-  filters: TransactionFilters;
-  onFiltersChange: (filters: TransactionFilters) => void;
+  filters: TransactionFiltersState;
+  onFiltersChange: (filters: TransactionFiltersState) => void;
   onClearFilters: () => void;
 }
 
@@ -36,7 +36,7 @@ export function TransactionFilters({
   const { theme } = useTheme();
   const { categories } = useTransactionCategories();
   const [showFilters, setShowFilters] = useState(false);
-  const [tempFilters, setTempFilters] = useState<TransactionFilters>(filters);
+  const [tempFilters, setTempFilters] = useState<TransactionFiltersState>(filters);
 
   const transactionTypes: TransactionType[] = [
     'credit_purchase',
@@ -63,8 +63,8 @@ export function TransactionFilters({
 
   const hasActiveFilters = () => {
     return Object.keys(filters).some(key => 
-      filters[key as keyof TransactionFilters] !== undefined && 
-      filters[key as keyof TransactionFilters] !== ''
+      filters[key as keyof TransactionFiltersState] !== undefined && 
+      filters[key as keyof TransactionFiltersState] !== ''
     );
   };
 
@@ -113,7 +113,7 @@ export function TransactionFilters({
           variant={hasActiveFilters() ? 'primary' : 'tertiary'}
           size="md"
           onPress={() => setShowFilters(true)}
-          icon={<Filter size={20} color={hasActiveFilters() ? theme.colors.white : theme.colors.text.primary} />}
+          icon={<Filter size={20} color={hasActiveFilters() ? theme.colors.primaryForeground : theme.colors.text.primary} />}
         >
           {hasActiveFilters() ? 'Filtered' : 'Filter'}
         </Button>
@@ -193,7 +193,7 @@ export function TransactionFilters({
       )}
 
       {/* Filter Modal */}
-      <Modal
+      <AppModal
         visible={showFilters}
         onClose={() => setShowFilters(false)}
         title="Filter Transactions"
@@ -374,7 +374,7 @@ export function TransactionFilters({
             Apply Filters
           </Button>
         </View>
-      </Modal>
+      </AppModal>
     </View>
   );
 }

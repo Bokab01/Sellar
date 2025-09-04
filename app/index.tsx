@@ -22,12 +22,11 @@ export default function IndexScreen() {
   // Show loading state while checking authentication
   if (loading || !isReady) {
     return (
-      <SafeAreaWrapper>
+      <SafeAreaWrapper backgroundColor={theme.colors.background}>
         <View style={{ 
           flex: 1, 
           justifyContent: 'center', 
           alignItems: 'center',
-          backgroundColor: theme.colors.background 
         }}>
           <Text variant="body">Loading...</Text>
         </View>

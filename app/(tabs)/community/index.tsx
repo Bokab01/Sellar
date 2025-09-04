@@ -26,16 +26,41 @@ export default function CommunityScreen() {
   const { profile } = useProfile();
   const { posts, loading, error, refreshing, refresh } = useCommunityPosts();
   const [sidebarVisible, setSidebarVisible] = useState(false);
+  const [followingStates, setFollowingStates] = useState<Record<string, boolean>>({});
 
-  // Transform database posts to component format
+  // Handle follow/unfollow functionality
+  const handleFollow = async (userId: string) => {
+    try {
+      // TODO: Implement actual follow API call
+      setFollowingStates(prev => ({ ...prev, [userId]: true }));
+      console.log('Following user:', userId);
+    } catch (error) {
+      console.error('Error following user:', error);
+    }
+  };
+
+  const handleUnfollow = async (userId: string) => {
+    try {
+      // TODO: Implement actual unfollow API call
+      setFollowingStates(prev => ({ ...prev, [userId]: false }));
+      console.log('Unfollowed user:', userId);
+    } catch (error) {
+      console.error('Error unfollowing user:', error);
+    }
+  };
+
+  // Transform database posts to component format with enhanced features
   const transformedPosts = posts.map((post: any) => ({
     id: post.id,
+    type: post.type || (post.listings ? 'listing' : 'general'), // Determine post type
     author: {
       id: post.profiles?.id,
       name: `${post.profiles?.first_name || 'User'} ${post.profiles?.last_name || ''}`,
       avatar: post.profiles?.avatar_url,
-      rating: post.profiles?.rating || 0,
+      rating: post.profiles?.rating_average || 0, // Use actual rating_average from database
+      reviewCount: post.profiles?.rating_count || post.profiles?.total_reviews || 0, // Use actual review count
       isVerified: post.profiles?.is_verified,
+      location: post.profiles?.location, // Use actual location from database
       profile: post.profiles, // Add the full profile object for UserDisplayName
     },
     timestamp: new Date(post.created_at).toLocaleString(),
@@ -122,7 +147,7 @@ export default function CommunityScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
                 <Avatar 
                   source={profile?.avatar_url || user?.user_metadata?.avatar_url}
-                  name={`${profile?.first_name || user?.user_metadata?.first_name || 'User'} ${profile?.last_name || user?.user_metadata?.last_name || ''}`}
+                  name={profile?.full_name || `${user?.user_metadata?.first_name || 'User'} ${user?.user_metadata?.last_name || ''}`}
                   size="sm" 
                 />
                 <Text variant="body" color="muted" style={{ flex: 1 }}>
@@ -158,9 +183,22 @@ export default function CommunityScreen() {
               <PostCard 
                 key={post.id} 
                 post={post}
-                onLike={() => {}}
+                isFollowing={followingStates[post.author.id] || false}
+                onLike={() => {
+                  console.log('Liked post:', post.id);
+                  // TODO: Implement like functionality
+                }}
                 onComment={() => router.push(`/(tabs)/community/${post.id}`)}
-                onShare={() => {}}
+                onShare={() => {
+                  console.log('Shared post:', post.id);
+                  // TODO: Implement share functionality
+                }}
+                onFollow={() => handleFollow(post.author.id)}
+                onUnfollow={() => handleUnfollow(post.author.id)}
+                onReport={() => {
+                  console.log('Reported post:', post.id);
+                  // TODO: Implement report functionality
+                }}
               />
             ))}
           </ScrollView>

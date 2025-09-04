@@ -29,9 +29,13 @@ export const dbHelpers = {
         id: userId,
         first_name: userData.firstName,
         last_name: userData.lastName,
-        full_name: `${userData.firstName} ${userData.lastName}`.trim(), // Add full_name field
+        full_name: `${userData.firstName} ${userData.lastName}`.trim(),
         phone: userData.phone || null,
         location: userData.location || 'Accra, Greater Accra',
+        bio: null,
+        // Only include fields that exist in the current schema
+        is_verified: false,
+        is_business: false,
       })
       .select()
       .single();
@@ -337,7 +341,10 @@ export const dbHelpers = {
           last_name,
           full_name,
           avatar_url,
-          rating,
+          rating_average,
+          rating_count,
+          total_reviews,
+          location,
           is_verified,
           is_business,
           business_name,

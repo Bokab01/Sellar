@@ -53,7 +53,7 @@ export {
   CompactTransactionCard, 
   TransactionListItem 
 } from './TransactionCard/TransactionCard';
-export { TransactionFilters } from './TransactionFilters/TransactionFilters';
+export { TransactionFilters, TransactionFiltersState } from './TransactionFilters/TransactionFilters';
 
 // Rewards System Components
 export { RewardNotification, CompactRewardNotification } from './RewardNotification/RewardNotification';

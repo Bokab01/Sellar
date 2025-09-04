@@ -6,7 +6,7 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 import { IntegrationStatus } from '@/components/IntegrationStatus/IntegrationStatus';
-import { ThemeProvider } from '@/theme/ThemeProvider';
+import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 import { RewardsProvider } from '@/components/RewardsProvider/RewardsProvider';
 import { SplashScreenManager, useSplashScreen } from '@/components/SplashScreen';
 import { useEffect } from 'react';
@@ -14,7 +14,10 @@ import { securityService } from '@/lib/securityService';
 import { offlineStorage } from '@/lib/offlineStorage';
 import { memoryManager } from '@/utils/memoryManager';
 
-export default function RootLayout() {
+// App content component that uses theme context
+function AppContent() {
+  const { theme, isDarkMode } = useTheme();
+  
   useFrameworkReady();
   usePushNotifications();
   
@@ -79,45 +82,64 @@ export default function RootLayout() {
   }, [startTimer, endTimer]);
 
   return (
+    <RewardsProvider>
+      <Stack 
+        screenOptions={{ 
+          headerShown: false,
+          // Add consistent background color to prevent flashing
+          contentStyle: { backgroundColor: theme.colors.background },
+          // Optimize animations for smoother transitions
+          animation: 'slide_from_right',
+          animationDuration: 200,
+        }}
+      >
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="profile/[id]"  />
+        <Stack.Screen name="buy-credits"  />
+        <Stack.Screen name="edit-profile"  />
+        <Stack.Screen name="feature-marketplace"  />
+        <Stack.Screen name="help"  />
+        <Stack.Screen name="invite"  />
+        <Stack.Screen name="knowledge-base"  />
+        <Stack.Screen name="my-listings"  />
+        <Stack.Screen name="my-rewards"  />
+        <Stack.Screen name="notification-settings"  />
+        <Stack.Screen name="notifications"  />
+        <Stack.Screen name="paystack-diagnostics" />
+        <Stack.Screen name="search"  />
+        <Stack.Screen name="subscription-plans"  />
+        <Stack.Screen name="support-tickets"  />
+        <Stack.Screen name="favorites"  />
+        <Stack.Screen name="reviews"  />
+        <Stack.Screen name="transactions"  />
+        <Stack.Screen name="+not-found" />
+      </Stack>
+      <StatusBar 
+        style={isDarkMode ? 'light' : 'dark'} 
+        backgroundColor={theme.colors.background}
+        translucent={false}
+      />
+      
+      {/* Development Integration Status - Temporarily disabled */}
+      {/* <IntegrationStatus visible={__DEV__} position="top-right" /> */}
+      
+      {/* Professional Splash Screen with Dark Mode Support */}
+      {showCustomSplash && (
+        <SplashScreenManager
+          isAppReady={isAppReady}
+          onAnimationComplete={handleAnimationComplete}
+        />
+      )}
+    </RewardsProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
     <ThemeProvider>
-      <RewardsProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="profile/[id]"  />
-          <Stack.Screen name="buy-credits"  />
-          <Stack.Screen name="edit-profile"  />
-          <Stack.Screen name="feature-marketplace"  />
-          <Stack.Screen name="help"  />
-          <Stack.Screen name="invite"  />
-          <Stack.Screen name="knowledge-base"  />
-          <Stack.Screen name="my-listings"  />
-          <Stack.Screen name="my-rewards"  />
-          <Stack.Screen name="notification-settings"  />
-          <Stack.Screen name="notifications"  />
-          <Stack.Screen name="paystack-diagnostics" />
-          <Stack.Screen name="search"  />
-          <Stack.Screen name="subscription-plans"  />
-          <Stack.Screen name="support-tickets"  />
-          <Stack.Screen name="favorites"  />
-          <Stack.Screen name="reviews"  />
-          <Stack.Screen name="transactions"  />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style="auto" />
-        
-        {/* Development Integration Status - Temporarily disabled */}
-        {/* <IntegrationStatus visible={__DEV__} position="top-right" /> */}
-        
-        {/* Professional Splash Screen with Dark Mode Support */}
-        {showCustomSplash && (
-          <SplashScreenManager
-            isAppReady={isAppReady}
-            onAnimationComplete={handleAnimationComplete}
-          />
-        )}
-      </RewardsProvider>
+      <AppContent />
     </ThemeProvider>
   );
 }

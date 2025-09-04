@@ -74,7 +74,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           return { error: 'Password must be at least 6 characters long' };
         }
         
-        if (error.message.includes('database')) {
+        if (error.message.includes('database') || error.message.includes('Database error saving new user')) {
           return { error: 'Database error saving new user. Please try again.' };
         }
         
@@ -89,20 +89,95 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Wait a moment for the trigger to execute, then check if profile was created
       setTimeout(async () => {
         try {
+          // First, ensure we have a valid session
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+            console.log('No session found, profile creation will be handled later');
+            return;
+          }
+
           const { data: profile, error: profileError } = await dbHelpers.getProfile(data.user!.id);
           
           if (profileError || !profile) {
             console.log('Profile not found, creating manually...');
-            // If profile wasn't created by trigger, create it manually
-            const { error: createError } = await dbHelpers.createProfile(data.user!.id, userData);
-            if (createError) {
-              console.error('Failed to create profile manually:', createError);
+            
+            // Try multiple fallback strategies with proper authentication context
+            const fallbackStrategies = [
+              // Strategy 1: Use our helper function (should work with RLS)
+              async () => {
+                const { error } = await dbHelpers.createProfile(data.user!.id, userData);
+                if (error) throw error;
+                return 'helper';
+              },
+              
+              // Strategy 2: Use authenticated supabase client for basic profile
+              async () => {
+                const { error } = await supabase
+                  .from('profiles')
+                  .insert({
+                    id: data.user!.id,
+                    first_name: userData.firstName,
+                    last_name: userData.lastName,
+                    full_name: `${userData.firstName} ${userData.lastName}`.trim(),
+                    phone: userData.phone || null,
+                    location: userData.location || 'Accra, Greater Accra',
+                  });
+                if (error) throw error;
+                return 'basic';
+              },
+              
+              // Strategy 3: Minimal profile with just essential fields
+              async () => {
+                const { error } = await supabase
+                  .from('profiles')
+                  .insert({
+                    id: data.user!.id,
+                    first_name: userData.firstName,
+                    last_name: userData.lastName,
+                  });
+                if (error) throw error;
+                return 'minimal';
+              },
+              
+              // Strategy 4: Just the ID (should always work with proper RLS)
+              async () => {
+                const { error } = await supabase
+                  .from('profiles')
+                  .insert({ id: data.user!.id });
+                if (error) throw error;
+                return 'id-only';
+              }
+            ];
+            
+            let profileCreated = false;
+            for (const [index, strategy] of fallbackStrategies.entries()) {
+              try {
+                const result = await strategy();
+                console.log(`✅ Profile created successfully using strategy ${index + 1} (${result})`);
+                profileCreated = true;
+                break;
+              } catch (error) {
+                console.error(`❌ Strategy ${index + 1} failed:`, error);
+                
+                // If it's an RLS error, provide more context
+                if (error && typeof error === 'object' && 'code' in error && error.code === '42501') {
+                  console.error('RLS Policy Error: The database security policy is preventing profile creation.');
+                  console.error('This usually means the RLS policies need to be updated.');
+                }
+              }
             }
+            
+            if (!profileCreated) {
+              console.error('❌ All profile creation strategies failed - user signup completed but profile creation failed');
+              console.error('The user account was created successfully, but the profile will need to be created later');
+            }
+          } else {
+            console.log('✅ Profile found successfully');
           }
         } catch (error) {
-          console.error('Error checking/creating profile:', error);
+          console.error('Error in profile creation process:', error);
         }
-      }, 1000);
+      }, 3000); // Increased timeout to ensure session is established
 
       return {};
     } catch (error: any) {

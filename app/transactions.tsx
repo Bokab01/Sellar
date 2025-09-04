@@ -12,7 +12,7 @@ import {
   Button,
 } from '@/components';
 import { TransactionCard } from '@/components/TransactionCard/TransactionCard';
-import { TransactionFilters, TransactionFilters as FilterComponent } from '@/components/TransactionFilters/TransactionFilters';
+import { TransactionFiltersState, TransactionFilters as FilterComponent } from '@/components/TransactionFilters/TransactionFilters';
 import { 
   useTransactions, 
   useTransactionSummary,
@@ -39,7 +39,7 @@ import {
 
 export default function TransactionsScreen() {
   const { theme } = useTheme();
-  const [filters, setFilters] = useState<TransactionFilters>({});
+  const [filters, setFilters] = useState<TransactionFiltersState>({});
   const [refreshing, setRefreshing] = useState(false);
 
   const { transactions, loading, error, refetch } = useTransactions();
@@ -207,7 +207,7 @@ export default function TransactionsScreen() {
             variant="primary"
             size="md"
             onPress={() => router.push('/buy-credits')}
-            icon={<Plus size={20} color={theme.colors.white} />}
+            icon={<Plus size={20} color={theme.colors.primaryForeground} />}
             style={{ flex: 1 }}
           >
             Buy Credits
@@ -326,24 +326,13 @@ export default function TransactionsScreen() {
                   : "You haven't made any transactions yet. Start by purchasing credits or making your first listing."
               }
               action={
-                Object.keys(filters).length > 0 ? (
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    onPress={clearFilters}
-                  >
-                    Clear Filters
-                  </Button>
-                ) : (
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    onPress={() => router.push('/buy-credits')}
-                    icon={<CreditCard size={20} color={theme.colors.white} />}
-                  >
-                    Buy Credits
-                  </Button>
-                )
+                Object.keys(filters).length > 0 ? {
+                  text: "Clear Filters",
+                  onPress: clearFilters
+                } : {
+                  text: "Buy Credits",
+                  onPress: () => router.push('/buy-credits')
+                }
               }
             />
           ) : (

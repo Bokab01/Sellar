@@ -48,6 +48,8 @@ export function SafeAreaWrapper({
     return { 
       flex: 1, 
       backgroundColor: bgColor,
+      // Ensure consistent background during transitions
+      opacity: 1,
       ...getPlatformPadding(),
     };
   }, [theme, backgroundColor, edges, includePlatformPadding]);
