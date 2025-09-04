@@ -44,7 +44,26 @@ import {
 export default function MoreScreen() {
   const { theme } = useTheme();
   const { user, signOut } = useAuthStore();
-  const { balance, currentPlan, refreshCredits, refreshSubscription, hasBusinessPlan } = useMonetizationStore();
+  // Use selective subscriptions to prevent unnecessary re-renders
+  const balance = useMonetizationStore(state => state.balance);
+  const currentPlan = useMonetizationStore(state => state.currentPlan);
+  const refreshCredits = useMonetizationStore(state => state.refreshCredits);
+  const refreshSubscription = useMonetizationStore(state => state.refreshSubscription);
+  const hasBusinessPlan = useMonetizationStore(state => state.hasBusinessPlan);
+
+  // Debug: Track what's changing
+  const renderCount = React.useRef(0);
+  renderCount.current += 1;
+  
+  React.useEffect(() => {
+    console.log(`MoreScreen render #${renderCount.current}`, {
+      balance,
+      currentPlan: currentPlan?.id,
+      themeColors: theme.colors.primary,
+      userId: user?.id,
+    });
+  });
+
   
   const [profile, setProfile] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -56,7 +75,8 @@ export default function MoreScreen() {
   useEffect(() => {
     if (user) {
       fetchUserData();
-      refreshCredits();
+      // Don't call refreshCredits here - it causes infinite re-renders
+      // Credits should already be loaded from the store
       refreshSubscription();
     }
   }, [user]);

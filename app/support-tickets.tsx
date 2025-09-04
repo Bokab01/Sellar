@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, ScrollView, RefreshControl } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { router } from 'expo-router';
@@ -22,21 +22,47 @@ export default function SupportTicketsScreen() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const handleRefresh = async () => {
+
+  // Memoize callback functions to prevent re-renders
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await refetch();
     setRefreshing(false);
-  };
+  }, [refetch]);
 
-  const handleTicketPress = (ticketId: string) => {
+  const handleTicketPress = useCallback((ticketId: string) => {
     // Navigate to ticket details - route will be created later
     console.log('Navigate to ticket:', ticketId);
-  };
+  }, []);
 
-  const handleTicketCreated = () => {
+  const handleTicketCreated = useCallback(() => {
     setShowCreateModal(false);
     refetch();
-  };
+  }, [refetch]);
+
+  // Memoize styles to prevent re-renders
+  const styles = useMemo(() => ({
+    loadingContainer: { gap: theme.spacing.md },
+    scrollContentContainer: { paddingBottom: theme.spacing.xl },
+    headerButton: { paddingHorizontal: theme.spacing.md },
+    headerActions: {
+      flexDirection: 'row' as const,
+      justifyContent: 'space-between' as const,
+      alignItems: 'center' as const,
+      marginBottom: theme.spacing.xl,
+    },
+    sectionTitle: { marginBottom: theme.spacing.xs },
+    newTicketButton: { paddingHorizontal: theme.spacing.lg },
+    errorContainer: {
+      backgroundColor: theme.colors.error + '10',
+      borderColor: theme.colors.error + '30',
+      borderWidth: 1,
+      borderRadius: theme.borderRadius.md,
+      padding: theme.spacing.md,
+      marginBottom: theme.spacing.lg,
+    },
+    ticketsContainer: { gap: theme.spacing.md },
+  }), [theme]);
 
   if (loading && tickets.length === 0) {
     return (
@@ -47,7 +73,7 @@ export default function SupportTicketsScreen() {
           onBackPress={() => router.back()}
         />
         <Container>
-          <View style={{ gap: theme.spacing.md }}>
+          <View style={styles.loadingContainer}>
             <LoadingSkeleton height={120} />
             <LoadingSkeleton height={120} />
             <LoadingSkeleton height={120} />
@@ -69,9 +95,7 @@ export default function SupportTicketsScreen() {
             variant="ghost"
             size="sm"
             onPress={() => setShowCreateModal(true)}
-            style={{
-              paddingHorizontal: theme.spacing.md,
-            }}
+            style={styles.headerButton}
           >
             <Plus size={20} color={theme.colors.primary} />
           </Button>
@@ -79,21 +103,16 @@ export default function SupportTicketsScreen() {
       />
 
       <ScrollView
-        contentContainerStyle={{ paddingBottom: theme.spacing.xl }}
+        contentContainerStyle={styles.scrollContentContainer}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
         <Container>
           {/* Header Actions */}
-          <View style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: theme.spacing.xl,
-          }}>
+          <View style={styles.headerActions}>
             <View>
-              <Text variant="h2" style={{ marginBottom: theme.spacing.xs }}>
+              <Text variant="h2" style={styles.sectionTitle}>
                 Your Tickets
               </Text>
               <Text variant="body" color="secondary">
@@ -105,9 +124,7 @@ export default function SupportTicketsScreen() {
               variant="primary"
               size="md"
               onPress={() => setShowCreateModal(true)}
-              style={{
-                paddingHorizontal: theme.spacing.lg,
-              }}
+              style={styles.newTicketButton}
               icon={<Plus size={18} color={theme.colors.surface} />}
             >
               New Ticket

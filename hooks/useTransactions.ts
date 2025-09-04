@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './useAuth';
 
@@ -179,9 +179,19 @@ export function useTransactions(filters?: {
     }
   };
 
+  // Memoize filters to prevent infinite re-renders from JSON.stringify
+  const memoizedFilters = useMemo(() => filters, [
+    filters?.type,
+    filters?.status, 
+    filters?.category,
+    filters?.startDate,
+    filters?.endDate,
+    filters?.limit
+  ]);
+
   useEffect(() => {
     fetchTransactions();
-  }, [user, JSON.stringify(filters)]);
+  }, [user, memoizedFilters]);
 
   return {
     transactions,

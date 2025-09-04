@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
 import Animated, {
@@ -14,7 +14,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { Button } from '@/components/Button/Button';
 import { CompactTransactionCard } from '@/components/TransactionCard/TransactionCard';
-import { useTransactions } from '@/hooks/useTransactions';
+import { supabase } from '@/lib/supabase';
 import { Zap, Plus, Building, History, ArrowRight } from 'lucide-react-native';
 import { router } from 'expo-router';
 
@@ -38,10 +38,42 @@ export function CreditBalance({
   showRecentTransactions = true,
 }: CreditBalanceProps) {
   const { theme } = useTheme();
+
   
-  // Get recent transactions
-  const { transactions } = useTransactions({ limit: 3 });
+  
+  // Use simple state management instead of the problematic useTransactions hook
+  const [transactions, setTransactions] = React.useState<any[]>([]);
+  const [transactionsLoading, setTransactionsLoading] = React.useState(false);
   const recentTransactions = transactions.slice(0, 3);
+  
+  // Fetch transactions once when component mounts
+  React.useEffect(() => {
+    const fetchTransactions = async () => {
+      if (!showRecentTransactions) return;
+      
+      try {
+        setTransactionsLoading(true);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data, error } = await supabase
+          .from('transactions')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(3);
+
+        if (error) throw error;
+        setTransactions(data || []);
+      } catch (error) {
+        console.error('Error fetching transactions:', error);
+      } finally {
+        setTransactionsLoading(false);
+      }
+    };
+
+    fetchTransactions();
+  }, []); // Only run once on mount
   
   // Animation values
   const scaleValue = useSharedValue(0);
@@ -56,7 +88,7 @@ export function CreditBalance({
     scaleValue.value = withDelay(200, withSpring(1, { damping: 15, stiffness: 150 }));
     fadeValue.value = withDelay(100, withSpring(1, { damping: 20, stiffness: 100 }));
     progressValue.value = withDelay(400, withSpring(progressPercentage, { damping: 20, stiffness: 80 }));
-  }, [balance, progressPercentage]);
+  }, [balance]); // Remove progressPercentage from dependencies as it's derived from balance
 
   // Animated styles
   const containerAnimatedStyle = useAnimatedStyle(() => ({

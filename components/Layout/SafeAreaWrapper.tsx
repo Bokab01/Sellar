@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { SafeAreaView, View, ViewProps, Platform } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 
@@ -21,39 +21,40 @@ export function SafeAreaWrapper({
 }: SafeAreaWrapperProps) {
   const { theme } = useTheme();
 
-  const bgColor = backgroundColor || theme.colors.background;
+  const safeAreaStyle = useMemo(() => {
+    const bgColor = backgroundColor || theme.colors.background;
 
-  // Platform-specific padding values
-  const getPlatformPadding = () => {
-    if (!includePlatformPadding) return {};
-    
-    return Platform.select({
-      ios: {
-        paddingTop: edges.includes('top') ? 0 : 20, // Status bar height when not using safe area
-        paddingBottom: edges.includes('bottom') ? 0 : 34, // Home indicator area
-      },
-      android: {
-        paddingTop: edges.includes('top') ? 0 : 24, // Status bar height
-        paddingBottom: 0, // Android handles bottom automatically
-      },
-      web: {
-        paddingTop: edges.includes('top') ? 0 : 0,
-        paddingBottom: 0,
-      },
-      default: {},
-    });
-  };
+    // Platform-specific padding values
+    const getPlatformPadding = () => {
+      if (!includePlatformPadding) return {};
+      
+      return Platform.select({
+        ios: {
+          paddingTop: edges.includes('top') ? 0 : 20, // Status bar height when not using safe area
+          paddingBottom: edges.includes('bottom') ? 0 : 34, // Home indicator area
+        },
+        android: {
+          paddingTop: edges.includes('top') ? 0 : 24, // Status bar height
+          paddingBottom: 0, // Android handles bottom automatically
+        },
+        web: {
+          paddingTop: edges.includes('top') ? 0 : 0,
+          paddingBottom: 0,
+        },
+        default: {},
+      });
+    };
+
+    return { 
+      flex: 1, 
+      backgroundColor: bgColor,
+      ...getPlatformPadding(),
+    };
+  }, [theme, backgroundColor, edges, includePlatformPadding]);
 
   return (
     <SafeAreaView 
-      style={[
-        { 
-          flex: 1, 
-          backgroundColor: bgColor,
-          ...getPlatformPadding(),
-        }, 
-        style
-      ]} 
+      style={[safeAreaStyle, style]} 
       {...props}
     >
       {children}
@@ -71,42 +72,43 @@ export function SafeAreaContainer({
 }: Omit<SafeAreaWrapperProps, 'edges' | 'statusBarStyle'>) {
   const { theme } = useTheme();
 
-  const bgColor = backgroundColor || theme.colors.background;
+  const containerStyle = useMemo(() => {
+    const bgColor = backgroundColor || theme.colors.background;
 
-  // Custom safe area implementation with platform-specific values
-  const getCustomSafeAreaPadding = () => {
-    if (!includePlatformPadding) return {};
-    
-    return Platform.select({
-      ios: {
-        paddingTop: 44, // Standard iOS status bar + navigation area
-        paddingBottom: 34, // Home indicator area
-      },
-      android: {
-        paddingTop: 24, // Android status bar
-        paddingBottom: 0,
-      },
-      web: {
-        paddingTop: 0,
-        paddingBottom: 0,
-      },
-      default: {
-        paddingTop: 20,
-        paddingBottom: 0,
-      },
-    });
-  };
+    // Custom safe area implementation with platform-specific values
+    const getCustomSafeAreaPadding = () => {
+      if (!includePlatformPadding) return {};
+      
+      return Platform.select({
+        ios: {
+          paddingTop: 44, // Standard iOS status bar + navigation area
+          paddingBottom: 34, // Home indicator area
+        },
+        android: {
+          paddingTop: 24, // Android status bar
+          paddingBottom: 0,
+        },
+        web: {
+          paddingTop: 0,
+          paddingBottom: 0,
+        },
+        default: {
+          paddingTop: 20,
+          paddingBottom: 0,
+        },
+      });
+    };
+
+    return { 
+      flex: 1, 
+      backgroundColor: bgColor,
+      ...getCustomSafeAreaPadding(),
+    };
+  }, [theme, backgroundColor, includePlatformPadding]);
 
   return (
     <View 
-      style={[
-        { 
-          flex: 1, 
-          backgroundColor: bgColor,
-          ...getCustomSafeAreaPadding(),
-        }, 
-        style
-      ]} 
+      style={[containerStyle, style]} 
       {...props}
     >
       {children}

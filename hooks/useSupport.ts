@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './useAuth';
 
@@ -99,8 +99,9 @@ export function useSupportTickets() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchTickets = async () => {
-    if (!user) return;
+
+  const fetchTickets = React.useCallback(async () => {
+    if (!user?.id) return;
 
     setLoading(true);
     setError(null);
@@ -120,11 +121,11 @@ export function useSupportTickets() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]); // Only depend on user.id, not the entire user object
 
   useEffect(() => {
     fetchTickets();
-  }, [user]);
+  }, [user?.id, fetchTickets]); // Depend on user.id and fetchTickets
 
   return {
     tickets,

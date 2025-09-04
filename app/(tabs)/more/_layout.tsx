@@ -1,42 +1,61 @@
+import React, { useMemo } from 'react';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { useTheme } from '@/theme/ThemeProvider';
-import {createMaterialTopTabNavigator} from '@react-navigation/material-top-tabs';
-import { withLayoutContext } from 'expo-router';
 
-const {Navigator} = createMaterialTopTabNavigator();
-const Tabs = withLayoutContext(Navigator);
+// Import the screen components explicitly
+import MoreScreen from './index';
+import BusinessDashboardScreen from './dashboard';
+import WalletScreen from './wallet';
+import SettingsScreen from './settings';
+
+const Tab = createMaterialTopTabNavigator();
 
 export default function MoreLayout() {
+  const { theme } = useTheme();
 
-    const {theme} = useTheme()
+  // Memoize screen options to prevent unnecessary re-renders
+  const screenOptions = useMemo(() => ({
+    tabBarStyle: {
+      backgroundColor: theme.colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    tabBarActiveTintColor: theme.colors.primary,
+    tabBarInactiveTintColor: theme.colors.text.muted,
+    tabBarIndicatorStyle: {
+      backgroundColor: theme.colors.primary,
+      height: 2,
+    },
+    tabBarLabelStyle: {
+      fontSize: 12,
+      fontWeight: '500' as const,
+      textTransform: 'capitalize' as const,
+    },
+    tabBarPressColor: theme.colors.primary + '20',
+  }), [theme]);
 
   return (
-    <Tabs  screenOptions={{
-        tabBarStyle: {
-          backgroundColor: theme.colors.surface,
-          borderTopColor: theme.colors.border,
-          borderTopWidth: 1,
-          paddingBottom: 10,
-          paddingTop: 15,
-          height: 60,
-        },
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.text.muted,
-        tabBarIndicatorStyle: {
-          backgroundColor: theme.colors.primary,
-        },
-        tabBarIndicatorContainerStyle: {
-          backgroundColor: theme.colors.surface,
-        },
-        tabBarLabelStyle: {
-          fontSize: 13,
-          fontWeight: '500',
-          marginTop: 4,
-        },
-      }}>
-      <Tabs.Screen name="index" options={{title: 'Profile'}} />
-      <Tabs.Screen name="dashboard" options={{title: 'Dashboard'}}/>
-      <Tabs.Screen name="wallet" options={{title: 'Wallet'}}/>
-      <Tabs.Screen name="settings" options={{title: 'Settings'}}/>
-    </Tabs>
+    <Tab.Navigator screenOptions={screenOptions}>
+      <Tab.Screen 
+        name="Profile" 
+        component={MoreScreen}
+        options={{ title: 'Profile' }}
+      />
+      <Tab.Screen 
+        name="Dashboard" 
+        component={BusinessDashboardScreen}
+        options={{ title: 'Dashboard' }}
+      />
+      <Tab.Screen 
+        name="Wallet" 
+        component={WalletScreen}
+        options={{ title: 'Wallet' }}
+      />
+      <Tab.Screen 
+        name="Settings" 
+        component={SettingsScreen}
+        options={{ title: 'Settings' }}
+      />
+    </Tab.Navigator>
   );
 }

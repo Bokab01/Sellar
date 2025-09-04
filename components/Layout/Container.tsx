@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, ViewProps } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 
@@ -17,37 +17,38 @@ export function Container({
 }: ContainerProps) {
   const { theme } = useTheme();
 
-  const getPadding = () => {
-    switch (padding) {
-      case 'none': return 0;
-      case 'sm': return theme.spacing.sm;
-      case 'md': return theme.spacing.lg;
-      case 'lg': return theme.spacing.xl;
-      case 'xl': return theme.spacing['2xl'];
-      default: return theme.spacing.lg;
-    }
-  };
+  const containerStyle = useMemo(() => {
+    const getPadding = () => {
+      switch (padding) {
+        case 'none': return 0;
+        case 'sm': return theme.spacing.sm;
+        case 'md': return theme.spacing.lg;
+        case 'lg': return theme.spacing.xl;
+        case 'xl': return theme.spacing['2xl'];
+        default: return theme.spacing.lg;
+      }
+    };
 
-  const getMargin = () => {
-    switch (margin) {
-      case 'none': return 0;
-      case 'sm': return theme.spacing.sm;
-      case 'md': return theme.spacing.lg;
-      case 'lg': return theme.spacing.xl;
-      case 'xl': return theme.spacing['2xl'];
-      default: return 0;
-    }
-  };
+    const getMargin = () => {
+      switch (margin) {
+        case 'none': return 0;
+        case 'sm': return theme.spacing.sm;
+        case 'md': return theme.spacing.lg;
+        case 'lg': return theme.spacing.xl;
+        case 'xl': return theme.spacing['2xl'];
+        default: return 0;
+      }
+    };
+
+    return {
+      padding: getPadding(),
+      margin: getMargin(),
+    };
+  }, [padding, margin, theme]);
 
   return (
     <View
-      style={[
-        {
-          padding: getPadding(),
-          margin: getMargin(),
-        },
-        style,
-      ]}
+      style={[containerStyle, style]}
       {...props}
     >
       {children}

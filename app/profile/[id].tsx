@@ -46,7 +46,7 @@ type TabType = 'listings' | 'reviews' | 'about' | 'posts';
 
 export default function UserProfileScreen() {
   const { theme } = useTheme();
-  const { id: profileId } = useLocalSearchParams<{ id: string }>();
+  const { id: profileId, tab } = useLocalSearchParams<{ id: string; tab?: string }>();
   const { user: currentUser } = useAuthStore();
   
   const [profile, setProfile] = useState<any>(null);
@@ -55,7 +55,7 @@ export default function UserProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabType>('listings');
+  const [activeTab, setActiveTab] = useState<TabType>((tab as TabType) || 'listings');
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 

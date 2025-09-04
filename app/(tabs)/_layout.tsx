@@ -1,3 +1,4 @@
+import React, { useMemo } from 'react';
 import { Tabs } from 'expo-router';
 import { View } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -6,27 +7,28 @@ import { MessageCircle, Plus, Users, EllipsisVertical, House } from 'lucide-reac
 export default function TabLayout() {
   const { theme } = useTheme();
 
+  // Memoize screen options to prevent unnecessary re-renders
+  const screenOptions = useMemo(() => ({
+    headerShown: false,
+    tabBarStyle: {
+      backgroundColor: theme.colors.surface,
+      borderTopColor: theme.colors.border,
+      borderTopWidth: 1,
+      paddingBottom: 8,
+      paddingTop: 8,
+      height: 70,
+    },
+    tabBarActiveTintColor: theme.colors.primary,
+    tabBarInactiveTintColor: theme.colors.text.muted,
+    tabBarLabelStyle: {
+      fontSize: 12,
+      fontWeight: '500' as const,
+      marginTop: 4,
+    },
+  }), [theme]);
+
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: theme.colors.surface,
-          borderTopColor: theme.colors.border,
-          borderTopWidth: 1,
-          paddingBottom: 8,
-          paddingTop: 8,
-          height: 70,
-        },
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.text.muted,
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '500',
-          marginTop: 4,
-        },
-      }}
-    >
+    <Tabs screenOptions={screenOptions}>
       <Tabs.Screen
         name="home"
         options={{

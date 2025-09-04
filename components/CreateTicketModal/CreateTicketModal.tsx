@@ -133,8 +133,10 @@ export function CreateTicketModal({ visible, onClose, onTicketCreated }: CreateT
   return (
     <AppModal
       visible={visible}
+      position="top"
       onClose={handleClose}
       title="Create Support Ticket"
+      size="full"
       primaryAction={{
         text: 'Create Ticket',
         onPress: handleSubmit,
@@ -145,7 +147,10 @@ export function CreateTicketModal({ visible, onClose, onTicketCreated }: CreateT
         onPress: handleClose,
       }}
     >
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        showsVerticalScrollIndicator={true}
+        contentContainerStyle={{ paddingBottom: theme.spacing.md }}
+      >
         <View style={{ gap: theme.spacing.lg }}>
           <Text variant="body" color="secondary">
             Describe your issue and we&apos;ll help you resolve it as quickly as possible.
@@ -237,7 +242,7 @@ export function CreateTicketModal({ visible, onClose, onTicketCreated }: CreateT
             placeholder="Please provide detailed information about your issue..."
             value={description}
             onChangeText={setDescription}
-            style={{ minHeight: 120 }}
+            style={{ minHeight: 80 }}
             maxLength={5000}
           />
 

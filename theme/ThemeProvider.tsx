@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useMemo, useCallback } from 'react';
 import { useColorScheme } from 'react-native';
 import { Theme } from './types';
 import { lightTheme, darkTheme } from './themes';
@@ -20,6 +20,7 @@ interface ThemeProviderProps {
 export function ThemeProvider({ children }: ThemeProviderProps) {
   const systemColorScheme = useColorScheme();
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system');
+
   
   const isDarkMode = themeMode === 'system' 
     ? systemColorScheme === 'dark'
@@ -27,21 +28,21 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   
   const theme = isDarkMode ? darkTheme : lightTheme;
 
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     setThemeMode(current => {
       if (current === 'light') return 'dark';
       if (current === 'dark') return 'system';
       return 'light';
     });
-  };
+  }, []);
 
-  const value: ThemeContextType = {
+  const value: ThemeContextType = useMemo(() => ({
     theme,
     isDarkMode,
     toggleTheme,
     setThemeMode,
     themeMode,
-  };
+  }), [theme, isDarkMode, toggleTheme, themeMode]); // Remove setThemeMode from dependencies as it's a state setter
 
   return (
     <ThemeContext.Provider value={value}>

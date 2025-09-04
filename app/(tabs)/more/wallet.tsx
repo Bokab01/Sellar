@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, ScrollView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -39,11 +39,11 @@ import {
 export default function WalletScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
-  const { 
-    balance: creditBalance, 
-    loading: creditLoading, 
-    refreshCredits 
-  } = useMonetizationStore();
+  // Use selective subscriptions to prevent unnecessary re-renders
+  const creditBalance = useMonetizationStore(state => state.balance);
+  const creditLoading = useMonetizationStore(state => state.loading);
+  const refreshCredits = useMonetizationStore(state => state.refreshCredits);
+
   
   const [profile, setProfile] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -53,10 +53,68 @@ export default function WalletScreen() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
 
+  // Memoize callback functions to prevent re-renders (must be at top level)
+  const handleTopUp = useCallback(() => {
+    router.push('/buy-credits');
+  }, []);
+
+  const handleBusinessPlans = useCallback(() => {
+    router.push('/subscription-plans');
+  }, []);
+
+  const handleFeatureMarketplace = useCallback(() => {
+    router.push('/feature-marketplace');
+  }, []);
+
+  // Memoize styles to prevent re-renders
+  const styles = useMemo(() => ({
+    scrollContentContainer: { paddingBottom: theme.spacing.xl },
+    sectionContainer: { marginBottom: theme.spacing.xl },
+    packageCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.lg,
+      padding: theme.spacing.lg,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    popularPackageCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.lg,
+      padding: theme.spacing.lg,
+      borderWidth: 2,
+      borderColor: theme.colors.primary,
+    },
+    businessPlanCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.lg,
+      padding: theme.spacing.lg,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    // Common layout styles
+    rowSpaceBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    rowCenter: { flexDirection: 'row', alignItems: 'center' },
+    rowCenterGap: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md },
+    flex1: { flex: 1 },
+    gapMd: { gap: theme.spacing.md },
+    alignEnd: { alignItems: 'flex-end' },
+    // Text styles
+    sectionTitle: { marginBottom: theme.spacing.lg },
+    itemTitle: { marginRight: theme.spacing.sm },
+    itemDescription: { marginBottom: theme.spacing.sm },
+    itemCredits: { fontWeight: '600', fontSize: 16 },
+    zapIcon: { marginRight: theme.spacing.xs },
+    // Loading styles
+    loadingMain: { marginBottom: theme.spacing.xl },
+    loadingSecondary: { marginBottom: theme.spacing.lg },
+    loadingItem: { marginBottom: theme.spacing.md },
+  }), [theme]);
+
   useEffect(() => {
     if (user) {
       fetchWalletData();
-      refreshCredits();
+      // Don't call refreshCredits here - it should already be loaded
+      // and calling it causes infinite re-renders
     }
   }, [user]);
 
@@ -138,32 +196,21 @@ export default function WalletScreen() {
     return (
       <SafeAreaWrapper>
         <ScrollView contentContainerStyle={{ padding: theme.spacing.lg }}>
-          <LoadingSkeleton width="100%" height={150} borderRadius={theme.borderRadius.lg} style={{ marginBottom: theme.spacing.xl }} />
-          <LoadingSkeleton width="100%" height={200} borderRadius={theme.borderRadius.lg} style={{ marginBottom: theme.spacing.lg }} />
+          <LoadingSkeleton width="100%" height={150} borderRadius={theme.borderRadius.lg} style={styles.loadingMain} />
+          <LoadingSkeleton width="100%" height={200} borderRadius={theme.borderRadius.lg} style={styles.loadingSecondary} />
           {Array.from({ length: 5 }).map((_, index) => (
-            <LoadingSkeleton key={index} width="100%" height={60} style={{ marginBottom: theme.spacing.md }} />
+            <LoadingSkeleton key={index} width="100%" height={60} style={styles.loadingItem} />
           ))}
         </ScrollView>
       </SafeAreaWrapper>
     );
   }
 
-  const handleTopUp = () => {
-    router.push('/buy-credits');
-  };
-
-  const handleBusinessPlans = () => {
-    router.push('/subscription-plans');
-  };
-
-  const handleFeatureMarketplace = () => {
-    router.push('/feature-marketplace');
-  };
 
   return (
     <SafeAreaWrapper>
       <ScrollView 
-        contentContainerStyle={{ paddingBottom: theme.spacing.xl }}
+        contentContainerStyle={styles.scrollContentContainer}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -183,47 +230,43 @@ export default function WalletScreen() {
           />
 
           {/* Credit Packages Preview */}
-          <View style={{ marginBottom: theme.spacing.xl }}>
-            <Text variant="h3" style={{ marginBottom: theme.spacing.lg }}>
+          <View style={styles.sectionContainer}>
+            <Text variant="h3" style={styles.sectionTitle}>
               Popular Credit Packages
             </Text>
             
-            <View style={{ gap: theme.spacing.md }}>
+            <View style={styles.gapMd}>
               {CREDIT_PACKAGES.slice(0, 2).map((package_) => (
                 <TouchableOpacity
                   key={package_.id}
                   onPress={handleTopUp}
-                  style={{
-                    backgroundColor: theme.colors.surface,
-                    borderRadius: theme.borderRadius.lg,
-                    padding: theme.spacing.lg,
-                    borderWidth: package_.popular ? 2 : 1,
-                    borderColor: package_.popular ? theme.colors.primary : theme.colors.border,
-                    ...theme.shadows.sm,
-                  }}
+                  style={[
+                    package_.popular ? styles.popularPackageCard : styles.packageCard,
+                    theme.shadows.sm,
+                  ]}
                   activeOpacity={0.95}
                 >
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.xs }}>
-                        <Text variant="h4" style={{ marginRight: theme.spacing.sm }}>
+                  <View style={styles.rowSpaceBetween}>
+                    <View style={styles.flex1}>
+                      <View style={[styles.rowCenter, { marginBottom: theme.spacing.xs }]}>
+                        <Text variant="h4" style={styles.itemTitle}>
                           {package_.name}
                         </Text>
                         {package_.popular && (
                           <Badge text="Popular" variant="success" />
                         )}
                       </View>
-                      <Text variant="bodySmall" color="muted" style={{ marginBottom: theme.spacing.sm }}>
+                      <Text variant="bodySmall" color="muted" style={styles.itemDescription}>
                         {package_.description}
                       </Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Zap size={16} color={theme.colors.primary} style={{ marginRight: theme.spacing.xs }} />
-                        <Text variant="bodyLarge" style={{ fontWeight: '600' }}>
+                      <View style={styles.rowCenter}>
+                        <Zap size={16} color={theme.colors.primary} style={styles.zapIcon} />
+                        <Text variant="body" style={styles.itemCredits}>
                           {package_.credits} Credits
                         </Text>
                       </View>
                     </View>
-                    <View style={{ alignItems: 'flex-end' }}>
+                    <View style={styles.alignEnd}>
                       <PriceDisplay 
                         amount={package_.priceGHS} 
                         currency="GHS" 
@@ -253,7 +296,7 @@ export default function WalletScreen() {
               <Text variant="h3">Recent Transactions</Text>
               <Button
                 variant="ghost"
-                onPress={() => router.push('/(tabs)/transactions')}
+                onPress={() => router.push('/transactions')}
                 size="sm"
               >
                 View All
@@ -373,21 +416,18 @@ export default function WalletScreen() {
           </View>
 
           {/* Business Plans Preview */}
-          <View style={{ marginBottom: theme.spacing.xl }}>
+          <View style={styles.sectionContainer}>
             <Text variant="h3" style={{ marginBottom: theme.spacing.lg }}>
               Business Plans
             </Text>
             
             <TouchableOpacity
               onPress={handleBusinessPlans}
-              style={{
-                backgroundColor: theme.colors.surface,
-                borderRadius: theme.borderRadius.lg,
-                padding: theme.spacing.lg,
-                borderWidth: 1,
-                borderColor: theme.colors.primary + '30',
-                ...theme.shadows.sm,
-              }}
+              style={[
+                styles.businessPlanCard,
+                { borderColor: theme.colors.primary + '30' },
+                theme.shadows.sm,
+              ]}
               activeOpacity={0.95}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>

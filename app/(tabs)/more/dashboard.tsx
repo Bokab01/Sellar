@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { router } from 'expo-router';
@@ -45,19 +45,19 @@ interface TabConfig {
 export default function BusinessDashboardScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { 
-    currentSubscription, 
-    hasBusinessPlan, 
-    refreshSubscription,
-    entitlements 
-  } = useMonetizationStore();
+  // Use selective subscriptions to prevent unnecessary re-renders
+  const currentSubscription = useMonetizationStore(state => state.currentSubscription);
+  const hasBusinessPlan = useMonetizationStore(state => state.hasBusinessPlan);
+  const refreshSubscription = useMonetizationStore(state => state.refreshSubscription);
+  const entitlements = useMonetizationStore(state => state.entitlements);
+
 
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Get current plan tier
-  const getCurrentTier = (): 'free' | 'starter' | 'pro' | 'premium' => {
+  // Memoize current plan tier calculation
+  const currentTier = useMemo((): 'free' | 'starter' | 'pro' | 'premium' => {
     if (!hasBusinessPlan()) return 'free';
     
     const planName = currentSubscription?.subscription_plans?.name?.toLowerCase();
@@ -65,55 +65,57 @@ export default function BusinessDashboardScreen() {
     if (planName?.includes('pro')) return 'pro';
     if (planName?.includes('starter')) return 'starter';
     return 'free';
-  };
+  }, [currentSubscription]); // Remove hasBusinessPlan from dependencies as it's a Zustand function
 
-  const currentTier = getCurrentTier();
+  // Memoize available tabs to prevent unnecessary re-renders
+  const availableTabs = useMemo((): TabConfig[] => {
+    const tabs: TabConfig[] = [
+      {
+        id: 'overview',
+        label: 'Overview',
+        icon: <BarChart3 size={18} color={theme.colors.text.primary} />,
+        requiredTier: 'free',
+      },
+    ];
 
-  // Define available tabs based on subscription tier
-  const availableTabs: TabConfig[] = [
-    {
-      id: 'overview',
-      label: 'Overview',
-      icon: <BarChart3 size={18} color={theme.colors.text.primary} />,
-      requiredTier: 'free',
-    },
-  ];
+    // Add tabs based on tier
+    if (currentTier !== 'free') {
+      tabs.push({
+        id: 'analytics',
+        label: 'Analytics',
+        icon: <TrendingUp size={18} color={theme.colors.text.primary} />,
+        requiredTier: 'starter',
+        badge: currentTier === 'starter' ? 'Basic' : currentTier === 'pro' ? 'Advanced' : 'Full',
+      });
+    }
 
-  // Add tabs based on tier
-  if (currentTier !== 'free') {
-    availableTabs.push({
-      id: 'analytics',
-      label: 'Analytics',
-      icon: <TrendingUp size={18} color={theme.colors.text.primary} />,
-      requiredTier: 'starter',
-      badge: currentTier === 'starter' ? 'Basic' : currentTier === 'pro' ? 'Advanced' : 'Full',
-    });
-  }
+    if (currentTier === 'pro' || currentTier === 'premium') {
+      tabs.push({
+        id: 'autoboost',
+        label: 'Auto-boost',
+        icon: <Zap size={18} color={theme.colors.warning} />,
+        requiredTier: 'pro',
+      });
+    }
 
-  if (currentTier === 'pro' || currentTier === 'premium') {
-    availableTabs.push({
-      id: 'autoboost',
-      label: 'Auto-boost',
-      icon: <Zap size={18} color={theme.colors.warning} />,
-      requiredTier: 'pro',
-    });
-  }
+    if (currentTier === 'premium') {
+      tabs.push({
+        id: 'support',
+        label: 'Priority Support',
+        icon: <HeadphonesIcon size={18} color={theme.colors.success} />,
+        requiredTier: 'premium',
+      });
 
-  if (currentTier === 'premium') {
-    availableTabs.push({
-      id: 'support',
-      label: 'Priority Support',
-      icon: <HeadphonesIcon size={18} color={theme.colors.success} />,
-      requiredTier: 'premium',
-    });
+      tabs.push({
+        id: 'premium',
+        label: 'Premium Features',
+        icon: <Crown size={18} color={theme.colors.primary} />,
+        requiredTier: 'premium',
+      });
+    }
 
-    availableTabs.push({
-      id: 'premium',
-      label: 'Premium Features',
-      icon: <Crown size={18} color={theme.colors.primary} />,
-      requiredTier: 'premium',
-    });
-  }
+    return tabs;
+  }, [currentTier, theme]);
 
   useEffect(() => {
     const initializeDashboard = async () => {
@@ -128,7 +130,7 @@ export default function BusinessDashboardScreen() {
     };
 
     initializeDashboard();
-  }, [refreshSubscription]);
+  }, []); // Zustand store functions are stable and don't need to be in dependencies
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -141,17 +143,25 @@ export default function BusinessDashboardScreen() {
     }
   };
 
+  // Memoize tab bar styles
+  const tabBarStyles = useMemo(() => ({
+    scrollView: {
+      backgroundColor: theme.colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    contentContainer: { 
+      paddingHorizontal: theme.spacing.lg 
+    },
+  }), [theme]);
+
   // Render tab bar
-  const renderTabBar = () => (
+  const renderTabBar = useMemo(() => (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      style={{
-        backgroundColor: theme.colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.colors.border,
-      }}
-      contentContainerStyle={{ paddingHorizontal: theme.spacing.lg }}
+      style={tabBarStyles.scrollView}
+      contentContainerStyle={tabBarStyles.contentContainer}
     >
       {availableTabs.map((tab) => {
         const isActive = activeTab === tab.id;
@@ -193,38 +203,10 @@ export default function BusinessDashboardScreen() {
         );
       })}
     </ScrollView>
-  );
+  ), [availableTabs, activeTab, theme, tabBarStyles]);
 
-  // Render tab content
-  const renderTabContent = () => {
-    if (loading) {
-      return (
-        <View style={{ padding: theme.spacing.lg, gap: theme.spacing.lg }}>
-          <LoadingSkeleton height={120} />
-          <LoadingSkeleton height={120} />
-          <LoadingSkeleton height={120} />
-        </View>
-      );
-    }
-
-    switch (activeTab) {
-      case 'overview':
-        return renderOverviewTab();
-      case 'analytics':
-        return <AnalyticsDashboard tier={currentTier === 'free' ? 'starter' : currentTier} />;
-      case 'autoboost':
-        return <AutoBoostDashboard />;
-      case 'support':
-        return <PrioritySupportDashboard />;
-      case 'premium':
-        return <PremiumFeaturesDashboard />;
-      default:
-        return renderOverviewTab();
-    }
-  };
-
-  // Render overview tab
-  const renderOverviewTab = () => {
+  // Memoize overview tab
+  const renderOverviewTab = useMemo(() => {
     if (currentTier === 'free') {
       return (
         <Container style={{ paddingTop: theme.spacing.xl }}>
@@ -369,7 +351,7 @@ export default function BusinessDashboardScreen() {
 
             <Button
               variant="secondary"
-              onPress={() => router.push('/(tabs)/subscription-plans')}
+              onPress={() => router.push('/subscription-plans')}
               style={{ width: '100%' }}
             >
               <Settings size={18} color={theme.colors.primary} />
@@ -487,12 +469,40 @@ export default function BusinessDashboardScreen() {
         </ScrollView>
       </Container>
     );
-  };
+  }, [currentTier, theme, currentSubscription, entitlements, availableTabs]);
+
+  // Memoize tab content
+  const renderTabContent = useMemo(() => {
+    if (loading) {
+      return (
+        <View style={{ padding: theme.spacing.lg, gap: theme.spacing.lg }}>
+          <LoadingSkeleton height={120} />
+          <LoadingSkeleton height={120} />
+          <LoadingSkeleton height={120} />
+        </View>
+      );
+    }
+
+    switch (activeTab) {
+      case 'overview':
+        return renderOverviewTab;
+      case 'analytics':
+        return <AnalyticsDashboard tier={currentTier === 'free' ? 'starter' : currentTier} />;
+      case 'autoboost':
+        return <AutoBoostDashboard />;
+      case 'support':
+        return <PrioritySupportDashboard />;
+      case 'premium':
+        return <PremiumFeaturesDashboard />;
+      default:
+        return renderOverviewTab;
+    }
+  }, [loading, activeTab, currentTier, theme, renderOverviewTab]);
 
   return (
     <SafeAreaWrapper>
       <View style={{ flex: 1, marginTop: theme.spacing.md }}>
-        {renderTabBar()}
+        {renderTabBar}
         
         <ScrollView
           style={{ flex: 1 }}
@@ -500,7 +510,7 @@ export default function BusinessDashboardScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }
         >
-          {renderTabContent()}
+          {renderTabContent}
         </ScrollView>
       </View>
     </SafeAreaWrapper>
