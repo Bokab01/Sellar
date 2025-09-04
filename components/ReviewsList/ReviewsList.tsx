@@ -267,7 +267,7 @@ export function ReviewsList({
           {error}
         </Text>
         <Button
-          variant="outline"
+          variant="tertiary"
           onPress={refresh}
           style={{ marginTop: theme.spacing.md }}
         >
@@ -308,7 +308,7 @@ export function ReviewsList({
           {/* Load More Button */}
           {hasMore && (
             <Button
-              variant="outline"
+              variant="tertiary"
               onPress={loadMore}
               loading={loading}
               style={{ marginTop: theme.spacing.md }}

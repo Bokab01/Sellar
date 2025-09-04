@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl, Image, Alert, Animated } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -11,23 +11,16 @@ import { useProfile } from '@/hooks/useProfile';
 // import { useOfflineListings, useOfflineSync } from '@/hooks/useOfflineSync';
 // import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 // import { useMemoryManager } from '@/utils/memoryManager';
-import { dbHelpers, supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import {
   Text,
   ProductCard,
   SearchBar,
-  CategoryCard,
   Grid,
   Avatar,
-  Button,
-  Chip,
   FilterSheet,
   EmptyState,
   LoadingSkeleton,
-  BusinessBadge,
-  PriceDisplay,
-  Badge,
-  CompactUserBadges,
   // Temporarily disabled performance components
   // ProductVirtualizedList,
   // LazyComponent,
@@ -59,7 +52,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { 
     currentLocation, 
-    setCurrentLocation,
+    // setCurrentLocation,
     searchQuery, 
     setSearchQuery,
     selectedCategories,

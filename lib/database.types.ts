@@ -40,6 +40,10 @@ export interface Database {
           business_website: string | null;
           display_business_name: boolean;
           business_name_priority: 'primary' | 'secondary' | 'hidden';
+          // Additional fields found in code
+          full_name?: string;
+          account_type?: string;
+          verification_status?: string;
         };
         Insert: {
           id: string;
@@ -79,6 +83,10 @@ export interface Database {
           business_website?: string | null;
           display_business_name?: boolean;
           business_name_priority?: 'primary' | 'secondary' | 'hidden';
+          // Additional fields found in code
+          full_name?: string;
+          account_type?: string;
+          verification_status?: string;
         };
         Update: {
           id?: string;
@@ -118,6 +126,10 @@ export interface Database {
           business_website?: string | null;
           display_business_name?: boolean;
           business_name_priority?: 'primary' | 'secondary' | 'hidden';
+          // Additional fields found in code
+          full_name?: string;
+          account_type?: string;
+          verification_status?: string;
         };
       };
       categories: {
@@ -867,6 +879,421 @@ export interface Database {
           updated_at?: string;
         };
       };
+      // Missing tables found in code
+      transactions: {
+        Row: {
+          id: string;
+          user_id: string;
+          reference: string;
+          amount: number;
+          currency: string;
+          payment_method: string;
+          purchase_type: string;
+          purchase_id: string;
+          customer_email: string | null;
+          status: string;
+          webhook_received: boolean;
+          webhook_processed: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          reference: string;
+          amount: number;
+          currency: string;
+          payment_method: string;
+          purchase_type: string;
+          purchase_id: string;
+          customer_email?: string | null;
+          status?: string;
+          webhook_received?: boolean;
+          webhook_processed?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          reference?: string;
+          amount?: number;
+          currency?: string;
+          payment_method?: string;
+          purchase_type?: string;
+          purchase_id?: string;
+          customer_email?: string | null;
+          status?: string;
+          webhook_received?: boolean;
+          webhook_processed?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      user_verification: {
+        Row: {
+          id: string;
+          user_id: string;
+          verification_type: string;
+          status: string;
+          submitted_at: string;
+          reviewed_at: string | null;
+          reviewer_id: string | null;
+          review_notes: string | null;
+          documents: any[];
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          verification_type: string;
+          status?: string;
+          submitted_at?: string;
+          reviewed_at?: string | null;
+          reviewer_id?: string | null;
+          review_notes?: string | null;
+          documents?: any[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          verification_type?: string;
+          status?: string;
+          submitted_at?: string;
+          reviewed_at?: string | null;
+          reviewer_id?: string | null;
+          review_notes?: string | null;
+          documents?: any[];
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      app_settings: {
+        Row: {
+          id: string;
+          key: string;
+          value: any;
+          description: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          key: string;
+          value?: any;
+          description?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          key?: string;
+          value?: any;
+          description?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      user_credits: {
+        Row: {
+          id: string;
+          user_id: string;
+          balance: number;
+          lifetime_earned: number;
+          lifetime_spent: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          balance?: number;
+          lifetime_earned?: number;
+          lifetime_spent?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          balance?: number;
+          lifetime_earned?: number;
+          lifetime_spent?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      credit_transactions: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: string;
+          amount: number;
+          balance_before: number;
+          balance_after: number;
+          reference_id: string | null;
+          reference_type: string | null;
+          metadata: any;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type: string;
+          amount: number;
+          balance_before?: number;
+          balance_after?: number;
+          reference_id?: string | null;
+          reference_type?: string | null;
+          metadata?: any;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          type?: string;
+          amount?: number;
+          balance_before?: number;
+          balance_after?: number;
+          reference_id?: string | null;
+          reference_type?: string | null;
+          metadata?: any;
+          created_at?: string;
+        };
+      };
+      credit_packages: {
+        Row: {
+          id: string;
+          name: string;
+          credits: number;
+          price_ghs: number;
+          description: string | null;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          credits: number;
+          price_ghs: number;
+          description?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          credits?: number;
+          price_ghs?: number;
+          description?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+        };
+      };
+      credit_purchases: {
+        Row: {
+          id: string;
+          user_id: string;
+          package_id: string;
+          credits: number;
+          amount_ghs: number;
+          status: string;
+          payment_reference: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          package_id: string;
+          credits: number;
+          amount_ghs: number;
+          status?: string;
+          payment_reference?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          package_id?: string;
+          credits?: number;
+          amount_ghs?: number;
+          status?: string;
+          payment_reference?: string | null;
+          created_at?: string;
+        };
+      };
+      subscription_plans: {
+        Row: {
+          id: string;
+          name: string;
+          description: string | null;
+          price_ghs: number;
+          billing_cycle: string;
+          features: any[];
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          price_ghs: number;
+          billing_cycle: string;
+          features?: any[];
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          description?: string | null;
+          price_ghs?: number;
+          billing_cycle?: string;
+          features?: any[];
+          is_active?: boolean;
+          created_at?: string;
+        };
+      };
+      user_subscriptions: {
+        Row: {
+          id: string;
+          user_id: string;
+          plan_id: string;
+          status: string;
+          current_period_start: string;
+          current_period_end: string;
+          auto_renew: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          plan_id: string;
+          status?: string;
+          current_period_start: string;
+          current_period_end: string;
+          auto_renew?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          plan_id?: string;
+          status?: string;
+          current_period_start?: string;
+          current_period_end?: string;
+          auto_renew?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      community_rewards: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: string;
+          points: number;
+          description: string;
+          metadata: any;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type: string;
+          points: number;
+          description: string;
+          metadata?: any;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          type?: string;
+          points?: number;
+          description?: string;
+          metadata?: any;
+          created_at?: string;
+        };
+      };
+      user_achievements: {
+        Row: {
+          id: string;
+          user_id: string;
+          achievement_type: string;
+          title: string;
+          description: string;
+          icon: string;
+          unlocked_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          achievement_type: string;
+          title: string;
+          description: string;
+          icon: string;
+          unlocked_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          achievement_type?: string;
+          title?: string;
+          description?: string;
+          icon?: string;
+          unlocked_at?: string;
+          created_at?: string;
+        };
+      };
+      paystack_transactions: {
+        Row: {
+          id: string;
+          user_id: string;
+          reference: string;
+          amount: number;
+          currency: string;
+          payment_method: string;
+          purchase_type: string;
+          purchase_id: string;
+          customer_email: string | null;
+          status: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          reference: string;
+          amount: number;
+          currency: string;
+          payment_method: string;
+          purchase_type: string;
+          purchase_id: string;
+          customer_email?: string | null;
+          status?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          reference?: string;
+          amount?: number;
+          currency?: string;
+          payment_method?: string;
+          purchase_type?: string;
+          purchase_id?: string;
+          customer_email?: string | null;
+          status?: string;
+          created_at?: string;
+        };
+      };
     };
     Views: {
       [_ in never]: never;
@@ -905,6 +1332,101 @@ export interface Database {
           p_preferences: any;
         };
         Returns: Database['public']['Tables']['notification_preferences']['Row'];
+      };
+      claim_referral_bonus: {
+        Args: {
+          p_referrer_id: string;
+          p_referee_id: string;
+          p_referral_code: string;
+        };
+        Returns: {
+          success: boolean;
+          message: string;
+        };
+      };
+      get_user_followers: {
+        Args: {
+          target_user_id: string;
+          page_limit: number;
+          page_offset: number;
+        };
+        Returns: any[];
+      };
+      get_user_following: {
+        Args: {
+          target_user_id: string;
+          page_limit: number;
+          page_offset: number;
+        };
+        Returns: any[];
+      };
+      follow_user: {
+        Args: {
+          follower_id: string;
+          following_id: string;
+        };
+        Returns: {
+          success: boolean;
+          message: string;
+        };
+      };
+      unfollow_user: {
+        Args: {
+          follower_id: string;
+          following_id: string;
+        };
+        Returns: {
+          success: boolean;
+          message: string;
+        };
+      };
+      spend_user_credits: {
+        Args: {
+          p_user_id: string;
+          p_amount: number;
+          p_reason: string;
+          p_reference_id: any;
+          p_reference_type: any;
+        };
+        Returns: {
+          success: boolean;
+          new_balance: number;
+          error?: string;
+        };
+      };
+      purchase_feature: {
+        Args: {
+          p_user_id: string;
+          p_feature_key: string;
+          p_credits: number;
+          p_metadata: any;
+        };
+        Returns: {
+          success: boolean;
+          new_balance: number;
+          error?: string;
+        };
+      };
+      get_user_entitlements: {
+        Args: {
+          p_user_id: string;
+        };
+        Returns: any;
+      };
+      get_user_reward_summary: {
+        Args: {
+          p_user_id: string;
+        };
+        Returns: any;
+      };
+      claim_anniversary_bonus: {
+        Args: {
+          p_user_id: string;
+        };
+        Returns: {
+          success: boolean;
+          message: string;
+        };
       };
     };
     Enums: {

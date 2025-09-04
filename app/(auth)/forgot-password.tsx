@@ -79,14 +79,14 @@ export default function ForgotPasswordScreen() {
                   Check Your Email
                 </Text>
                 <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
-                  We've sent a password reset link to {email}
+                  We&apos;ve sent a password reset link to {email}
                 </Text>
               </View>
 
               {/* Instructions */}
               <View style={{ marginBottom: theme.spacing['4xl'] }}>
                 <Text variant="body" color="secondary" style={{ textAlign: 'center', lineHeight: 24 }}>
-                  Click the link in the email to reset your password. If you don't see it, check your spam folder.
+                  Click the link in the email to reset your password. If you don&apos;t see it, check your spam folder.
                 </Text>
               </View>
 
@@ -149,7 +149,7 @@ export default function ForgotPasswordScreen() {
                 Forgot Password?
               </Text>
               <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
-                No worries! Enter your email and we'll send you a reset link.
+                No worries! Enter your email and we&apos;ll send you a reset link.
               </Text>
             </View>
 

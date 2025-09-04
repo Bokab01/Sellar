@@ -8,6 +8,7 @@ import { Toast } from '@/components/Toast/Toast';
 import { LinearProgress } from '@/components/ProgressIndicator/ProgressIndicator';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import * as ImagePicker from 'expo-image-picker';
+
 import { Camera, Image as ImageIcon, X, Plus } from 'lucide-react-native';
 
 export interface SelectedImage {
@@ -46,6 +47,7 @@ export function CustomImagePicker({
   const [error, setError] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+
 
   const showError = (message: string) => {
     setError(message);
@@ -120,46 +122,41 @@ export function CustomImagePicker({
   };
 
   const pickFromLibrary = async () => {
-    setShowPicker(false);
-    
-    const hasPermission = await requestPermissions('library');
-    if (!hasPermission) return;
-
-    const remainingSlots = limit - value.length;
-    if (remainingSlots <= 0) {
-      showError(`Maximum ${limit} images allowed`);
-      return;
-    }
+    if (!(await requestPermissions('library'))) return;
 
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: true,
-        selectionLimit: remainingSlots,
-        aspect: [4, 3],
+        allowsMultipleSelection: limit > 1,
+        selectionLimit: limit,
         quality: 0.8,
+        allowsEditing: limit === 1,
       });
 
       if (!result.canceled && result.assets.length > 0) {
         const newImages: SelectedImage[] = result.assets.map((asset, index) => ({
           uri: asset.uri,
           id: `${Date.now()}_${index}`,
-          type: asset.type,
+          type: 'image',
           name: asset.fileName || `image_${Date.now()}_${index}.jpg`,
         }));
 
-        onChange([...value, ...newImages]);
+        onChange(newImages);
         
-        if (uploadImmediately) {
-          await handleUpload(newImages);
+        if (uploadImmediately && newImages.length > 0) {
+          handleUpload(newImages);
         }
         
-        showSuccess(`${newImages.length} image${newImages.length > 1 ? 's' : ''} added!`);
+        showSuccess(`${newImages.length} image${newImages.length > 1 ? 's' : ''} selected!`);
       }
     } catch (error) {
-      showError('Failed to select images');
+      showError('Failed to select images from library');
     }
+    
+    setShowPicker(false);
   };
+
+
 
   const removeImage = (imageId: string) => {
     const updatedImages = value.filter(img => img.id !== imageId);
@@ -429,7 +426,7 @@ export function CustomImagePicker({
             lineHeight: 22,
             marginBottom: theme.spacing.md,
           }}>
-            Choose how you'd like to add images
+            Choose how you&apos;d like to add images
           </Text>
 
           <View style={{ gap: theme.spacing.md }}>
@@ -492,6 +489,8 @@ export function CustomImagePicker({
         variant="success"
         onHide={() => setShowToast(false)}
       />
+
+
 
     </View>
   );

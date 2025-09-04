@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, TouchableOpacity, RefreshControl, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { useAuthStore } from '@/store/useAuthStore';
+// import { useAuthStore } from '@/store/useAuthStore';
 import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
 import {
@@ -13,7 +13,7 @@ import {
   Avatar,
   Button,
 } from '@/components';
-import { TrendingUp, Hash, MessageCircle, Heart, Eye, Flame, Crown, Plus } from 'lucide-react-native';
+import { TrendingUp, Hash, MessageCircle, Heart, Eye, Flame } from 'lucide-react-native';
 
 interface TrendingTopic {
   id: string;
@@ -39,7 +39,7 @@ interface TrendingPost {
 
 export default function TrendingTopicsScreen() {
   const { theme } = useTheme();
-  const { user } = useAuthStore();
+  // const { user } = useAuthStore();
   const [topics, setTopics] = useState<TrendingTopic[]>([]);
   const [posts, setPosts] = useState<TrendingPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +49,7 @@ export default function TrendingTopicsScreen() {
 
   useEffect(() => {
     fetchTrendingData();
-  }, [activeTab]);
+  }, [activeTab, fetchTrendingData]);
 
   const fetchTrendingData = async () => {
     try {
@@ -198,10 +198,10 @@ export default function TrendingTopicsScreen() {
     router.push(`/(tabs)/community/${post.id}`);
   };
 
-  const extractHashtagsFromContent = (content: string): string[] => {
-    const hashtags = content.match(/#[a-zA-Z0-9_]+/g);
-    return hashtags ? hashtags.map(tag => tag.substring(1).toLowerCase()) : [];
-  };
+  // const extractHashtagsFromContent = (content: string): string[] => {
+  //   const hashtags = content.match(/#[a-zA-Z0-9_]+/g);
+  //   return hashtags ? hashtags.map(tag => tag.substring(1).toLowerCase()) : [];
+  // };
 
   const getCategoryColor = (category: string) => {
     switch (category) {
@@ -425,7 +425,7 @@ export default function TrendingTopicsScreen() {
 
                     {/* Sample Posts Preview */}
                     <Text variant="caption" color="muted">
-                      "{topic.sample_posts[0]}"
+                      &quot;{topic.sample_posts[0]}&quot;
                     </Text>
                   </TouchableOpacity>
                 ))}

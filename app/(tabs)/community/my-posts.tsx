@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, ScrollView, RefreshControl } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -41,11 +41,7 @@ export default function MyPostsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchMyPosts();
-  }, [user]);
-
-  const fetchMyPosts = async () => {
+  const fetchMyPosts = useCallback(async () => {
     if (!user?.id) return;
 
     try {
@@ -83,29 +79,33 @@ export default function MyPostsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    fetchMyPosts();
+  }, [fetchMyPosts]);
 
   const handleRefresh = () => {
     setRefreshing(true);
     fetchMyPosts();
   };
 
-  const handleDeletePost = async (postId: string) => {
-    try {
-      const { error } = await supabase
-        .from('posts')
-        .delete()
-        .eq('id', postId)
-        .eq('user_id', user?.id); // Ensure user can only delete their own posts
+  // const handleDeletePost = async (postId: string) => {
+  //   try {
+  //     const { error } = await supabase
+  //       .from('posts')
+  //       .delete()
+  //       .eq('id', postId)
+  //       .eq('user_id', user?.id); // Ensure user can only delete their own posts
 
-      if (error) throw error;
+  //     if (error) throw error;
 
-      // Remove from local state
-      setPosts(prev => prev.filter(post => post.id !== postId));
-    } catch (error) {
-      console.error('Error deleting post:', error);
-    }
-  };
+  //       // Remove from local state
+  //       setPosts(prev => prev.filter(post => post.id !== postId));
+  //     } catch (error) {
+  //       console.error('Error deleting post:', error);
+  //     }
+  //   };
 
   // Transform posts to PostCard format
   const transformedPosts = posts.map((post) => ({
@@ -138,7 +138,7 @@ export default function MyPostsScreen() {
       id: post.listing.id,
       title: post.listing.title,
       price: post.listing.price,
-      image: post.listing.images?.[0],
+      image: post.listing.image,
     } : undefined,
   }));
 

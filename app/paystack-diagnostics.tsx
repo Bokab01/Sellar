@@ -513,7 +513,7 @@ export default function PaystackDiagnosticsScreen() {
                 🚀 Ready to Test
               </Text>
               <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
-                Click "Run Diagnostics" to test your Paystack integration setup and identify any issues.
+                Click &quot;Run Diagnostics&quot; to test your Paystack integration setup and identify any issues.
               </Text>
             </View>
           )}

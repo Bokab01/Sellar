@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { useAuthStore } from '@/store/useAuthStore';
+// import { useAuthStore } from '@/store/useAuthStore';
 import { router } from 'expo-router';
 import {
   Text,
@@ -11,7 +11,7 @@ import {
   EmptyState,
   LoadingSkeleton,
 } from '@/components';
-import { Calendar, MapPin, Users, Clock, Plus } from 'lucide-react-native';
+import { Calendar, MapPin, Users, Plus } from 'lucide-react-native';
 
 interface CommunityEvent {
   id: string;
@@ -33,7 +33,7 @@ interface CommunityEvent {
 
 export default function CommunityEventsScreen() {
   const { theme } = useTheme();
-  const { user } = useAuthStore();
+  // const { user } = useAuthStore();
   const [events, setEvents] = useState<CommunityEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -122,7 +122,7 @@ export default function CommunityEventsScreen() {
       case 'meetup': return theme.colors.primary;
       case 'workshop': return theme.colors.success;
       case 'sale': return theme.colors.warning;
-      case 'networking': return theme.colors.info;
+      case 'networking': return theme.colors.secondary;
       default: return theme.colors.text.muted;
     }
   };
@@ -192,8 +192,8 @@ export default function CommunityEventsScreen() {
             >
               <Text
                 variant="body"
-                weight="medium"
                 style={{
+                  fontWeight: '500',
                   textAlign: 'center',
                   color: filter === tab.key ? '#FFF' : theme.colors.text.primary,
                 }}
@@ -265,7 +265,7 @@ export default function CommunityEventsScreen() {
                 </View>
 
                 {/* Event Title */}
-                <Text variant="h4" weight="semibold" style={{ marginBottom: theme.spacing.sm, marginRight: 80 }}>
+                <Text variant="h4" style={{ marginBottom: theme.spacing.sm, marginRight: 80, fontWeight: '600' }}>
                   {event.title}
                 </Text>
 
@@ -308,7 +308,7 @@ export default function CommunityEventsScreen() {
 
                 {/* Action Button */}
                 <Button
-                  variant={event.is_attending ? "outline" : "primary"}
+                  variant={event.is_attending ? "tertiary" : "primary"}
                   size="sm"
                   onPress={() => handleAttendToggle(event.id)}
                   style={{ alignSelf: 'flex-start' }}

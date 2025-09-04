@@ -456,7 +456,7 @@ export default function IdentityVerificationScreen() {
             • Our team will review your documents within 24-48 hours
           </Text>
           <Text variant="bodySmall" color="secondary">
-            • You'll receive a notification when verification is complete
+            • You&apos;ll receive a notification when verification is complete
           </Text>
           <Text variant="bodySmall" color="secondary">
             • Your trust score will be updated upon approval

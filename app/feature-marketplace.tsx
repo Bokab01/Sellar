@@ -119,6 +119,7 @@ export default function FeatureMarketplaceScreen() {
         onBackPress={() => router.back()}
         rightActions={[
           <View
+            key="credits-display"
             style={{
               backgroundColor: theme.colors.primary,
               borderRadius: theme.borderRadius.full,
@@ -308,7 +309,7 @@ export default function FeatureMarketplaceScreen() {
                   ⚠️ Low Credits
                 </Text>
                 <Text variant="body" color="secondary" style={{ textAlign: 'center', marginBottom: theme.spacing.lg }}>
-                  You're running low on credits. Buy more to unlock powerful features for your listings.
+                  You&apos;re running low on credits. Buy more to unlock powerful features for your listings.
                 </Text>
                 <Button
                   variant="primary"

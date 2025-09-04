@@ -138,7 +138,7 @@ export default function ResetPasswordScreen() {
                   />
                 }
                 secureTextEntry={!showPassword}
-                helperText="Must be at least 6 characters"
+                                  helper="Must be at least 6 characters"
               />
 
               <Input

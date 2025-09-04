@@ -741,7 +741,7 @@ export default function EditProfileScreen() {
                         <View style={{ flex: 1, marginRight: theme.spacing.md }}>
                           <Text style={{ fontSize: 14, marginBottom: 4 }}>Show business name publicly</Text>
                           <Text style={{ fontSize: 12, color: theme.colors.text.muted }}>
-                            Display "{formData.business_name}" on your posts, listings, and profile
+                            Display &quot;{formData.business_name}&quot; on your posts, listings, and profile
                           </Text>
                         </View>
                         <TouchableOpacity
@@ -921,9 +921,9 @@ export default function EditProfileScreen() {
                   marginBottom: theme.spacing.sm,
                 }}>
                   <View style={{ flex: 1, marginRight: theme.spacing.md }}>
-                    <Text style={{ fontSize: 14, marginBottom: 4 }}>Show when I'm online</Text>
+                    <Text style={{ fontSize: 14, marginBottom: 4 }}>Show when I&apos;m online</Text>
                     <Text style={{ fontSize: 12, color: theme.colors.text.muted }}>
-                      Let others see when you're active
+                      Let others see when you&apos;re active
                     </Text>
                   </View>
                   <TouchableOpacity

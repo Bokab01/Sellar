@@ -84,8 +84,8 @@ export { LinearProgress, CircularProgress } from './ProgressIndicator/ProgressIn
 export { StepIndicator } from './StepIndicator/StepIndicator';
 
 // Image Picker
-export { CustomImagePicker, ModernImagePicker } from './ImagePicker';
-export type { SelectedImage, MediaAsset } from './ImagePicker';
+export { CustomImagePicker } from './ImagePicker';
+export type { SelectedImage } from './ImagePicker';
 
 // Splash Screen
 export { SplashScreenManager, useSplashScreen } from './SplashScreen';

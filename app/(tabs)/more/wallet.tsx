@@ -31,7 +31,9 @@ import {
   Gift,
   Star,
   Crown,
-  UserPlus
+  UserPlus,
+  ArrowDownLeft,
+  DollarSign
 } from 'lucide-react-native';
 
 export default function WalletScreen() {

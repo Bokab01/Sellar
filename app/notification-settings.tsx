@@ -348,7 +348,7 @@ export default function NotificationSettingsScreen() {
             <Container style={{ margin: theme.spacing.lg }}>
               <Button
                 onPress={handleSendTestNotification}
-                variant="outline"
+                variant="tertiary"
                 leftIcon={<TestTube size={20} color={theme.colors.primary} />}
               >
                 Send Test Notification

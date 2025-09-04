@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
+import { View, ScrollView, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useConversations } from '@/hooks/useChat';
 import { usePresence } from '@/hooks/usePresence';

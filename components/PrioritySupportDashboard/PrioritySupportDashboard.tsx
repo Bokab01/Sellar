@@ -283,7 +283,7 @@ export function PrioritySupportDashboard() {
 
         <View style={{ gap: theme.spacing.sm }}>
           <Button
-            variant="outline"
+            variant="tertiary"
             onPress={() => handleContactAccountManager('email')}
             style={{ width: '100%' }}
           >
@@ -300,7 +300,7 @@ export function PrioritySupportDashboard() {
           </Button>
 
           <Button
-            variant="outline"
+            variant="tertiary"
             onPress={() => handleContactAccountManager('phone')}
             style={{ width: '100%' }}
           >

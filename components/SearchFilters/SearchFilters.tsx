@@ -392,7 +392,7 @@ export function SmartSearchFilters({
           }}
         >
           <Button
-            variant="outline"
+            variant="tertiary"
             onPress={handleClear}
             style={{ flex: 1 }}
             disabled={getActiveFiltersCount() === 0}

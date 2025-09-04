@@ -97,7 +97,7 @@ export default function PhoneVerificationScreen() {
         </Text>
 
         <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
-          We'll send you a verification code to confirm your phone number and increase your account security.
+          We&apos;ll send you a verification code to confirm your phone number and increase your account security.
         </Text>
       </View>
 
@@ -130,7 +130,7 @@ export default function PhoneVerificationScreen() {
         }}
       >
         <Text variant="bodySmall" color="secondary" style={{ textAlign: 'center' }}>
-          📱 We'll send you a 6-digit code via SMS. Standard messaging rates may apply.
+          📱 We&apos;ll send you a 6-digit code via SMS. Standard messaging rates may apply.
         </Text>
       </View>
     </View>
@@ -161,7 +161,7 @@ export default function PhoneVerificationScreen() {
         </Text>
 
         <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
-          We've sent a 6-digit code to {phoneNumber}
+          We&apos;ve sent a 6-digit code to {phoneNumber}
         </Text>
       </View>
 
@@ -211,7 +211,7 @@ export default function PhoneVerificationScreen() {
         }}
       >
         <Text variant="bodySmall" color="secondary" style={{ textAlign: 'center' }}>
-          💡 Didn't receive the code? Check your messages or try resending.
+          💡 Didn&apos;t receive the code? Check your messages or try resending.
         </Text>
       </View>
     </View>
@@ -274,7 +274,7 @@ export default function PhoneVerificationScreen() {
         }}
       >
         <Text variant="bodySmall" style={{ color: theme.colors.success, textAlign: 'center' }}>
-          🎉 You've earned trust points! Your verification level has been updated.
+          🎉 You&apos;ve earned trust points! Your verification level has been updated.
         </Text>
       </View>
     </View>

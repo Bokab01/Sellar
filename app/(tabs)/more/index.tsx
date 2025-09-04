@@ -456,7 +456,7 @@ export default function MoreScreen() {
               </Text>
             </View>
             <Text variant="caption" color="muted" style={{ textAlign: 'center' }}>
-              Ghana's premier marketplace for buying and selling
+              Ghana&apos;s premier marketplace for buying and selling
             </Text>
           </View>
 

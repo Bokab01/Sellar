@@ -432,7 +432,7 @@ export function PostCard({
       >
         <View style={{ gap: theme.spacing.lg }}>
           <Text variant="body" color="secondary">
-            Help us understand what's wrong with this post
+            Help us understand what&apos;s wrong with this post
           </Text>
 
           <View>

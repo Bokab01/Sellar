@@ -509,7 +509,7 @@ export default function SettingsScreen() {
       >
         <View style={{ gap: theme.spacing.lg }}>
           <Text variant="body" color="secondary">
-            We'll prepare a complete export of your data including:
+            We&apos;ll prepare a complete export of your data including:
           </Text>
 
           <View style={{ gap: theme.spacing.md }}>
@@ -568,7 +568,7 @@ export default function SettingsScreen() {
           </View>
 
           <Text variant="body" color="secondary">
-            To confirm deletion, please type "DELETE" below:
+            To confirm deletion, please type &quot;DELETE&quot; below:
           </Text>
 
           <Input

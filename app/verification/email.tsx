@@ -93,7 +93,7 @@ export default function EmailVerificationScreen() {
         </Text>
 
         <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
-          We'll send you a verification link to confirm your email address and secure your account.
+          We&apos;ll send you a verification link to confirm your email address and secure your account.
         </Text>
       </View>
 
@@ -159,7 +159,7 @@ export default function EmailVerificationScreen() {
         }}
       >
         <Text variant="bodySmall" color="secondary" style={{ textAlign: 'center' }}>
-          📧 Make sure to check your spam folder if you don't see the email in your inbox.
+          📧 Make sure to check your spam folder if you don&apos;t see the email in your inbox.
         </Text>
       </View>
     </View>
@@ -190,7 +190,7 @@ export default function EmailVerificationScreen() {
         </Text>
 
         <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
-          We've sent a verification link to {email}. Click the link in the email or enter the verification code below.
+          We&apos;ve sent a verification link to {email}. Click the link in the email or enter the verification code below.
         </Text>
       </View>
 
@@ -213,7 +213,7 @@ export default function EmailVerificationScreen() {
               Option 1: Click the Link
             </Text>
             <Text variant="bodySmall" color="secondary">
-              Open the email and click the "Verify Email" button. This will automatically verify your email.
+              Open the email and click the &quot;Verify Email&quot; button. This will automatically verify your email.
             </Text>
           </View>
 
@@ -314,7 +314,7 @@ export default function EmailVerificationScreen() {
         </Text>
 
         <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
-          Your email address has been verified. You'll now receive important notifications and your account is more secure.
+          Your email address has been verified. You&apos;ll now receive important notifications and your account is more secure.
         </Text>
       </View>
 
@@ -368,7 +368,7 @@ export default function EmailVerificationScreen() {
             • Complete identity verification to unlock premium features
           </Text>
           <Text variant="body" color="secondary">
-            • Set up business verification if you're a business seller
+            • Set up business verification if you&apos;re a business seller
           </Text>
         </View>
       </View>

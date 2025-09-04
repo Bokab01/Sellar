@@ -16,6 +16,7 @@ import {
   LoadingSkeleton,
   Toast,
   Button,
+  Badge,
 } from '@/components';
 import { Heart, Trash2, ShoppingBag } from 'lucide-react-native';
 
@@ -232,7 +233,7 @@ export default function FavoritesScreen() {
         showBackButton
         onBackPress={() => router.back()}
         rightActions={favorites.length > 0 ? [
-          <Text variant="caption" color="muted">
+          <Text key="favorites-count" variant="caption" color="muted">
             {favorites.length} saved
           </Text>,
         ] : []}

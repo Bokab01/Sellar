@@ -185,6 +185,7 @@ export function PaymentModal({
           onBackPress={handleClose}
           rightActions={[
             <Button
+              key="close-payment"
               variant="icon"
               icon={<X size={20} color={theme.colors.text.primary} />}
               onPress={handleClose}

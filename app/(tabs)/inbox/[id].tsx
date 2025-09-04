@@ -113,6 +113,7 @@ export default function ChatScreen() {
     }
   };
 
+
   const handleSendOffer = async () => {
     if (!offerAmount.trim()) {
       Alert.alert('Error', 'Please enter an offer amount');
@@ -365,6 +366,7 @@ export default function ChatScreen() {
         rightActions={[
           otherUser?.phone && (
             <Button
+              key="call-user"
               variant="icon"
               icon={<Phone size={20} color={theme.colors.text.primary} />}
               onPress={() => {
@@ -380,6 +382,7 @@ export default function ChatScreen() {
             />
           ),
           <Button
+            key="more-options"
             variant="icon"
             icon={<MoreVertical size={20} color={theme.colors.text.primary} />}
             onPress={() => {
@@ -563,6 +566,7 @@ export default function ChatScreen() {
           onCamera={() => {
             Alert.alert('Coming Soon', 'Camera feature will be available soon');
           }}
+          onImagePicker={() => Alert.alert('Coming Soon', 'Image sharing feature will be available soon')}
           placeholder={conversation?.listings 
             ? `Message about ${conversation.listings.title}...`
             : "Type a message..."
@@ -727,6 +731,7 @@ export default function ChatScreen() {
         variant={toastVariant}
         onHide={() => setShowToast(false)}
       />
+
     </SafeAreaWrapper>
   );
 }

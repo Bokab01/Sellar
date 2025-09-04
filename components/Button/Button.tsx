@@ -2,7 +2,6 @@ import React from 'react';
 import {
   TouchableOpacity,
   TouchableOpacityProps,
-  StyleSheet,
   ActivityIndicator,
   View,
 } from 'react-native';
@@ -21,7 +20,6 @@ interface ButtonProps extends TouchableOpacityProps {
   icon?: React.ReactNode;
   fullWidth?: boolean;
 }
-import { getFontFamily } from '@/theme/fonts';
 
 export function Button({
   variant = 'primary',

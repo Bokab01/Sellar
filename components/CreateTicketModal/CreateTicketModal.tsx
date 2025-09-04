@@ -148,7 +148,7 @@ export function CreateTicketModal({ visible, onClose, onTicketCreated }: CreateT
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={{ gap: theme.spacing.lg }}>
           <Text variant="body" color="secondary">
-            Describe your issue and we'll help you resolve it as quickly as possible.
+            Describe your issue and we&apos;ll help you resolve it as quickly as possible.
           </Text>
 
           {/* Subject */}
@@ -267,7 +267,7 @@ export function CreateTicketModal({ visible, onClose, onTicketCreated }: CreateT
             }}
           >
             <Text variant="bodySmall" color="muted" style={{ textAlign: 'center' }}>
-              📧 We'll respond to your registered email address within 24 hours
+              📧 We&apos;ll respond to your registered email address within 24 hours
             </Text>
           </View>
         </View>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, ScrollView, RefreshControl } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -37,11 +37,7 @@ export default function FollowersScreen() {
   const [error, setError] = useState<string | null>(null);
   const [followingStates, setFollowingStates] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    fetchFollowers();
-  }, [user]);
-
-  const fetchFollowers = async () => {
+  const fetchFollowers = useCallback(async () => {
     if (!user?.id) return;
 
     try {
@@ -133,7 +129,11 @@ export default function FollowersScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    fetchFollowers();
+  }, [user, fetchFollowers]);
 
   const handleFollowToggle = async (userId: string) => {
     const isCurrentlyFollowing = followingStates[userId];
@@ -305,7 +305,7 @@ export default function FollowersScreen() {
                 </View>
                 
                 <Button
-                  variant={followingStates[follower.id] ? "outline" : "primary"}
+                  variant={followingStates[follower.id] ? "tertiary" : "primary"}
                   size="sm"
                   icon={
                     followingStates[follower.id] ? 

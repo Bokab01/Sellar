@@ -43,7 +43,7 @@ export default function MyListingsScreen() {
     if (user) {
       fetchMyListings();
     }
-  }, [user, activeTab]);
+  }, [user, activeTab, fetchMyListings]);
 
   const fetchMyListings = async () => {
     if (!user) return;
@@ -187,6 +187,7 @@ export default function MyListingsScreen() {
         onBackPress={() => router.back()}
         rightActions={[
           <Button
+            key="create-listing"
             variant="icon"
             icon={<Plus size={20} color={theme.colors.text.primary} />}
             onPress={() => router.push('/(tabs)/create')}
@@ -394,7 +395,7 @@ export default function MyListingsScreen() {
       >
         <View style={{ gap: theme.spacing.lg }}>
           <Text variant="body" color="secondary">
-            Are you sure you want to delete "{selectedListing?.title}"?
+            Are you sure you want to delete &quot;{selectedListing?.title}&quot;?
           </Text>
 
           <View

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, ScrollView, RefreshControl, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -36,14 +36,7 @@ export default function PostDetailScreen() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
-  useEffect(() => {
-    if (postId) {
-      fetchPost();
-      fetchComments();
-    }
-  }, [postId]);
-
-  const fetchPost = async () => {
+  const fetchPost = useCallback(async () => {
     try {
       const { data, error: fetchError } = await supabase
         .from('posts')
@@ -78,10 +71,10 @@ export default function PostDetailScreen() {
       } else {
         setPost(data);
       }
-    } catch (err) {
+    } catch {
       setError('Failed to load post');
     }
-  };
+  }, [postId]);
 
   const fetchComments = async () => {
     try {
@@ -131,8 +124,8 @@ export default function PostDetailScreen() {
 
         setComments(commentsWithReplies);
       }
-    } catch (err) {
-      console.error('Failed to fetch comments:', err);
+    } catch {
+      console.error('Failed to fetch comments');
     } finally {
       setLoading(false);
     }
@@ -174,8 +167,8 @@ export default function PostDetailScreen() {
 
       // Refresh post to get updated counts
       await fetchPost();
-    } catch (err) {
-      console.error('Failed to toggle like:', err);
+    } catch {
+      console.error('Failed to toggle like');
     }
   };
 
@@ -198,7 +191,7 @@ export default function PostDetailScreen() {
       setToastMessage('Comment added successfully!');
       setShowToast(true);
       await fetchComments();
-    } catch (err) {
+    } catch {
       Alert.alert('Error', 'Failed to add comment');
     } finally {
       setSubmittingComment(false);

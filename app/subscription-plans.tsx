@@ -293,7 +293,7 @@ export default function SubscriptionPlansScreen() {
                   {/* Features */}
                   <View style={{ marginBottom: theme.spacing.xl }}>
                     <Text variant="h4" style={{ marginBottom: theme.spacing.lg }}>
-                      What's Included
+                      What&apos;s Included
                     </Text>
                     
                     <View style={{ gap: theme.spacing.md }}>
@@ -361,7 +361,7 @@ export default function SubscriptionPlansScreen() {
                   Can I cancel anytime?
                 </Text>
                 <Text variant="bodySmall" color="secondary">
-                  Yes, you can cancel your subscription at any time. You'll keep access to premium features until the end of your current billing period.
+                  Yes, you can cancel your subscription at any time. You&apos;ll keep access to premium features until the end of your current billing period.
                 </Text>
               </View>
               
@@ -370,7 +370,7 @@ export default function SubscriptionPlansScreen() {
                   What happens to my boost credits?
                 </Text>
                 <Text variant="bodySmall" color="secondary">
-                  Boost credits are added to your account each month and don't expire. You can use them anytime, even after cancelling.
+                  Boost credits are added to your account each month and don&apos;t expire. You can use them anytime, even after cancelling.
                 </Text>
               </View>
               

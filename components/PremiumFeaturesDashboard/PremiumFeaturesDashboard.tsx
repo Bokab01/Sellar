@@ -291,7 +291,7 @@ export function PremiumFeaturesDashboard() {
                 </View>
                 
                 <Button
-                  variant={feature.enabled ? 'primary' : 'outline'}
+                  variant={feature.enabled ? 'primary' : 'tertiary'}
                   size="small"
                   onPress={() => toggleFeature(feature.id)}
                 >
@@ -352,7 +352,7 @@ export function PremiumFeaturesDashboard() {
         }}>
           <Text variant="h4">Homepage Placements</Text>
           <Button
-            variant="outline"
+            variant="tertiary"
             size="small"
             onPress={() => {
               // Navigate to placement management

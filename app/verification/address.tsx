@@ -85,7 +85,7 @@ export default function AddressVerificationScreen() {
   const handleFinalSubmit = () => {
     Alert.alert(
       'Address Verification Submitted',
-      'Your address verification has been submitted for review. We\'ll notify you within 2-3 business days.',
+      'Your address verification has been submitted for review. We&apos;ll notify you within 2-3 business days.',
       [
         {
           text: 'OK',
@@ -444,7 +444,7 @@ export default function AddressVerificationScreen() {
         
         <View style={{ gap: theme.spacing.sm }}>
           <Text variant="bodySmall" color="secondary">
-            • We'll verify your address against the uploaded document
+            • We&apos;ll verify your address against the uploaded document
           </Text>
           <Text variant="bodySmall" color="secondary">
             • Document date and address details will be checked
@@ -453,7 +453,7 @@ export default function AddressVerificationScreen() {
             • Review process typically takes 2-3 business days
           </Text>
           <Text variant="bodySmall" color="secondary">
-            • You'll receive notifications about verification status
+            • You&apos;ll receive notifications about verification status
           </Text>
           <Text variant="bodySmall" color="secondary">
             • Location-based features will be enhanced upon approval

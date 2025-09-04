@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, ScrollView, Dimensions } from 'react-native';
+import { View, ScrollView } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import {
   Text,
@@ -19,7 +19,7 @@ import {
   ArrowRight
 } from 'lucide-react-native';
 
-const { width: screenWidth } = Dimensions.get('window');
+// const { width: screenWidth } = Dimensions.get('window');
 
 interface OnboardingStep {
   id: string;

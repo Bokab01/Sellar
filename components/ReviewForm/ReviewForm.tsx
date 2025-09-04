@@ -244,7 +244,7 @@ export function ReviewForm({
           }}
         >
           <Button
-            variant="outline"
+            variant="tertiary"
             onPress={handleClose}
             style={{ flex: 1 }}
             disabled={loading}

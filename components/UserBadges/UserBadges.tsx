@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { getUserSubscriptionBadges } from '@/lib/subscriptionEntitlements';
 import { Badge } from '@/components';
-import { Building, Star, Crown, Shield, CheckCircle } from 'lucide-react-native';
+import { Building, Star, Crown, CheckCircle } from 'lucide-react-native';
 
 interface UserBadgesProps {
   userId: string;

@@ -92,7 +92,7 @@ export default function BusinessVerificationScreen() {
   const handleFinalSubmit = () => {
     Alert.alert(
       'Business Verification Submitted',
-      'Your business verification has been submitted for review. We\'ll notify you within 3-5 business days.',
+      'Your business verification has been submitted for review. We&apos;ll notify you within 3-5 business days.',
       [
         {
           text: 'OK',
@@ -544,7 +544,7 @@ export default function BusinessVerificationScreen() {
             • Review process typically takes 3-5 business days
           </Text>
           <Text variant="bodySmall" color="secondary">
-            • You'll receive email updates on verification status
+            • You&apos;ll receive email updates on verification status
           </Text>
           <Text variant="bodySmall" color="secondary">
             • Business features will be unlocked upon approval

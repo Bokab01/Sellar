@@ -127,6 +127,31 @@ export function VirtualizedList<T>({
     };
   }, [getItemLayout, estimatedItemSize]);
 
+  // Footer component with loading indicator
+  const FooterComponent = useCallback(() => {
+    if (ListFooterComponent) {
+      return <>{ListFooterComponent}</>;
+    }
+    
+    if (loading && data.length > 0) {
+      return (
+        <View style={{ 
+          padding: theme.spacing.lg,
+          alignItems: 'center',
+        }}>
+          <LoadingSkeleton width={200} height={20} />
+          <Text variant="caption" color="muted" style={{ 
+            marginTop: theme.spacing.sm 
+          }}>
+            Loading more items...
+          </Text>
+        </View>
+      );
+    }
+    
+    return null;
+  }, [ListFooterComponent, loading, data.length, theme]);
+
   // Loading state
   if (loading && data.length === 0) {
     return (
@@ -219,31 +244,6 @@ export function VirtualizedList<T>({
       </Text>
     </View>
   ));
-
-  // Footer component with loading indicator
-  const FooterComponent = useCallback(() => {
-    if (ListFooterComponent) {
-      return <>{ListFooterComponent}</>;
-    }
-    
-    if (loading && data.length > 0) {
-      return (
-        <View style={{ 
-          padding: theme.spacing.lg,
-          alignItems: 'center',
-        }}>
-          <LoadingSkeleton width={200} height={20} />
-          <Text variant="caption" color="muted" style={{ 
-            marginTop: theme.spacing.sm 
-          }}>
-            Loading more items...
-          </Text>
-        </View>
-      );
-    }
-    
-    return null;
-  }, [ListFooterComponent, loading, data.length, theme]);
 
   return (
     <FlatList

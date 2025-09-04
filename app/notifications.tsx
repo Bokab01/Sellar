@@ -99,12 +99,12 @@ export default function NotificationsScreen() {
         break;
       case 'follow':
         if (data.user_id) {
-          router.push(`/(tabs)/profile/${data.user_id}`);
+          router.push(`/profile/${data.user_id}`);
         }
         break;
       case 'review':
         if (data.user_id) {
-          router.push(`/(tabs)/profile/${data.user_id}`);
+          router.push(`/profile/${data.user_id}`);
         }
         break;
       case 'listing':
@@ -165,6 +165,7 @@ export default function NotificationsScreen() {
         onBackPress={() => router.back()}
         rightActions={unreadCount > 0 ? [
           <Button
+            key="mark-all-read"
             variant="ghost"
             onPress={handleMarkAllRead}
             size="sm"

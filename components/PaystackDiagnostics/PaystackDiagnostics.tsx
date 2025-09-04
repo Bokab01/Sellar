@@ -245,7 +245,7 @@ export function PaystackDiagnostics({ visible, onClose }: PaystackDiagnosticsPro
               }}
             >
               <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
-                Click "Run Diagnostics" to test your Paystack integration setup.
+                Click &quot;Run Diagnostics&quot; to test your Paystack integration setup.
               </Text>
             </View>
           )}

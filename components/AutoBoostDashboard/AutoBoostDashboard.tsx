@@ -220,7 +220,7 @@ export function AutoBoostDashboard() {
         </View>
 
         <Button
-          variant={settings.enabled ? 'outline' : 'primary'}
+                          variant={settings.enabled ? 'tertiary' : 'primary'}
           onPress={toggleAutoBoost}
           loading={updating}
           style={{ width: '100%' }}
@@ -266,7 +266,7 @@ export function AutoBoostDashboard() {
               {[1, 3, 7].map((days) => (
                 <Button
                   key={days}
-                  variant={settings.boostDuration === days ? 'primary' : 'outline'}
+                  variant={settings.boostDuration === days ? 'primary' : 'tertiary'}
                   size="small"
                   onPress={() => updateBoostDuration(days)}
                 >
@@ -293,7 +293,7 @@ export function AutoBoostDashboard() {
               flex: 1,
               lineHeight: 18,
             }}>
-              Auto-boost will automatically boost your newest listings when they're created. 
+              Auto-boost will automatically boost your newest listings when they&apos;re created. 
               Each boost costs 15 credits.
             </Text>
           </View>

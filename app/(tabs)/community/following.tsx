@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, ScrollView, RefreshControl } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -36,11 +36,7 @@ export default function FollowingScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchFollowing();
-  }, [user]);
-
-  const fetchFollowing = async () => {
+  const fetchFollowing = useCallback(async () => {
     if (!user?.id) return;
 
     try {
@@ -117,7 +113,11 @@ export default function FollowingScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    fetchFollowing();
+  }, [user, fetchFollowing]);
 
   const handleUnfollow = async (userId: string) => {
     try {
@@ -284,7 +284,7 @@ export default function FollowingScreen() {
                 </View>
                 
                 <Button
-                  variant="outline"
+                  variant="tertiary"
                   size="sm"
                   icon={<UserMinus size={16} color={theme.colors.error} />}
                   onPress={() => handleUnfollow(followingUser.id)}

@@ -465,7 +465,7 @@ export default function VerificationStartScreen() {
         <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
           {template?.verification_type === 'phone' || template?.verification_type === 'email'
             ? 'Your verification has been completed successfully!'
-            : 'Your verification request has been submitted and is under review. We\'ll notify you once it\'s processed.'}
+            : 'Your verification request has been submitted and is under review. We&apos;ll notify you once it&apos;s processed.'}
         </Text>
       </View>
 
@@ -478,7 +478,7 @@ export default function VerificationStartScreen() {
         }}
       >
         <Text variant="h4" style={{ color: theme.colors.success, marginBottom: theme.spacing.md }}>
-          What's Next?
+          What&apos;s Next?
         </Text>
         
         <View style={{ gap: theme.spacing.sm }}>
@@ -486,7 +486,7 @@ export default function VerificationStartScreen() {
             • Your trust score has been updated
           </Text>
           <Text variant="body" style={{ color: theme.colors.success }}>
-            • You'll receive notifications about status changes
+            • You&apos;ll receive notifications about status changes
           </Text>
           <Text variant="body" style={{ color: theme.colors.success }}>
             • New features may be unlocked based on verification level

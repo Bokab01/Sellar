@@ -24,7 +24,7 @@ export default function VerifyEmailScreen() {
   const userEmail = email || user?.email || '';
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (resendCooldown > 0) {
       interval = setInterval(() => {
         setResendCooldown((prev) => prev - 1);
@@ -85,7 +85,7 @@ export default function VerifyEmailScreen() {
                 Verify Your Email
               </Text>
               <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
-                We've sent a verification link to
+                We&apos;ve sent a verification link to
               </Text>
               <Text variant="body" style={{ textAlign: 'center', fontWeight: '600', marginTop: theme.spacing.xs }}>
                 {userEmail}
@@ -109,7 +109,7 @@ export default function VerifyEmailScreen() {
                       Click the verification link in your email
                     </Text>
                     <Text variant="caption" color="muted">
-                      Check your spam folder if you don't see it
+                      Check your spam folder if you don&apos;t see it
                     </Text>
                   </View>
                 </View>
@@ -144,7 +144,7 @@ export default function VerifyEmailScreen() {
                 fullWidth
                 size="lg"
               >
-                I've Verified My Email
+                I&apos;ve Verified My Email
               </Button>
 
               <Button

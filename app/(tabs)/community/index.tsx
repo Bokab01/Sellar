@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, ScrollView, TouchableOpacity, Image, RefreshControl, Pressable } from 'react-native';
+import { View, ScrollView, TouchableOpacity, RefreshControl, Pressable } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useCommunityPosts } from '@/hooks/useCommunity';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -9,7 +9,7 @@ import {
   Text,
   SafeAreaWrapper,
   AppHeader,
-  Button,
+
   Avatar,
   EmptyState,
   ErrorState,
@@ -18,7 +18,7 @@ import {
   CommunitySidebar,
   SidebarToggle,
 } from '@/components';
-import { Plus, Heart, MessageCircle, Share, MoveHorizontal as MoreHorizontal, Users } from 'lucide-react-native';
+import { Plus, Users } from 'lucide-react-native';
 
 export default function CommunityScreen() {
   const { theme } = useTheme();
@@ -115,6 +115,7 @@ export default function CommunityScreen() {
                 marginBottom: theme.spacing.lg,
                 borderWidth: 1,
                 borderColor: theme.colors.border,
+                ...theme.shadows.sm,
               }}
               activeOpacity={0.7}
             >
@@ -125,15 +126,30 @@ export default function CommunityScreen() {
                   size="sm" 
                 />
                 <Text variant="body" color="muted" style={{ flex: 1 }}>
-                  What's on your mind?
+                  What&apos;s on your mind?
                 </Text>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  icon={<Plus size={16} color="#FFF" />}
+                <View
+                  style={{
+                    backgroundColor: theme.colors.primary,
+                    borderRadius: theme.borderRadius.full,
+                    paddingHorizontal: theme.spacing.md,
+                    paddingVertical: theme.spacing.sm,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: theme.spacing.xs,
+                  }}
                 >
-                  Post
-                </Button>
+                  <Plus size={16} color={theme.colors.primaryForeground} />
+                  <Text
+                    variant="bodySmall"
+                    style={{
+                      color: theme.colors.primaryForeground,
+                      fontWeight: '600',
+                    }}
+                  >
+                    Post
+                  </Text>
+                </View>
               </View>
             </TouchableOpacity>
 

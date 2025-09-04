@@ -12,7 +12,7 @@ import {
   LinkButton,
 } from '@/components';
 import { router } from 'expo-router';
-import { Mail, Lock, Eye } from 'lucide-react-native';
+import { Mail, Lock } from 'lucide-react-native';
 
 export default function SignInScreen() {
   const { theme } = useTheme();
@@ -54,7 +54,7 @@ export default function SignInScreen() {
         Alert.alert('Sign In Failed', result.error || 'Unknown error occurred');
       }
     } else {
-      router.replace('/(tabs)');
+      router.replace('/(tabs)/home');
     }
     
     setLoading(false);
@@ -77,7 +77,7 @@ export default function SignInScreen() {
                 Welcome to Sellar
               </Text>
               <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
-                Ghana's premier marketplace for buying and selling
+                Ghana&apos;s premier marketplace for buying and selling
               </Text>
             </View>
 
@@ -135,7 +135,7 @@ export default function SignInScreen() {
 
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text variant="body" color="secondary">
-                  Don't have an account?{' '}
+                  Don&apos;t have an account?{' '}
                 </Text>
                 <LinkButton
                   variant="primary"

@@ -27,11 +27,6 @@ export function SplashScreenManager({ isAppReady, onAnimationComplete }: SplashS
   const scaleAnim = useSharedValue(1);
   const logoOpacity = useSharedValue(1);
 
-  // Safety check for theme
-  if (!theme) {
-    return null;
-  }
-
   useEffect(() => {
     if (isAppReady) {
       // Start the exit animation
@@ -59,7 +54,7 @@ export function SplashScreenManager({ isAppReady, onAnimationComplete }: SplashS
 
       return () => clearTimeout(timer);
     }
-  }, [isAppReady]);
+  }, [isAppReady, fadeAnim, scaleAnim, logoOpacity, onAnimationComplete]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: fadeAnim.value,
@@ -70,6 +65,11 @@ export function SplashScreenManager({ isAppReady, onAnimationComplete }: SplashS
     opacity: logoOpacity.value,
   }));
 
+  // Safety check for theme
+  if (!theme) {
+    return null;
+  }
+
   // Choose the appropriate splash screen image based on theme
   const splashImage = isDarkMode 
     ? require('../../assets/splashscreen/splashscreen-dark.png')
@@ -77,6 +77,7 @@ export function SplashScreenManager({ isAppReady, onAnimationComplete }: SplashS
 
   const backgroundColor = isDarkMode ? '#000000' : '#ffffff';
 
+  // Early return for app not ready
   if (!isAppReady) {
     return null; // Let the native splash screen handle the initial display
   }

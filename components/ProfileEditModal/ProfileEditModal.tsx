@@ -522,7 +522,7 @@ export function ProfileEditModal({ visible, onClose, onProfileUpdated }: Profile
               }}>
                 <Text variant="body">Show online status</Text>
                 <Button
-                  variant={formData.show_online_status ? 'primary' : 'outline'}
+                  variant={formData.show_online_status ? 'primary' : 'tertiary'}
                   size="small"
                   onPress={() => setFormData(prev => ({ ...prev, show_online_status: !prev.show_online_status }))}
                 >
@@ -542,7 +542,7 @@ export function ProfileEditModal({ visible, onClose, onProfileUpdated }: Profile
               }}>
                 <Text variant="body">Show last seen</Text>
                 <Button
-                  variant={formData.show_last_seen ? 'primary' : 'outline'}
+                  variant={formData.show_last_seen ? 'primary' : 'tertiary'}
                   size="small"
                   onPress={() => setFormData(prev => ({ ...prev, show_last_seen: !prev.show_last_seen }))}
                 >
@@ -574,11 +574,11 @@ export function ProfileEditModal({ visible, onClose, onProfileUpdated }: Profile
                   <View style={{ flex: 1, marginRight: theme.spacing.md }}>
                     <Text variant="body">Show business name publicly</Text>
                     <Text variant="bodySmall" color="muted">
-                      Display "{profile.business_name}" on your posts, listings, and profile
+                      Display &quot;{profile.business_name}&quot; on your posts, listings, and profile
                     </Text>
                   </View>
                   <Button
-                    variant={formData.display_business_name ? 'primary' : 'outline'}
+                    variant={formData.display_business_name ? 'primary' : 'tertiary'}
                     size="small"
                     onPress={() => setFormData(prev => ({ ...prev, display_business_name: !prev.display_business_name }))}
                   >

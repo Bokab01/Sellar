@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, ScrollView, Alert, TouchableOpacity, FlatList } from 'react-native';
+import React, { useState } from 'react';
+import { View, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useCommunityPosts } from '@/hooks/useCommunity';
@@ -15,13 +15,13 @@ import {
   LocationPicker,
   Toast,
   LinearProgress,
-  ProductCard,
+
   EmptyState,
   LoadingSkeleton,
   PriceDisplay,
 } from '@/components';
 import { SelectedImage } from '@/components/ImagePicker';
-import { Send, MapPin, Package, X, Search, Sparkles, Users, TrendingUp, Lightbulb, Star, Calendar, Handshake, MessageSquare, Plus } from 'lucide-react-native';
+import { Send, Package, X, Search, Sparkles, Users, TrendingUp, Lightbulb, Star, Calendar, Handshake, MessageSquare, Plus } from 'lucide-react-native';
 import { router } from 'expo-router';
 
 export default function CreatePostScreen() {
@@ -44,6 +44,8 @@ export default function CreatePostScreen() {
   
   // Post type selection
   const [postType, setPostType] = useState<'general' | 'showcase' | 'question' | 'announcement' | 'tips' | 'review' | 'event' | 'collaboration'>('general');
+
+
 
   const handleSubmit = async () => {
     if (!content.trim()) {
@@ -94,6 +96,7 @@ export default function CreatePostScreen() {
         router.back();
       }, 1500);
     } catch (error: any) {
+      console.error('Error creating post:', error);
       Alert.alert('Error', 'Failed to create post. Please try again.');
     } finally {
       setLoading(false);
@@ -197,6 +200,7 @@ export default function CreatePostScreen() {
         onBackPress={() => router.back()}
         rightActions={[
           <Button
+            key="post-button"
             variant="primary"
             onPress={handleSubmit}
             loading={loading}
@@ -554,7 +558,7 @@ export default function CreatePostScreen() {
                       No Active Listings
                     </Text>
                     <Text variant="body" color="muted" style={{ textAlign: 'center', maxWidth: 280 }}>
-                      You don't have any active listings yet. Create your first listing to showcase your products in posts.
+                      You don&apos;t have any active listings yet. Create your first listing to showcase your products in posts.
                     </Text>
                   </View>
                   <Button
@@ -587,6 +591,8 @@ export default function CreatePostScreen() {
         variant="success"
         onHide={() => setShowSuccess(false)}
       />
+
+
     </SafeAreaWrapper>
   );
 }

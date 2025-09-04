@@ -7,7 +7,9 @@
     "dev": "EXPO_NO_TELEMETRY=1 expo start",
     "build:web": "expo export --platform web",
     "lint": "expo lint",
-    "test:backend": "node scripts/test-phase1-components.js"
+    "test:backend": "node scripts/test-phase1-components.js",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.1",
@@ -17,6 +19,7 @@
     "@paystack/inline-js": "^2.22.7",
     "@react-native-async-storage/async-storage": "^2.1.2",
     "@react-native-community/netinfo": "^11.4.1",
+    "@react-native-firebase/app": "^23.3.0",
     "@react-native-picker/picker": "^2.11.1",
     "@react-navigation/bottom-tabs": "^7.2.0",
     "@react-navigation/material-top-tabs": "^7.3.7",
@@ -40,7 +43,7 @@
     "expo-linear-gradient": "~14.1.3",
     "expo-linking": "~7.1.3",
     "expo-media-library": "^17.1.7",
-    "expo-notifications": "^0.31.4",
+    "expo-notifications": "~0.31.4",
     "expo-router": "~5.1.5",
     "expo-sharing": "^13.1.5",
     "expo-splash-screen": "~0.30.10",
@@ -72,6 +75,8 @@
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@types/react": "~19.0.10",
-    "typescript": "~5.8.3"
+    "typescript": "~5.8.3",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~9.2.0"
   }
 }

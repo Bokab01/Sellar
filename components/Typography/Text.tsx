@@ -1,19 +1,22 @@
 import React from 'react';
-import { Text as RNText, TextProps as RNTextProps, StyleSheet } from 'react-native';
+import { Text as RNText, TextProps as RNTextProps, TextStyle } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 
 type TextVariant = 'h1' | 'h2' | 'h3' | 'h4' | 'body' | 'bodySmall' | 'caption' | 'button';
 type TextColor = 'primary' | 'secondary' | 'muted' | 'inverse' | 'error' | 'success' | 'warning';
+type TextWeight = 'normal' | 'medium' | 'semibold' | 'bold';
 
 interface TextProps extends RNTextProps {
   variant?: TextVariant;
   color?: TextColor;
+  weight?: TextWeight;
   children: React.ReactNode;
 }
 
 export function Text({ 
   variant = 'body', 
   color = 'primary', 
+  weight = 'normal',
   style, 
   children, 
   ...props 
@@ -53,12 +56,28 @@ export function Text({
     );
   }
 
+  const getFontWeight = (weightVariant: TextWeight): TextStyle['fontWeight'] => {
+    switch (weightVariant) {
+      case 'normal':
+        return '400';
+      case 'medium':
+        return '500';
+      case 'semibold':
+        return '600';
+      case 'bold':
+        return '700';
+      default:
+        return '400';
+    }
+  };
+
   const textStyle = [
     {
       fontSize: typographyVariant.fontSize || 16,
       lineHeight: typographyVariant.lineHeight || 24,
       fontFamily: typographyVariant.fontFamily || 'System',
       letterSpacing: typographyVariant.letterSpacing || 0,
+      fontWeight: getFontWeight(weight),
       color: getTextColor(color),
     },
     style,

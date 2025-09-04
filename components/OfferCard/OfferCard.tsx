@@ -233,7 +233,7 @@ export function OfferCard({
             💬 Message from {offer.isOwn ? 'you' : offer.buyer.name}:
           </Text>
           <Text variant="body" style={{ fontStyle: 'italic' }}>
-            "{offer.message}"
+            &quot;{offer.message}&quot;
           </Text>
         </View>
       )}
@@ -291,7 +291,7 @@ export function OfferCard({
                 textAlign: 'center',
                 fontWeight: '500',
               }}>
-                ⏳ Waiting for seller's response...
+                ⏳ Waiting for seller&apos;s response...
               </Text>
             </View>
           )}

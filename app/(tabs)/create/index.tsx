@@ -13,14 +13,14 @@ import {
   extractKeywords,
   type ValidationResult 
 } from '@/utils/listingValidation';
-import { validateListingTitle, validateListingDescription } from '@/utils/validation';
+// import { validateListingTitle, validateListingDescription } from '@/utils/validation';
 import { contentModerationService } from '@/lib/contentModerationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   Text,
   SafeAreaWrapper,
-  Container,
+
   AppHeader,
   Input,
   Button,
@@ -29,7 +29,7 @@ import {
   PriceDisplay,
   Stepper,
   LocationPicker,
-  CategoryPicker,
+    CategoryPicker,
   CategoryAttributes,
   StepIndicator,
   Toast,
@@ -41,18 +41,14 @@ import {
   Camera, 
   FileText, 
   Package, 
-  MapPin, 
   DollarSign, 
   CheckCircle, 
-  Plus,
-  Info,
-  Eye,
   ArrowLeft,
   ArrowRight
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { findCategoryById, COMPREHENSIVE_CATEGORIES } from '@/constants/categories';
-import { getCategoryAttributes, hasCategoryAttributes, type CategoryAttribute } from '@/constants/categoryAttributes';
+import { getCategoryAttributes, hasCategoryAttributes } from '@/constants/categoryAttributes';
 import { networkUtils } from '@/utils/networkUtils';
 
 
@@ -155,7 +151,7 @@ export default function CreateListingScreen() {
   
   // Validation state
   const [validationResults, setValidationResults] = useState<Record<number, ValidationResult>>({});
-  const [isValidating, setIsValidating] = useState(false);
+  // const [isValidating, setIsValidating] = useState(false);
   
   // Performance optimization refs
   const debouncedValidator = useRef(createDebouncedValidator(300));
@@ -170,10 +166,10 @@ export default function CreateListingScreen() {
   useEffect(() => {
     checkListingLimits();
     loadDraft();
-  }, []);
+  }, [checkListingLimits, loadDraft]);
 
   // Load saved draft on component mount
-  const loadDraft = async () => {
+  const loadDraft = useCallback(async () => {
     try {
       const savedDraft = await AsyncStorage.getItem(AUTOSAVE_KEY);
       if (savedDraft) {
@@ -193,7 +189,7 @@ export default function CreateListingScreen() {
     } catch (error) {
       console.error('Failed to load draft:', error);
     }
-  };
+  }, [AUTOSAVE_KEY]);
 
   // Save draft to AsyncStorage
   const saveDraft = useCallback(async (data: ListingFormData) => {
@@ -244,7 +240,7 @@ export default function CreateListingScreen() {
     }, [hasUnsavedChanges, formData, saveDraft, clearDraft])
   );
 
-  const checkListingLimits = async () => {
+  const checkListingLimits = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -260,7 +256,7 @@ export default function CreateListingScreen() {
     } catch (error) {
       console.error('Failed to check listing limits:', error);
     }
-  };
+  }, [user]);
 
   // Update form data with validation and autosave
   const updateFormData = useCallback((updates: Partial<ListingFormData>) => {
@@ -637,6 +633,8 @@ export default function CreateListingScreen() {
   const handleImagesChange = useCallback((images: SelectedImage[]) => {
     updateFormData({ images });
   }, [updateFormData]);
+
+
 
   const handleCategorySelect = useCallback((categoryId: string) => {
     // Clear category attributes when category changes
@@ -1073,7 +1071,7 @@ export default function CreateListingScreen() {
             📋 Additional Listing Fee
           </Text>
           <Text variant="body" color="secondary" style={{ marginBottom: theme.spacing.md }}>
-            You've reached your limit of {getMaxListings()} active listings. Additional listings cost 10 credits each.
+            You&apos;ve reached your limit of {getMaxListings()} active listings. Additional listings cost 10 credits each.
           </Text>
           <Text variant="bodySmall" style={{ color: theme.colors.warning }}>
             Your balance: {balance} credits
@@ -1273,7 +1271,7 @@ export default function CreateListingScreen() {
               Listing Limit Reached
             </Text>
             <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
-              You've reached your free listing limit of {getMaxListings()} active listings
+              You&apos;ve reached your free listing limit of {getMaxListings()} active listings
             </Text>
           </View>
 
@@ -1412,6 +1410,8 @@ export default function CreateListingScreen() {
           onPress: () => setShowSuccess(false),
         }}
       />
+
+
     </SafeAreaWrapper>
   );
 }

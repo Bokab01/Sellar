@@ -117,7 +117,7 @@ export function CategoryAttributes({ attributes, values = {}, onChange }: Catego
         padding: theme.spacing.md,
       }}>
         <Text variant="bodySmall" style={{ color: theme.colors.primary, textAlign: 'center' }}>
-          ✨ Add specific details to help buyers find exactly what they're looking for
+          ✨ Add specific details to help buyers find exactly what they&apos;re looking for
         </Text>
       </View>
       

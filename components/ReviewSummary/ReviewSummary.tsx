@@ -112,7 +112,7 @@ export function ReviewSummary({
             No Reviews Yet
           </Text>
           <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
-            This seller hasn't received any reviews yet.
+            This seller hasn&apos;t received any reviews yet.
           </Text>
         </View>
       ) : (

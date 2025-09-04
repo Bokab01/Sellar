@@ -3,7 +3,7 @@ import { View, TouchableOpacity, TextInput } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Button } from '@/components/Button/Button';
 import { usePresence } from '@/hooks/usePresence';
-import { Send, Paperclip, Camera, Mic } from 'lucide-react-native';
+import { Send, Paperclip, Camera, Mic, Image as ImageIcon } from 'lucide-react-native';
 
 interface MessageInputProps {
   value: string;
@@ -12,6 +12,7 @@ interface MessageInputProps {
   onAttach?: () => void;
   onCamera?: () => void;
   onVoice?: () => void;
+  onImagePicker?: () => void;
   placeholder?: string;
   disabled?: boolean;
   conversationId?: string;
@@ -25,6 +26,7 @@ export function MessageInput({
   onAttach,
   onCamera,
   onVoice,
+  onImagePicker,
   placeholder = "Type a message...",
   disabled = false,
   conversationId,
@@ -123,6 +125,20 @@ export function MessageInput({
               onPress={onCamera}
               disabled={disabled}
               style={{ width: 36, height: 36 }}
+            />
+          )}
+
+          {onImagePicker && (
+            <Button
+              variant="icon"
+              icon={<ImageIcon size={20} color={theme.colors.primary} />}
+              onPress={onImagePicker}
+              disabled={disabled}
+              style={{ 
+                width: 36, 
+                height: 36,
+                backgroundColor: theme.colors.primary + '10',
+              }}
             />
           )}
         </View>

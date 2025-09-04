@@ -287,7 +287,7 @@ export function FeatureActivationModal({
           {/* Feature Benefits */}
           <View>
             <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.md }}>
-              What You'll Get
+              What You&apos;ll Get
             </Text>
             
             <View style={{ gap: theme.spacing.sm }}>
@@ -343,7 +343,7 @@ export function FeatureActivationModal({
             
             <Text variant="bodySmall" color="secondary">
               {hasEnoughCredits 
-                ? `You have ${balance} credits. After activation, you'll have ${balance - feature.credits} credits remaining.`
+                ? `You have ${balance} credits. After activation, you&apos;ll have ${balance - feature.credits} credits remaining.`
                 : `You need ${feature.credits} credits but only have ${balance}. Purchase more credits to continue.`
               }
             </Text>
@@ -361,7 +361,7 @@ export function FeatureActivationModal({
           >
             <Text variant="bodySmall" color="muted" style={{ textAlign: 'center', fontStyle: 'italic' }}>
               💡 Tip: Features are activated immediately and cannot be refunded. 
-              Make sure you're ready to maximize the benefits!
+              Make sure you&apos;re ready to maximize the benefits!
             </Text>
           </View>
         </View>

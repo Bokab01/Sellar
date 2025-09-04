@@ -197,7 +197,7 @@ export function CounterOfferModal({
                 marginTop: theme.spacing.sm,
               }}>
                 <Text variant="body" style={{ fontStyle: 'italic' }}>
-                  "{originalOffer.message}"
+                  &quot;{originalOffer.message}&quot;
                 </Text>
               </View>
             )}
@@ -322,7 +322,7 @@ export function CounterOfferModal({
                   <Text variant="caption" style={{ color: theme.colors.info, lineHeight: 16 }}>
                     • Be reasonable - extreme counters are often rejected{'\n'}
                     • Explain your reasoning in the message{'\n'}
-                    • Consider the item's condition and market value{'\n'}
+                    • Consider the item&apos;s condition and market value{'\n'}
                     • Counter offers expire in 3 days
                   </Text>
                 </View>

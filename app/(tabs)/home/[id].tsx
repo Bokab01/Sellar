@@ -12,10 +12,7 @@ import {
   Avatar,
   Badge,
   PriceDisplay,
-  UserProfile,
-  ReviewCard,
-  ReviewsList,
-  ReviewSummary,
+
   CompactReviewSummary,
   EmptyState,
   ErrorState,
@@ -26,10 +23,10 @@ import {
   Grid,
   ProductCard,
   ImageViewer,
+  ReviewsList,
 } from '@/components';
 import { useImageViewer } from '@/hooks/useImageViewer';
-import { Heart, Share, MessageCircle, Phone, Flag, Eye, PhoneCall, DollarSign, ArrowLeft } from 'lucide-react-native';
-import { Package } from 'lucide-react-native';
+import { Heart, Share, MessageCircle, Phone, PhoneCall, DollarSign, ArrowLeft, Package } from 'lucide-react-native';
 
 export default function ListingDetailScreen() {
   const { theme } = useTheme();
@@ -62,7 +59,7 @@ export default function ListingDetailScreen() {
   const [sendingOffer, setSendingOffer] = useState(false);
   
   // Status states
-  const [callbackRequested, setCallbackRequested] = useState(false);
+  // const [callbackRequested, setCallbackRequested] = useState(false);
   const [pendingOffer, setPendingOffer] = useState<any>(null);
   
   // Toast
@@ -84,8 +81,8 @@ export default function ListingDetailScreen() {
     currentIndex: imageViewerIndex,
     openViewer: openImageViewer,
     closeViewer: closeImageViewer,
-    shareImage,
-    downloadImage,
+    // shareImage,
+    // downloadImage,
   } = useImageViewer({ images, initialIndex: currentImageIndex });
 
   useEffect(() => {
@@ -992,7 +989,7 @@ export default function ListingDetailScreen() {
                 💰 Offer Pending
               </Text>
               <Text variant="bodySmall" color="secondary">
-                Your offer of GHS {pendingOffer.amount.toLocaleString()} is waiting for the seller's response.
+                Your offer of GHS {pendingOffer.amount.toLocaleString()} is waiting for the seller&apos;s response.
               </Text>
             </View>
           )}
@@ -1085,7 +1082,7 @@ export default function ListingDetailScreen() {
                   fontWeight: activeRelatedTab === 'seller' ? '600' : '500',
                 }}
               >
-                Seller's Items
+                Seller&apos;s Items
               </Text>
             </TouchableOpacity>
 

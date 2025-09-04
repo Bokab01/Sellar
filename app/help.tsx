@@ -188,7 +188,7 @@ export default function HelpScreen() {
       setContactMessage('');
       setToastMessage('Support request sent! We\'ll respond within 24 hours.');
       setShowToast(true);
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to send message. Please try again.');
     } finally {
       setSendingMessage(false);
@@ -321,7 +321,7 @@ export default function HelpScreen() {
               Sellar v1.0.0 • Made with ❤️ in Ghana
             </Text>
             <Text variant="caption" color="muted" style={{ textAlign: 'center' }}>
-              Ghana's premier marketplace for buying and selling
+              Ghana&apos;s premier marketplace for buying and selling
             </Text>
           </View>
         </Container>
@@ -344,7 +344,7 @@ export default function HelpScreen() {
       >
         <View style={{ gap: theme.spacing.lg }}>
           <Text variant="body" color="secondary">
-            Describe your issue and we'll get back to you within 24 hours.
+            Describe your issue and we&apos;ll get back to you within 24 hours.
           </Text>
 
           <Input
@@ -371,7 +371,7 @@ export default function HelpScreen() {
             }}
           >
             <Text variant="bodySmall" style={{ color: theme.colors.primary, textAlign: 'center' }}>
-              📧 We'll respond to your registered email address
+              📧 We&apos;ll respond to your registered email address
             </Text>
           </View>
         </View>
