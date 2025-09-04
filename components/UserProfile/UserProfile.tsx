@@ -6,7 +6,7 @@ import { Avatar } from '@/components/Avatar/Avatar';
 import { Badge } from '@/components/Badge/Badge';
 import { Rating } from '@/components/Rating/Rating';
 import { Button } from '@/components/Button/Button';
-import { MessageCircle, Phone, MapPin, Calendar, Star } from 'lucide-react-native';
+import { MessageCircle, Phone, MapPin, Calendar } from 'lucide-react-native';
 
 interface UserProfileProps {
   user: {
