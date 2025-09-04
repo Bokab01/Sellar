@@ -158,17 +158,17 @@ export default function HelpScreen() {
     {
       title: 'Terms of Service',
       icon: <FileText size={20} color={theme.colors.text.primary} />,
-      onPress: () => Linking.openURL('https://sellar.gh/terms'),
+      onPress: () => router.push('/terms-of-service'),
     },
     {
       title: 'Privacy Policy',
       icon: <Shield size={20} color={theme.colors.text.primary} />,
-      onPress: () => Linking.openURL('https://sellar.gh/privacy'),
+      onPress: () => router.push('/privacy-policy'),
     },
     {
       title: 'Safety Guidelines',
       icon: <Shield size={20} color={theme.colors.text.primary} />,
-      onPress: () => Linking.openURL('https://sellar.gh/safety'),
+      onPress: () => router.push('/safety-guidelines'),
     },
   ];
 
