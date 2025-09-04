@@ -30,7 +30,7 @@
     },
     "android": {
       "package": "com.sellar.app",
-      "googleServicesFile": "./sellar-1969b-firebase-adminsdk-fbsvc-eccbcbea49.json",
+      "googleServicesFile": "./google-services.json",
       "icon": "./assets/icon/icon-light.png",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon/icon-light.png",

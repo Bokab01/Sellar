@@ -32,5 +32,9 @@ yarn-error.*
 *firebase-adminsdk*.json
 sellar-*-firebase-adminsdk-*.json
 
+# Firebase client configuration (contains sensitive data)
+google-services.json
+GoogleService-Info.plist
+
 # Expo
 .expo/
