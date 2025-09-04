@@ -14,3 +14,7 @@ local.properties
 
 # Bundle artifacts
 *.jsbundle
+
+# Firebase service account credentials
+*firebase-adminsdk*.json
+google-services.json
