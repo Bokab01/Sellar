@@ -8,10 +8,13 @@ interface EmptyStateProps {
   icon?: React.ReactNode;
   title: string;
   description?: string;
+  message?: string;
   action?: {
     text: string;
     onPress: () => void;
   };
+  actionText?: string;
+  onActionPress?: () => void;
   style?: any;
 }
 
@@ -19,7 +22,10 @@ export function EmptyState({
   icon,
   title,
   description,
+  message,
   action,
+  actionText,
+  onActionPress,
   style,
 }: EmptyStateProps) {
   const { theme } = useTheme();
@@ -75,6 +81,22 @@ export function EmptyState({
         </Text>
       )}
 
+      {/* Message */}
+      {message && (
+        <Text
+          variant="body"
+          color="secondary"
+          style={{
+            textAlign: 'center',
+            marginBottom: theme.spacing.xl,
+            maxWidth: 280,
+            lineHeight: 22,
+          }}
+        >
+          {message}
+        </Text>
+      )}
+
       {/* Action Button */}
       {action && (
         <Button
@@ -82,6 +104,16 @@ export function EmptyState({
           onPress={action.onPress}
         >
           {action.text}
+        </Button>
+      )}
+      
+      {/* Action Button (alternative props) */}
+      {actionText && onActionPress && (
+        <Button
+          variant="primary"
+          onPress={onActionPress}
+        >
+          {actionText}
         </Button>
       )}
     </View>

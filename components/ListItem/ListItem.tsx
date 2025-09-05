@@ -21,8 +21,13 @@ interface ListItemProps {
     variant?: 'new' | 'sold' | 'featured' | 'discount' | 'success' | 'warning' | 'error' | 'info' | 'neutral';
   };
   unreadCount?: number;
+  leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   showChevron?: boolean;
+  toggle?: {
+    value: boolean;
+    onToggle: (value: boolean) => void;
+  };
   onPress?: () => void;
   style?: any;
 }
@@ -35,8 +40,10 @@ export function ListItem({
   timestamp,
   badge,
   unreadCount,
+  leftIcon,
   rightIcon,
   showChevron = false,
+  toggle,
   onPress,
   style,
 }: ListItemProps) {
@@ -69,6 +76,13 @@ export function ListItem({
           isOnline={avatar.isOnline}
           style={{ marginRight: theme.spacing.md }}
         />
+      )}
+
+      {/* Left Icon */}
+      {leftIcon && !avatar && (
+        <View style={{ marginRight: theme.spacing.md }}>
+          {leftIcon}
+        </View>
       )}
 
       {/* Content */}
@@ -170,11 +184,40 @@ export function ListItem({
           </View>
         )}
 
+        {toggle && (
+          <TouchableOpacity
+            onPress={() => toggle.onToggle(!toggle.value)}
+            style={{
+              width: 50,
+              height: 30,
+              borderRadius: 15,
+              backgroundColor: toggle.value ? theme.colors.primary : theme.colors.border,
+              justifyContent: 'center',
+              alignItems: toggle.value ? 'flex-end' : 'flex-start',
+              paddingHorizontal: 2,
+            }}
+          >
+            <View
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: 13,
+                backgroundColor: theme.colors.background,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 2,
+                elevation: 2,
+              }}
+            />
+          </TouchableOpacity>
+        )}
+
         {rightIcon && (
           <View>{rightIcon}</View>
         )}
 
-        {showChevron && (
+        {showChevron && !toggle && (
           <ChevronRight
             size={16}
             color={theme.colors.text.muted}

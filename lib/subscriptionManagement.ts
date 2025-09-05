@@ -146,7 +146,7 @@ class SubscriptionManagementService {
       }
 
       // Get plan details
-      const currentPlan = BUSINESS_PLANS.find(p => p.id === currentSub.plan_id);
+      const currentPlan = BUSINESS_PLANS.find(p => p.id === (currentSub as any).plan_id);
       const newPlan = BUSINESS_PLANS.find(p => p.id === newPlanId);
 
       if (!currentPlan || !newPlan) {
@@ -159,7 +159,7 @@ class SubscriptionManagementService {
       }
 
       // Determine when downgrade takes effect
-      const downgradeTo = effectiveDate ? new Date(effectiveDate) : new Date(currentSub.current_period_end);
+      const downgradeTo = effectiveDate ? new Date(effectiveDate) : new Date((currentSub as any).current_period_end);
       const now = new Date().toISOString();
 
       if (downgradeTo <= new Date()) {
@@ -172,10 +172,10 @@ class SubscriptionManagementService {
             status: 'active',
             current_period_start: now,
             current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
-            downgraded_from: currentSub.id,
+            downgraded_from: (currentSub as any).id,
             created_at: now,
             updated_at: now,
-          })
+          } as any)
           .select()
           .single();
 
@@ -191,10 +191,10 @@ class SubscriptionManagementService {
             cancelled_at: now,
             cancellation_reason: 'downgraded',
             updated_at: now,
-          })
-          .eq('id', currentSub.id);
+          } as any)
+          .eq('id', (currentSub as any).id);
 
-        await this.logSubscriptionChange(userId, 'downgrade', currentSub.id, newSubscription.id, {
+        await this.logSubscriptionChange(userId, 'downgrade', (currentSub as any).id, (newSubscription as any).id, {
           old_plan: currentPlan.name,
           new_plan: newPlan.name,
           effective_immediately: true,
@@ -202,7 +202,7 @@ class SubscriptionManagementService {
 
         return {
           success: true,
-          newSubscriptionId: newSubscription.id,
+          newSubscriptionId: (newSubscription as any).id,
           effectiveDate: now,
         };
       } else {

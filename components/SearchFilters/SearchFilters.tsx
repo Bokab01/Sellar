@@ -164,7 +164,7 @@ export function SmartSearchFilters({
             <Text
               variant="bodySmall"
               style={{
-                color: !localFilters.category ? theme.colors.primary : theme.colors.text,
+                color: !localFilters.category ? theme.colors.primary : theme.colors.text.primary,
                 fontWeight: !localFilters.category ? '600' : '400',
               }}
             >
@@ -192,7 +192,7 @@ export function SmartSearchFilters({
                 variant="bodySmall"
                 numberOfLines={2}
                 style={{
-                  color: localFilters.category === category.id ? theme.colors.primary : theme.colors.text,
+                  color: localFilters.category === category.id ? theme.colors.primary : theme.colors.text.primary,
                   fontWeight: localFilters.category === category.id ? '600' : '400',
                   textAlign: 'center',
                 }}
@@ -232,7 +232,7 @@ export function SmartSearchFilters({
             <Text
               variant="bodySmall"
               style={{
-                color: localFilters.condition === option.value ? theme.colors.primary : theme.colors.text,
+                color: localFilters.condition === option.value ? theme.colors.primary : theme.colors.text.primary,
                 fontWeight: localFilters.condition === option.value ? '600' : '400',
               }}
             >
@@ -295,7 +295,7 @@ export function SmartSearchFilters({
                 style={{
                   marginLeft: theme.spacing.md,
                   flex: 1,
-                  color: isSelected ? theme.colors.primary : theme.colors.text,
+                  color: isSelected ? theme.colors.primary : theme.colors.text.primary,
                   fontWeight: isSelected ? '600' : '400',
                 }}
               >
@@ -363,7 +363,7 @@ export function SmartSearchFilters({
           </View>
           
           <TouchableOpacity onPress={onClose}>
-            <X size={24} color={theme.colors.text} />
+            <X size={24} color={theme.colors.text.primary} />
           </TouchableOpacity>
         </View>
 

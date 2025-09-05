@@ -131,6 +131,7 @@ export const BUSINESS_PLANS = [
     id: 'starter_business',
     name: 'Starter Business',
     priceGHS: 100,
+    priceMonthly: 100,
     billingPeriod: 'monthly',
     boostCredits: 20,
     maxListings: 20,
@@ -147,11 +148,13 @@ export const BUSINESS_PLANS = [
       'Business badge',
       'Basic analytics',
     ],
+    popular: false,
   },
   {
     id: 'pro_business',
     name: 'Pro Business',
     priceGHS: 250,
+    priceMonthly: 250,
     billingPeriod: 'monthly',
     boostCredits: 80,
     maxListings: null, // unlimited
@@ -176,6 +179,7 @@ export const BUSINESS_PLANS = [
     id: 'premium_business',
     name: 'Premium Business',
     priceGHS: 400,
+    priceMonthly: 400,
     billingPeriod: 'monthly',
     boostCredits: 150,
     maxListings: null, // unlimited
@@ -196,6 +200,7 @@ export const BUSINESS_PLANS = [
       'Priority support & account manager',
       'Sponsored posts',
     ],
+    popular: false,
   },
 ] as const;
 

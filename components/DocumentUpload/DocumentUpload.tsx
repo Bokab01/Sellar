@@ -192,9 +192,7 @@ export function DocumentUpload({
         // For web, we need to create a File object
         const response = await fetch(asset.uri);
         const blob = await response.blob();
-        file = new File([blob], asset.name || `document.${asset.type?.split('/')[1] || 'jpg'}`, {
-          type: asset.mimeType || asset.type,
-        });
+        file = new (File as any)([blob], asset.name || `document.${asset.type?.split('/')[1] || 'jpg'}`);
       } else {
         // For mobile, create a File-like object
         file = {

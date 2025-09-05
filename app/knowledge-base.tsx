@@ -122,7 +122,7 @@ export default function KnowledgeBaseScreen() {
                 key={category.value}
                 text={category.label}
                 variant={selectedCategory === category.value ? 'primary' : 'default'}
-                size="medium"
+                size="md"
                 onPress={() => setSelectedCategory(category.value)}
                 style={{
                   paddingHorizontal: theme.spacing.md,

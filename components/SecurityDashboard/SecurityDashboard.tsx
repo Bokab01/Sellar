@@ -248,7 +248,7 @@ export function SecurityDashboard({ onSecurityEventPress }: SecurityDashboardPro
       case 'device_change':
         return 'Device access changed';
       default:
-        return event.eventType.replace('_', ' ');
+        return (event.eventType as string).replace('_', ' ');
     }
   };
 
@@ -256,7 +256,7 @@ export function SecurityDashboard({ onSecurityEventPress }: SecurityDashboardPro
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={[styles.loadingText, { color: theme.colors.text }]}>
+        <Text style={[styles.loadingText, { color: theme.colors.text.primary }]}>
           Loading security dashboard...
         </Text>
       </View>
@@ -273,7 +273,7 @@ export function SecurityDashboard({ onSecurityEventPress }: SecurityDashboardPro
       {/* Security Score */}
       <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
         <View style={styles.scoreHeader}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
             Security Score
           </Text>
           <View style={[styles.scoreCircle, { borderColor: getSecurityScoreColor(securityScore) }]}>
@@ -291,7 +291,7 @@ export function SecurityDashboard({ onSecurityEventPress }: SecurityDashboardPro
 
       {/* Quick Actions */}
       <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
           Quick Actions
         </Text>
         
@@ -300,7 +300,7 @@ export function SecurityDashboard({ onSecurityEventPress }: SecurityDashboardPro
           onPress={handleLogoutAllDevices}
         >
           <Ionicons name="log-out-outline" size={24} color={theme.colors.error} />
-          <Text style={[styles.actionText, { color: theme.colors.text }]}>
+          <Text style={[styles.actionText, { color: theme.colors.text.primary }]}>
             Logout All Devices
           </Text>
           <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
@@ -309,7 +309,7 @@ export function SecurityDashboard({ onSecurityEventPress }: SecurityDashboardPro
 
       {/* Devices */}
       <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
           Your Devices ({devices.length})
         </Text>
         
@@ -322,7 +322,7 @@ export function SecurityDashboard({ onSecurityEventPress }: SecurityDashboardPro
                 color={device.isCurrentDevice ? theme.colors.primary : theme.colors.textSecondary} 
               />
               <View style={styles.deviceText}>
-                <Text style={[styles.deviceName, { color: theme.colors.text }]}>
+                <Text style={[styles.deviceName, { color: theme.colors.text.primary }]}>
                   {device.name}
                   {device.isCurrentDevice && (
                     <Text style={[styles.currentDevice, { color: theme.colors.primary }]}>
@@ -366,7 +366,7 @@ export function SecurityDashboard({ onSecurityEventPress }: SecurityDashboardPro
 
       {/* Recent Security Events */}
       <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
           Recent Activity
         </Text>
         
@@ -385,7 +385,7 @@ export function SecurityDashboard({ onSecurityEventPress }: SecurityDashboardPro
               } 
             />
             <View style={styles.eventText}>
-              <Text style={[styles.eventTitle, { color: theme.colors.text }]}>
+              <Text style={[styles.eventTitle, { color: theme.colors.text.primary }]}>
                 {formatEventDescription(event)}
               </Text>
               <Text style={[styles.eventTime, { color: theme.colors.textSecondary }]}>

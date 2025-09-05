@@ -24,10 +24,13 @@ interface AppModalProps {
   position?: ModalPosition;
   showCloseButton?: boolean;
   dismissOnBackdrop?: boolean;
+  fullScreen?: boolean;
   primaryAction?: {
     text: string;
     onPress: () => void;
     loading?: boolean;
+    disabled?: boolean;
+    icon?: React.ReactNode;
   };
   secondaryAction?: {
     text: string;
@@ -44,6 +47,7 @@ export function AppModal({
   position = 'center',
   showCloseButton = true,
   dismissOnBackdrop = true,
+  fullScreen = false,
   primaryAction,
   secondaryAction,
 }: AppModalProps) {
@@ -51,6 +55,14 @@ export function AppModal({
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
   const getModalSize = () => {
+    if (fullScreen) {
+      return {
+        width: screenWidth,
+        height: screenHeight,
+        maxHeight: screenHeight,
+      };
+    }
+    
     const maxWidth = screenWidth - (theme.spacing.xl * 2);
     
     switch (size) {
@@ -117,7 +129,7 @@ export function AppModal({
             {
               flex: 1,
               backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              padding: size === 'full' ? 0 : theme.spacing.lg,
+              padding: (size === 'full' || fullScreen) ? 0 : theme.spacing.lg,
             },
             positionStyles,
           ]}
@@ -127,7 +139,7 @@ export function AppModal({
               style={[
                 {
                   backgroundColor: theme.colors.surface,
-                  borderRadius: size === 'full' ? 0 : theme.borderRadius.lg,
+                  borderRadius: (size === 'full' || fullScreen) ? 0 : theme.borderRadius.lg,
                   ...theme.shadows.lg,
                   overflow: 'hidden',
                   alignSelf: position === 'center' ? 'center' : 'stretch',
@@ -217,7 +229,9 @@ export function AppModal({
                       variant="primary"
                       onPress={primaryAction.onPress}
                       loading={primaryAction.loading}
+                      disabled={primaryAction.disabled}
                       style={{ flex: 1 }}
+                      leftIcon={primaryAction.icon}
                     >
                       {primaryAction.text}
                     </Button>
@@ -231,3 +245,6 @@ export function AppModal({
     </RNModal>
   );
 }
+
+// Export Modal as an alias for AppModal
+export const Modal = AppModal;

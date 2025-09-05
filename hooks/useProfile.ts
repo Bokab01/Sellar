@@ -6,6 +6,8 @@ import { useMonetizationStore } from '@/store/useMonetizationStore';
 // Types for profile management
 export interface UserProfile {
   id: string;
+  first_name?: string;
+  last_name?: string;
   username?: string;
   full_name?: string;
   email?: string;
@@ -15,6 +17,8 @@ export interface UserProfile {
   location?: string;
   date_of_birth?: string;
   gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
+  created_at?: string;
+  updated_at?: string;
   
   // Professional Information
   professional_title?: string;
@@ -62,9 +66,7 @@ export interface UserProfile {
   display_business_name?: boolean;
   business_name_priority?: 'primary' | 'secondary' | 'hidden';
   
-  // Timestamps
-  created_at: string;
-  updated_at: string;
+  // Timestamps are already declared above
 }
 
 export interface BusinessCategory {

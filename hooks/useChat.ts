@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { dbHelpers } from '@/lib/supabase';
+import { dbHelpers, supabase } from '@/lib/supabase';
 import { useChatRealtime } from './useRealtime';
 import { useAuthStore } from '@/store/useAuthStore';
 

@@ -119,7 +119,7 @@ export default function VerificationScreen() {
       completedTypes.push('email');
     }
     
-    return templates.filter(t => !completedTypes.includes(t.verification_type));
+    return templates.filter(t => !completedTypes.includes(t.verification_type as any));
   };
 
   if (requestsLoading && statusLoading) {

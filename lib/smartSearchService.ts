@@ -389,9 +389,9 @@ class SmartSearchService {
 
       if (popularSearches) {
         suggestions.push(...popularSearches.map(search => ({
-          text: search.query,
+          text: (search as any).query,
           type: 'query' as const,
-          count: search.count
+          count: (search as any).count
         })));
       }
 
@@ -406,9 +406,9 @@ class SmartSearchService {
 
       if (locations) {
         suggestions.push(...locations.map(loc => ({
-          text: loc.location,
+          text: (loc as any).location,
           type: 'location' as const,
-          count: loc.count
+          count: (loc as any).count
         })));
       }
 
@@ -432,9 +432,9 @@ class SmartSearchService {
         .limit(limit);
 
       return (data || []).map(item => ({
-        text: item.query,
+        text: (item as any).query,
         type: 'query' as const,
-        count: item.search_count
+        count: (item as any).search_count
       }));
     } catch (error) {
       console.warn('Failed to get trending searches:', error);

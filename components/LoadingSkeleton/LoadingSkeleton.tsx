@@ -6,17 +6,22 @@ interface LoadingSkeletonProps {
   width?: number | string;
   height?: number;
   borderRadius?: number;
+  count?: number;
   style?: any;
 }
 
 export function LoadingSkeleton({
-  width = '100%',
+  width = 200,
   height = 20,
   borderRadius,
+  count = 1,
   style,
 }: LoadingSkeletonProps) {
   const { theme } = useTheme();
   const animatedValue = useRef(new Animated.Value(0)).current;
+  
+  // Convert string width to number for Animated.View
+  const numericWidth = typeof width === 'string' ? 200 : width;
 
   useEffect(() => {
     const animation = Animated.loop(
@@ -44,18 +49,39 @@ export function LoadingSkeleton({
     outputRange: [theme.colors.surfaceVariant, theme.colors.border],
   });
 
+  if (count === 1) {
+    return (
+      <Animated.View
+        style={[
+          {
+            width,
+            height,
+            backgroundColor,
+            borderRadius: borderRadius ?? theme.borderRadius.sm,
+          },
+          style,
+        ]}
+      />
+    );
+  }
+
   return (
-    <Animated.View
-      style={[
-        {
-          width,
-          height,
-          backgroundColor,
-          borderRadius: borderRadius ?? theme.borderRadius.sm,
-        },
-        style,
-      ]}
-    />
+    <View style={style}>
+      {Array.from({ length: count }, (_, index) => (
+        <Animated.View
+          key={index}
+          style={[
+            {
+              width: numericWidth,
+              height,
+              backgroundColor,
+              borderRadius: borderRadius ?? theme.borderRadius.sm,
+              marginBottom: index < count - 1 ? theme.spacing.sm : 0,
+            },
+          ]}
+        />
+      ))}
+    </View>
   );
 }
 

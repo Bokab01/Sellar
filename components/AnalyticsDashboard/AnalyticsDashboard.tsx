@@ -18,7 +18,7 @@ import {
   ArrowDown,
   Minus,
   Lock,
-  Upgrade
+  ArrowUpRight
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
@@ -234,7 +234,7 @@ export function AnalyticsDashboard({ tier }: AnalyticsDashboardProps) {
         
         <View style={{
           flexDirection: 'row',
-          alignItems: 'end',
+          alignItems: 'flex-end',
           justifyContent: 'space-between',
           height: chartHeight,
         }}>
@@ -356,7 +356,7 @@ export function AnalyticsDashboard({ tier }: AnalyticsDashboardProps) {
       borderColor: theme.colors.primary + '30',
       alignItems: 'center',
     }}>
-      <Upgrade size={32} color={theme.colors.primary} style={{ marginBottom: theme.spacing.md }} />
+      <ArrowUpRight size={32} color={theme.colors.primary} style={{ marginBottom: theme.spacing.md }} />
       
       <Text variant="h4" style={{ 
         textAlign: 'center', 

@@ -9,7 +9,7 @@ import { generateDeviceFingerprint, generateSecureToken, RateLimiter } from '../
 export interface SecurityEvent {
   id: string;
   userId: string;
-  eventType: 'login' | 'failed_login' | 'password_change' | 'suspicious_activity' | 'device_change';
+  eventType: 'login' | 'failed_login' | 'password_change' | 'suspicious_activity' | 'device_change' | 'logout';
   deviceFingerprint: string;
   ipAddress?: string;
   userAgent?: string;

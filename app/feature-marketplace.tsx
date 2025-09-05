@@ -72,7 +72,7 @@ export default function FeatureMarketplaceScreen() {
     const feature = getFeatureByKey(featureKey);
     if (!feature) return;
 
-    setSelectedFeature({ key: featureKey, ...feature });
+    setSelectedFeature({ key: featureKey, ...(feature as any) });
     
     // For listing-specific features, check if user has listings
     if (['pulse_boost_24h', 'mega_pulse_7d', 'category_spotlight_3d', 'ad_refresh', 'auto_refresh_30d', 'direct_whatsapp'].includes(featureKey)) {
@@ -219,7 +219,7 @@ export default function FeatureMarketplaceScreen() {
                 const feature = getFeatureByKey(featureKey);
                 if (!feature) return null;
 
-                const canAfford = balance >= feature.credits;
+                const canAfford = balance >= (feature as any).credits;
                 const hasAccess = hasFeatureAccess(featureKey);
 
                 return (
@@ -254,13 +254,13 @@ export default function FeatureMarketplaceScreen() {
                       
                       <View style={{ flex: 1 }}>
                         <Text variant="h4" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
-                          {feature.name}
+                          {(feature as any).name}
                         </Text>
                         <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.sm }}>
-                          {feature.description}
+                          {(feature as any).description}
                         </Text>
                         <Text variant="caption" color="muted">
-                          Duration: {feature.duration}
+                          Duration: {(feature as any).duration}
                         </Text>
                       </View>
                     </View>
@@ -268,12 +268,12 @@ export default function FeatureMarketplaceScreen() {
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
                         <Badge
-                          text={`${feature.credits} Credits`}
+                          text={`${(feature as any).credits} Credits`}
                           variant={canAfford ? 'success' : 'error'}
                         />
                         
                         <Text variant="caption" color="muted">
-                          ≈ GHS {(feature.credits * 0.167).toFixed(2)}
+                          ≈ GHS {((feature as any).credits * 0.167).toFixed(2)}
                         </Text>
                       </View>
 

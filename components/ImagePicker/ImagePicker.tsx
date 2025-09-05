@@ -21,7 +21,11 @@ export interface SelectedImage {
 interface ImagePickerProps {
   limit?: number;
   value?: SelectedImage[];
+  currentImage?: string | null;
   onChange: (images: SelectedImage[]) => void;
+  onImageSelected?: (uri: string) => void;
+  bucketName?: string;
+  folder?: string;
   uploadImmediately?: boolean;
   onUploadComplete?: (urls: string[]) => void;
   disabled?: boolean;
@@ -32,7 +36,11 @@ interface ImagePickerProps {
 export function CustomImagePicker({
   limit = 5,
   value = [],
+  currentImage,
   onChange,
+  onImageSelected,
+  bucketName,
+  folder,
   uploadImmediately = false,
   onUploadComplete,
   disabled = false,

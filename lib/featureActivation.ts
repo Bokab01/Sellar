@@ -262,7 +262,7 @@ class FeatureActivationService {
       })
       .eq('id', userId);
 
-    await this.logFeatureActivity('analytics_activated', userId, null, {
+    await this.logFeatureActivity('analytics_activated', userId, undefined, {
       expires_at: expiresAt.toISOString(),
     });
   }
@@ -283,7 +283,7 @@ class FeatureActivationService {
       })
       .eq('id', userId);
 
-    await this.logFeatureActivity('priority_support_activated', userId, null, {
+    await this.logFeatureActivity('priority_support_activated', userId, undefined, {
       expires_at: expiresAt.toISOString(),
     });
   }

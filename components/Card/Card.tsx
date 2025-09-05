@@ -26,14 +26,14 @@ interface ProductCardProps {
   };
   badge?: {
     text: string;
-    variant?: 'new' | 'sold' | 'featured' | 'discount' | 'info' | 'success';
+    variant?: 'new' | 'sold' | 'featured' | 'discount' | 'info' | 'success' | 'neutral' | 'warning' | 'error';
   };
   onPress?: () => void;
   onSellerPress?: () => void;
   onActionPress?: () => void;
   actionText?: string;
   location?: string;
-  layout?: 'default' | 'grid';
+  layout?: 'default' | 'grid' | 'list';
   fullWidth?: boolean; // New prop for full-width mode
   enableImageViewer?: boolean; // New prop to enable/disable ImageViewer
 }
@@ -259,3 +259,6 @@ export function ProductCard({
   </>
   );
 }
+
+// Export Card as an alias for ProductCard
+export const Card = ProductCard;

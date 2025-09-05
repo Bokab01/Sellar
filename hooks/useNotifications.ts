@@ -22,7 +22,7 @@ export function useNotifications() {
         setError(fetchError.message);
       } else {
         setNotifications(data || []);
-        const unread = (data || []).filter(n => !n.is_read).length;
+        const unread = (data || []).filter((n: any) => !n.is_read).length;
         setUnreadCount(unread);
       }
     } catch (err) {

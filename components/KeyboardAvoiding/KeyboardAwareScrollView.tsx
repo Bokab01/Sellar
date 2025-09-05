@@ -186,7 +186,7 @@ export function KeyboardAwareScrollView({
   const enhancedContentContainerStyle: ViewStyle = {
     flexGrow: 1,
     paddingBottom: keyboardHeight > 0 ? extraScrollHeight : 0,
-    ...contentContainerStyle,
+    ...(contentContainerStyle as ViewStyle),
   };
 
   return (
@@ -275,7 +275,7 @@ export function KeyboardAwareTextInput({ children }: KeyboardAwareTextInputProps
       {children({
         onFocus: handleFocus,
         onBlur: handleBlur,
-        ref: inputRef,
+        ref: inputRef as React.RefObject<TextInput>,
       })}
     </>
   );

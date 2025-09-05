@@ -7,6 +7,7 @@ import { ArrowLeft } from 'lucide-react-native';
 interface AppHeaderProps {
   title?: string;
   showBackButton?: boolean;
+  showBack?: boolean;
   onBackPress?: () => void;
   leftAction?: React.ReactNode;
   rightActions?: React.ReactNode[];
@@ -17,6 +18,7 @@ interface AppHeaderProps {
 export function AppHeader({
   title,
   showBackButton = false,
+  showBack = false,
   onBackPress,
   leftAction,
   rightActions,
@@ -52,7 +54,7 @@ export function AppHeader({
       >
         {/* Left Side */}
         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-          {showBackButton && (
+          {(showBackButton || showBack) && (
             <TouchableOpacity
               onPress={onBackPress}
               style={{

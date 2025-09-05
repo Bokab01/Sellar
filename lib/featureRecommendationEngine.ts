@@ -221,7 +221,7 @@ class FeatureRecommendationEngine {
     }, {} as Record<string, number>) || {};
 
     const mostUsedCategory = Object.entries(categoryCount)
-      .sort(([,a], [,b]) => b - a)[0]?.[0] || 'General';
+      .sort(([,a], [,b]) => (b as number) - (a as number))[0]?.[0] || 'General';
 
     // Determine listing performance
     const listingPerformance = totalListings > 5 ? 'high' : totalListings > 2 ? 'medium' : 'low';

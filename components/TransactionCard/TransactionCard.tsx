@@ -56,7 +56,7 @@ export function TransactionCard({
       case 'cancelled':
         return <XCircle {...iconProps} color={theme.colors.text.secondary} />;
       case 'refunded':
-        return <RefreshCw {...iconProps} color={theme.colors.purple} />;
+        return <RefreshCw {...iconProps} color={theme.colors.secondary} />;
       default:
         return <Circle {...iconProps} />;
     }

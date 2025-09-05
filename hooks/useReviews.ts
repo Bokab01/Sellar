@@ -428,7 +428,7 @@ export function useReviewHelpfulVote() {
         // Decrement helpful count
         const { error: updateError } = await supabase
           .from('reviews')
-          .update({ helpful_count: supabase.raw('helpful_count - 1') })
+          .update({ helpful_count: (supabase as any).raw('helpful_count - 1') })
           .eq('id', reviewId);
 
         if (updateError) throw updateError;
@@ -448,7 +448,7 @@ export function useReviewHelpfulVote() {
         // Increment helpful count
         const { error: updateError } = await supabase
           .from('reviews')
-          .update({ helpful_count: supabase.raw('helpful_count + 1') })
+          .update({ helpful_count: (supabase as any).raw('helpful_count + 1') })
           .eq('id', reviewId);
 
         if (updateError) throw updateError;

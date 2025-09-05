@@ -39,12 +39,6 @@ export default function MyListingsScreen() {
   const [toastMessage, setToastMessage] = useState('');
   const [processing, setProcessing] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      fetchMyListings();
-    }
-  }, [user, activeTab, fetchMyListings]);
-
   const fetchMyListings = async () => {
     if (!user) return;
 
@@ -80,6 +74,12 @@ export default function MyListingsScreen() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (user) {
+      fetchMyListings();
+    }
+  }, [user, activeTab, fetchMyListings]);
 
   const handleRefresh = async () => {
     setRefreshing(true);

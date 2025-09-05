@@ -121,8 +121,8 @@ class OfferAnalyticsService {
       const topOfferCategories = Object.entries(categoryStats)
         .map(([category, stats]) => ({
           category,
-          count: stats.count,
-          avgAmount: stats.totalAmount / stats.count,
+          count: (stats as any).count,
+          avgAmount: (stats as any).totalAmount / (stats as any).count,
         }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 5);
@@ -144,9 +144,9 @@ class OfferAnalyticsService {
       const monthlyTrends = Object.entries(monthlyData)
         .map(([month, data]) => ({
           month,
-          offers: data.offers,
-          accepted: data.accepted,
-          avgAmount: data.totalAmount / data.offers,
+          offers: (data as any).offers,
+          accepted: (data as any).accepted,
+          avgAmount: (data as any).totalAmount / (data as any).offers,
         }))
         .sort((a, b) => a.month.localeCompare(b.month));
 
@@ -210,7 +210,7 @@ class OfferAnalyticsService {
       }, {} as Record<string, number>);
 
       const preferredCategories = Object.entries(categoryCount)
-        .sort(([,a], [,b]) => b - a)
+        .sort(([,a], [,b]) => (b as number) - (a as number))
         .slice(0, 3)
         .map(([category]) => category);
 

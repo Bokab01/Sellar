@@ -418,23 +418,23 @@ export default function SettingsScreen() {
                       title={item.title}
                       description={item.subtitle}
                       rightIcon={item.icon}
-                      showChevron={!item.toggle}
+                      showChevron={!(item as any).toggle}
                       onPress={item.onPress}
                       style={{
-                        borderBottomWidth: index < section.items.length - 1 || item.customContent ? 1 : 0,
+                        borderBottomWidth: index < section.items.length - 1 || (item as any).customContent ? 1 : 0,
                         paddingVertical: theme.spacing.lg,
                       }}
                     />
                     
                     {/* Custom Content */}
-                    {item.customContent && (
+                    {(item as any).customContent && (
                       <View style={{ padding: theme.spacing.lg, paddingTop: 0 }}>
-                        {item.customContent}
+                        {(item as any).customContent}
                       </View>
                     )}
 
                     {/* Toggle Switch */}
-                    {item.toggle && (
+                    {(item as any).toggle && (
                       <View
                         style={{
                           flexDirection: 'row',
@@ -445,12 +445,12 @@ export default function SettingsScreen() {
                         }}
                       >
                         <TouchableOpacity
-                          onPress={() => item.toggle!.onToggle(!item.toggle!.value)}
+                          onPress={() => (item as any).toggle!.onToggle(!(item as any).toggle!.value)}
                           style={{
                             width: 50,
                             height: 30,
                             borderRadius: 15,
-                            backgroundColor: item.toggle.value ? theme.colors.primary : theme.colors.border,
+                            backgroundColor: (item as any).toggle.value ? theme.colors.primary : theme.colors.border,
                             justifyContent: 'center',
                             paddingHorizontal: 2,
                           }}
@@ -462,7 +462,7 @@ export default function SettingsScreen() {
                               height: 26,
                               borderRadius: 13,
                               backgroundColor: theme.colors.surface,
-                              alignSelf: item.toggle.value ? 'flex-end' : 'flex-start',
+                              alignSelf: (item as any).toggle.value ? 'flex-end' : 'flex-start',
                               ...theme.shadows.sm,
                             }}
                           />

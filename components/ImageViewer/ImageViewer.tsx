@@ -41,6 +41,8 @@ interface ImageViewerProps {
   images: string[];
   initialIndex?: number;
   onClose: () => void;
+  onShare?: (imageUrl: string, index: number) => Promise<void>;
+  onDownload?: (imageUrl: string, index: number) => Promise<void>;
   showControls?: boolean;
   backgroundColor?: string;
 }
@@ -50,6 +52,8 @@ export function ImageViewer({
   images,
   initialIndex = 0,
   onClose,
+  onShare,
+  onDownload,
   showControls = true,
   backgroundColor = 'rgba(0, 0, 0, 0.9)',
 }: ImageViewerProps) {
@@ -64,10 +68,10 @@ export function ImageViewer({
   const imageTranslateX = useSharedValue(-currentIndex * screenWidth);
 
   // Refs for gesture handlers
-  const panRef = useRef();
-  const pinchRef = useRef();
-  const tapRef = useRef();
-  const doubleTapRef = useRef();
+  const panRef = useRef<any>(null);
+  const pinchRef = useRef<any>(null);
+  const tapRef = useRef<any>(null);
+  const doubleTapRef = useRef<any>(null);
 
   // Track gesture state
   const lastScale = useSharedValue(1);

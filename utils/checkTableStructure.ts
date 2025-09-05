@@ -42,7 +42,7 @@ export async function checkPaystackTableStructure() {
 
     const { data: insertData, error: insertError } = await supabase
       .from('paystack_transactions')
-      .insert(testRecord)
+      .insert(testRecord as any)
       .select()
       .single();
 
@@ -66,7 +66,7 @@ export async function checkPaystackTableStructure() {
     await supabase
       .from('paystack_transactions')
       .delete()
-      .eq('id', insertData.id);
+      .eq('id', (insertData as any).id);
 
     console.log('✅ Test record cleaned up');
 

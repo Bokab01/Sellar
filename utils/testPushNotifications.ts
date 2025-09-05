@@ -78,7 +78,7 @@ export class PushNotificationTester {
         this.addResult('Device Token Registration', false, 'Failed to get push token');
       }
     } catch (error) {
-      this.addResult('Device Token Registration', false, 'Test failed', error.message);
+      this.addResult('Device Token Registration', false, 'Test failed', (error as any).message);
     }
   }
 
@@ -110,7 +110,7 @@ export class PushNotificationTester {
         this.addResult('Notification Preferences - Update', true, 'Preferences updated successfully');
       }
     } catch (error) {
-      this.addResult('Notification Preferences', false, 'Test failed', error.message);
+      this.addResult('Notification Preferences', false, 'Test failed', (error as any).message);
     }
   }
 
@@ -135,7 +135,7 @@ export class PushNotificationTester {
         this.addResult('Local Notification', false, 'Failed to schedule local notification');
       }
     } catch (error) {
-      this.addResult('Local Notification', false, 'Test failed', error.message);
+      this.addResult('Local Notification', false, 'Test failed', (error as any).message);
     }
   }
 
@@ -158,7 +158,7 @@ export class PushNotificationTester {
         this.addResult('Database Notification Creation', true, 'Notification created successfully');
       }
     } catch (error) {
-      this.addResult('Database Notification Creation', false, 'Test failed', error.message);
+      this.addResult('Database Notification Creation', false, 'Test failed', (error as any).message);
     }
   }
 
@@ -176,7 +176,7 @@ export class PushNotificationTester {
 
       this.addResult('Push Notification Service', true, 'Push notification sent successfully');
     } catch (error) {
-      this.addResult('Push Notification Service', false, 'Test failed', error.message);
+      this.addResult('Push Notification Service', false, 'Test failed', (error as any).message);
     }
   }
 
@@ -211,7 +211,7 @@ export class PushNotificationTester {
 
       this.addResult('Notification Service Integration', true, 'All notification types sent successfully');
     } catch (error) {
-      this.addResult('Notification Service Integration', false, 'Test failed', error.message);
+      this.addResult('Notification Service Integration', false, 'Test failed', (error as any).message);
     }
   }
 
@@ -234,7 +234,7 @@ export class PushNotificationTester {
         this.addResult('Queue Processing', true, 'Notification queued successfully');
       }
     } catch (error) {
-      this.addResult('Queue Processing', false, 'Test failed', error.message);
+      this.addResult('Queue Processing', false, 'Test failed', (error as any).message);
     }
   }
 

@@ -104,6 +104,16 @@ export const lightTheme: Theme = {
     successContainer: colorPalette.success[100],
     warningContainer: colorPalette.warning[100],
     textMuted: colorPalette.neutral[500],
+    textSecondary: colorPalette.neutral[600],
+    
+    // Additional colors used in components
+    card: '#ffffff',
+    purple: colorPalette.primary[600],
+    onErrorContainer: '#ffffff',
+    destructive: colorPalette.error[600],
+    outline: colorPalette.neutral[300],
+    onPrimary: '#ffffff',
+    info: colorPalette.primary[500],
   },
   typography: baseTypography,
   spacing: baseSpacing,
@@ -163,6 +173,16 @@ export const darkTheme: Theme = {
     successContainer: colorPalette.success[800],
     warningContainer: colorPalette.warning[800],
     textMuted: colorPalette.neutral[400],
+    textSecondary: colorPalette.neutral[400],
+    
+    // Additional colors used in components
+    card: colorPalette.neutral[800],
+    purple: colorPalette.primary[400],
+    onErrorContainer: '#ffffff',
+    destructive: colorPalette.error[500],
+    outline: colorPalette.neutral[600],
+    onPrimary: '#ffffff',
+    info: colorPalette.primary[400],
   },
   typography: baseTypography,
   spacing: baseSpacing,

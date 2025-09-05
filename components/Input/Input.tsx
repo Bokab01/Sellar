@@ -12,7 +12,7 @@ import { Eye, EyeOff, Search } from 'lucide-react-native';
 import { getFontFamily } from '@/theme/fonts';
 import { useInputFocus } from '@/components/KeyboardAvoiding';
 
-type InputVariant = 'default' | 'search' | 'multiline' | 'password';
+type InputVariant = 'default' | 'search' | 'password' | 'multiline';
 type InputState = 'default' | 'focus' | 'error' | 'disabled';
 
 interface InputProps extends Omit<TextInputProps, 'style'> {
@@ -97,14 +97,11 @@ export function Input({
     lineHeight: theme.typography.body.lineHeight,
     fontFamily: theme.typography.body.fontFamily,
     color: isDisabled ? theme.colors.text.muted : theme.colors.text.primary,
-    paddingVertical: variant === 'multiline' ? theme.spacing.md : theme.spacing.sm,
+    paddingVertical: theme.spacing.sm,
     paddingHorizontal: 0, // Remove horizontal padding to prevent alignment issues
     includeFontPadding: false, // Android: Remove extra font padding
-    textAlignVertical: variant === 'multiline' ? 'top' : 'center',
-    height: variant === 'multiline' ? undefined : 40, // Fixed height for single-line inputs
-    ...(variant === 'multiline' && {
-      minHeight: 60,
-    }),
+    textAlignVertical: 'center' as const,
+    height: 40, // Fixed height for single-line inputs
   };
 
   const renderLeftIcon = () => {
@@ -129,7 +126,7 @@ export function Input({
         <View style={{ 
           marginRight: theme.spacing.sm,
           alignItems: 'center',
-          justifyContent: variant === 'multiline' ? 'flex-start' : 'center',
+          justifyContent: 'center',
           height: variant === 'multiline' ? 60 : 40, // Match input height
           width: 24, // Fixed width for consistent alignment
           paddingTop: variant === 'multiline' ? theme.spacing.md : 0,
@@ -151,9 +148,9 @@ export function Input({
             marginLeft: theme.spacing.sm,
             alignItems: 'center',
             justifyContent: 'center',
-            height: variant === 'multiline' ? 60 : 40, // Match input height
+            height: 40, // Match input height
             width: 32, // Slightly wider for touch target
-            paddingTop: variant === 'multiline' ? theme.spacing.md : 0,
+            paddingTop: 0,
           }}
         >
           {showPassword ? (
@@ -169,7 +166,7 @@ export function Input({
         <View style={{ 
           marginLeft: theme.spacing.sm,
           alignItems: 'center',
-          justifyContent: variant === 'multiline' ? 'flex-start' : 'center',
+          justifyContent: 'center',
           height: variant === 'multiline' ? 60 : 40, // Match input height
           width: 24, // Fixed width for consistent alignment
           paddingTop: variant === 'multiline' ? theme.spacing.md : 0,
@@ -204,8 +201,8 @@ export function Input({
           selectionColor={theme.colors.primary}
           cursorColor={theme.colors.primary}
           secureTextEntry={variant === 'password' && !showPassword}
-          multiline={variant === 'multiline'}
-          numberOfLines={variant === 'multiline' ? 4 : 1}
+          multiline={false}
+          numberOfLines={1}
           editable={!isDisabled}
           onFocus={(e) => {
             setIsFocused(true);
