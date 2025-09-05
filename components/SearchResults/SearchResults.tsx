@@ -342,7 +342,7 @@ export function SearchResults({
         action={
           query ? {
             text: "Browse All Categories",
-            onPress: () => router.push('/(tabs)/browse')
+            onPress: () => router.push('/(tabs)/home')
           } : undefined
         }
       />

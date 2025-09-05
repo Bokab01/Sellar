@@ -1230,7 +1230,7 @@ export default function ListingDetailScreen() {
                         variant="tertiary"
                         onPress={() => {
                           // Navigate to category view with filters
-                          router.push('/(tabs)');
+                          router.push('/(tabs)/home');
                         }}
                         fullWidth
                         style={{ marginTop: theme.spacing.lg, marginHorizontal: theme.spacing.lg }}

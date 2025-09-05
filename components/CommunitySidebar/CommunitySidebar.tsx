@@ -227,7 +227,7 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
       label: 'Notifications',
       onPress: () => {
         try {
-          router.push('/(tabs)/notifications');
+          router.push('/notifications');
           onClose();
         } catch (error) {
           Alert.alert('Coming Soon!', 'Notifications screen will be available in the next update.');
@@ -240,7 +240,7 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
       label: 'Settings',
       onPress: () => {
         try {
-          router.push('/(tabs)/settings');
+          router.push('/(tabs)/more/settings');
           onClose();
         } catch (error) {
           Alert.alert('Coming Soon!', 'Settings screen will be available in the next update.');

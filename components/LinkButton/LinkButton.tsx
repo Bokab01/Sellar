@@ -168,7 +168,7 @@ export function LinkButton({
   // For internal navigation, wrap with Link component
   if (href && !external && !onPress) {
     return (
-      <Link href={href} asChild>
+      <Link href={href as any} asChild>
         {linkContent}
       </Link>
     );

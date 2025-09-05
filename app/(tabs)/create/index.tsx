@@ -505,7 +505,7 @@ export default function CreateListingScreen() {
         try {
           // Check if router is available before navigating
           if (router && typeof router.replace === 'function') {
-            router.replace('/(tabs)');
+            router.replace('/(tabs)/home');
           } else {
             console.log('Router not available, just resetting form');
             setFormData({

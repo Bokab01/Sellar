@@ -15,7 +15,7 @@ import {
   HybridKeyboardAvoidingView,
 } from '@/components';
 import { router } from 'expo-router';
-import { Mail, Lock, User, Phone } from 'lucide-react-native';
+import { Mail, Lock, User, Phone, ArrowLeft } from 'lucide-react-native';
 
 export default function SignUpScreen() {
   const { theme } = useTheme();
@@ -114,16 +114,33 @@ export default function SignUpScreen() {
           paddingBottom: theme.spacing['4xl'],
         }}
       >
-        <Container>
+        <Container padding='sm'>
+          {/* Back Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onPress={() => router.back()}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                padding: 0,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <ArrowLeft size={20} color={theme.colors.text.primary} />
+            </Button>
+    
           <View
             style={{
               minHeight: '100%',
               justifyContent: 'center',
-              paddingVertical: theme.spacing['4xl'],
+              paddingVertical: theme.spacing['xs'],
             }}
           >
             {/* Header */}
-            <View style={{ alignItems: 'center', marginBottom: theme.spacing['3xl'] }}>
+            <View style={{ alignItems: 'center', marginBottom: theme.spacing['xl'] }}>
               <Text variant="h1" style={{ marginBottom: theme.spacing.md }}>
                 Join Sellar
               </Text>
@@ -134,7 +151,7 @@ export default function SignUpScreen() {
 
             {/* Sign Up Form */}
             <View>
-              <View style={{ flexDirection: 'row', marginBottom: theme.spacing.lg }}>
+              <View style={{ flexDirection: 'row', marginBottom: theme.spacing.md}}>
                 <View style={{ flex: 1, marginRight: theme.spacing.md }}>
                   <Input
                     label="First Name"
@@ -198,17 +215,6 @@ export default function SignUpScreen() {
                 error={errors.phone}
                 style={{ marginBottom: theme.spacing.lg }}
               />
-
-              <View style={{ marginBottom: theme.spacing.lg }}>
-                <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.sm }}>
-                  Location (Optional)
-                </Text>
-                <LocationPicker
-                  value={location}
-                  onLocationSelect={setLocation}
-                  placeholder="Select your location (optional)"
-                />
-              </View>
 
               <Input
                 variant="password"

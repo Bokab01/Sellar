@@ -15,12 +15,12 @@ export function QuickSearch({ style }: QuickSearchProps) {
   const { trending } = useTrendingSearches();
 
   const handleSearchPress = () => {
-    router.push('/(tabs)/search');
+    router.push('/search');
   };
 
   const handleTrendingPress = (query: string) => {
     router.push({
-      pathname: '/(tabs)/search',
+      pathname: '/search',
       params: { q: query }
     });
   };

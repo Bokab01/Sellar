@@ -139,7 +139,7 @@ export function PrioritySupportDashboard() {
   };
 
   const createPriorityTicket = () => {
-    router.push('/(tabs)/support-tickets');
+    router.push('/support-tickets');
   };
 
   if (loading) {
@@ -337,7 +337,7 @@ export function PrioritySupportDashboard() {
           <Button
             variant="ghost"
             size="small"
-            onPress={() => router.push('/(tabs)/support-tickets')}
+            onPress={() => router.push('/support-tickets')}
           >
             <Text variant="bodySmall" style={{ color: theme.colors.primary }}>
               View All
@@ -435,7 +435,7 @@ export function PrioritySupportDashboard() {
             title="Knowledge Base"
             description="Find answers to common questions"
             leftIcon={<MessageSquare size={20} color={theme.colors.text.primary} />}
-            onPress={() => router.push('/(tabs)/knowledge-base')}
+            onPress={() => router.push('/knowledge-base')}
             showChevron
           />
           

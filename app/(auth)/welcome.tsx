@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { View, ScrollView } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
+import { useAuth } from '@/hooks/useAuth';
+import { markUserAsExisting } from '@/hooks/useNewUserDetection';
 import {
   Text,
   SafeAreaWrapper,
   Container,
   Button,
-  LinkButton,
 } from '@/components';
 import { router } from 'expo-router';
 import { 
@@ -16,7 +17,8 @@ import {
   Shield, 
   Zap,
   ChevronRight,
-  ArrowRight
+  ArrowRight,
+  CheckCircle
 } from 'lucide-react-native';
 
 // const { width: screenWidth } = Dimensions.get('window');
@@ -31,6 +33,7 @@ interface OnboardingStep {
 
 export default function WelcomeScreen() {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
 
   const onboardingSteps: OnboardingStep[] = [
@@ -66,21 +69,24 @@ export default function WelcomeScreen() {
 
   const currentStepData = onboardingSteps[currentStep];
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentStep < onboardingSteps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      // Last step, go to sign up
-      router.push('/(auth)/sign-up');
+      // Last step, mark user as existing and go to home
+      if (user) {
+        await markUserAsExisting(user.id);
+      }
+      router.replace('/(tabs)/home');
     }
   };
 
-  const handleSkip = () => {
-    router.push('/(auth)/sign-up');
-  };
-
-  const handleSignIn = () => {
-    router.push('/(auth)/sign-in');
+  const handleSkip = async () => {
+    // Skip onboarding, mark user as existing and go to home
+    if (user) {
+      await markUserAsExisting(user.id);
+    }
+    router.replace('/(tabs)/home');
   };
 
   return (
@@ -100,7 +106,7 @@ export default function WelcomeScreen() {
                 onPress={handleSkip}
                 size="sm"
               >
-                Skip
+                Skip Tour
               </Button>
             </View>
 
@@ -177,31 +183,14 @@ export default function WelcomeScreen() {
                 onPress={handleNext}
                 fullWidth
                 size="lg"
-                icon={currentStep === onboardingSteps.length - 1 ? <ArrowRight size={20} /> : <ChevronRight size={20} />}
+                icon={currentStep === onboardingSteps.length - 1 ? <CheckCircle size={20} /> : <ChevronRight size={20} />}
                 style={{ backgroundColor: currentStepData.color }}
               >
-                {currentStep === onboardingSteps.length - 1 ? 'Get Started' : 'Continue'}
+                {currentStep === onboardingSteps.length - 1 ? 'Start Exploring' : 'Continue'}
               </Button>
-
-              {/* Secondary Action */}
-              {currentStep === onboardingSteps.length - 1 && (
-                <View style={{ alignItems: 'center' }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-                    <Text variant="body" color="secondary">
-                      Already have an account?
-                    </Text>
-                    <LinkButton
-                      variant="primary"
-                      onPress={handleSignIn}
-                    >
-                      Sign In
-                    </LinkButton>
-                  </View>
-                </View>
-              )}
             </View>
 
-            {/* Features Preview (Last Step) */}
+            {/* Welcome Message (Last Step) */}
             {currentStep === onboardingSteps.length - 1 && (
               <View 
                 style={{ 
@@ -212,22 +201,11 @@ export default function WelcomeScreen() {
                 }}
               >
                 <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.md, textAlign: 'center' }}>
-                  What you get with Sellar:
+                  Welcome to Sellar! 🎉
                 </Text>
-                <View style={{ gap: theme.spacing.sm }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-                    <Shield size={16} color={theme.colors.success} />
-                    <Text variant="caption" color="secondary">Secure transactions & verified sellers</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-                    <MessageCircle size={16} color={theme.colors.success} />
-                    <Text variant="caption" color="secondary">Built-in chat & offer system</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-                    <Zap size={16} color={theme.colors.success} />
-                    <Text variant="caption" color="secondary">Boost listings for better visibility</Text>
-                  </View>
-                </View>
+                <Text variant="caption" color="secondary" style={{ textAlign: 'center', lineHeight: 20 }}>
+                  You're all set to start buying and selling. Your account is verified and ready to go!
+                </Text>
               </View>
             )}
           </View>

@@ -47,7 +47,7 @@ export default function KnowledgeBaseScreen() {
   };
 
   const handleArticlePress = (article: any) => {
-    router.push(`/(tabs)/knowledge-base/${article.slug}`);
+    router.push(`/knowledge-base/${article.slug}` as any);
   };
 
   const handleSearch = (query: string) => {
@@ -237,7 +237,7 @@ export default function KnowledgeBaseScreen() {
                       backgroundColor: theme.colors.primary + '10',
                       borderRadius: theme.borderRadius.md,
                     }}
-                    onPress={() => router.push('/(tabs)/support-tickets')}
+                    onPress={() => router.push('/support-tickets')}
                   >
                     🎫 Create Ticket
                   </Text>
@@ -253,7 +253,7 @@ export default function KnowledgeBaseScreen() {
                       backgroundColor: theme.colors.primary + '10',
                       borderRadius: theme.borderRadius.md,
                     }}
-                    onPress={() => router.push('/(tabs)/help')}
+                    onPress={() => router.push('/help')}
                   >
                     ❓ View FAQ
                   </Text>

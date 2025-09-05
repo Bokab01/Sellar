@@ -12,7 +12,7 @@ import {
   LinkButton,
 } from '@/components';
 import { router } from 'expo-router';
-import { Mail, Lock } from 'lucide-react-native';
+import { Mail, Lock, ArrowLeft } from 'lucide-react-native';
 
 export default function SignInScreen() {
   const { theme } = useTheme();
@@ -63,7 +63,25 @@ export default function SignInScreen() {
   return (
     <SafeAreaWrapper>
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-        <Container>
+        <Container padding='sm'>
+          {/* Back Button */}
+         
+            <Button
+              variant="ghost"
+              size="sm"
+              onPress={() => router.back()}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                padding: 0,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <ArrowLeft size={20} color={theme.colors.text.primary} />
+            </Button>
+
           <View
             style={{
               flex: 1,
@@ -72,7 +90,7 @@ export default function SignInScreen() {
             }}
           >
             {/* Header */}
-            <View style={{ alignItems: 'center', marginBottom: theme.spacing['4xl'] }}>
+            <View style={{ alignItems: 'center', marginBottom: theme.spacing['xl']}}>
               <Text variant="h1" style={{ marginBottom: theme.spacing.md }}>
                 Welcome to Sellar
               </Text>
@@ -133,7 +151,7 @@ export default function SignInScreen() {
                 Forgot your password?
               </LinkButton>
 
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: theme.spacing.md }}>
                 <Text variant="body" color="secondary">
                   Don&apos;t have an account?{' '}
                 </Text>

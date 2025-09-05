@@ -134,7 +134,7 @@ export default function MoreScreen() {
               
               // Force navigation to auth screen
               setTimeout(() => {
-                router.replace('/(auth)/welcome');
+                router.replace('/(auth)/onboarding');
               }, 500); // Give time for toast to show
             } catch (error) {
               console.error('Sign out error:', error);

@@ -112,13 +112,13 @@ export class AuthErrorBoundary extends Component<Props, State> {
                 {authErrorInfo.message}
               </Text>
               <Button
-                title="Sign In Again"
+                children="Sign In Again"
                 onPress={this.handleSignIn}
                 style={{ marginBottom: 12 }}
               />
               <Button
-                title="Retry"
-                variant="outline"
+                children="Retry"
+                variant="secondary"
                 onPress={this.handleRetry}
               />
             </View>
@@ -146,7 +146,7 @@ export class AuthErrorBoundary extends Component<Props, State> {
               {this.state.errorInfo || 'An unexpected error occurred'}
             </Text>
             <Button
-              title="Try Again"
+              children="Try Again"
               onPress={this.handleRetry}
             />
           </View>

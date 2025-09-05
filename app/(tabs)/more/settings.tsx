@@ -327,7 +327,7 @@ export default function SettingsScreen() {
           title: 'Blocked Users',
           subtitle: 'Manage your blocked users list',
           icon: <Users size={20} color={theme.colors.text.primary} />,
-          onPress: () => router.push('/(tabs)/blocked-users'),
+          onPress: () => router.push('/(tabs)/more/settings'),
         },
       ],
     },

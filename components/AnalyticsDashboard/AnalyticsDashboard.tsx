@@ -378,7 +378,7 @@ export function AnalyticsDashboard({ tier }: AnalyticsDashboardProps) {
 
       <Button
         variant="primary"
-        onPress={() => router.push('/(tabs)/subscription-plans')}
+        onPress={() => router.push('/subscription-plans')}
       >
         <Text variant="body" style={{ color: theme.colors.surface }}>
           Upgrade Plan

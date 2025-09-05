@@ -313,7 +313,7 @@ export default function FeatureMarketplaceScreen() {
                 </Text>
                 <Button
                   variant="primary"
-                  onPress={() => router.push('/(tabs)/buy-credits')}
+                  onPress={() => router.push('/buy-credits')}
                   icon={<ShoppingCart size={18} color={theme.colors.primaryForeground} />}
                 >
                   Buy Credits

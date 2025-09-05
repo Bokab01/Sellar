@@ -63,7 +63,7 @@ export default function SearchScreen() {
 
   const handleResultPress = (result: any, index: number) => {
     trackClick(result, index);
-    router.push(`/listing/${result.id}`);
+    router.push(`/home/${result.id}`);
   };
 
   const handleRefresh = () => {

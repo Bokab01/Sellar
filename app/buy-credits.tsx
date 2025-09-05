@@ -123,7 +123,7 @@ export default function BuyCreditsScreen() {
           rightActions={[
             <TouchableOpacity
               key="diagnostics"
-              onPress={() => router.push('/(tabs)/paystack-diagnostics')}
+              onPress={() => router.push('/paystack-diagnostics')}
               style={{
                 padding: theme.spacing.sm,
                 backgroundColor: theme.colors.surfaceVariant,
@@ -157,7 +157,7 @@ export default function BuyCreditsScreen() {
           rightActions={[
             <TouchableOpacity
               key="diagnostics"
-              onPress={() => router.push('/(tabs)/paystack-diagnostics')}
+              onPress={() => router.push('/paystack-diagnostics')}
               style={{
                 padding: theme.spacing.sm,
                 backgroundColor: theme.colors.surfaceVariant,

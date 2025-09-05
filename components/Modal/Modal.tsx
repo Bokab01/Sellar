@@ -63,6 +63,14 @@ export function AppModal({
       };
     }
     
+    // For bottom-positioned modals, use full width
+    if (position === 'bottom') {
+      return {
+        width: screenWidth,
+        maxHeight: screenHeight * 0.8,
+      };
+    }
+    
     const maxWidth = screenWidth - (theme.spacing.xl * 2);
     
     switch (size) {
@@ -129,7 +137,7 @@ export function AppModal({
             {
               flex: 1,
               backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              padding: (size === 'full' || fullScreen) ? 0 : theme.spacing.lg,
+              padding: (size === 'full' || fullScreen || position === 'bottom') ? 0 : theme.spacing.lg,
             },
             positionStyles,
           ]}
@@ -143,13 +151,11 @@ export function AppModal({
                   ...theme.shadows.lg,
                   overflow: 'hidden',
                   alignSelf: position === 'center' ? 'center' : 'stretch',
-                  marginBottom: position === 'bottom' ? (Platform.OS === 'ios' ? 34 : 20) : 0,
                 },
                 modalSize,
                 position === 'bottom' && {
                   borderBottomLeftRadius: 0,
                   borderBottomRightRadius: 0,
-                  marginBottom: Platform.OS === 'ios' ? 34 : 20,
                 },
               ]}
             >

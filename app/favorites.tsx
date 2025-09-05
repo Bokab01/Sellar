@@ -339,7 +339,7 @@ export default function FavoritesScreen() {
             description="Save listings you're interested in to see them here. Tap the heart icon on any listing to add it to your favorites."
             action={{
               text: 'Browse Products',
-              onPress: () => router.push('/(tabs)'),
+              onPress: () => router.push('/(tabs)/home'),
             }}
           />
         )}

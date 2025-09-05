@@ -180,7 +180,7 @@ export default function InboxScreen() {
             description="Start chatting with sellers to see your conversations here."
             action={{
               text: 'Browse Products',
-              onPress: () => router.push('/(tabs)'),
+              onPress: () => router.push('/(tabs)/home'),
             }}
           />
         )}

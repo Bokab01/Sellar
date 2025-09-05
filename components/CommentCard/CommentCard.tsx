@@ -90,7 +90,7 @@ export function CommentCard({
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
             <TouchableOpacity
-              onPress={() => router.push(`/(tabs)/profile/${comment.author.id}`)}
+              onPress={() => router.push(`/profile/${comment.author.id}`)}
               activeOpacity={0.7}
             >
               <Avatar
@@ -104,7 +104,7 @@ export function CommentCard({
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
                 <TouchableOpacity
-                  onPress={() => router.push(`/(tabs)/profile/${comment.author.id}`)}
+                  onPress={() => router.push(`/profile/${comment.author.id}`)}
                   activeOpacity={0.7}
                 >
                   <Text variant="bodySmall" style={{ fontWeight: '600' }}>

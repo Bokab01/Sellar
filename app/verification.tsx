@@ -106,7 +106,7 @@ export default function VerificationScreen() {
   };
 
   const handleViewRequest = (request: VerificationRequest) => {
-    router.push(`/verification/request/${request.id}`);
+    router.push(`/verification/${request.id}` as any);
   };
 
   const getAvailableVerifications = () => {

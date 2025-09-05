@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Redirect } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
+import { useNewUserDetection } from '@/hooks/useNewUserDetection';
 import { View } from 'react-native';
 import { Text, SafeAreaWrapper } from '@/components';
 import { useTheme } from '@/theme/ThemeProvider';
 
 export default function IndexScreen() {
   const { user, loading } = useAuth();
+  const { isNewUser, loading: newUserLoading } = useNewUserDetection();
   const { theme } = useTheme();
   const [isReady, setIsReady] = useState(false);
 
@@ -19,8 +21,8 @@ export default function IndexScreen() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Show loading state while checking authentication
-  if (loading || !isReady) {
+  // Show loading state while checking authentication and new user status
+  if (loading || newUserLoading || !isReady) {
     return (
       <SafeAreaWrapper backgroundColor={theme.colors.background}>
         <View style={{ 
@@ -34,10 +36,16 @@ export default function IndexScreen() {
     );
   }
 
-  // Redirect based on authentication state
+  // Redirect based on authentication state and new user status
   if (user) {
+    // Check if user is new and show welcome screen
+    if (isNewUser === true) {
+      return <Redirect href="/(auth)/welcome" />;
+    }
+    // Existing user goes to home
     return <Redirect href="/(tabs)/home" />;
   } else {
-    return <Redirect href="/(auth)/sign-in" />;
+    // Not authenticated, show onboarding
+    return <Redirect href="/(auth)/onboarding" />;
   }
 }
