@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase, dbHelpers } from '@/lib/supabase';
+import { handleAuthError, analyzeAuthError } from '@/utils/authErrorHandler';
 import type { User, Session } from '@supabase/supabase-js';
 
 interface AuthState {
@@ -34,12 +35,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       if (error) {
-        return { error: error.message };
+        const errorInfo = analyzeAuthError(error);
+        console.warn('Sign in error:', errorInfo.message);
+        return { error: errorInfo.message };
       }
 
       return {};
     } catch (error) {
-      return { error: 'An unexpected error occurred' };
+      const errorInfo = analyzeAuthError(error);
+      console.error('Sign in catch error:', errorInfo.message);
+      return { error: errorInfo.message };
     }
   },
 

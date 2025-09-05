@@ -96,6 +96,9 @@ export { Grid } from './Grid/Grid';
 // Alert
 export { Alert } from './Alert/Alert';
 
+// Auth Error Boundary
+export { AuthErrorBoundary, useAuthErrorRecovery } from './AuthErrorBoundary/AuthErrorBoundary';
+
 // Link Button
 export { LinkButton } from './LinkButton/LinkButton';
 

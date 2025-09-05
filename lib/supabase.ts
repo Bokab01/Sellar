@@ -11,6 +11,19 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    // Enhanced error handling for refresh tokens
+    debug: __DEV__,
+  },
+  global: {
+    headers: {
+      'x-client-info': 'sellar-mobile-app',
+    },
+  },
+  // Add retry configuration for network issues
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+    },
   },
 });
 

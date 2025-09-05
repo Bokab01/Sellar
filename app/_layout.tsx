@@ -9,6 +9,7 @@ import { IntegrationStatus } from '@/components/IntegrationStatus/IntegrationSta
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 import { RewardsProvider } from '@/components/RewardsProvider/RewardsProvider';
 import { SplashScreenManager, useSplashScreen } from '@/components/SplashScreen';
+import { AuthErrorBoundary } from '@/components/AuthErrorBoundary/AuthErrorBoundary';
 import { useEffect } from 'react';
 import { securityService } from '@/lib/securityService';
 import { offlineStorage } from '@/lib/offlineStorage';
@@ -82,17 +83,18 @@ function AppContent() {
   }, [startTimer, endTimer]);
 
   return (
-    <RewardsProvider>
-      <Stack 
-        screenOptions={{ 
-          headerShown: false,
-          // Add consistent background color to prevent flashing
-          contentStyle: { backgroundColor: theme.colors.background },
-          // Optimize animations for smoother transitions
-          animation: 'slide_from_right',
-          animationDuration: 200,
-        }}
-      >
+    <AuthErrorBoundary>
+      <RewardsProvider>
+        <Stack 
+          screenOptions={{ 
+            headerShown: false,
+            // Add consistent background color to prevent flashing
+            contentStyle: { backgroundColor: theme.colors.background },
+            // Optimize animations for smoother transitions
+            animation: 'slide_from_right',
+            animationDuration: 200,
+          }}
+        >
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
@@ -132,7 +134,8 @@ function AppContent() {
           onAnimationComplete={handleAnimationComplete}
         />
       )}
-    </RewardsProvider>
+      </RewardsProvider>
+    </AuthErrorBoundary>
   );
 }
 

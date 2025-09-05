@@ -1,0 +1,216 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '@/lib/supabase';
+
+export interface AuthErrorInfo {
+  type: 'refresh_token' | 'network' | 'session' | 'unknown';
+  message: string;
+  shouldSignOut: boolean;
+  shouldRetry: boolean;
+}
+
+/**
+ * Analyzes authentication errors and provides appropriate handling strategy
+ */
+export function analyzeAuthError(error: any): AuthErrorInfo {
+  const errorMessage = error?.message || error?.toString() || 'Unknown error';
+  
+  // Refresh token errors
+  if (errorMessage.includes('Invalid Refresh Token') || 
+      errorMessage.includes('Refresh Token Not Found') ||
+      errorMessage.includes('refresh_token_not_found') ||
+      errorMessage.includes('invalid_refresh_token')) {
+    return {
+      type: 'refresh_token',
+      message: 'Session expired. Please sign in again.',
+      shouldSignOut: true,
+      shouldRetry: false,
+    };
+  }
+  
+  // Network/connectivity errors
+  if (errorMessage.includes('Network Error') ||
+      errorMessage.includes('fetch') ||
+      errorMessage.includes('timeout') ||
+      errorMessage.includes('connection')) {
+    return {
+      type: 'network',
+      message: 'Network connection issue. Please check your internet connection.',
+      shouldSignOut: false,
+      shouldRetry: true,
+    };
+  }
+  
+  // Session-related errors
+  if (errorMessage.includes('session') ||
+      errorMessage.includes('unauthorized') ||
+      errorMessage.includes('401')) {
+    return {
+      type: 'session',
+      message: 'Session invalid. Please sign in again.',
+      shouldSignOut: true,
+      shouldRetry: false,
+    };
+  }
+  
+  // Unknown errors
+  return {
+    type: 'unknown',
+    message: errorMessage,
+    shouldSignOut: false,
+    shouldRetry: false,
+  };
+}
+
+/**
+ * Handles authentication errors with appropriate recovery strategies
+ */
+export async function handleAuthError(error: any): Promise<{
+  handled: boolean;
+  shouldRedirect: boolean;
+  message?: string;
+}> {
+  const errorInfo = analyzeAuthError(error);
+  
+  console.warn(`Auth error detected [${errorInfo.type}]:`, errorInfo.message);
+  
+  try {
+    if (errorInfo.shouldSignOut) {
+      console.log('Clearing invalid session...');
+      
+      // Clear Supabase session
+      await supabase.auth.signOut({ scope: 'local' });
+      
+      // Clear any additional stored auth data
+      await clearStoredAuthData();
+      
+      return {
+        handled: true,
+        shouldRedirect: true,
+        message: errorInfo.message,
+      };
+    }
+    
+    if (errorInfo.shouldRetry) {
+      console.log('Network error detected, will retry...');
+      return {
+        handled: true,
+        shouldRedirect: false,
+        message: errorInfo.message,
+      };
+    }
+    
+    return {
+      handled: false,
+      shouldRedirect: false,
+      message: errorInfo.message,
+    };
+    
+  } catch (recoveryError) {
+    console.error('Error during auth error recovery:', recoveryError);
+    return {
+      handled: false,
+      shouldRedirect: false,
+      message: 'Failed to recover from authentication error',
+    };
+  }
+}
+
+/**
+ * Clears all stored authentication-related data
+ */
+export async function clearStoredAuthData(): Promise<void> {
+  try {
+    // Clear security service sessions
+    const keys = await AsyncStorage.getAllKeys();
+    const sessionKeys = keys.filter(key => 
+      key.startsWith('session_') || 
+      key === 'current_session_id' ||
+      key.startsWith('device_') ||
+      key.includes('auth_')
+    );
+    
+    if (sessionKeys.length > 0) {
+      await AsyncStorage.multiRemove(sessionKeys);
+      console.log(`Cleared ${sessionKeys.length} auth-related storage items`);
+    }
+    
+  } catch (error) {
+    console.warn('Error clearing stored auth data:', error);
+  }
+}
+
+/**
+ * Validates if a session is still valid
+ */
+export async function validateSession(): Promise<{
+  isValid: boolean;
+  error?: string;
+}> {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      const errorInfo = analyzeAuthError(error);
+      return {
+        isValid: false,
+        error: errorInfo.message,
+      };
+    }
+    
+    if (!session) {
+      return {
+        isValid: false,
+        error: 'No active session',
+      };
+    }
+    
+    // Check if session is expired
+    const expiresAt = session.expires_at;
+    if (expiresAt && Date.now() / 1000 > expiresAt) {
+      return {
+        isValid: false,
+        error: 'Session expired',
+      };
+    }
+    
+    return { isValid: true };
+    
+  } catch (error) {
+    const errorInfo = analyzeAuthError(error);
+    return {
+      isValid: false,
+      error: errorInfo.message,
+    };
+  }
+}
+
+/**
+ * Retry mechanism for auth operations
+ */
+export async function retryAuthOperation<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  delay: number = 1000
+): Promise<T> {
+  let lastError: any;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      const errorInfo = analyzeAuthError(error);
+      
+      // Don't retry if it's a refresh token error
+      if (!errorInfo.shouldRetry || attempt === maxRetries) {
+        throw error;
+      }
+      
+      console.log(`Auth operation failed (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      delay *= 2; // Exponential backoff
+    }
+  }
+  
+  throw lastError;
+}
