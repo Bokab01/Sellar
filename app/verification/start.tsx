@@ -47,9 +47,7 @@ export default function VerificationStartScreen() {
   const [verificationCode, setVerificationCode] = useState('');
   const [verificationStep, setVerificationStep] = useState<'form' | 'documents' | 'code' | 'success'>('form');
 
-  const { currentStep, nextStep, prevStep, goToStep } = useMultiStepForm({
-    totalSteps: 3,
-  });
+  const { currentStep, nextStep, previousStep, goToStep } = useMultiStepForm(3);
 
   useEffect(() => {
     if (type && templates.length > 0) {

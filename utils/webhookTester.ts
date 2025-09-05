@@ -32,8 +32,8 @@ export async function testWebhookConfiguration(): Promise<WebhookTestResult> {
     console.log('📊 Recent transactions:', transactions);
 
     // 3. Check for webhook processing status
-    const processedWebhooks = transactions?.filter(t => t.webhook_received) || [];
-    const pendingWebhooks = transactions?.filter(t => !t.webhook_received && t.status === 'pending') || [];
+    const processedWebhooks = transactions?.filter(t => (t as any).webhook_received) || [];
+    const pendingWebhooks = transactions?.filter(t => !(t as any).webhook_received && (t as any).status === 'pending') || [];
 
     return {
       success: true,
@@ -44,11 +44,11 @@ export async function testWebhookConfiguration(): Promise<WebhookTestResult> {
         processedWebhooks: processedWebhooks.length,
         pendingWebhooks: pendingWebhooks.length,
         recentTransactions: transactions?.map(t => ({
-          reference: t.reference,
-          status: t.status,
-          webhook_received: t.webhook_received,
-          webhook_processed: t.webhook_processed,
-          created_at: t.created_at
+          reference: (t as any).reference,
+          status: (t as any).status,
+          webhook_received: (t as any).webhook_received,
+          webhook_processed: (t as any).webhook_processed,
+          created_at: (t as any).created_at
         }))
       }
     };
@@ -85,13 +85,13 @@ export async function simulateWebhookCall(reference: string): Promise<WebhookTes
     const webhookPayload = {
       event: 'charge.success',
       data: {
-        id: transaction.transaction_id || 'test_transaction_id',
+        id: (transaction as any).transaction_id || 'test_transaction_id',
         reference: reference,
-        amount: transaction.amount * 100, // Convert to pesewas
+        amount: (transaction as any).amount * 100, // Convert to pesewas
         status: 'success',
         paid_at: new Date().toISOString(),
         customer: {
-          email: transaction.customer_email
+          email: (transaction as any).customer_email
         }
       }
     };

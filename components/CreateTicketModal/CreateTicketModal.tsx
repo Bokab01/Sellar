@@ -70,7 +70,7 @@ export function CreateTicketModal({ visible, onClose, onTicketCreated }: CreateT
         osVersion: Device.osVersion,
         appVersion: Application.nativeApplicationVersion,
         buildVersion: Application.nativeBuildVersion,
-      };
+      } as any;
 
       return deviceInfo;
     } catch (error) {

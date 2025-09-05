@@ -114,9 +114,9 @@ export function VirtualizedList<T>({
   }, [onViewableItemsChanged]);
 
   // Optimized get item layout for better scrolling performance
-  const optimizedGetItemLayout = useCallback((data: T[] | null | undefined, index: number) => {
+  const optimizedGetItemLayout = useCallback((data: ArrayLike<T> | null | undefined, index: number) => {
     if (getItemLayout) {
-      return getItemLayout(data, index);
+      return getItemLayout(data as T[] | null | undefined, index);
     }
     
     // Default layout calculation
@@ -156,7 +156,7 @@ export function VirtualizedList<T>({
   if (loading && data.length === 0) {
     return (
       <View style={[{ flex: 1 }, style]}>
-        {ListHeaderComponent}
+        {ListHeaderComponent && typeof ListHeaderComponent === 'function' ? (ListHeaderComponent as any)() : ListHeaderComponent}
         <View style={contentContainerStyle}>
           {Array.from({ length: initialNumToRender }).map((_, index) => (
             <ProductCardSkeleton key={index} />
@@ -188,14 +188,14 @@ export function VirtualizedList<T>({
           }}
         >
           <Text variant="h4" style={{ 
-            color: theme.colors.onErrorContainer,
+            color: theme.colors.errorContainer,
             marginBottom: theme.spacing.md,
             textAlign: 'center',
           }}>
             Something went wrong
           </Text>
           <Text variant="body" style={{ 
-            color: theme.colors.onErrorContainer,
+            color: theme.colors.errorContainer,
             textAlign: 'center',
             opacity: 0.8,
           }}>

@@ -235,7 +235,7 @@ export function SmartSearchBar({
           style={{
             flex: 1,
             fontSize: 16,
-            color: theme.colors.text,
+            color: theme.colors.text.primary,
             paddingVertical: theme.spacing.sm,
           }}
         />

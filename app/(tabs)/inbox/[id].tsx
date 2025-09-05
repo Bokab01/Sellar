@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, TouchableOpacity } from 'react-native';
+import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, TouchableOpacity, Linking } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useMessages } from '@/hooks/useChat';
@@ -85,12 +85,12 @@ export default function ChatScreen() {
     try {
       const { data, error } = await dbHelpers.getConversations(user!.id);
       if (data) {
-        const conv = data.find(c => c.id === conversationId);
+        const conv = (data as any).find((c: any) => c.id === conversationId);
         if (conv) {
           setConversation(conv);
-          const otherParticipant = conv.participant_1_profile?.id === user!.id 
-            ? conv.participant_2_profile 
-            : conv.participant_1_profile;
+          const otherParticipant = (conv as any).participant_1_profile?.id === user!.id 
+            ? (conv as any).participant_2_profile 
+            : (conv as any).participant_1_profile;
           setOtherUser(otherParticipant);
         }
       }
@@ -337,30 +337,7 @@ export default function ChatScreen() {
   return (
     <SafeAreaWrapper>
       <AppHeader
-        title={
-          <View style={{ alignItems: 'center' }}>
-            <Text variant="body" style={{ fontWeight: '600' }}>
-              {otherUser ? `${otherUser.first_name} ${otherUser.last_name}` : 'Chat'}
-            </Text>
-            {otherUser && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
-                {otherUser.is_online && (
-                  <View
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: theme.colors.success,
-                    }}
-                  />
-                )}
-                <Text variant="caption" color="muted">
-                  {getLastSeenText()}
-                </Text>
-              </View>
-            )}
-          </View>
-        }
+        title={otherUser ? `${otherUser.first_name} ${otherUser.last_name}` : 'Chat'}
         showBackButton
         onBackPress={() => router.back()}
         rightActions={[

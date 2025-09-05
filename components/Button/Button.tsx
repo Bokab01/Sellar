@@ -9,7 +9,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 
 type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'ghost' | 'icon' | 'fab';
-type ButtonSize = 'sm' | 'md' | 'lg';
+type ButtonSize = 'sm' | 'md' | 'lg' | 'small' | 'large';
 
 interface ButtonProps extends TouchableOpacityProps {
   variant?: ButtonVariant;
@@ -18,6 +18,7 @@ interface ButtonProps extends TouchableOpacityProps {
   disabled?: boolean;
   children?: React.ReactNode;
   icon?: React.ReactNode;
+  leftIcon?: React.ReactNode;
   fullWidth?: boolean;
 }
 
@@ -28,6 +29,7 @@ export function Button({
   disabled = false,
   children,
   icon,
+  leftIcon,
   fullWidth = false,
   style,
   ...props
@@ -51,12 +53,22 @@ export function Button({
         paddingVertical: theme.spacing.sm,
         minHeight: 36,
       },
+      small: {
+        paddingHorizontal: theme.spacing.md,
+        paddingVertical: theme.spacing.sm,
+        minHeight: 36,
+      },
       md: {
         paddingHorizontal: theme.spacing.lg,
         paddingVertical: theme.spacing.md,
         minHeight: 44,
       },
       lg: {
+        paddingHorizontal: theme.spacing.xl,
+        paddingVertical: theme.spacing.lg,
+        minHeight: 52,
+      },
+      large: {
         paddingHorizontal: theme.spacing.xl,
         paddingVertical: theme.spacing.lg,
         minHeight: 52,
@@ -173,7 +185,20 @@ export function Button({
               </Text>
             </>
           )}
-          {children && !icon && variant !== 'icon' && (
+          {leftIcon && children && !icon && (
+            <>
+              <View style={{ marginRight: theme.spacing.sm }}>
+                {leftIcon}
+              </View>
+              <Text
+                variant="button"
+                style={{ color: getTextColor() }}
+              >
+                {children}
+              </Text>
+            </>
+          )}
+          {children && !icon && !leftIcon && variant !== 'icon' && (
             <Text
               variant="button"
               style={{ 

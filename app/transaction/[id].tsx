@@ -383,7 +383,7 @@ export default function TransactionDetailsScreen() {
                       Balance Before
                     </Text>
                     <Text variant="h3">
-                      {formatCredits(transaction.balance_before)}
+                      {formatCredits(transaction.balance_before || 0)}
                     </Text>
                   </View>
                 )}
@@ -394,7 +394,7 @@ export default function TransactionDetailsScreen() {
                       Balance After
                     </Text>
                     <Text variant="h3">
-                      {formatCredits(transaction.balance_after)}
+                      {formatCredits(transaction.balance_after || 0)}
                     </Text>
                   </View>
                 )}

@@ -19,7 +19,7 @@ export function useOfflineSync() {
     syncError: null,
   });
 
-  const syncTimeoutRef = useRef<NodeJS.Timeout>();
+  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Initialize offline state

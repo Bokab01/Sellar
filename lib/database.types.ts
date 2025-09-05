@@ -6,6 +6,9 @@ export interface Database {
           id: string;
           first_name: string;
           last_name: string;
+          full_name?: string;
+          username?: string;
+          email?: string;
           phone: string | null;
           avatar_url: string | null;
           location: string;
@@ -21,27 +24,27 @@ export interface Database {
           created_at: string;
           updated_at: string;
           // Professional fields
-          professional_title: string | null;
-          years_of_experience: number | null;
+          professional_title?: string | null;
+          years_of_experience?: number | null;
           // Contact preferences
-          preferred_contact_method: 'app' | 'phone' | 'email' | 'whatsapp';
-          response_time_expectation: 'within_minutes' | 'within_hours' | 'within_day' | 'within_week';
+          preferred_contact_method?: 'app' | 'phone' | 'email' | 'whatsapp';
+          response_time_expectation?: 'within_minutes' | 'within_hours' | 'within_day' | 'within_week';
           // Privacy settings
-          phone_visibility: 'public' | 'contacts' | 'private';
-          email_visibility: 'public' | 'contacts' | 'private';
-          show_online_status: boolean;
-          show_last_seen: boolean;
+          phone_visibility?: 'public' | 'contacts' | 'private';
+          email_visibility?: 'public' | 'contacts' | 'private';
+          show_online_status?: boolean;
+          show_last_seen?: boolean;
           // Business fields
-          business_name: string | null;
-          business_type: string | null;
-          business_description: string | null;
-          business_phone: string | null;
-          business_email: string | null;
-          business_website: string | null;
-          display_business_name: boolean;
-          business_name_priority: 'primary' | 'secondary' | 'hidden';
-          // Additional fields found in code
-          full_name?: string;
+          is_business?: boolean;
+          business_name?: string | null;
+          business_type?: string | null;
+          business_description?: string | null;
+          business_phone?: string | null;
+          business_email?: string | null;
+          business_website?: string | null;
+          display_business_name?: boolean;
+          business_name_priority?: 'primary' | 'secondary' | 'hidden';
+          // Additional fields
           account_type?: string;
           verification_status?: string;
         };
@@ -49,6 +52,9 @@ export interface Database {
           id: string;
           first_name: string;
           last_name: string;
+          full_name?: string;
+          username?: string;
+          email?: string;
           phone?: string | null;
           avatar_url?: string | null;
           location?: string;
@@ -75,6 +81,7 @@ export interface Database {
           show_online_status?: boolean;
           show_last_seen?: boolean;
           // Business fields
+          is_business?: boolean;
           business_name?: string | null;
           business_type?: string | null;
           business_description?: string | null;
@@ -83,8 +90,7 @@ export interface Database {
           business_website?: string | null;
           display_business_name?: boolean;
           business_name_priority?: 'primary' | 'secondary' | 'hidden';
-          // Additional fields found in code
-          full_name?: string;
+          // Additional fields
           account_type?: string;
           verification_status?: string;
         };
@@ -92,6 +98,9 @@ export interface Database {
           id?: string;
           first_name?: string;
           last_name?: string;
+          full_name?: string;
+          username?: string;
+          email?: string;
           phone?: string | null;
           avatar_url?: string | null;
           location?: string;
@@ -118,6 +127,7 @@ export interface Database {
           show_online_status?: boolean;
           show_last_seen?: boolean;
           // Business fields
+          is_business?: boolean;
           business_name?: string | null;
           business_type?: string | null;
           business_description?: string | null;
@@ -126,8 +136,7 @@ export interface Database {
           business_website?: string | null;
           display_business_name?: boolean;
           business_name_priority?: 'primary' | 'secondary' | 'hidden';
-          // Additional fields found in code
-          full_name?: string;
+          // Additional fields
           account_type?: string;
           verification_status?: string;
         };
@@ -879,7 +888,6 @@ export interface Database {
           updated_at?: string;
         };
       };
-      // Missing tables found in code
       transactions: {
         Row: {
           id: string;

@@ -37,7 +37,7 @@ class OfflineStorage {
 
   private syncQueue: SyncQueueItem[] = [];
   private isOnline: boolean = true;
-  private syncTimer: NodeJS.Timeout | null = null;
+  private syncTimer: ReturnType<typeof setInterval> | null = null;
   private listeners: ((isOnline: boolean) => void)[] = [];
 
   constructor(config?: Partial<OfflineConfig>) {

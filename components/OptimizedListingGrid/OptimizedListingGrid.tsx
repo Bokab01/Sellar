@@ -62,6 +62,9 @@ export function OptimizedListingGrid({
   const { shouldLoadHeavyComponent, memoryUsage } = useMemoryManager();
   const { startTimer, endTimer } = usePerformanceMonitor();
   const { isOnline } = useOfflineSync();
+  
+  // Mock pending changes count - in real app this would come from state
+  const pendingChanges = 0;
 
   // Calculate optimal item dimensions
   const itemDimensions = useMemo(() => {
@@ -300,8 +303,8 @@ export function useOptimizedListingGrid(initialListings: Listing[] = []) {
     refreshing,
     error,
     hasMore,
-    loadMore: () => loadMore(loadMoreListings),
-    refresh: () => refresh(refreshListings),
+    loadMore: (loadMore as any)(loadMoreListings),
+    refresh: (refresh as any)(refreshListings),
     reset,
   };
 }

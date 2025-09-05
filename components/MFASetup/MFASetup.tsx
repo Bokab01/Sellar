@@ -217,7 +217,7 @@ export function MFASetup({ onMFAStatusChange }: MFASetupProps) {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={[styles.loadingText, { color: theme.colors.text }]}>
+        <Text style={[styles.loadingText, { color: theme.colors.text.primary }]}>
           Loading MFA settings...
         </Text>
       </View>
@@ -235,7 +235,7 @@ export function MFASetup({ onMFAStatusChange }: MFASetupProps) {
               color={mfaEnabled ? theme.colors.success || '#4CAF50' : theme.colors.textSecondary} 
             />
             <View style={styles.headerText}>
-              <Text style={[styles.title, { color: theme.colors.text }]}>
+              <Text style={[styles.title, { color: theme.colors.text.primary }]}>
                 Two-Factor Authentication
               </Text>
               <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
@@ -274,8 +274,8 @@ export function MFASetup({ onMFAStatusChange }: MFASetupProps) {
                 style={[styles.secondaryButton, { borderColor: theme.colors.border }]}
                 onPress={() => setShowBackupCodes(true)}
               >
-                <Ionicons name="key-outline" size={20} color={theme.colors.text} />
-                <Text style={[styles.secondaryButtonText, { color: theme.colors.text }]}>
+                <Ionicons name="key-outline" size={20} color={theme.colors.text.primary} />
+                <Text style={[styles.secondaryButtonText, { color: theme.colors.text.primary }]}>
                   View Backup Codes
                 </Text>
               </TouchableOpacity>
@@ -303,9 +303,9 @@ export function MFASetup({ onMFAStatusChange }: MFASetupProps) {
         <View style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
           <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
             <TouchableOpacity onPress={() => setShowSetupModal(false)}>
-              <Ionicons name="close" size={24} color={theme.colors.text} />
+              <Ionicons name="close" size={24} color={theme.colors.text.primary} />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.text.primary }]}>
               Setup Two-Factor Authentication
             </Text>
             <View style={{ width: 24 }} />
@@ -314,7 +314,7 @@ export function MFASetup({ onMFAStatusChange }: MFASetupProps) {
           <ScrollView style={styles.modalContent}>
             {setupStep === 1 && (
               <View style={styles.step}>
-                <Text style={[styles.stepTitle, { color: theme.colors.text }]}>
+                <Text style={[styles.stepTitle, { color: theme.colors.text.primary }]}>
                   Step 1: Install Authenticator App
                 </Text>
                 <Text style={[styles.stepDescription, { color: theme.colors.textSecondary }]}>
@@ -333,7 +333,7 @@ export function MFASetup({ onMFAStatusChange }: MFASetupProps) {
 
             {setupStep === 2 && (
               <View style={styles.step}>
-                <Text style={[styles.stepTitle, { color: theme.colors.text }]}>
+                <Text style={[styles.stepTitle, { color: theme.colors.text.primary }]}>
                   Step 2: Scan QR Code
                 </Text>
                 <Text style={[styles.stepDescription, { color: theme.colors.textSecondary }]}>
@@ -355,7 +355,7 @@ export function MFASetup({ onMFAStatusChange }: MFASetupProps) {
                 <TextInput
                   style={[styles.codeInput, { 
                     borderColor: theme.colors.border, 
-                    color: theme.colors.text,
+                    color: theme.colors.text.primary,
                     backgroundColor: theme.colors.background 
                   }]}
                   placeholder="Enter 6-digit code"
@@ -386,7 +386,7 @@ export function MFASetup({ onMFAStatusChange }: MFASetupProps) {
 
             {setupStep === 3 && (
               <View style={styles.step}>
-                <Text style={[styles.stepTitle, { color: theme.colors.text }]}>
+                <Text style={[styles.stepTitle, { color: theme.colors.text.primary }]}>
                   Step 3: Save Backup Codes
                 </Text>
                 <Text style={[styles.stepDescription, { color: theme.colors.textSecondary }]}>
@@ -396,7 +396,7 @@ export function MFASetup({ onMFAStatusChange }: MFASetupProps) {
 
                 <View style={[styles.backupCodesContainer, { backgroundColor: theme.colors.background }]}>
                   {backupCodes.map((backup, index) => (
-                    <Text key={index} style={[styles.backupCode, { color: theme.colors.text }]}>
+                    <Text key={index} style={[styles.backupCode, { color: theme.colors.text.primary }]}>
                       {backup.code}
                     </Text>
                   ))}
@@ -407,8 +407,8 @@ export function MFASetup({ onMFAStatusChange }: MFASetupProps) {
                     style={[styles.secondaryButton, { borderColor: theme.colors.border }]}
                     onPress={copyBackupCodes}
                   >
-                    <Ionicons name="copy-outline" size={20} color={theme.colors.text} />
-                    <Text style={[styles.secondaryButtonText, { color: theme.colors.text }]}>
+                    <Ionicons name="copy-outline" size={20} color={theme.colors.text.primary} />
+                    <Text style={[styles.secondaryButtonText, { color: theme.colors.text.primary }]}>
                       Copy Codes
                     </Text>
                   </TouchableOpacity>
@@ -417,8 +417,8 @@ export function MFASetup({ onMFAStatusChange }: MFASetupProps) {
                     style={[styles.secondaryButton, { borderColor: theme.colors.border }]}
                     onPress={downloadBackupCodes}
                   >
-                    <Ionicons name="download-outline" size={20} color={theme.colors.text} />
-                    <Text style={[styles.secondaryButtonText, { color: theme.colors.text }]}>
+                    <Ionicons name="download-outline" size={20} color={theme.colors.text.primary} />
+                    <Text style={[styles.secondaryButtonText, { color: theme.colors.text.primary }]}>
                       Download
                     </Text>
                   </TouchableOpacity>
@@ -445,9 +445,9 @@ export function MFASetup({ onMFAStatusChange }: MFASetupProps) {
         <View style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
           <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
             <TouchableOpacity onPress={() => setShowBackupCodes(false)}>
-              <Ionicons name="close" size={24} color={theme.colors.text} />
+              <Ionicons name="close" size={24} color={theme.colors.text.primary} />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.text.primary }]}>
               Backup Codes
             </Text>
             <View style={{ width: 24 }} />
@@ -465,7 +465,7 @@ export function MFASetup({ onMFAStatusChange }: MFASetupProps) {
                   <Text style={[
                     styles.backupCode, 
                     { 
-                      color: backup.used ? theme.colors.textSecondary : theme.colors.text,
+                      color: backup.used ? theme.colors.textSecondary : theme.colors.text.primary,
                       textDecorationLine: backup.used ? 'line-through' : 'none'
                     }
                   ]}>
@@ -485,8 +485,8 @@ export function MFASetup({ onMFAStatusChange }: MFASetupProps) {
                 style={[styles.secondaryButton, { borderColor: theme.colors.border }]}
                 onPress={copyBackupCodes}
               >
-                <Ionicons name="copy-outline" size={20} color={theme.colors.text} />
-                <Text style={[styles.secondaryButtonText, { color: theme.colors.text }]}>
+                <Ionicons name="copy-outline" size={20} color={theme.colors.text.primary} />
+                <Text style={[styles.secondaryButtonText, { color: theme.colors.text.primary }]}>
                   Copy Codes
                 </Text>
               </TouchableOpacity>

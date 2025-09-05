@@ -92,17 +92,17 @@ export default function WalletScreen() {
       borderColor: theme.colors.border,
     },
     // Common layout styles
-    rowSpaceBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    rowCenter: { flexDirection: 'row', alignItems: 'center' },
-    rowCenterGap: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md },
+    rowSpaceBetween: { flexDirection: 'row' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const },
+    rowCenter: { flexDirection: 'row' as const, alignItems: 'center' as const },
+    rowCenterGap: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: theme.spacing.md },
     flex1: { flex: 1 },
     gapMd: { gap: theme.spacing.md },
-    alignEnd: { alignItems: 'flex-end' },
+    alignEnd: { alignItems: 'flex-end' as const },
     // Text styles
     sectionTitle: { marginBottom: theme.spacing.lg },
     itemTitle: { marginRight: theme.spacing.sm },
     itemDescription: { marginBottom: theme.spacing.sm },
-    itemCredits: { fontWeight: '600', fontSize: 16 },
+    itemCredits: { fontWeight: '600' as const, fontSize: 16 },
     zapIcon: { marginRight: theme.spacing.xs },
     // Loading styles
     loadingMain: { marginBottom: theme.spacing.xl },

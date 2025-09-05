@@ -13,6 +13,7 @@ interface StepIndicatorProps {
   currentStep: number;
   orientation?: 'horizontal' | 'vertical';
   showLabels?: boolean;
+  style?: any;
 }
 
 export function StepIndicator({
@@ -20,6 +21,7 @@ export function StepIndicator({
   currentStep,
   orientation = 'horizontal',
   showLabels = true,
+  style,
 }: StepIndicatorProps) {
   const { theme } = useTheme();
 
@@ -53,7 +55,7 @@ export function StepIndicator({
 
   if (orientation === 'vertical') {
     return (
-      <View style={{ paddingVertical: theme.spacing.md }}>
+      <View style={[{ paddingVertical: theme.spacing.md }, style]}>
         {steps.map((step, index) => (
           <View key={index} style={{ flexDirection: 'row', alignItems: 'center' }}>
             {/* Step Circle */}
@@ -125,7 +127,7 @@ export function StepIndicator({
 
   // Horizontal orientation
   return (
-    <View style={{ paddingVertical: theme.spacing.md }}>
+    <View style={[{ paddingVertical: theme.spacing.md }, style]}>
       {/* Step Circles */}
       <View
         style={{

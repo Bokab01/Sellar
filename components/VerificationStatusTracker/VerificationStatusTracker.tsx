@@ -31,6 +31,21 @@ export function VerificationStatusTracker({
 }: VerificationStatusTrackerProps) {
   const { theme } = useTheme();
 
+  const formatActionText = (action: string) => {
+    const actionMap: Record<string, string> = {
+      submitted: 'Application Submitted',
+      document_uploaded: 'Document Uploaded',
+      updated: 'Application Updated',
+      reviewed: 'Under Review',
+      approved: 'Approved',
+      rejected: 'Rejected',
+      expired: 'Expired',
+      cancelled: 'Cancelled',
+      document_removed: 'Document Removed',
+    };
+    return actionMap[action] || action.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
   const getStatusIcon = (status: string, size: number = 24) => {
     const color = getVerificationStatusColor(status);
     
@@ -69,20 +84,6 @@ export function VerificationStatusTracker({
     }
   };
 
-  const formatActionText = (action: string) => {
-    const actionMap: Record<string, string> = {
-      submitted: 'Application Submitted',
-      document_uploaded: 'Document Uploaded',
-      updated: 'Application Updated',
-      reviewed: 'Under Review',
-      approved: 'Approved',
-      rejected: 'Rejected',
-      expired: 'Expired',
-      cancelled: 'Cancelled',
-      document_removed: 'Document Removed',
-    };
-    return actionMap[action] || action.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-  };
 
   const getTimelineSteps = () => {
     const steps = [
@@ -413,6 +414,21 @@ export function VerificationActivityFeed({
   style?: any;
 }) {
   const { theme } = useTheme();
+
+  const formatActionText = (action: string) => {
+    const actionMap: Record<string, string> = {
+      submitted: 'Application Submitted',
+      document_uploaded: 'Document Uploaded',
+      updated: 'Application Updated',
+      reviewed: 'Under Review',
+      approved: 'Approved',
+      rejected: 'Rejected',
+      expired: 'Expired',
+      cancelled: 'Cancelled',
+      document_removed: 'Document Removed',
+    };
+    return actionMap[action] || action.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
 
   if (history.length === 0) {
     return (

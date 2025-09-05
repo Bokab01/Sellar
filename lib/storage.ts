@@ -195,18 +195,18 @@ export const storageHelpers = {
           }
         }
 
-        console.log('Direct upload successful:', data.path);
+        console.log('Direct upload successful:', (data as any)?.path);
 
         // Get public URL
         const { data: urlData } = supabase.storage
           .from(bucket)
-          .getPublicUrl(data.path);
+          .getPublicUrl((data as any)?.path || '');
 
         // Trigger image optimization pipeline if enabled
         if (enableOptimization && userId) {
           try {
             console.log('🔄 Triggering image optimization pipeline...');
-            await triggerImageOptimization(bucket, data.path, userId);
+            await triggerImageOptimization(bucket, (data as any)?.path || '', userId);
           } catch (optimizationError) {
             console.warn('⚠️ Image optimization failed (non-critical):', optimizationError);
             // Don't fail the upload if optimization fails
@@ -215,7 +215,7 @@ export const storageHelpers = {
 
         return {
           url: urlData.publicUrl,
-          path: data.path,
+          path: (data as any)?.path || '',
         };
       } catch (error) {
         lastError = error as Error;
@@ -383,7 +383,7 @@ async function triggerImageOptimization(bucket: string, path: string, userId: st
       return;
     }
 
-    const response = await fetch(`${supabase.supabaseUrl}/functions/v1/image-optimize`, {
+    const response = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/image-optimize`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

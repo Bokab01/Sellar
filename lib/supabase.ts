@@ -1,31 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Database } from './database.types';
+// Re-export the type-safe client
+export { supabase, db, rpc } from './supabase-client';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
-
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
-    // Enhanced error handling for refresh tokens
-    debug: __DEV__,
-  },
-  global: {
-    headers: {
-      'x-client-info': 'sellar-mobile-app',
-    },
-  },
-  // Add retry configuration for network issues
-  realtime: {
-    params: {
-      eventsPerSecond: 10,
-    },
-  },
-});
+// Import for use in this file
+import { db, rpc } from './supabase-client';
 
 // Helper functions for common database operations
 export const dbHelpers = {
@@ -36,680 +13,347 @@ export const dbHelpers = {
     phone?: string;
     location?: string;
   }) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .insert({
-        id: userId,
-        first_name: userData.firstName,
-        last_name: userData.lastName,
-        full_name: `${userData.firstName} ${userData.lastName}`.trim(),
-        phone: userData.phone || null,
-        location: userData.location || 'Accra, Greater Accra',
-        bio: null,
-        // Only include fields that exist in the current schema
-        is_verified: false,
-        is_business: false,
-      })
-      .select()
-      .single();
+    const { data, error } = await db.profiles.insert({
+      id: userId,
+      first_name: userData.firstName,
+      last_name: userData.lastName,
+      full_name: `${userData.firstName} ${userData.lastName}`.trim(),
+      phone: userData.phone || null,
+      location: userData.location || 'Accra, Greater Accra',
+      bio: null,
+      is_verified: false,
+      is_business: false,
+    }).select().single();
     
     return { data, error };
   },
 
   async getProfile(userId: string) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    
+    const { data, error } = await db.profiles.select('*').eq('id', userId).single();
     return { data, error };
   },
 
-  async updateProfile(userId: string, updates: Database['public']['Tables']['profiles']['Update']) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', userId)
-      .select()
-      .single();
-    
+  async updateProfile(userId: string, updates: any) {
+    const { data, error } = await db.profiles.update(updates, userId).select().single();
     return { data, error };
   },
 
-  // Listings operations
-  async getListings(filters?: {
-    category?: string;
-    location?: string;
-    priceMin?: number;
-    priceMax?: number;
-    condition?: string[];
-    search?: string;
-    limit?: number;
-    offset?: number;
-    userId?: string;
-  }) {
-    console.log('getListings called with filters:', filters);
-    
-    // First, try the joined query
-    let query = supabase
-      .from('listings')
+  // Listing operations
+  async getListingsWithDetails(filters: any = {}) {
+    const { data: listingsData, error } = await db.listings
       .select(`
         *,
-        profiles (
-          id,
-          first_name,
-          last_name,
-          avatar_url,
-          rating,
-          is_verified,
-          account_type,
-          verification_status
-        ),
-        categories (
-          name,
-          slug,
-          icon
-        )
+        profiles!listings_user_id_fkey(*),
+        categories!listings_category_id_fkey(*)
       `)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false });
+      .match(filters);
 
-    if (filters?.category) {
-      query = query.eq('category_id', filters.category);
-    }
+    if (error) return { data: null, error };
 
-    if (filters?.location) {
-      query = query.ilike('location', `%${filters.location}%`);
-    }
+    // Get unique user and category IDs
+    const userIds = [...new Set(listingsData?.map((listing: any) => listing.user_id) || [])];
+    const categoryIds = [...new Set(listingsData?.map((listing: any) => listing.category_id) || [])];
 
-    if (filters?.priceMin !== undefined) {
-      query = query.gte('price', filters.priceMin);
-    }
+    // Fetch profiles and categories
+    const { data: profiles } = await db.profiles.select('*').in('id', userIds);
+    const { data: categories } = await db.categories.select('*').in('id', categoryIds);
 
-    if (filters?.priceMax !== undefined) {
-      query = query.lte('price', filters.priceMax);
-    }
+    // Create lookup maps
+    const profilesMap = new Map();
+    profiles?.forEach((profile: any) => {
+      profilesMap.set(profile.id, profile);
+    });
 
-    if (filters?.condition && filters.condition.length > 0) {
-      query = query.in('condition', filters.condition);
-    }
+    const categoriesMap = new Map();
+    categories?.forEach((category: any) => {
+      categoriesMap.set(category.id, category);
+    });
 
-    if (filters?.search) {
-      query = query.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
-    }
+    // Combine data
+    const enrichedListings = listingsData?.map((listing: any) => ({
+      ...listing,
+      profiles: profilesMap.get(listing.user_id) || null,
+      categories: categoriesMap.get(listing.category_id) || null
+    }));
 
-    if (filters?.userId) {
-      query = query.eq('user_id', filters.userId);
-    }
+    return { data: enrichedListings, error: null };
+  },
 
-    if (filters?.limit) {
-      query = query.limit(filters.limit);
-    }
-
-    if (filters?.offset) {
-      query = query.range(filters.offset, filters.offset + (filters.limit || 10) - 1);
-    }
-
-    const { data, error } = await query;
-    
-    // If the joined query fails due to schema cache issues, fall back to separate queries
-    if (error && error.message.includes('schema cache')) {
-      console.log('🔄 Falling back to separate queries due to schema cache issue');
-      
-      // Get listings without joins
-      let fallbackQuery = supabase
-        .from('listings')
-        .select('*')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
-
-      // Apply the same filters
-      if (filters?.category) {
-        fallbackQuery = fallbackQuery.eq('category_id', filters.category);
-      }
-      if (filters?.location) {
-        fallbackQuery = fallbackQuery.ilike('location', `%${filters.location}%`);
-      }
-      if (filters?.priceMin !== undefined) {
-        fallbackQuery = fallbackQuery.gte('price', filters.priceMin);
-      }
-      if (filters?.priceMax !== undefined) {
-        fallbackQuery = fallbackQuery.lte('price', filters.priceMax);
-      }
-      if (filters?.condition && filters.condition.length > 0) {
-        fallbackQuery = fallbackQuery.in('condition', filters.condition);
-      }
-      if (filters?.search) {
-        fallbackQuery = fallbackQuery.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
-      }
-      if (filters?.userId) {
-        fallbackQuery = fallbackQuery.eq('user_id', filters.userId);
-      }
-      if (filters?.limit) {
-        fallbackQuery = fallbackQuery.limit(filters.limit);
-      }
-      if (filters?.offset) {
-        fallbackQuery = fallbackQuery.range(filters.offset, filters.offset + (filters.limit || 10) - 1);
-      }
-
-      const { data: listingsData, error: listingsError } = await fallbackQuery;
-      
-      if (listingsError) {
-        return { data: null, error: listingsError };
-      }
-
-      if (!listingsData || listingsData.length === 0) {
-        return { data: [], error: null };
-      }
-
-      // Get unique user IDs and category IDs
-      const userIds = [...new Set(listingsData.map(listing => listing.user_id))];
-      const categoryIds = [...new Set(listingsData.map(listing => listing.category_id))];
-
-      // Fetch profiles and categories separately
-      const [profilesResult, categoriesResult] = await Promise.all([
-        supabase.from('profiles').select('id, first_name, last_name, avatar_url, rating, is_verified').in('id', userIds),
-        supabase.from('categories').select('id, name, icon').in('id', categoryIds)
-      ]);
-
-      // Create lookup maps
-      const profilesMap = new Map();
-      if (profilesResult.data) {
-        profilesResult.data.forEach(profile => {
-          profilesMap.set(profile.id, profile);
-        });
-      }
-
-      const categoriesMap = new Map();
-      if (categoriesResult.data) {
-        categoriesResult.data.forEach(category => {
-          categoriesMap.set(category.id, category);
-        });
-      }
-
-      // Combine the data
-      const combinedData = listingsData.map(listing => ({
-        ...listing,
-        profiles: profilesMap.get(listing.user_id) || null,
-        categories: categoriesMap.get(listing.category_id) || null
-      }));
-
-      return { data: combinedData, error: null };
-    }
-    
+  async createListing(listing: any) {
+    const { data, error } = await db.listings.insert(listing).select().single();
     return { data, error };
   },
 
-  async createListing(listing: Database['public']['Tables']['listings']['Insert']) {
-    const { data, error } = await supabase
-      .from('listings')
-      .insert(listing)
-      .select()
-      .single();
-    
+  async updateListing(listingId: string, updates: any) {
+    const { data, error } = await db.listings.update(updates, listingId).select().single();
     return { data, error };
   },
 
-  // Chat operations
-  async getConversations(userId: string) {
-    const { data, error } = await supabase
-      .from('conversations')
+  async deleteListing(listingId: string) {
+    const { error } = await db.listings.delete(listingId);
+    return { error };
+  },
+
+  // Message operations
+  async createMessage(message: any) {
+    const { data, error } = await db.messages.insert(message).select().single();
+    return { data, error };
+  },
+
+  async getMessages(conversationId: string, limit = 50, offset = 0) {
+    const { data, error } = await db.messages
       .select(`
         *,
-        participant_1_profile:participant_1 (
-          id,
-          first_name,
-          last_name,
-          avatar_url,
-          is_online,
-          last_seen
-        ),
-        participant_2_profile:participant_2 (
-          id,
-          first_name,
-          last_name,
-          avatar_url,
-          is_online,
-          last_seen
-        ),
-        listings (
-          id,
-          title,
-          price,
-          images
-        ),
-        messages (
-          content,
-          message_type,
-          created_at
-        )
-      `)
-      .or(`participant_1.eq.${userId},participant_2.eq.${userId}`)
-      .order('last_message_at', { ascending: false });
-
-    return { data, error };
-  },
-
-  async getMessages(conversationId: string) {
-    const { data, error } = await supabase
-      .from('messages')
-      .select(`
-        *,
-        sender:sender_id (
-          id,
-          first_name,
-          last_name,
-          avatar_url
-        ),
-        offers (
-          id,
-          amount,
-          currency,
-          status,
-          expires_at
-        )
+        profiles!messages_sender_id_fkey(*)
       `)
       .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     return { data, error };
   },
 
-  async sendMessage(message: Database['public']['Tables']['messages']['Insert']) {
-    const { data, error } = await supabase
-      .from('messages')
-      .insert(message)
-      .select()
-      .single();
+  async updateMessage(messageId: string, updates: any) {
+    const { data, error } = await db.messages.update(updates, messageId).select().single();
+    return { data, error };
+  },
+
+  // Post operations
+  async createPost(post: any) {
+    const { data, error } = await db.posts.insert(post).select().single();
+    return { data, error };
+  },
+
+  async getPosts(options: any = {}) {
+    const limit = options.limit || 20;
+    const offset = options.offset || 0;
     
-    return { data, error };
-  },
-
-  // Categories
-  async getCategories() {
-    const { data, error } = await supabase
-      .from('categories')
-      .select('*')
-      .eq('is_active', true)
-      .order('sort_order');
-
-    return { data, error };
-  },
-
-  // Community operations
-  async getPosts(filters?: {
-    userId?: string;
-    following?: boolean;
-    limit?: number;
-    offset?: number;
-  }) {
-    let query = supabase
-      .from('posts')
+    let query = db.posts
       .select(`
         *,
-        profiles:user_id (
-          id,
-          first_name,
-          last_name,
-          full_name,
-          avatar_url,
-          rating_average,
-          rating_count,
-          total_reviews,
-          location,
-          is_verified,
-          is_business,
-          business_name,
-          display_business_name,
-          business_name_priority,
-          verification_level
-        ),
-        listings:listing_id (
-          id,
-          title,
-          price,
-          images
-        )
+        profiles!posts_user_id_fkey(*),
+        listings!posts_listing_id_fkey(*)
       `)
       .order('created_at', { ascending: false });
 
-    if (filters?.userId) {
-      query = query.eq('user_id', filters.userId);
+    if (options.userId) {
+      query = query.eq('user_id', options.userId);
     }
 
-    if (filters?.limit) {
-      query = query.limit(filters.limit);
+    if (options.following) {
+      // Add following filter logic if needed
     }
 
-    if (filters?.offset) {
-      query = query.range(filters.offset, filters.offset + (filters.limit || 10) - 1);
-    }
-
-    const { data, error } = await query;
+    const { data, error } = await query.range(offset, offset + limit - 1);
     return { data, error };
   },
 
-  async createPost(post: Database['public']['Tables']['posts']['Insert']) {
-    const { data, error } = await supabase
-      .from('posts')
-      .insert(post)
-      .select()
-      .single();
-    
+  async updatePost(postId: string, updates: any) {
+    const { data, error } = await db.posts.update(updates, postId).select().single();
     return { data, error };
   },
 
-  // Comments operations
-  async getComments(postId: string) {
-    const { data, error } = await supabase
-      .from('comments')
+  async deletePost(postId: string) {
+    const { error } = await db.posts.delete(postId);
+    return { error };
+  },
+
+  // Comment operations
+  async createComment(comment: any) {
+    const { data, error } = await db.comments.insert(comment).select().single();
+    return { data, error };
+  },
+
+  async getComments(postId: string, limit = 50, offset = 0) {
+    const { data, error } = await db.comments
       .select(`
         *,
-        profiles:user_id (
-          id,
-          first_name,
-          last_name,
-          avatar_url,
-          is_verified
-        )
+        profiles!comments_user_id_fkey(*)
       `)
       .eq('post_id', postId)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     return { data, error };
   },
 
-  async createComment(comment: Database['public']['Tables']['comments']['Insert']) {
-    const { data, error } = await supabase
-      .from('comments')
-      .insert(comment)
-      .select()
-      .single();
-    
+  async updateComment(commentId: string, updates: any) {
+    const { data, error } = await db.comments.update(updates, commentId).select().single();
     return { data, error };
   },
 
-  // Likes operations
+  async deleteComment(commentId: string) {
+    const { error } = await db.comments.delete(commentId);
+    return { error };
+  },
+
+  // Like operations
   async toggleLike(userId: string, postId?: string, commentId?: string) {
-    try {
-      // Check if already liked
-      let query = supabase
-        .from('likes')
-        .select('id')
-        .eq('user_id', userId);
+    // Check if like already exists
+    const { data: existingLike } = await db.likes
+      .select('*')
+      .eq('user_id', userId)
+      .eq('post_id', postId || null)
+      .eq('comment_id', commentId || null)
+      .single();
 
-      if (postId) {
-        query = query.eq('post_id', postId);
-      } else if (commentId) {
-        query = query.eq('comment_id', commentId);
-      }
+    if (existingLike) {
+      // Unlike
+      const { error } = await db.likes.delete((existingLike as any).id);
+      return { data: { action: 'unliked' }, error };
+    } else {
+      // Like
+      const { data, error } = await db.likes.insert({
+        user_id: userId,
+        post_id: postId || null,
+        comment_id: commentId || null,
+      }).select().single();
 
-      const { data: existingLike } = await query.single();
-
-      if (existingLike) {
-        // Unlike
-        const { error } = await supabase
-          .from('likes')
-          .delete()
-          .eq('id', existingLike.id);
-        
-        return { data: { action: 'unliked' }, error };
-      } else {
-        // Like
-        const { data, error } = await supabase
-          .from('likes')
-          .insert({
-            user_id: userId,
-            post_id: postId || null,
-            comment_id: commentId || null,
-          })
-          .select()
-          .single();
-        
-        return { data: { action: 'liked', ...data }, error };
-      }
-    } catch (error) {
-      return { data: null, error };
+      return { data: { action: 'liked', ...data }, error };
     }
   },
 
   // Follow operations
   async toggleFollow(followerId: string, followingId: string) {
-    try {
-      // Check if already following
-      const { data: existingFollow } = await supabase
-        .from('follows')
-        .select('id')
-        .eq('follower_id', followerId)
-        .eq('following_id', followingId)
-        .single();
+    // Check if follow already exists
+    const { data: existingFollow } = await db.follows
+      .select('*')
+      .eq('follower_id', followerId)
+      .eq('following_id', followingId)
+      .single();
 
-      if (existingFollow) {
-        // Unfollow
-        const { error } = await supabase
-          .from('follows')
-          .delete()
-          .eq('id', existingFollow.id);
-        
-        return { data: { action: 'unfollowed' }, error };
-      } else {
-        // Follow
-        const { data, error } = await supabase
-          .from('follows')
-          .insert({
-            follower_id: followerId,
-            following_id: followingId,
-          })
-          .select()
-          .single();
-        
-        return { data: { action: 'followed', ...data }, error };
-      }
-    } catch (error) {
-      return { data: null, error };
+    if (existingFollow) {
+      // Unfollow
+      const { error } = await db.follows.delete((existingFollow as any).id);
+      return { data: { action: 'unfollowed' }, error };
+    } else {
+      // Follow
+      const { data, error } = await db.follows.insert({
+        follower_id: followerId,
+        following_id: followingId,
+      }).select().single();
+
+      return { data: { action: 'followed', ...data }, error };
     }
   },
 
-  // Reports operations
-  async createReport(report: Database['public']['Tables']['reports']['Insert']) {
-    const { data, error } = await supabase
-      .from('reports')
-      .insert(report)
-      .select()
-      .single();
-    
+  // Report operations
+  async createReport(report: any) {
+    const { data, error } = await db.reports.insert(report).select().single();
     return { data, error };
   },
 
-  // Callback requests
-  async createCallbackRequest(request: {
-    listing_id: string;
-    requester_id: string;
-    seller_id: string;
-    phone_number: string;
-    preferred_time?: string;
-    message?: string;
-  }) {
-    const { data, error } = await supabase
-      .from('callback_requests')
-      .insert(request)
-      .select()
-      .single();
-    
+  // Callback request operations
+  async createCallbackRequest(request: any) {
+    const { data, error } = await db.callback_requests.insert(request).select().single();
     return { data, error };
   },
 
-  async getCallbackRequests(userId: string, listingId?: string) {
-    let query = supabase
-      .from('callback_requests')
-      .select(`
-        *,
-        requester:requester_id (
-          first_name,
-          last_name,
-          avatar_url
-        ),
-        listings (
-          title
-        )
-      `)
-      .or(`requester_id.eq.${userId},seller_id.eq.${userId}`)
-      .order('created_at', { ascending: false });
-
-    if (listingId) {
-      query = query.eq('listing_id', listingId);
-    }
-
-    const { data, error } = await query;
+  async updateCallbackRequest(requestId: string, status: string) {
+    const { data, error } = await db.callback_requests.update({ status }, requestId).select().single();
     return { data, error };
   },
 
-  async updateCallbackStatus(callbackId: string, status: string) {
-    const { data, error } = await supabase
-      .from('callback_requests')
-      .update({ status })
-      .eq('id', callbackId)
-      .select()
-      .single();
-    
+  // Offer operations
+  async createOffer(offer: any) {
+    const { data, error } = await db.offers.insert(offer).select().single();
     return { data, error };
   },
 
-  // Offers operations
-  async createOffer(offer: Database['public']['Tables']['offers']['Insert']) {
-    const { data, error } = await supabase
-      .from('offers')
-      .insert(offer)
-      .select()
-      .single();
-    
-    return { data, error };
-  },
-
-  async updateOfferStatus(offerId: string, status: string) {
-    const { data, error } = await supabase
-      .from('offers')
-      .update({ status })
-      .eq('id', offerId)
-      .select()
-      .single();
-    
-    return { data, error };
-  },
-
-  async getOffersByListing(listingId: string, userId?: string) {
-    let query = supabase
-      .from('offers')
-      .select(`
-        *,
-        buyer:buyer_id (
-          id,
-          first_name,
-          last_name,
-          avatar_url,
-          rating
-        ),
-        seller:seller_id (
-          id,
-          first_name,
-          last_name,
-          avatar_url,
-          rating
-        ),
-        messages (
-          id,
-          content,
-          created_at
-        )
-      `)
-      .eq('listing_id', listingId)
-      .order('created_at', { ascending: false });
-
-    if (userId) {
-      query = query.or(`buyer_id.eq.${userId},seller_id.eq.${userId}`);
-    }
-
-    const { data, error } = await query;
+  async updateOffer(offerId: string, status: string) {
+    const { data, error } = await db.offers.update({ status }, offerId).select().single();
     return { data, error };
   },
 
   // Notification operations
-  async createNotification(notification: Database['public']['Tables']['notifications']['Insert']) {
-    const { data, error } = await supabase
-      .from('notifications')
-      .insert(notification)
-      .select()
-      .single();
-    
+  async createNotification(notification: any) {
+    const { data, error } = await db.notifications.insert(notification).select().single();
     return { data, error };
   },
 
-  async getNotifications(userId: string, limit = 20) {
-    const { data, error } = await supabase
-      .from('notifications')
+  async getNotifications(userId: string, limit = 20, offset = 0) {
+    const { data, error } = await db.notifications
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
-      .limit(limit);
+      .range(offset, offset + limit - 1);
 
     return { data, error };
   },
 
   async markNotificationAsRead(notificationId: string) {
-    const { data, error } = await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('id', notificationId)
-      .select()
-      .single();
-    
+    const { data, error } = await db.notifications.update({ is_read: true }, notificationId).select().single();
     return { data, error };
   },
 
   async markAllNotificationsAsRead(userId: string) {
-    const { data, error } = await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('user_id', userId)
-      .eq('is_read', false);
-    
+    const { error } = await db.notifications.update({ is_read: true }).eq('user_id', userId);
+    return { error };
+  },
+
+  // Device token operations
+  async upsertDeviceToken(tokenData: any) {
+    const { data, error } = await db.device_tokens.upsert(tokenData, {
+      onConflict: 'user_id,platform',
+      ignoreDuplicates: false,
+    }).select().single();
+
     return { data, error };
   },
 
-  // Push notification operations
-  async registerDeviceToken(tokenData: Database['public']['Tables']['device_tokens']['Insert']) {
-    const { data, error } = await supabase
-      .from('device_tokens')
-      .upsert(tokenData, {
-        onConflict: 'user_id,token',
-      })
-      .select()
-      .single();
-    
+  async deactivateDeviceToken(userId: string, platform: string) {
+    const { error } = await db.device_tokens.update({ is_active: false }).eq('user_id', userId).eq('platform', platform);
+    return { error };
+  },
+
+  // Transaction operations
+  async createTransaction(transaction: any) {
+    const { data, error } = await db.transactions.insert(transaction).select().single();
     return { data, error };
   },
 
-  async getDeviceTokens(userId: string) {
-    const { data, error } = await supabase
-      .from('device_tokens')
+  async getTransactions(userId: string, limit = 20, offset = 0) {
+    const { data, error } = await db.transactions
       .select('*')
       .eq('user_id', userId)
-      .eq('is_active', true);
-    
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
     return { data, error };
   },
 
-  async deactivateDeviceToken(userId: string, token: string) {
-    const { data, error } = await supabase
-      .from('device_tokens')
-      .update({ is_active: false })
+  // Verification operations
+  async createVerification(verification: any) {
+    const { data, error } = await db.user_verification.insert(verification).select().single();
+    return { data, error };
+  },
+
+  async getVerifications(userId: string) {
+    const { data, error } = await db.user_verification
+      .select('*')
       .eq('user_id', userId)
-      .eq('token', token);
-    
+      .order('created_at', { ascending: false });
+
     return { data, error };
   },
 
+  async updateVerification(verificationId: string, updates: any) {
+    const { data, error } = await db.user_verification.update(updates, verificationId).select().single();
+    return { data, error };
+  },
+
+  // User settings operations
+  async updateUserSettings(userId: string, updates: any) {
+    const { data, error } = await db.user_settings.update(updates, userId).select().single();
+    return { data, error };
+  },
+
+  async getUserSettings(userId: string) {
+    const { data, error } = await db.user_settings.select('*').eq('user_id', userId).single();
+    return { data, error };
+  },
+
+  // RPC function wrappers
   async queuePushNotification(
     userIds: string[],
     title: string,
@@ -718,7 +362,7 @@ export const dbHelpers = {
     notificationData?: any,
     scheduledFor?: string
   ) {
-    const { data, error } = await supabase.rpc('queue_push_notification', {
+    return await rpc.queue_push_notification({
       p_user_ids: userIds,
       p_title: title,
       p_body: body,
@@ -726,108 +370,124 @@ export const dbHelpers = {
       p_data: notificationData || {},
       p_scheduled_for: scheduledFor || new Date().toISOString(),
     });
-    
-    return { data, error };
   },
 
   async getNotificationPreferences(userId: string) {
-    const { data, error } = await supabase.rpc('get_user_notification_preferences', {
-      p_user_id: userId,
-    });
-    
-    return { data, error };
+    return await rpc.get_user_notification_preferences({ p_user_id: userId });
   },
 
   async updateNotificationPreferences(userId: string, preferences: any) {
-    const { data, error } = await supabase.rpc('update_notification_preferences', {
-      p_user_id: userId,
-      p_preferences: preferences,
-    });
-    
-    return { data, error };
+    return await rpc.update_notification_preferences({ p_user_id: userId, p_preferences: preferences });
   },
 
-  // Wallet and transaction operations
-  async getTransactions(userId: string, limit = 20, offset = 0) {
-    const { data, error } = await supabase
-      .from('transactions')
+  async claimReferralBonus(referrerId: string, refereeId: string, referralCode: string) {
+    return await rpc.claim_referral_bonus({
+      p_referrer_id: referrerId,
+      p_referee_id: refereeId,
+      p_referral_code: referralCode,
+    });
+  },
+
+  async getUserFollowers(targetUserId: string, pageLimit = 20, pageOffset = 0) {
+    return await rpc.get_user_followers({
+      target_user_id: targetUserId,
+      page_limit: pageLimit,
+      page_offset: pageOffset,
+    });
+  },
+
+  async getUserFollowing(targetUserId: string, pageLimit = 20, pageOffset = 0) {
+    return await rpc.get_user_following({
+      target_user_id: targetUserId,
+      page_limit: pageLimit,
+      page_offset: pageOffset,
+    });
+  },
+
+  async followUser(followerId: string, followingId: string) {
+    return await rpc.follow_user({
+      follower_id: followerId,
+      following_id: followingId,
+    });
+  },
+
+  async unfollowUser(followerId: string, followingId: string) {
+    return await rpc.unfollow_user({
+      follower_id: followerId,
+      following_id: followingId,
+    });
+  },
+
+  async spendUserCredits(userId: string, amount: number, reason: string, referenceId?: string, referenceType?: string) {
+    return await rpc.spend_user_credits({
+      p_user_id: userId,
+      p_amount: amount,
+      p_reason: reason,
+      p_reference_id: referenceId,
+      p_reference_type: referenceType,
+    });
+  },
+
+  async purchaseFeature(userId: string, featureKey: string, credits: number, metadata?: any) {
+    return await rpc.purchase_feature({
+      p_user_id: userId,
+      p_feature_key: featureKey,
+      p_credits: credits,
+      p_metadata: metadata || {},
+    });
+  },
+
+  async getUserEntitlements(userId: string) {
+    return await rpc.get_user_entitlements({ p_user_id: userId });
+  },
+
+  async getUserRewardSummary(userId: string) {
+    return await rpc.get_user_reward_summary({ p_user_id: userId });
+  },
+
+  async claimAnniversaryBonus(userId: string) {
+    return await rpc.claim_anniversary_bonus({ p_user_id: userId });
+  },
+
+  // Chat operations
+  async getConversations(userId: string) {
+    const { data, error } = await db.conversations
       .select(`
         *,
-        related_listing:related_listing_id (
-          title,
-          images
-        )
+        participants!conversations_participants_participant_id_fkey(*),
+        messages!conversations_messages_conversation_id_fkey(*)
       `)
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
-
+      .eq('participants.participant_id', userId);
     return { data, error };
   },
 
-  async createTransaction(transaction: Database['public']['Tables']['transactions']['Insert']) {
-    const { data, error } = await supabase
-      .from('transactions')
-      .insert(transaction)
-      .select()
-      .single();
-    
+  async sendMessage(messageData: any) {
+    const { data, error } = await db.messages.insert(messageData).select().single();
     return { data, error };
   },
 
-  // User verification operations
-  async submitVerification(verification: Database['public']['Tables']['user_verification']['Insert']) {
-    const { data, error } = await supabase
-      .from('user_verification')
-      .insert(verification)
-      .select()
-      .single();
-    
+  // Listing operations
+  async getListings(options: any) {
+    const { data, error } = await db.listings
+      .select(`
+        *,
+        profiles!listings_user_id_fkey(*),
+        categories!listings_category_id_fkey(*)
+      `)
+      .limit(options.limit || 20);
     return { data, error };
   },
 
-  async getVerificationStatus(userId: string) {
-    const { data, error } = await supabase
-      .from('user_verification')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
 
+  // Device token operations
+  async registerDeviceToken(tokenData: any) {
+    const { data, error } = await db.device_tokens.insert(tokenData).select().single();
     return { data, error };
   },
 
-  // App settings operations
-  async getAppSettings() {
-    const { data, error } = await supabase
-      .from('app_settings')
-      .select('*')
-      .eq('is_public', true);
-
+  // Offer operations
+  async updateOfferStatus(offerId: string, status: string) {
+    const { data, error } = await db.offers.update({ status }, offerId).select().single();
     return { data, error };
   },
-
-  // User settings operations
-  async getUserSettings(userId: string) {
-    const { data, error } = await supabase
-      .from('user_settings')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-
-    return { data, error };
-  },
-
-  async updateUserSettings(userId: string, updates: Database['public']['Tables']['user_settings']['Update']) {
-    const { data, error } = await supabase
-      .from('user_settings')
-      .update(updates)
-      .eq('user_id', userId)
-      .select()
-      .single();
-    
-    return { data, error };
-  },
-
 };

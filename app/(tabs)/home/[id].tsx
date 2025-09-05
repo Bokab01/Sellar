@@ -44,6 +44,7 @@ export default function ListingDetailScreen() {
   const [showContactModal, setShowContactModal] = useState(false);
   const [showCallbackModal, setShowCallbackModal] = useState(false);
   const [showOfferModal, setShowOfferModal] = useState(false);
+  const [callbackRequested, setCallbackRequested] = useState(false);
   
   // Form states
   const [messageText, setMessageText] = useState('');

@@ -170,7 +170,7 @@ export function CounterOfferModal({
               <Avatar 
                 source={originalOffer.buyer.avatar} 
                 name={originalOffer.buyer.name}
-                size={32}
+                size="md"
               />
               <View style={{ flex: 1 }}>
                 <Text variant="body" style={{ fontWeight: '600' }}>

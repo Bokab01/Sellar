@@ -22,7 +22,7 @@ export async function testPerformanceIntegration(): Promise<IntegrationTestResul
     await offlineStorage.set('test_key', { test: 'data' }, 60000);
     const retrieved = await offlineStorage.get('test_key');
     
-    if (retrieved && retrieved.test === 'data') {
+    if (retrieved && (retrieved as any).test === 'data') {
       results.push({
         component: 'Offline Storage',
         status: 'pass',
@@ -49,7 +49,7 @@ export async function testPerformanceIntegration(): Promise<IntegrationTestResul
 
   // Test 2: Memory Manager
   try {
-    const memoryUsage = memoryManager.getMemoryUsage();
+    const memoryUsage = (memoryManager as any).getMemoryUsage();
     const shouldLoad = memoryManager.shouldLoadHeavyComponent();
     
     results.push({

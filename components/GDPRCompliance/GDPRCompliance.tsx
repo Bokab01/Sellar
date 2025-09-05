@@ -290,7 +290,7 @@ export function GDPRCompliance() {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={[styles.loadingText, { color: theme.colors.text }]}>
+        <Text style={[styles.loadingText, { color: theme.colors.text.primary }]}>
           Loading GDPR data...
         </Text>
       </View>
@@ -301,7 +301,7 @@ export function GDPRCompliance() {
     <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Your Rights */}
       <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
           Your Privacy Rights
         </Text>
         
@@ -313,7 +313,7 @@ export function GDPRCompliance() {
         <View style={styles.rightsGrid}>
           <View style={styles.rightItem}>
             <Ionicons name="eye-outline" size={24} color={theme.colors.primary} />
-            <Text style={[styles.rightTitle, { color: theme.colors.text }]}>
+            <Text style={[styles.rightTitle, { color: theme.colors.text.primary }]}>
               Right to Access
             </Text>
             <Text style={[styles.rightDescription, { color: theme.colors.textSecondary }]}>
@@ -323,7 +323,7 @@ export function GDPRCompliance() {
 
           <View style={styles.rightItem}>
             <Ionicons name="create-outline" size={24} color={theme.colors.primary} />
-            <Text style={[styles.rightTitle, { color: theme.colors.text }]}>
+            <Text style={[styles.rightTitle, { color: theme.colors.text.primary }]}>
               Right to Rectify
             </Text>
             <Text style={[styles.rightDescription, { color: theme.colors.textSecondary }]}>
@@ -333,7 +333,7 @@ export function GDPRCompliance() {
 
           <View style={styles.rightItem}>
             <Ionicons name="trash-outline" size={24} color={theme.colors.primary} />
-            <Text style={[styles.rightTitle, { color: theme.colors.text }]}>
+            <Text style={[styles.rightTitle, { color: theme.colors.text.primary }]}>
               Right to Erase
             </Text>
             <Text style={[styles.rightDescription, { color: theme.colors.textSecondary }]}>
@@ -343,7 +343,7 @@ export function GDPRCompliance() {
 
           <View style={styles.rightItem}>
             <Ionicons name="download-outline" size={24} color={theme.colors.primary} />
-            <Text style={[styles.rightTitle, { color: theme.colors.text }]}>
+            <Text style={[styles.rightTitle, { color: theme.colors.text.primary }]}>
               Right to Port
             </Text>
             <Text style={[styles.rightDescription, { color: theme.colors.textSecondary }]}>
@@ -355,7 +355,7 @@ export function GDPRCompliance() {
 
       {/* Data Processing Consent */}
       <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
           Data Processing Consent
         </Text>
         
@@ -366,7 +366,7 @@ export function GDPRCompliance() {
               size={24} 
               color={consentInfo.hasConsent ? theme.colors.success || '#4CAF50' : theme.colors.error} 
             />
-            <Text style={[styles.consentText, { color: theme.colors.text }]}>
+            <Text style={[styles.consentText, { color: theme.colors.text.primary }]}>
               {consentInfo.hasConsent ? 'Consent Given' : 'No Consent'}
             </Text>
           </View>
@@ -380,7 +380,7 @@ export function GDPRCompliance() {
 
         {consentInfo.purposes.length > 0 && (
           <View style={styles.purposes}>
-            <Text style={[styles.purposesTitle, { color: theme.colors.text }]}>
+            <Text style={[styles.purposesTitle, { color: theme.colors.text.primary }]}>
               Data processing purposes:
             </Text>
             {consentInfo.purposes.map((purpose, index) => (
@@ -394,7 +394,7 @@ export function GDPRCompliance() {
 
       {/* Data Management Actions */}
       <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
           Data Management
         </Text>
         
@@ -405,7 +405,7 @@ export function GDPRCompliance() {
         >
           <Ionicons name="download-outline" size={24} color={theme.colors.primary} />
           <View style={styles.actionText}>
-            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>
+            <Text style={[styles.actionTitle, { color: theme.colors.text.primary }]}>
               Request Data Export
             </Text>
             <Text style={[styles.actionDescription, { color: theme.colors.textSecondary }]}>
@@ -442,7 +442,7 @@ export function GDPRCompliance() {
         >
           <Ionicons name="information-circle-outline" size={24} color={theme.colors.primary} />
           <View style={styles.actionText}>
-            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>
+            <Text style={[styles.actionTitle, { color: theme.colors.text.primary }]}>
               Data Retention Policy
             </Text>
             <Text style={[styles.actionDescription, { color: theme.colors.textSecondary }]}>
@@ -456,7 +456,7 @@ export function GDPRCompliance() {
       {/* Request History */}
       {dataRequests.length > 0 && (
         <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
             Request History
           </Text>
           
@@ -469,7 +469,7 @@ export function GDPRCompliance() {
                     size={20} 
                     color={getStatusColor(request.status)} 
                   />
-                  <Text style={[styles.requestType, { color: theme.colors.text }]}>
+                  <Text style={[styles.requestType, { color: theme.colors.text.primary }]}>
                     {formatRequestType(request.type)}
                   </Text>
                 </View>
@@ -521,9 +521,9 @@ export function GDPRCompliance() {
         <View style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
           <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
             <TouchableOpacity onPress={() => setShowRetentionPolicy(false)}>
-              <Ionicons name="close" size={24} color={theme.colors.text} />
+              <Ionicons name="close" size={24} color={theme.colors.text.primary} />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.text.primary }]}>
               Data Retention Policy
             </Text>
             <View style={{ width: 24 }} />
@@ -536,7 +536,7 @@ export function GDPRCompliance() {
 
             {Object.entries(dataProtectionService.getDataRetentionPolicy()).map(([dataType, policy]) => (
               <View key={dataType} style={[styles.policyItem, { borderBottomColor: theme.colors.border }]}>
-                <Text style={[styles.policyDataType, { color: theme.colors.text }]}>
+                <Text style={[styles.policyDataType, { color: theme.colors.text.primary }]}>
                   {dataType}
                 </Text>
                 <Text style={[styles.policyPeriod, { color: theme.colors.textSecondary }]}>

@@ -149,15 +149,15 @@ export function ProfileEditModal({ visible, onClose, onProfileUpdated }: Profile
     try {
       const updates: Partial<UserProfile> = {
         full_name: formData.full_name.trim(),
-        username: formData.username.trim() || null,
+        username: formData.username.trim() || undefined,
         email: formData.email.trim(),
-        phone: formData.phone.trim() || null,
-        bio: formData.bio.trim() || null,
-        location: formData.location.trim() || null,
-        date_of_birth: formData.date_of_birth || null,
-        gender: formData.gender || null,
-        professional_title: formData.professional_title.trim() || null,
-        years_of_experience: formData.years_of_experience ? parseInt(formData.years_of_experience) : null,
+        phone: formData.phone.trim() || undefined,
+        bio: formData.bio.trim() || undefined,
+        location: formData.location.trim() || undefined,
+        date_of_birth: formData.date_of_birth || undefined,
+        gender: formData.gender as 'male' | 'female' | 'other' | 'prefer_not_to_say' | undefined,
+        professional_title: formData.professional_title.trim() || undefined,
+        years_of_experience: formData.years_of_experience ? parseInt(formData.years_of_experience) : undefined,
         specializations: specializations.trim() ? specializations.split(',').map(s => s.trim()).filter(s => s) : [],
         preferred_contact_method: formData.preferred_contact_method as any,
         response_time_expectation: formData.response_time_expectation as any,
@@ -167,7 +167,7 @@ export function ProfileEditModal({ visible, onClose, onProfileUpdated }: Profile
         show_last_seen: formData.show_last_seen,
         display_business_name: formData.display_business_name,
         business_name_priority: formData.business_name_priority as any,
-        avatar_url: avatar,
+        avatar_url: avatar || undefined,
       };
 
       const updatedProfile = await updateProfile(updates);
@@ -217,6 +217,7 @@ export function ProfileEditModal({ visible, onClose, onProfileUpdated }: Profile
             <ImagePicker
               currentImage={avatar}
               onImageSelected={handleAvatarSelected}
+              onChange={() => {}}
               bucketName="profile-images"
               folder={`${user?.id}/avatar`}
               style={{

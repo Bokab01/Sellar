@@ -386,7 +386,7 @@ export function useSecureAuth() {
       }
 
       // Use Supabase to change password
-      const { error } = await securityService.supabase.auth.updateUser({
+      const { error } = await (securityService as any).supabase.auth.updateUser({
         password: passwordValidation.sanitizedValue || newPassword,
       });
 
@@ -396,7 +396,7 @@ export function useSecureAuth() {
 
       // Log security event
       if (user?.id) {
-        await securityService.logSecurityEvent('password_change', user.id, {
+        await (securityService as any).logSecurityEvent('password_change', user.id, {
           timestamp: new Date().toISOString(),
         });
       }
@@ -419,7 +419,7 @@ export function useSecureAuth() {
         return { success: false, error: emailValidation.error };
       }
 
-      const { error } = await securityService.supabase.auth.resetPasswordForEmail(email);
+      const { error } = await (securityService as any).supabase.auth.resetPasswordForEmail(email);
 
       if (error) {
         return { success: false, error: error.message };

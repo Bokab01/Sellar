@@ -104,6 +104,16 @@ export interface ThemeColors {
   
   // Additional text colors
   textMuted: string;
+  textSecondary: string;
+  
+  // Additional colors used in components
+  card: string;
+  purple: string;
+  onErrorContainer: string;
+  destructive: string;
+  outline: string;
+  onPrimary: string;
+  info: string;
 }
 
 export interface Typography {

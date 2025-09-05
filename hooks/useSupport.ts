@@ -401,7 +401,7 @@ export function useKnowledgeBase() {
       const field = isHelpful ? 'helpful_count' : 'not_helpful_count';
       await supabase
         .from('kb_articles')
-        .update({ [field]: supabase.raw(`${field} + 1`) })
+        .update({ [field]: (supabase as any).raw(`${field} + 1`) })
         .eq('id', articleId);
 
     } catch (err) {

@@ -223,7 +223,7 @@ export function SearchResults({
           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
             {item.user && (
               <UserDisplayName
-                profile={item.user}
+                profile={item.user as any}
                 showAvatar
                 avatarSize={24}
                 variant="caption"
@@ -340,28 +340,10 @@ export function SearchResults({
             : "Enter a search term to find listings, or browse by category."
         }
         action={
-          query ? (
-            <TouchableOpacity
-              onPress={() => router.push('/(tabs)/browse')}
-              style={{
-                backgroundColor: theme.colors.primary,
-                paddingHorizontal: theme.spacing.lg,
-                paddingVertical: theme.spacing.md,
-                borderRadius: theme.borderRadius.md,
-                marginTop: theme.spacing.md,
-              }}
-            >
-              <Text
-                variant="body"
-                style={{
-                  color: theme.colors.surface,
-                  fontWeight: '600',
-                }}
-              >
-                Browse All Categories
-              </Text>
-            </TouchableOpacity>
-          ) : undefined
+          query ? {
+            text: "Browse All Categories",
+            onPress: () => router.push('/(tabs)/browse')
+          } : undefined
         }
       />
     );
