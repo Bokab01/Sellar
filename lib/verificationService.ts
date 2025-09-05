@@ -349,19 +349,19 @@ export class VerificationService {
 
       const stats = {
         totalRequests: requests?.length || 0,
-        approvedRequests: requests?.filter(r => r.status === 'approved').length || 0,
-        pendingRequests: requests?.filter(r => ['pending', 'in_review'].includes(r.status)).length || 0,
-        rejectedRequests: requests?.filter(r => r.status === 'rejected').length || 0,
+        approvedRequests: requests?.filter(r => (r as any).status === 'approved').length || 0,
+        pendingRequests: requests?.filter(r => ['pending', 'in_review'].includes((r as any).status)).length || 0,
+        rejectedRequests: requests?.filter(r => (r as any).status === 'rejected').length || 0,
         averageProcessingTime: 0,
         verificationTypes: {} as Record<string, number>,
       };
 
       // Calculate average processing time
-      const processedRequests = requests?.filter(r => r.reviewed_at) || [];
+      const processedRequests = requests?.filter(r => (r as any).reviewed_at) || [];
       if (processedRequests.length > 0) {
         const totalProcessingTime = processedRequests.reduce((total, request) => {
-          const submitted = new Date(request.submitted_at).getTime();
-          const reviewed = new Date(request.reviewed_at!).getTime();
+          const submitted = new Date((request as any).submitted_at).getTime();
+          const reviewed = new Date((request as any).reviewed_at!).getTime();
           return total + (reviewed - submitted);
         }, 0);
         
@@ -370,8 +370,8 @@ export class VerificationService {
 
       // Count verification types
       requests?.forEach(request => {
-        stats.verificationTypes[request.verification_type] = 
-          (stats.verificationTypes[request.verification_type] || 0) + 1;
+        stats.verificationTypes[(request as any).verification_type] = 
+          (stats.verificationTypes[(request as any).verification_type] || 0) + 1;
       });
 
       return stats;

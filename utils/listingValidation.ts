@@ -162,7 +162,7 @@ export const validateCompleteForm = (formData: ListingFormData): ValidationResul
 
 // Performance optimization: Debounced validation
 export const createDebouncedValidator = (delay: number = 300) => {
-  let timeoutId: NodeJS.Timeout;
+  let timeoutId: ReturnType<typeof setTimeout>;
   
   return (step: number, formData: ListingFormData, callback: (result: ValidationResult) => void) => {
     clearTimeout(timeoutId);

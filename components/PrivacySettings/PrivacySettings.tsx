@@ -222,7 +222,7 @@ export function PrivacySettings({ onSettingsChange }: PrivacySettingsProps) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={[styles.loadingText, { color: theme.colors.text }]}>
+        <Text style={[styles.loadingText, { color: theme.colors.text.primary }]}>
           Loading privacy settings...
         </Text>
       </View>
@@ -233,7 +233,7 @@ export function PrivacySettings({ onSettingsChange }: PrivacySettingsProps) {
     <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Profile Privacy */}
       <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
           Profile Privacy
         </Text>
         
@@ -292,7 +292,7 @@ export function PrivacySettings({ onSettingsChange }: PrivacySettingsProps) {
 
       {/* Communication Settings */}
       <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
           Communication
         </Text>
         
@@ -315,7 +315,7 @@ export function PrivacySettings({ onSettingsChange }: PrivacySettingsProps) {
 
       {/* Security Settings */}
       <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
           Security
         </Text>
         
@@ -349,7 +349,7 @@ export function PrivacySettings({ onSettingsChange }: PrivacySettingsProps) {
 
       {/* Data & Consent */}
       <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
           Data & Consent
         </Text>
         
@@ -383,7 +383,7 @@ export function PrivacySettings({ onSettingsChange }: PrivacySettingsProps) {
 
       {/* Data Management */}
       <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
           Data Management
         </Text>
         
@@ -408,7 +408,7 @@ export function PrivacySettings({ onSettingsChange }: PrivacySettingsProps) {
       {saving && (
         <View style={styles.savingIndicator}>
           <ActivityIndicator size="small" color={theme.colors.primary} />
-          <Text style={[styles.savingText, { color: theme.colors.text }]}>
+          <Text style={[styles.savingText, { color: theme.colors.text.primary }]}>
             Saving...
           </Text>
         </View>

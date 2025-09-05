@@ -221,7 +221,7 @@ export const imageOptimization = {
         width: options.width,
         height: options.height,
         quality: options.quality,
-        format: options.format,
+        format: options.format as any,
         resize: options.resize || 'cover'
       }
     });

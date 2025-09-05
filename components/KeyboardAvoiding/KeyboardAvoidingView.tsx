@@ -73,7 +73,8 @@ export function CustomKeyboardAvoidingView({
   }, [enabled]);
 
   const handleKeyboardShow = (event: KeyboardEvent) => {
-    const { height: kbHeight, duration = 250 } = event.endCoordinates;
+    const { height: kbHeight } = event.endCoordinates;
+    const duration = 250;
     const adjustedHeight = kbHeight - keyboardVerticalOffset;
 
     setKeyboardHeight(adjustedHeight);
@@ -113,7 +114,7 @@ export function CustomKeyboardAvoidingView({
     switch (behavior) {
       case 'height':
         return {
-          height: screenData.height + animatedValue._value,
+          height: screenData.height + (animatedValue as any)._value,
         };
       case 'position':
         return {

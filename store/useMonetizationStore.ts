@@ -99,9 +99,9 @@ export const useMonetizationStore = create<MonetizationState>((set, get) => ({
       if (transError) throw transError;
 
       set({
-        balance: credits?.balance || 0,
-        lifetimeEarned: credits?.lifetime_earned || 0,
-        lifetimeSpent: credits?.lifetime_spent || 0,
+        balance: (credits as any)?.balance || 0,
+        lifetimeEarned: (credits as any)?.lifetime_earned || 0,
+        lifetimeSpent: (credits as any)?.lifetime_spent || 0,
         transactions: transactions || [],
         loading: false,
       });
@@ -129,10 +129,10 @@ export const useMonetizationStore = create<MonetizationState>((set, get) => ({
         .from('credit_purchases')
         .insert({
           user_id: user.id,
-          package_id: package_.id,
-          credits: package_.credits,
-          amount_ghs: package_.price_ghs,
-        })
+          package_id: (package_ as any).id,
+          credits: (package_ as any).credits,
+          amount_ghs: (package_ as any).price_ghs,
+        } as any)
         .select()
         .single();
 
@@ -143,11 +143,11 @@ export const useMonetizationStore = create<MonetizationState>((set, get) => ({
         'paystack-initialize',
         {
           body: {
-            amount: package_.price_ghs * 100, // Convert to pesewas
+            amount: (package_ as any).price_ghs * 100, // Convert to pesewas
             email: user.email,
-            reference: `credit_${purchase.id}`,
+            reference: `credit_${(purchase as any).id}`,
             purpose: 'credit_purchase',
-            purpose_id: purchase.id,
+            purpose_id: (purchase as any).id,
           },
         }
       );
@@ -174,14 +174,14 @@ export const useMonetizationStore = create<MonetizationState>((set, get) => ({
         p_reason: reason,
         p_reference_id: metadata?.referenceId,
         p_reference_type: metadata?.referenceType,
-      });
+      } as any);
 
       if (error) throw error;
 
-      if (data.success) {
+      if ((data as any).success) {
         // Update local state
         set(state => ({
-          balance: data.new_balance,
+          balance: (data as any).new_balance,
           lifetimeSpent: state.lifetimeSpent + amount,
         }));
         
@@ -189,7 +189,7 @@ export const useMonetizationStore = create<MonetizationState>((set, get) => ({
         get().refreshCredits();
       }
 
-      return { success: data.success, error: data.error };
+      return { success: (data as any).success, error: (data as any).error };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
@@ -206,14 +206,14 @@ export const useMonetizationStore = create<MonetizationState>((set, get) => ({
         p_feature_key: featureKey,
         p_credits: credits,
         p_metadata: metadata || {},
-      });
+      } as any);
 
       if (error) throw error;
 
-      if (data.success) {
+      if ((data as any).success) {
         // Update local state
         set(state => ({
-          balance: data.new_balance,
+          balance: (data as any).new_balance,
           lifetimeSpent: state.lifetimeSpent + credits,
         }));
         
@@ -222,7 +222,7 @@ export const useMonetizationStore = create<MonetizationState>((set, get) => ({
         get().refreshSubscription();
       }
 
-      return { success: data.success, error: data.error };
+      return { success: (data as any).success, error: (data as any).error };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
@@ -266,7 +266,7 @@ export const useMonetizationStore = create<MonetizationState>((set, get) => ({
       // Get entitlements
       const { data: entitlements, error: entError } = await supabase.rpc('get_user_entitlements', {
         p_user_id: user.id,
-      });
+      } as any);
 
       if (entError) throw entError;
 
@@ -298,10 +298,10 @@ export const useMonetizationStore = create<MonetizationState>((set, get) => ({
         .from('user_subscriptions')
         .insert({
           user_id: user.id,
-          plan_id: plan.id,
+          plan_id: (plan as any).id,
           current_period_start: new Date().toISOString(),
           current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
-        })
+        } as any)
         .select()
         .single();
 
@@ -312,11 +312,11 @@ export const useMonetizationStore = create<MonetizationState>((set, get) => ({
         'paystack-initialize',
         {
           body: {
-            amount: plan.price_ghs * 100, // Convert to pesewas
+            amount: (plan as any).price_ghs * 100, // Convert to pesewas
             email: user.email,
-            reference: `sub_${subscription.id}`,
+            reference: `sub_${(subscription as any).id}`,
             purpose: 'subscription',
-            purpose_id: subscription.id,
+            purpose_id: (subscription as any).id,
           },
         }
       );
@@ -339,10 +339,10 @@ export const useMonetizationStore = create<MonetizationState>((set, get) => ({
 
       const { error } = await supabase
         .from('user_subscriptions')
-        .update({ 
+                .update({
           status: 'cancelled',
           auto_renew: false,
-        })
+        } as any)
         .eq('user_id', user.id)
         .eq('status', 'active');
 

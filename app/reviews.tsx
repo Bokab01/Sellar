@@ -127,7 +127,7 @@ const ReviewsScreen = () => {
                 <ReviewsList
                   userId={user.id}
                   showWriteReview={false}
-                  reviewedUserName={`${user.first_name} ${user.last_name}`}
+                  reviewedUserName={`${(user as any).first_name} ${(user as any).last_name}`}
                 />
               ) : (
                 <ReviewsList

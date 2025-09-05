@@ -182,7 +182,7 @@ export function ModerationDashboard({ isAdmin = false }: ModerationDashboardProp
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={[styles.loadingText, { color: theme.colors.text }]}>
+        <Text style={[styles.loadingText, { color: theme.colors.text.primary }]}>
           Loading moderation dashboard...
         </Text>
       </View>
@@ -198,7 +198,7 @@ export function ModerationDashboard({ isAdmin = false }: ModerationDashboardProp
     >
       {/* Statistics */}
       <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
           Moderation Statistics (Last 7 Days)
         </Text>
         
@@ -243,13 +243,13 @@ export function ModerationDashboard({ isAdmin = false }: ModerationDashboardProp
         {/* Flag Types */}
         {Object.keys(stats.flagsByType).length > 0 && (
           <View style={styles.flagsSection}>
-            <Text style={[styles.flagsTitle, { color: theme.colors.text }]}>
+            <Text style={[styles.flagsTitle, { color: theme.colors.text.primary }]}>
               Common Flags
             </Text>
             <View style={styles.flagsGrid}>
               {Object.entries(stats.flagsByType).map(([type, count]) => (
                 <View key={type} style={styles.flagItem}>
-                  <Text style={[styles.flagType, { color: theme.colors.text }]}>
+                  <Text style={[styles.flagType, { color: theme.colors.text.primary }]}>
                     {type.replace('_', ' ')}
                   </Text>
                   <Text style={[styles.flagCount, { color: theme.colors.textSecondary }]}>
@@ -264,13 +264,13 @@ export function ModerationDashboard({ isAdmin = false }: ModerationDashboardProp
 
       {/* Filters */}
       <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
           Filters
         </Text>
         
         <View style={styles.filtersRow}>
           <View style={styles.filterGroup}>
-            <Text style={[styles.filterLabel, { color: theme.colors.text }]}>
+            <Text style={[styles.filterLabel, { color: theme.colors.text.primary }]}>
               Status
             </Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -294,7 +294,7 @@ export function ModerationDashboard({ isAdmin = false }: ModerationDashboardProp
                       {
                         color: filterStatus === status 
                           ? 'white' 
-                          : theme.colors.text
+                          : theme.colors.text.primary
                       }
                     ]}>
                       {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -306,7 +306,7 @@ export function ModerationDashboard({ isAdmin = false }: ModerationDashboardProp
           </View>
 
           <View style={styles.filterGroup}>
-            <Text style={[styles.filterLabel, { color: theme.colors.text }]}>
+            <Text style={[styles.filterLabel, { color: theme.colors.text.primary }]}>
               Content Type
             </Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -330,7 +330,7 @@ export function ModerationDashboard({ isAdmin = false }: ModerationDashboardProp
                       {
                         color: filterType === type 
                           ? 'white' 
-                          : theme.colors.text
+                          : theme.colors.text.primary
                       }
                     ]}>
                       {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -345,7 +345,7 @@ export function ModerationDashboard({ isAdmin = false }: ModerationDashboardProp
 
       {/* Moderation Queue */}
       <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
           Moderation Queue ({queueItems.length})
         </Text>
         
@@ -368,7 +368,7 @@ export function ModerationDashboard({ isAdmin = false }: ModerationDashboardProp
                       size={16} 
                       color={getStatusColor(item.status)} 
                     />
-                    <Text style={[styles.itemTypeText, { color: theme.colors.text }]}>
+                    <Text style={[styles.itemTypeText, { color: theme.colors.text.primary }]}>
                       {formatContentType(item.contentType)}
                     </Text>
                   </View>
@@ -399,7 +399,7 @@ export function ModerationDashboard({ isAdmin = false }: ModerationDashboardProp
                 />
               </View>
               
-              <Text style={[styles.itemContent, { color: theme.colors.text }]}>
+              <Text style={[styles.itemContent, { color: theme.colors.text.primary }]}>
                 {truncateContent(item.content)}
               </Text>
               
@@ -436,9 +436,9 @@ export function ModerationDashboard({ isAdmin = false }: ModerationDashboardProp
         <View style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
           <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
             <TouchableOpacity onPress={() => setShowReviewModal(false)}>
-              <Ionicons name="close" size={24} color={theme.colors.text} />
+              <Ionicons name="close" size={24} color={theme.colors.text.primary} />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.text.primary }]}>
               Review Content
             </Text>
             <View style={{ width: 24 }} />
@@ -451,7 +451,7 @@ export function ModerationDashboard({ isAdmin = false }: ModerationDashboardProp
                   <Text style={[styles.contentType, { color: theme.colors.textSecondary }]}>
                     {formatContentType(selectedItem.contentType)}
                   </Text>
-                  <Text style={[styles.contentText, { color: theme.colors.text }]}>
+                  <Text style={[styles.contentText, { color: theme.colors.text.primary }]}>
                     {selectedItem.content}
                   </Text>
                   
@@ -463,7 +463,7 @@ export function ModerationDashboard({ isAdmin = false }: ModerationDashboardProp
                 </View>
 
                 <View style={styles.decisionSection}>
-                  <Text style={[styles.decisionTitle, { color: theme.colors.text }]}>
+                  <Text style={[styles.decisionTitle, { color: theme.colors.text.primary }]}>
                     Decision
                   </Text>
                   
@@ -487,7 +487,7 @@ export function ModerationDashboard({ isAdmin = false }: ModerationDashboardProp
                           {
                             color: reviewDecision === decision 
                               ? 'white' 
-                              : theme.colors.text
+                              : theme.colors.text.primary
                           }
                         ]}>
                           {decision.charAt(0).toUpperCase() + decision.slice(1)}
@@ -498,7 +498,7 @@ export function ModerationDashboard({ isAdmin = false }: ModerationDashboardProp
                 </View>
 
                 <View style={styles.notesSection}>
-                  <Text style={[styles.notesTitle, { color: theme.colors.text }]}>
+                  <Text style={[styles.notesTitle, { color: theme.colors.text.primary }]}>
                     Review Notes (Optional)
                   </Text>
                   <TextInput
@@ -506,7 +506,7 @@ export function ModerationDashboard({ isAdmin = false }: ModerationDashboardProp
                       styles.notesInput,
                       {
                         borderColor: theme.colors.border,
-                        color: theme.colors.text,
+                        color: theme.colors.text.primary,
                         backgroundColor: theme.colors.background,
                       }
                     ]}

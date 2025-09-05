@@ -121,7 +121,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                     full_name: `${userData.firstName} ${userData.lastName}`.trim(),
                     phone: userData.phone || null,
                     location: userData.location || 'Accra, Greater Accra',
-                  });
+                  } as any);
                 if (error) throw error;
                 return 'basic';
               },
@@ -134,7 +134,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                     id: data.user!.id,
                     first_name: userData.firstName,
                     last_name: userData.lastName,
-                  });
+                  } as any);
                 if (error) throw error;
                 return 'minimal';
               },
@@ -143,7 +143,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               async () => {
                 const { error } = await supabase
                   .from('profiles')
-                  .insert({ id: data.user!.id });
+                  .insert({ id: data.user!.id } as any);
                 if (error) throw error;
                 return 'id-only';
               }
@@ -248,10 +248,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (user) {
         await supabase
           .from('profiles')
-          .update({ 
-            is_online: false, 
-            last_seen: new Date().toISOString() 
-          })
+                    .update({
+            is_online: false,
+            last_seen: new Date().toISOString()
+          } as any)
           .eq('id', user.id);
       }
 

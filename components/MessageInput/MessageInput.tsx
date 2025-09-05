@@ -35,7 +35,7 @@ export function MessageInput({
   const { theme } = useTheme();
   const { setTypingStatus } = usePresence();
   const [isFocused, setIsFocused] = useState(false);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canSend = value.trim().length > 0 && !disabled;
 

@@ -47,10 +47,6 @@ export default function TrendingTopicsScreen() {
   const [activeTab, setActiveTab] = useState<'topics' | 'posts'>('topics');
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchTrendingData();
-  }, [activeTab, fetchTrendingData]);
-
   const fetchTrendingData = async () => {
     try {
       setError(null);
@@ -72,6 +68,10 @@ export default function TrendingTopicsScreen() {
       setRefreshing(false);
     }
   };
+
+  useEffect(() => {
+    fetchTrendingData();
+  }, [activeTab, fetchTrendingData]);
 
   const fetchTrendingTopics = async () => {
     try {

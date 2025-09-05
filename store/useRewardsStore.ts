@@ -93,7 +93,7 @@ export const useRewardsStore = create<RewardsStore>((set, get) => ({
 
       const { data, error } = await supabase.rpc('get_user_reward_summary', {
         p_user_id: user.id
-      });
+      } as any);
 
       if (error) throw error;
 
@@ -279,7 +279,7 @@ export const useRewardsStore = create<RewardsStore>((set, get) => ({
 
       const { data, error } = await supabase.rpc('claim_anniversary_bonus', {
         p_user_id: user.id
-      });
+      } as any);
 
       if (error) throw error;
 
@@ -309,7 +309,7 @@ export const useRewardsStore = create<RewardsStore>((set, get) => ({
         p_referrer_id: user.id,
         p_referee_id: refereeId,
         p_referral_code: referralCode
-      });
+      } as any);
 
       if (error) throw error;
 

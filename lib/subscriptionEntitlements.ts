@@ -102,18 +102,18 @@ class SubscriptionEntitlementsService {
       monthlyCredits: plan.boostCredits,
       boostCredits: plan.boostCredits,
       businessBadge: plan.badges.includes('business'),
-      prioritySellerBadge: plan.badges.includes('priority_seller'),
-      premiumBadge: plan.badges.includes('premium'),
+      prioritySellerBadge: (plan.badges as any).includes('priority_seller'),
+      premiumBadge: (plan.badges as any).includes('premium'),
       autoBoost: plan.features.autoBoost || false,
-      autoBoostDays: plan.features.autoBoostDays || 0,
+      autoBoostDays: (plan.features as any).autoBoostDays || 0,
       analyticsLevel: plan.features.analytics as any || 'none',
       prioritySupport: plan.features.prioritySupport || false,
-      accountManager: plan.features.accountManager || false,
-      homepagePlacement: plan.features.homepagePlacement || false,
-      premiumBranding: plan.features.homepagePlacement || false, // Same as homepage placement
-      sponsoredPosts: plan.features.accountManager || false, // Premium feature
+      accountManager: (plan.features as any).accountManager || false,
+      homepagePlacement: (plan.features as any).homepagePlacement || false,
+      premiumBranding: (plan.features as any).homepagePlacement || false, // Same as homepage placement
+      sponsoredPosts: (plan.features as any).accountManager || false, // Premium feature
       bulkOperations: plan.maxListings === null, // Unlimited plans get bulk ops
-      apiAccess: plan.features.accountManager || false, // Premium feature
+      apiAccess: (plan.features as any).accountManager || false, // Premium feature
     };
 
     return baseEntitlements;

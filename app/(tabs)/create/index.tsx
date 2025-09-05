@@ -151,7 +151,7 @@ export default function CreateListingScreen() {
   
   // Validation state
   const [validationResults, setValidationResults] = useState<Record<number, ValidationResult>>({});
-  // const [isValidating, setIsValidating] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
   
   // Performance optimization refs
   const debouncedValidator = useRef(createDebouncedValidator(300));
@@ -162,11 +162,6 @@ export default function CreateListingScreen() {
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const AUTOSAVE_KEY = useMemo(() => `listing_draft_${user?.id || 'anonymous'}`, [user?.id]);
-
-  useEffect(() => {
-    checkListingLimits();
-    loadDraft();
-  }, [checkListingLimits, loadDraft]);
 
   // Load saved draft on component mount
   const loadDraft = useCallback(async () => {
@@ -190,6 +185,29 @@ export default function CreateListingScreen() {
       console.error('Failed to load draft:', error);
     }
   }, [AUTOSAVE_KEY]);
+
+  const checkListingLimits = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('listings')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('status', 'active');
+
+      if (data) {
+        setUserListingsCount(data.length);
+      }
+    } catch (error) {
+      console.error('Failed to check listing limits:', error);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    checkListingLimits();
+    loadDraft();
+  }, [checkListingLimits, loadDraft]);
 
   // Save draft to AsyncStorage
   const saveDraft = useCallback(async (data: ListingFormData) => {
@@ -239,24 +257,6 @@ export default function CreateListingScreen() {
       return () => subscription.remove();
     }, [hasUnsavedChanges, formData, saveDraft, clearDraft])
   );
-
-  const checkListingLimits = useCallback(async () => {
-    if (!user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('listings')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('status', 'active');
-
-      if (data) {
-        setUserListingsCount(data.length);
-      }
-    } catch (error) {
-      console.error('Failed to check listing limits:', error);
-    }
-  }, [user]);
 
   // Update form data with validation and autosave
   const updateFormData = useCallback((updates: Partial<ListingFormData>) => {

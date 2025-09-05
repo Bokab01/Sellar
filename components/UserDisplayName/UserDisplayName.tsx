@@ -1,14 +1,16 @@
 import React from 'react';
 import { View } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { Text, Badge, BusinessBadge } from '@/components';
+import { Text, Badge, BusinessBadge, Avatar } from '@/components';
 import { useDisplayName } from '@/hooks/useDisplayName';
 import { UserProfile } from '@/hooks/useProfile';
 
 interface UserDisplayNameProps {
   profile: UserProfile | null;
-  variant?: 'full' | 'short' | 'primary';
+  variant?: 'full' | 'short' | 'primary' | 'caption';
   showBadge?: boolean;
+  showAvatar?: boolean;
+  avatarSize?: number;
   textVariant?: 'h1' | 'h2' | 'h3' | 'h4' | 'body' | 'bodySmall' | 'caption';
   color?: 'primary' | 'secondary' | 'muted';
   style?: any;
@@ -19,6 +21,8 @@ export function UserDisplayName({
   profile,
   variant = 'full',
   showBadge = true,
+  showAvatar = false,
+  avatarSize = 24,
   textVariant = 'body',
   color = 'primary',
   style,
@@ -33,6 +37,8 @@ export function UserDisplayName({
         return displayInfo.shortDisplayName;
       case 'primary':
         return displayInfo.displayName;
+      case 'caption':
+        return displayInfo.shortDisplayName;
       case 'full':
       default:
         return displayInfo.fullDisplayName;
@@ -61,6 +67,13 @@ export function UserDisplayName({
       flexWrap: 'wrap',
       gap: theme.spacing.xs,
     }}>
+      {showAvatar && (
+        <Avatar
+          source={profile.avatar_url}
+          name={getDisplayText()}
+          size={avatarSize as any}
+        />
+      )}
       <Text 
         variant={textVariant} 
         color={color} 
@@ -72,7 +85,7 @@ export function UserDisplayName({
         ]}
         numberOfLines={numberOfLines}
       >
-        {displayText}
+        {getDisplayText()}
       </Text>
       
       {showBadge && displayInfo.showBusinessBadge && (

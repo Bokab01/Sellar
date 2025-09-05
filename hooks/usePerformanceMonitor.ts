@@ -79,9 +79,9 @@ class PerformanceMonitor {
     try {
       // React Native doesn't have direct access to memory info
       // This is a placeholder for native module integration
-      if (global.performance && global.performance.memory) {
-        this.metrics.jsHeapSize = global.performance.memory.usedJSHeapSize;
-        this.metrics.memoryUsage = global.performance.memory.totalJSHeapSize;
+      if (global.performance && (global.performance as any).memory) {
+        this.metrics.jsHeapSize = (global.performance as any).memory.usedJSHeapSize;
+        this.metrics.memoryUsage = (global.performance as any).memory.totalJSHeapSize;
       }
     } catch (error) {
       // Silently fail if memory monitoring is not available
@@ -260,7 +260,7 @@ export function useApiPerformanceMonitor() {
       endTimer(timerKey, 'api', { endpoint, success: true });
       return result;
     } catch (error) {
-      endTimer(timerKey, 'api', { endpoint, success: false, error: error.message });
+      endTimer(timerKey, 'api', { endpoint, success: false, error: (error as any).message });
       throw error;
     }
   }, [startTimer, endTimer]);

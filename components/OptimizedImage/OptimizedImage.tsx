@@ -6,8 +6,9 @@ import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
 import { imageOptimization, ImageVariant } from '@/lib/imageOptimization';
 
 interface OptimizedImageProps {
-  bucket: string;
-  path: string;
+  bucket?: string;
+  path?: string;
+  source?: { uri: string };
   style?: ImageStyle;
   containerStyle?: ViewStyle;
   width?: number;
@@ -25,6 +26,7 @@ interface OptimizedImageProps {
 export function OptimizedImage({
   bucket,
   path,
+  source,
   style,
   containerStyle,
   width,
@@ -68,6 +70,20 @@ export function OptimizedImage({
     try {
       setLoading(true);
       setError(false);
+
+      // If source prop is provided, use it directly
+      if (source?.uri) {
+        setImageUrl(source.uri);
+        return;
+      }
+
+      // If bucket and path are not provided, use fallback
+      if (!bucket || !path) {
+        if (fallbackUrl) {
+          setImageUrl(fallbackUrl);
+        }
+        return;
+      }
 
       // First, try to get pre-generated variants
       const imageVariants = await imageOptimization.getOptimizedUrls(bucket, path);

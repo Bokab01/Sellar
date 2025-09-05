@@ -10,6 +10,7 @@ interface SearchBarProps {
   onChangeText: (text: string) => void;
   onSearch?: () => void;
   onFilter?: () => void;
+  onClear?: () => void;
   placeholder?: string;
   showFilter?: boolean;
   style?: any;
@@ -20,6 +21,7 @@ export function SearchBar({
   onChangeText,
   onSearch,
   onFilter,
+  onClear,
   placeholder = "Search products...",
   showFilter = true,
   style,
@@ -50,6 +52,14 @@ export function SearchBar({
           returnKeyType="search"
         />
       </View>
+
+      {value && onClear && (
+        <Button
+          variant="icon"
+          icon={<X size={20} color={theme.colors.text.primary} />}
+          onPress={onClear}
+        />
+      )}
 
       {showFilter && (
         <Button

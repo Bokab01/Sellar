@@ -133,7 +133,7 @@ export function Toast({
     }
   };
 
-  if (!visible && fadeAnim._value === 0) {
+  if (!visible) {
     return null;
   }
 
