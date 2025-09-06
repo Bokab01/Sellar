@@ -120,7 +120,7 @@ export default function SupportTicketsScreen() {
               </Text>
             </View>
 
-            <Button
+           {/*  <Button
               variant="primary"
               size="md"
               onPress={() => setShowCreateModal(true)}
@@ -128,7 +128,7 @@ export default function SupportTicketsScreen() {
               icon={<Plus size={18} color={theme.colors.surface} />}
             >
               New Ticket
-            </Button>
+            </Button> */}
           </View>
 
           {/* Error State */}

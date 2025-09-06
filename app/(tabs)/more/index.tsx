@@ -182,26 +182,26 @@ export default function MoreScreen() {
           icon: <Edit3 size={20} color={theme.colors.text.primary} />,
           onPress: () => router.push('/edit-profile'),
         },
-        {
+        /* {
           title: 'Wallet & Credit',
           subtitle: `${Math.floor(creditBalance)} credits • GHS ${walletBalance.toFixed(2)} wallet`,
           icon: <Wallet size={20} color={theme.colors.success} />,
           badge: creditBalance > 0 ? { text: `${Math.floor(creditBalance)}`, variant: 'success' as const } : undefined,
           onPress: () => router.push('/(tabs)/more/wallet'),
-        },
-        {
+        }, */
+       /*  {
           title: 'Buy Credits',
           subtitle: 'Purchase credits for premium features',
           icon: <ShoppingCart size={20} color={theme.colors.primary} />,
           onPress: () => router.push('/buy-credits'),
-        },
+        }, */
         {
           title: 'My Rewards',
           subtitle: 'Track your credits and achievements',
           icon: <Award size={20} color={theme.colors.warning} />,
           onPress: () => router.push('/my-rewards'),
         },
-        {
+       /*  {
           title: 'Business Plans',
           subtitle: currentPlan ? `${currentPlan.subscription_plans?.name} Plan` : 'Unlock business features',
           icon: <Building size={20} color={theme.colors.primary} />,
@@ -214,7 +214,7 @@ export default function MoreScreen() {
           icon: <BarChart3 size={20} color={theme.colors.primary} />,
           badge: hasBusinessPlan() ? { text: 'Business', variant: 'success' as const } : undefined,
           onPress: () => router.push('/(tabs)/more/dashboard'),
-        },
+        }, */
         {
           title: 'Feature Marketplace',
           subtitle: 'Boost your listings and unlock tools',
@@ -256,12 +256,12 @@ export default function MoreScreen() {
     {
       title: 'App & Support',
       items: [
-        {
+       /*  {
           title: 'Settings',
           subtitle: 'App preferences, privacy, and notifications',
           icon: <Settings size={20} color={theme.colors.text.primary} />,
           onPress: () => router.push('/(tabs)/more/settings'),
-        },
+        }, */
         /* {
           title: 'Notifications',
           subtitle: 'Manage your notification preferences',
@@ -332,7 +332,7 @@ export default function MoreScreen() {
             style={{
               backgroundColor: theme.colors.surface,
               borderRadius: theme.borderRadius.lg,
-              padding: theme.spacing.lg,
+              padding: theme.spacing.sm,
               marginBottom: theme.spacing.xl,
               ...theme.shadows.sm,
             }}

@@ -117,7 +117,7 @@ export default function CommunityScreen() {
         ) : transformedPosts.length > 0 ? (
           <ScrollView
             contentContainerStyle={{
-              padding: theme.spacing.lg,
+              padding: theme.spacing.sm,
               paddingBottom: theme.spacing.xl,
             }}
             showsVerticalScrollIndicator={false}

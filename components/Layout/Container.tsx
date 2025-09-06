@@ -10,7 +10,7 @@ interface ContainerProps extends ViewProps {
 
 export function Container({ 
   children, 
-  padding = 'md', 
+  padding = 'sm', 
   margin = 'none',
   style,
   ...props 

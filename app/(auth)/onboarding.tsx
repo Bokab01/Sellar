@@ -307,7 +307,7 @@ export default function OnboardingScreen() {
                     lineHeight: 16
                   }}
                 >
-                  About Sellar: Our platform
+                  About Sellar
                 </Text>
               </LinkButton>
             </View>

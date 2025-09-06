@@ -179,14 +179,24 @@ export function CreateTicketModal({ visible, onClose, onTicketCreated }: CreateT
               borderRadius: theme.borderRadius.md,
               borderWidth: 1,
               borderColor: theme.colors.border,
+              overflow: 'hidden', // Ensure border radius is applied
             }}>
               <Picker
                 selectedValue={category}
                 onValueChange={setCategory}
                 style={{
                   color: theme.colors.text.primary,
-                  backgroundColor: 'transparent',
+                  backgroundColor: theme.colors.surface,
+                  height: Platform.OS === 'ios' ? 200 : 50,
                 }}
+                itemStyle={{
+                  color: theme.colors.text.primary,
+                  backgroundColor: theme.colors.surface,
+                  fontSize: 16,
+                  height: Platform.OS === 'ios' ? 200 : undefined,
+                }}
+                dropdownIconColor={theme.colors.text.primary}
+                mode="dropdown"
               >
                 {CATEGORIES.map((cat) => (
                   <Picker.Item
@@ -194,6 +204,9 @@ export function CreateTicketModal({ visible, onClose, onTicketCreated }: CreateT
                     label={cat.label}
                     value={cat.value}
                     color={theme.colors.text.primary}
+                    style={{
+                      backgroundColor: theme.colors.surface,
+                    }}
                   />
                 ))}
               </Picker>
@@ -214,14 +227,24 @@ export function CreateTicketModal({ visible, onClose, onTicketCreated }: CreateT
               borderRadius: theme.borderRadius.md,
               borderWidth: 1,
               borderColor: theme.colors.border,
+              overflow: 'hidden', // Ensure border radius is applied
             }}>
               <Picker
                 selectedValue={priority}
                 onValueChange={setPriority}
                 style={{
                   color: theme.colors.text.primary,
-                  backgroundColor: 'transparent',
+                  backgroundColor: theme.colors.surface,
+                  height: Platform.OS === 'ios' ? 200 : 50,
                 }}
+                itemStyle={{
+                  color: theme.colors.text.primary,
+                  backgroundColor: theme.colors.surface,
+                  fontSize: 16,
+                  height: Platform.OS === 'ios' ? 200 : undefined,
+                }}
+                dropdownIconColor={theme.colors.text.primary}
+                mode="dropdown"
               >
                 {PRIORITIES.map((pri) => (
                   <Picker.Item
@@ -229,6 +252,9 @@ export function CreateTicketModal({ visible, onClose, onTicketCreated }: CreateT
                     label={pri.label}
                     value={pri.value}
                     color={theme.colors.text.primary}
+                    style={{
+                      backgroundColor: theme.colors.surface,
+                    }}
                   />
                 ))}
               </Picker>
@@ -247,21 +273,21 @@ export function CreateTicketModal({ visible, onClose, onTicketCreated }: CreateT
           />
 
           {/* Help Text */}
-          <View
+        {/*   <View
             style={{
               backgroundColor: theme.colors.primary + '10',
               borderRadius: theme.borderRadius.md,
               padding: theme.spacing.md,
             }}
           >
-            <Text variant="bodySmall" style={{ 
+            <Text variant="caption" style={{ 
               color: theme.colors.primary, 
               textAlign: 'center',
               lineHeight: 18,
             }}>
               💡 Include steps to reproduce the issue, error messages, and any relevant details to help us assist you better.
             </Text>
-          </View>
+          </View> */}
 
           {/* Response Time Info */}
           <View
@@ -271,7 +297,7 @@ export function CreateTicketModal({ visible, onClose, onTicketCreated }: CreateT
               padding: theme.spacing.md,
             }}
           >
-            <Text variant="bodySmall" color="muted" style={{ textAlign: 'center' }}>
+            <Text variant="caption" color="muted" style={{ textAlign: 'center' }}>
               📧 We&apos;ll respond to your registered email address within 24 hours
             </Text>
           </View>

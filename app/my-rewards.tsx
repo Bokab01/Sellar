@@ -324,7 +324,11 @@ export default function MyRewardsScreen() {
 
   return (
     <SafeAreaWrapper>
-      <AppHeader title="My Rewards" showBack />
+      <AppHeader 
+        title="My Rewards" 
+        showBack 
+        onBackPress={() => router.back()}
+      />
       
       {/* Tab Navigation */}
       <View
