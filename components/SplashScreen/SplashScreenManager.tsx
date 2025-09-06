@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Image, Dimensions } from 'react-native';
+import { View, Image, Dimensions, ActivityIndicator } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
@@ -9,6 +9,7 @@ import Animated, {
   withTiming,
   withSequence,
   withDelay,
+  withRepeat,
 } from 'react-native-reanimated';
 
 // Keep the splash screen visible while we fetch resources
@@ -26,10 +27,23 @@ export function SplashScreenManager({ isAppReady, onAnimationComplete }: SplashS
   const fadeAnim = useSharedValue(1);
   const scaleAnim = useSharedValue(1);
   const logoOpacity = useSharedValue(1);
+  const loadingOpacity = useSharedValue(1);
 
   useEffect(() => {
+    // Start loading animation immediately
+    loadingOpacity.value = withRepeat(
+      withSequence(
+        withTiming(0.3, { duration: 800 }),
+        withTiming(1, { duration: 800 })
+      ),
+      -1, // Infinite repeat
+      false
+    );
+
     if (isAppReady) {
-      // Start the exit animation
+      // Stop loading animation and start exit animation
+      loadingOpacity.value = withTiming(0, { duration: 300 });
+      
       fadeAnim.value = withSequence(
         withTiming(1, { duration: 500 }),
         withDelay(300, withTiming(0, { duration: 800 }))
@@ -54,7 +68,7 @@ export function SplashScreenManager({ isAppReady, onAnimationComplete }: SplashS
 
       return () => clearTimeout(timer);
     }
-  }, [isAppReady, fadeAnim, scaleAnim, logoOpacity, onAnimationComplete]);
+  }, [isAppReady, fadeAnim, scaleAnim, logoOpacity, loadingOpacity, onAnimationComplete]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: fadeAnim.value,
@@ -65,22 +79,24 @@ export function SplashScreenManager({ isAppReady, onAnimationComplete }: SplashS
     opacity: logoOpacity.value,
   }));
 
-  // Safety check for theme
-  if (!theme) {
-    return null;
-  }
+  const loadingAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: loadingOpacity.value,
+  }));
+
+  // Safety check for theme - provide fallback colors
+  const safeTheme = theme || {
+    colors: {
+      background: isDarkMode ? '#000000' : '#ffffff',
+      text: { primary: isDarkMode ? '#ffffff' : '#000000' }
+    }
+  };
 
   // Choose the appropriate splash screen image based on theme
   const splashImage = isDarkMode 
     ? require('../../assets/splashscreen/splashscreen-dark.png')
     : require('../../assets/splashscreen/splashscreen-light.png');
 
-  const backgroundColor = isDarkMode ? theme.colors.background : theme.colors.background;
-
-  // Early return for app not ready
-  if (!isAppReady) {
-    return null; // Let the native splash screen handle the initial display
-  }
+  const backgroundColor = safeTheme.colors.background;
 
   return (
     <Animated.View
@@ -117,13 +133,21 @@ export function SplashScreenManager({ isAppReady, onAnimationComplete }: SplashS
           }}
         />
         
-        {/* Optional loading indicator */}
-        <View
-          style={{
-            marginTop: 40,
-            alignItems: 'center',
-          }}
+        {/* Loading indicator with animation */}
+        <Animated.View
+          style={[
+            loadingAnimatedStyle,
+            {
+              marginTop: 40,
+              alignItems: 'center',
+            }
+          ]}
         >
+          <ActivityIndicator
+            size="large"
+            color={isDarkMode ? '#ffffff' : '#000000'}
+            style={{ marginBottom: 16 }}
+          />
           <Text
             variant="bodySmall"
             style={{
@@ -132,9 +156,9 @@ export function SplashScreenManager({ isAppReady, onAnimationComplete }: SplashS
               fontWeight: '500',
             }}
           >
-            Loading your marketplace...
+            Getting ready...
           </Text>
-        </View>
+        </Animated.View>
       </Animated.View>
     </Animated.View>
   );

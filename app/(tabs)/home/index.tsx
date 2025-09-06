@@ -25,6 +25,7 @@ import {
   // ProductVirtualizedList,
   // LazyComponent,
 } from '@/components';
+// Removed SmartSearchModal import - now using dedicated screen
 import { 
   Bell, 
   Heart, 
@@ -39,7 +40,9 @@ import {
   MapPin, 
   ChevronDown,
   Zap,
-  Grid3X3
+  Grid3X3,
+  Search,
+  Filter
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 
@@ -93,6 +96,8 @@ export default function HomeScreen() {
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
   const [categoryCountsLoading, setCategoryCountsLoading] = useState(true);
   const [categoryIdMap, setCategoryIdMap] = useState<Record<string, string>>({});
+
+  // Smart search modal removed - now using dedicated screen
 
   // Fetch user credit balance
   useEffect(() => {
@@ -288,25 +293,19 @@ export default function HomeScreen() {
   } = useListings({
     search: searchQuery,
     category: selectedCategoryId,
-    location: filters.location || currentLocation,
+    location: filters.location, // Only apply location filter if explicitly set by user
     priceMin: filters.priceRange.min,
     priceMax: filters.priceRange.max,
     condition: filters.condition,
   });
 
-  // Debug logging - temporarily disabled to prevent infinite re-renders
-  // useEffect(() => {
-  //   console.log('Home screen - Selected categories:', selectedCategories);
-  //   console.log('Home screen - Category ID map:', categoryIdMap);
-  //   console.log('Home screen - Selected category ID:', selectedCategoryId);
-  //   console.log('Home screen - Products count:', products.length);
-  //   console.log('Home screen - Loading:', loading);
-  //   console.log('Home screen - Error:', error);
-  // }, [selectedCategories, categoryIdMap, selectedCategoryId, products.length, loading, error]);
+  // Real-time updates should handle new listings automatically
+  // Removed useFocusEffect to prevent blinking - relying on enhanced real-time updates
 
   // Transform database listings to component format with full-bleed styling
   const transformedProducts = products.map((listing: any) => {
-    const seller = listing.profiles;
+    // Handle both joined and simple listing data
+    const seller = listing.profiles || null;
     const badges = [];
     
     // Add boost badge if listing is boosted
@@ -329,9 +328,9 @@ export default function HomeScreen() {
       title: listing.title,
       price: listing.price,
       seller: {
-        id: seller?.id,
-        name: `${seller?.first_name || 'User'} ${seller?.last_name || ''}`,
-        avatar: seller?.avatar_url,
+        id: seller?.id || listing.user_id,
+        name: seller ? `${seller.first_name || 'User'} ${seller.last_name || ''}`.trim() : 'Anonymous User',
+        avatar: seller?.avatar_url || null,
         rating: seller?.rating || 0,
         badges: seller?.account_type === 'business' ? ['business'] : [],
       },
@@ -523,13 +522,43 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Search Bar */}
-        <SearchBar
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          onFilter={() => setShowFilters(true)}
-          placeholder="Search for anything..."
-        />
+        {/* Search Bar Trigger */}
+        <TouchableOpacity
+          onPress={() => router.push('/smart-search')}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.borderRadius.lg,
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+            paddingHorizontal: theme.spacing.lg,
+            paddingVertical: theme.spacing.md,
+            marginHorizontal: theme.spacing.lg,
+            marginBottom: theme.spacing.md,
+          }}
+          activeOpacity={0.7}
+        >
+          <Search size={20} color={theme.colors.text.secondary} />
+          <Text 
+            variant="body" 
+            color="muted" 
+            style={{ 
+              flex: 1, 
+              marginLeft: theme.spacing.md,
+            }}
+          >
+            {searchQuery || "Search for anything..."}
+          </Text>
+          <TouchableOpacity
+            onPress={() => setShowFilters(true)}
+            style={{
+              padding: theme.spacing.xs,
+            }}
+          >
+            <Filter size={20} color={theme.colors.text.primary} />
+          </TouchableOpacity>
+        </TouchableOpacity>
 
         {/* Enhanced Categories with Icons and Scroll Indicator */}
         <View style={{ paddingVertical: theme.spacing.md, position: 'relative' }}>
@@ -683,10 +712,10 @@ export default function HomeScreen() {
           {error ? (
             <View style={{ paddingHorizontal: theme.spacing.lg }}>
               <EmptyState
-                title="Failed to load listings"
-                description={error}
+                title="Unable to load listings"
+                description="Please check your internet connection and try again."
                 action={{
-                  text: 'Try Again',
+                  text: 'Refresh',
                   onPress: refresh,
                 }}
               />
@@ -707,11 +736,19 @@ export default function HomeScreen() {
           ) : transformedProducts.length === 0 ? (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: theme.spacing.lg }}>
               <EmptyState
-                title="No listings found"
-                description="There are no active listings at the moment. Try adjusting your search or filters, or check back later."
+                title="No listings available"
+                description={searchQuery || selectedCategories.length > 0 
+                  ? "No listings match your current search or filters. Try adjusting your criteria or browse all listings."
+                  : "Be the first to list an item! Start selling and help build our marketplace community."
+                }
                 action={{
-                  text: 'Refresh',
-                  onPress: refresh,
+                  text: searchQuery || selectedCategories.length > 0 ? 'Clear Filters' : 'Create Listing',
+                  onPress: searchQuery || selectedCategories.length > 0 
+                    ? () => {
+                        setSearchQuery('');
+                        setSelectedCategories([]);
+                      }
+                    : () => router.push('/(tabs)/create'),
                 }}
               />
             </View>

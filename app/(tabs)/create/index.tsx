@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { View, ScrollView, Alert, Pressable, BackHandler } from 'react-native';
+import { View, ScrollView, Alert, Pressable, BackHandler, Image } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
@@ -753,7 +753,7 @@ export default function CreateListingScreen() {
 
       <Input
         label="Title"
-        placeholder="e.g. White COS Jumper"
+        placeholder="e.g. Samsung Galaxy Note 20"
         value={formData.title}
         onChangeText={handleTitleChange}
         helper={validationResults[1]?.warnings.title || "Be descriptive and specific (min. 10 characters)"}
@@ -763,7 +763,7 @@ export default function CreateListingScreen() {
       <Input
         variant="multiline"
         label="Describe your item"
-        placeholder="e.g. only worn a few times, true to size"
+        placeholder="Describe your item in detail..."
         value={formData.description}
         onChangeText={handleDescriptionChange}
         helper={validationResults[1]?.warnings.description || "Include condition, age, reason for selling, etc. (min. 20 characters)"}
@@ -933,7 +933,7 @@ export default function CreateListingScreen() {
 
       <Input
         label="Price (GHS)"
-        placeholder="25.00"
+        placeholder="0.00"
         value={formData.price}
         onChangeText={handlePriceChange}
         keyboardType="numeric"
@@ -952,13 +952,13 @@ export default function CreateListingScreen() {
         onValueChange={handleQuantityChange}
         min={1}
         max={99}
-        showLabel
-        label="Quantity Available"
+        showLabel={true}
+        label="How many are you selling?"
       />
 
       <View>
         <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.md }}>
-          Pricing Options
+          How do you want to sell your item?
         </Text>
         <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
           <Chip
@@ -988,6 +988,16 @@ export default function CreateListingScreen() {
   const ReviewStep = useMemo(() => (
     <View style={{ gap: theme.spacing.lg }}>
 
+      {/* Preview Header */}
+      <View style={{ marginBottom: theme.spacing.md }}>
+        <Text variant="h3" style={{ marginBottom: theme.spacing.sm }}>
+          📋 Listing Preview
+        </Text>
+        <Text variant="body" color="secondary">
+          This is how your listing will appear to buyers
+        </Text>
+      </View>
+
       {/* Preview Card */}
       <View style={{
         backgroundColor: theme.colors.surface,
@@ -995,6 +1005,7 @@ export default function CreateListingScreen() {
         padding: theme.spacing.lg,
         borderWidth: 1,
         borderColor: theme.colors.border,
+        ...theme.shadows.md,
       }}>
         {/* Images Preview */}
         {formData.images.length > 0 && (
@@ -1003,7 +1014,7 @@ export default function CreateListingScreen() {
               <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
                 {formData.images.map((image, index) => (
                   <View
-                    key={index}
+                    key={image.id || index}
                     style={{
                       width: 80,
                       height: 80,
@@ -1012,13 +1023,27 @@ export default function CreateListingScreen() {
                       backgroundColor: theme.colors.surfaceVariant,
                     }}
                   >
-                    {/* Image would be rendered here */}
+                    <Image
+                      source={{ uri: image.uri }}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                      }}
+                      resizeMode="cover"
+                    />
+                    {/* Image counter overlay */}
                     <View style={{
-                      flex: 1,
-                      alignItems: 'center',
-                      justifyContent: 'center',
+                      position: 'absolute',
+                      bottom: 2,
+                      right: 2,
+                      backgroundColor: 'rgba(0,0,0,0.6)',
+                      borderRadius: theme.borderRadius.sm,
+                      paddingHorizontal: 4,
+                      paddingVertical: 2,
                     }}>
-                      <Text variant="caption">Photo {index + 1}</Text>
+                      <Text variant="caption" style={{ color: 'white', fontSize: 10 }}>
+                        {index + 1}
+                      </Text>
                     </View>
                   </View>
                 ))}
@@ -1055,8 +1080,21 @@ export default function CreateListingScreen() {
           <Text variant="caption" color="muted">
             Location: {formData.location}
           </Text>
+          
+          {/* Category Attributes */}
+          {formData.categoryAttributes && Object.keys(formData.categoryAttributes).length > 0 && (
+            <>
+              <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: theme.spacing.xs }} />
+              {Object.entries(formData.categoryAttributes).map(([key, value]) => (
+                <Text key={key} variant="caption" color="muted">
+                  {key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}: {Array.isArray(value) ? value.join(', ') : String(value)}
+                </Text>
+              ))}
+            </>
+          )}
         </View>
       </View>
+
 
       {/* Listing Limit Warning */}
       {!hasUnlimitedListings() && userListingsCount >= getMaxListings() && (

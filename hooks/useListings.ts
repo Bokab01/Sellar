@@ -35,7 +35,7 @@ export function useListings(options: UseListingsOptions = {}) {
       });
 
       if (fetchError) {
-        setError(fetchError.message);
+        setError(typeof fetchError === 'string' ? fetchError : (fetchError as any)?.message || 'Failed to load listings');
       } else {
         setListings(data || []);
       }

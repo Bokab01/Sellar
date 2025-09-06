@@ -19,7 +19,7 @@ export function useConversations() {
       const { data, error: fetchError } = await dbHelpers.getConversations(user.id);
 
       if (fetchError) {
-        setError(fetchError.message);
+        setError(typeof fetchError === 'string' ? fetchError : (fetchError as any)?.message || 'Failed to load conversations');
       } else {
         setConversations(data || []);
       }
@@ -55,7 +55,7 @@ export function useMessages(conversationId: string) {
       const { data, error: fetchError } = await dbHelpers.getMessages(conversationId);
 
       if (fetchError) {
-        setError(fetchError.message);
+        setError(typeof fetchError === 'string' ? fetchError : (fetchError as any)?.message || 'Failed to load messages');
       } else {
         setMessages(data || []);
       }

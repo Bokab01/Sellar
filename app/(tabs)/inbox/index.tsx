@@ -4,6 +4,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { useConversations } from '@/hooks/useChat';
 import { usePresence } from '@/hooks/usePresence';
 import { useChatStore } from '@/store/useChatStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { router } from 'expo-router';
 import {
   Text,
@@ -35,9 +36,11 @@ export default function InboxScreen() {
 
   // Transform database conversations to component format
   const transformedConversations = conversations.map((conv: any) => {
-    const otherParticipant = conv.participant_1_profile?.id === conv.participant_1 
-      ? conv.participant_2_profile 
-      : conv.participant_1_profile;
+    // Get the other participant (not the current user)
+    const { user } = useAuthStore.getState();
+    const otherParticipant = conv.buyer_id === user?.id 
+      ? conv.seller_profile 
+      : conv.buyer_profile;
     
     const lastMessage = conv.messages?.[0];
     const typingUsers = getTypingUsers(conv.id);
@@ -45,25 +48,31 @@ export default function InboxScreen() {
     
     return {
       id: conv.id,
-      title: `${otherParticipant?.first_name} ${otherParticipant?.last_name}`,
-      subtitle: conv.listings?.title ? `About ${conv.listings.title}` : 'General conversation',
+      title: otherParticipant 
+        ? `${otherParticipant.first_name || 'User'} ${otherParticipant.last_name || ''}`.trim()
+        : 'Anonymous User',
+      subtitle: conv.listing?.title ? `About ${conv.listing.title}` : 'General conversation',
       description: isOtherUserTyping 
         ? 'typing...' 
         : lastMessage?.content || 'No messages yet',
-      timestamp: new Date(conv.last_message_at).toLocaleTimeString([], { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      }),
+      timestamp: conv.last_message_at 
+        ? new Date(conv.last_message_at).toLocaleTimeString([], { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          })
+        : '',
       unreadCount: unreadCounts[conv.id] || 0,
       avatar: {
-        name: `${otherParticipant?.first_name} ${otherParticipant?.last_name}`,
+        name: otherParticipant 
+          ? `${otherParticipant.first_name || 'User'} ${otherParticipant.last_name || ''}`.trim()
+          : 'Anonymous User',
         source: otherParticipant?.avatar_url,
         isOnline: isUserOnline(otherParticipant?.id),
       },
-      listing: conv.listings ? {
-        title: conv.listings.title,
-        price: conv.listings.price,
-        image: conv.listings.images?.[0],
+      listing: conv.listing ? {
+        title: conv.listing.title,
+        price: conv.listing.price,
+        image: conv.listing.images?.[0],
       } : null,
       isTyping: isOtherUserTyping,
     };

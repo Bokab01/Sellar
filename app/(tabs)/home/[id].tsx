@@ -408,6 +408,12 @@ export default function ListingDetailScreen() {
       return;
     }
 
+    // Prevent users from favoriting their own listings
+    if (listing && listing.user_id === user.id) {
+      Alert.alert('Cannot Favorite', 'You cannot favorite your own listing');
+      return;
+    }
+
     try {
       if (isFavorited) {
         await supabase
@@ -747,28 +753,31 @@ export default function ListingDetailScreen() {
         </TouchableOpacity>
 
         <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
-          <TouchableOpacity
-            onPress={toggleFavorite}
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              backgroundColor: 'rgba(0,0,0,0.5)',
-              justifyContent: 'center',
-              alignItems: 'center',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.25,
-              shadowRadius: 4,
-              elevation: 5,
-            }}
-          >
-            <Heart 
-              size={20} 
-              color={isFavorited ? theme.colors.error : "white"} 
-              fill={isFavorited ? theme.colors.error : 'none'} 
-            />
-          </TouchableOpacity>
+          {/* Only show favorite button if user doesn't own the listing */}
+          {listing && listing.user_id !== user?.id && (
+            <TouchableOpacity
+              onPress={toggleFavorite}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                justifyContent: 'center',
+                alignItems: 'center',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 4,
+                elevation: 5,
+              }}
+            >
+              <Heart 
+                size={20} 
+                color={isFavorited ? theme.colors.error : "white"} 
+                fill={isFavorited ? theme.colors.error : 'none'} 
+              />
+            </TouchableOpacity>
+          )}
           
           <TouchableOpacity
             onPress={() => {

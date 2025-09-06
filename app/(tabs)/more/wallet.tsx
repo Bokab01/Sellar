@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, ScrollView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
@@ -113,10 +114,21 @@ export default function WalletScreen() {
   useEffect(() => {
     if (user) {
       fetchWalletData();
-      // Don't call refreshCredits here - it should already be loaded
-      // and calling it causes infinite re-renders
     }
   }, [user]);
+
+  // Load credits when screen comes into focus, but only if needed
+  useFocusEffect(
+    useCallback(() => {
+      // Only refresh credits if:
+      // 1. User is authenticated
+      // 2. Credits are not currently loading
+      // 3. Balance is 0 (likely not loaded yet) OR this is the first time focusing
+      if (user && !creditLoading && creditBalance === 0) {
+        refreshCredits();
+      }
+    }, [user, creditLoading, creditBalance, refreshCredits])
+  );
 
   const fetchWalletData = async () => {
     if (!user) return;

@@ -451,14 +451,35 @@ export const dbHelpers = {
 
   // Chat operations
   async getConversations(userId: string) {
-    const { data, error } = await db.conversations
-      .select(`
-        *,
-        participants!conversations_participants_participant_id_fkey(*),
-        messages!conversations_messages_conversation_id_fkey(*)
-      `)
-      .eq('participants.participant_id', userId);
-    return { data, error };
+    try {
+      // First, try the full query with joins
+      const { data, error } = await db.conversations
+        .select(`
+          *,
+          buyer_profile:profiles!conversations_buyer_id_fkey(*),
+          seller_profile:profiles!conversations_seller_id_fkey(*),
+          listing:listings!conversations_listing_id_fkey(*),
+          messages!conversations_messages_conversation_id_fkey(*)
+        `)
+        .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
+        .order('last_message_at', { ascending: false });
+
+      // If the joined query fails, try a simpler query without joins
+      if (error && (error.message.includes('schema cache') || error.message.includes('relationship'))) {
+        console.log('🔄 Falling back to simple conversations query without joins');
+        
+        const { data: simpleData, error: simpleError } = await db.conversations
+          .select('*')
+          .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
+          .order('last_message_at', { ascending: false });
+        
+        return { data: simpleData, error: simpleError };
+      }
+      
+      return { data, error };
+    } catch (err) {
+      return { data: null, error: err };
+    }
   },
 
   async sendMessage(messageData: any) {
@@ -468,14 +489,92 @@ export const dbHelpers = {
 
   // Listing operations
   async getListings(options: any) {
-    const { data, error } = await db.listings
-      .select(`
-        *,
-        profiles!listings_user_id_fkey(*),
-        categories!listings_category_id_fkey(*)
-      `)
-      .limit(options.limit || 20);
-    return { data, error };
+    try {
+      // First, try the full query with joins
+      let query = db.listings
+        .select(`
+          *,
+          profiles!listings_user_id_fkey(*),
+          categories!listings_category_id_fkey(*)
+        `)
+        .eq('status', 'active'); // Only get active listings
+
+      // Apply filters
+      if (options.category) {
+        query = query.eq('category_id', options.category);
+      }
+      
+      if (options.search) {
+        query = query.or(`title.ilike.%${options.search}%,description.ilike.%${options.search}%`);
+      }
+      
+      if (options.priceMin !== undefined && options.priceMin > 0) {
+        query = query.gte('price', options.priceMin);
+      }
+      
+      if (options.priceMax !== undefined && options.priceMax > 0) {
+        query = query.lte('price', options.priceMax);
+      }
+      
+      if (options.condition && options.condition.length > 0) {
+        query = query.in('condition', options.condition);
+      }
+      
+      if (options.location) {
+        query = query.ilike('location', `%${options.location}%`);
+      }
+
+      // Order by creation date (newest first)
+      query = query.order('created_at', { ascending: false });
+      
+      // Apply limit
+      query = query.limit(options.limit || 20);
+
+      const { data, error } = await query;
+      
+      // If the joined query fails, try a simpler query without joins
+      if (error && (error.message.includes('schema cache') || error.message.includes('relationship'))) {
+        
+        let simpleQuery = db.listings
+          .select('*')
+          .eq('status', 'active');
+
+        // Apply the same filters to the simple query
+        if (options.category) {
+          simpleQuery = simpleQuery.eq('category_id', options.category);
+        }
+        
+        if (options.search) {
+          simpleQuery = simpleQuery.or(`title.ilike.%${options.search}%,description.ilike.%${options.search}%`);
+        }
+        
+        if (options.priceMin !== undefined && options.priceMin > 0) {
+          simpleQuery = simpleQuery.gte('price', options.priceMin);
+        }
+        
+        if (options.priceMax !== undefined && options.priceMax > 0) {
+          simpleQuery = simpleQuery.lte('price', options.priceMax);
+        }
+        
+        if (options.condition && options.condition.length > 0) {
+          simpleQuery = simpleQuery.in('condition', options.condition);
+        }
+        
+        if (options.location) {
+          simpleQuery = simpleQuery.ilike('location', `%${options.location}%`);
+        }
+
+        const { data: simpleData, error: simpleError } = await simpleQuery
+          .order('created_at', { ascending: false })
+          .limit(options.limit || 20);
+        
+        return { data: simpleData, error: simpleError };
+      }
+      
+      return { data, error };
+    } catch (err) {
+      return { data: null, error: err };
+    }
   },
 
 

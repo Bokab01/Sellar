@@ -188,17 +188,8 @@ export function ProductCard({
 
         {/* Seller Info - Simplified for grid layout */}
         {isGridLayout ? (
-          <Text 
-            variant="caption" 
-            color="secondary" 
-            numberOfLines={1}
-            style={{ 
-              fontSize: 11,
-              marginTop: 'auto', // Push to bottom
-            }}
-          >
-            {seller.name}
-          </Text>
+          // Seller name removed from grid layout
+          null
         ) : (
           <TouchableOpacity
             onPress={onSellerPress}

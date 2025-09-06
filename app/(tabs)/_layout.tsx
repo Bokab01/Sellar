@@ -61,6 +61,9 @@ export default function TabLayout() {
         name="create"
         options={{
           title: '',
+          tabBarStyle: {
+            display: 'none',
+          },
           tabBarIcon: ({ size, color }) => (
             <View
               style={{

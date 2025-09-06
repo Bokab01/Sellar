@@ -72,8 +72,54 @@ export function useListingsRealtime(onListingUpdate: (listing: any) => void) {
   return useRealtime({
     table: 'listings',
     filter: 'status=eq.active',
-    onInsert: onListingUpdate,
-    onUpdate: onListingUpdate,
+    onInsert: async (payload) => {
+      // Fetch the complete listing data with joins for new listings
+      try {
+        const { data, error } = await supabase
+          .from('listings')
+          .select(`
+            *,
+            profiles!listings_user_id_fkey(*),
+            categories!listings_category_id_fkey(*)
+          `)
+          .eq('id', payload.id)
+          .single();
+        
+        if (!error && data) {
+          onListingUpdate(data);
+        } else {
+          // Fallback to the raw payload if fetch fails
+          onListingUpdate(payload);
+        }
+      } catch (err) {
+        // Fallback to the raw payload if fetch fails
+        onListingUpdate(payload);
+      }
+    },
+    onUpdate: async (payload) => {
+      // Fetch the complete listing data with joins for updated listings
+      try {
+        const { data, error } = await supabase
+          .from('listings')
+          .select(`
+            *,
+            profiles!listings_user_id_fkey(*),
+            categories!listings_category_id_fkey(*)
+          `)
+          .eq('id', payload.id)
+          .single();
+        
+        if (!error && data) {
+          onListingUpdate(data);
+        } else {
+          // Fallback to the raw payload if fetch fails
+          onListingUpdate(payload);
+        }
+      } catch (err) {
+        // Fallback to the raw payload if fetch fails
+        onListingUpdate(payload);
+      }
+    },
   });
 }
 
