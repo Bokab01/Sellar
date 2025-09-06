@@ -6,6 +6,18 @@
     "orientation": "portrait",
     "icon": "./assets/icon/icon-light.png",
     "scheme": "sellar",
+    "linking": {
+      "prefixes": ["sellar://"],
+      "config": {
+        "screens": {
+          "(auth)": {
+            "screens": {
+              "email-confirmation": "auth/callback"
+            }
+          }
+        }
+      }
+    },
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {

@@ -15,7 +15,7 @@ export { Badge } from './Badge/Badge';
 export { Avatar } from './Avatar/Avatar';
 export { Chip } from './Chip/Chip';
 export { PriceDisplay } from './PriceDisplay/PriceDisplay';
-export { AppModal } from './Modal/Modal';
+export { AppModal, Modal } from './Modal/Modal';
 export { Toast } from './Toast/Toast';
 export { Stepper } from './Stepper/Stepper';
 

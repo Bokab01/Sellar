@@ -3,7 +3,10 @@ import { View, Alert, Platform } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useSecureAuth } from '@/hooks/useSecureAuth';
 import { validateSignUpForm } from '@/utils/validation';
-import { checkMultipleUniqueness } from '@/utils/uniquenessValidation';
+import { validatePreSignup, getSignupErrorMessage, getSignupSuggestedActions } from '@/utils/preSignupValidation';
+import { sanitizeEmail, sanitizeName, sanitizePassword, InputSanitizer } from '@/utils/inputSanitization';
+import { AuthRateLimiters, rateLimitUtils } from '@/utils/rateLimiter';
+// import { checkMultipleUniqueness } from '@/utils/uniquenessValidation'; // Temporarily disabled
 import {
   Text,
   SafeAreaWrapper,
@@ -37,15 +40,58 @@ export default function SignUpScreen() {
     setLoading(true);
 
     try {
-      // Step 1: Validate all form fields
-      const validation = validateSignUpForm({
-        email: email.trim(),
-        password,
-        confirmPassword,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        phone: phone.trim(),
-      });
+      // Step 1: Check rate limiting first
+      const identifier = email.trim().toLowerCase();
+      const rateLimitCheck = await AuthRateLimiters.registration.checkLimit(identifier, 'registration');
+      
+      if (!rateLimitCheck.allowed) {
+        const message = rateLimitUtils.getRateLimitMessage(rateLimitCheck, 'registration');
+        Alert.alert('Registration Limit Reached', message);
+        setLoading(false);
+        return;
+      }
+
+      // Step 2: Sanitize all inputs for security
+      const emailSanitization = sanitizeEmail(email);
+      const passwordSanitization = sanitizePassword(password);
+      const firstNameSanitization = sanitizeName(firstName);
+      const lastNameSanitization = sanitizeName(lastName);
+      const phoneSanitization = sanitizeName(phone); // Use name sanitization for phone
+
+      // Check for security threats
+      const allThreats = [
+        ...emailSanitization.threats,
+        ...passwordSanitization.threats,
+        ...firstNameSanitization.threats,
+        ...lastNameSanitization.threats,
+        ...phoneSanitization.threats,
+      ];
+
+      if (allThreats.length > 0) {
+        const criticalThreats = allThreats.filter(t => t.severity === 'critical');
+        if (criticalThreats.length > 0) {
+          Alert.alert(
+            'Security Alert',
+            'Your input contains potentially harmful content. Please review and try again.',
+            [{ text: 'OK' }]
+          );
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Use sanitized values for validation
+      const sanitizedData = {
+        email: emailSanitization.sanitized.trim(),
+        password: passwordSanitization.sanitized,
+        confirmPassword, // Don't sanitize confirm password to ensure exact match
+        firstName: firstNameSanitization.sanitized.trim(),
+        lastName: lastNameSanitization.sanitized.trim(),
+        phone: phoneSanitization.sanitized.trim(),
+      };
+
+      // Step 2: Validate all form fields
+      const validation = validateSignUpForm(sanitizedData);
 
       if (!validation.isValid) {
         setErrors(validation.errors);
@@ -55,29 +101,47 @@ export default function SignUpScreen() {
         return;
       }
 
-      // Step 2: Check uniqueness of email and phone
-      const uniquenessCheck = await checkMultipleUniqueness({
-        email: email.trim(),
-        phone: phone.trim() || undefined,
-      });
-
-      if (!uniquenessCheck.isValid) {
-        setErrors(uniquenessCheck.errors);
-        const firstError = Object.values(uniquenessCheck.errors)[0];
-        Alert.alert('Registration Error', firstError);
+      // Step 3: Pre-signup validation to handle edge cases
+      console.log('Running pre-signup validation...');
+      const preSignupResult = await validatePreSignup(sanitizedData.email);
+      
+      if (!preSignupResult.canProceed) {
+        const errorMessage = getSignupErrorMessage(preSignupResult);
+        const suggestedActions = getSignupSuggestedActions(preSignupResult);
+        
+        setErrors({ email: errorMessage });
+        
+        // Show detailed alert with suggested actions
+        const actionText = suggestedActions.length > 0 
+          ? '\n\nSuggested actions:\n• ' + suggestedActions.join('\n• ')
+          : '';
+        
+        Alert.alert(
+          preSignupResult.userStatus === 'confirmed' ? 'Account Already Exists' : 'Registration Issue',
+          errorMessage + actionText
+        );
+        
         setLoading(false);
         return;
       }
+      
+      console.log('Pre-signup validation passed - proceeding with registration');
 
-      // Step 3: Proceed with signup
+      // Step 4: Record the registration attempt
+      await AuthRateLimiters.registration.recordAttempt(identifier, 'registration');
+
+      // Step 5: Proceed with signup using sanitized data
+      console.log('Starting signup process for:', sanitizedData.email);
       const result = await secureSignUp({
-        email: email.trim(),
-        password,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        phone: phone.trim() || undefined,
-        location: location || undefined,
+        email: sanitizedData.email,
+        password: sanitizedData.password,
+        firstName: sanitizedData.firstName,
+        lastName: sanitizedData.lastName,
+        phone: sanitizedData.phone || undefined,
+        location: location || undefined, // Location is not sanitized as it's from picker
       });
+      
+      console.log('Signup result:', result);
       
       if (!result.success) {
         // Handle specific signup errors

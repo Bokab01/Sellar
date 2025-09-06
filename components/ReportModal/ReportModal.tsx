@@ -146,30 +146,22 @@ export function ReportModal({
           return (
             <ListItem
               key={category.id}
-              onPress={() => handleCategorySelect(category.id)}
-              style={{ marginBottom: theme.spacing.sm }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+              title={category.name}
+              subtitle={category.description}
+              leftIcon={
                 <View
                   style={{
                     backgroundColor: `${category.color}20`,
                     borderRadius: theme.borderRadius.sm,
                     padding: theme.spacing.sm,
-                    marginRight: theme.spacing.md,
                   }}
                 >
                   <Icon size={20} color={category.color} />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text variant="body" style={{ fontWeight: '600', marginBottom: 2 }}>
-                    {category.name}
-                  </Text>
-                  <Text variant="bodySmall" color="secondary">
-                    {category.description}
-                  </Text>
-                </View>
-              </View>
-            </ListItem>
+              }
+              onPress={() => handleCategorySelect(category.id)}
+              style={{ marginBottom: theme.spacing.sm }}
+            />
           );
         })}
       </ScrollView>

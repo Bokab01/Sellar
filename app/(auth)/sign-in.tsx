@@ -3,6 +3,8 @@ import { View, ScrollView, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useSecureAuth } from '@/hooks/useSecureAuth';
 import { validateEmail } from '@/utils/validation';
+import { sanitizeEmail, sanitizePassword } from '@/utils/inputSanitization';
+import { AuthRateLimiters, rateLimitUtils } from '@/utils/rateLimiter';
 import {
   Text,
   SafeAreaWrapper,
@@ -32,17 +34,48 @@ export default function SignInScreen() {
       return;
     }
 
-    // Validate email
-    const emailValidation = validateEmail(email);
+    // Check rate limiting first
+    const identifier = email.trim().toLowerCase();
+    const rateLimitCheck = await AuthRateLimiters.login.checkLimit(identifier, 'login');
+    
+    if (!rateLimitCheck.allowed) {
+      const message = rateLimitUtils.getRateLimitMessage(rateLimitCheck, 'login');
+      Alert.alert('Too Many Attempts', message);
+      return;
+    }
+
+    // Sanitize inputs for security
+    const emailSanitization = sanitizeEmail(email);
+    const passwordSanitization = sanitizePassword(password);
+
+    // Check for critical security threats
+    const allThreats = [...emailSanitization.threats, ...passwordSanitization.threats];
+    const criticalThreats = allThreats.filter(t => t.severity === 'critical');
+    
+    if (criticalThreats.length > 0) {
+      Alert.alert(
+        'Security Alert',
+        'Your input contains potentially harmful content. Please review and try again.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Validate email format
+    const emailValidation = validateEmail(emailSanitization.sanitized);
     if (!emailValidation.isValid) {
       setEmailError(emailValidation.error!);
       return;
     }
 
     setLoading(true);
+    
+    // Record the attempt
+    await AuthRateLimiters.login.recordAttempt(identifier, 'login');
+    
     const result = await secureSignIn({
-      email: email.trim(),
-      password,
+      email: emailSanitization.sanitized.trim(),
+      password: passwordSanitization.sanitized,
       rememberDevice: true,
     });
     
