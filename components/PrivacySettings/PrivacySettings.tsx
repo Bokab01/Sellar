@@ -232,7 +232,7 @@ export function PrivacySettings({ onSettingsChange }: PrivacySettingsProps) {
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Profile Privacy */}
-      <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
+      <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
         <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
           Profile Privacy
         </Text>
@@ -291,7 +291,7 @@ export function PrivacySettings({ onSettingsChange }: PrivacySettingsProps) {
       </View>
 
       {/* Communication Settings */}
-      <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
+      <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
         <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
           Communication
         </Text>
@@ -314,7 +314,7 @@ export function PrivacySettings({ onSettingsChange }: PrivacySettingsProps) {
       </View>
 
       {/* Security Settings */}
-      <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
+      <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
         <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
           Security
         </Text>
@@ -348,7 +348,7 @@ export function PrivacySettings({ onSettingsChange }: PrivacySettingsProps) {
       </View>
 
       {/* Data & Consent */}
-      <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
+      <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
         <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
           Data & Consent
         </Text>
@@ -382,7 +382,7 @@ export function PrivacySettings({ onSettingsChange }: PrivacySettingsProps) {
       </View>
 
       {/* Data Management */}
-      <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
+      <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
         <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
           Data Management
         </Text>
@@ -432,10 +432,10 @@ function SettingToggle({ icon, title, subtitle, value, onToggle, theme }: Settin
       <View style={styles.settingContent}>
         <Ionicons name={icon as any} size={24} color={theme.colors.primary} />
         <View style={styles.settingText}>
-          <Text style={[styles.settingTitle, { color: theme.colors.text }]}>
+          <Text style={[styles.settingTitle, { color: theme.colors.text.primary }]}>
             {title}
           </Text>
-          <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>
+          <Text style={[styles.settingSubtitle, { color: theme.colors.text.secondary }]}>
             {subtitle}
           </Text>
         </View>
@@ -444,7 +444,7 @@ function SettingToggle({ icon, title, subtitle, value, onToggle, theme }: Settin
         value={value}
         onValueChange={onToggle}
         trackColor={{ false: theme.colors.border, true: theme.colors.primary + '40' }}
-        thumbColor={value ? theme.colors.primary : theme.colors.textSecondary}
+        thumbColor={value ? theme.colors.primary : theme.colors.text.secondary}
       />
     </View>
   );
@@ -471,11 +471,11 @@ function SettingRow({ icon, title, subtitle, onPress, theme, danger }: SettingRo
         <View style={styles.settingText}>
           <Text style={[
             styles.settingTitle, 
-            { color: danger ? theme.colors.error : theme.colors.text }
+            { color: danger ? theme.colors.error : theme.colors.text.primary }
           ]}>
             {title}
           </Text>
-          <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>
+          <Text style={[styles.settingSubtitle, { color: theme.colors.text.secondary }]}>
             {subtitle}
           </Text>
         </View>
@@ -483,7 +483,7 @@ function SettingRow({ icon, title, subtitle, onPress, theme, danger }: SettingRo
       <Ionicons 
         name="chevron-forward" 
         size={20} 
-        color={theme.colors.textSecondary} 
+        color={theme.colors.text.secondary} 
       />
     </TouchableOpacity>
   );

@@ -19,7 +19,7 @@ export default function MoreLayout() {
       backgroundColor: theme.colors.surface,
       borderBottomWidth: 1,
       borderBottomColor: theme.colors.border,
-      marginTop: 30,
+    
     },
     tabBarActiveTintColor: theme.colors.primary,
     tabBarInactiveTintColor: theme.colors.text.muted,

@@ -399,18 +399,21 @@ class SecurityService {
    */
   async getUserDevices(userId: string): Promise<DeviceInfo[]> {
     try {
+      console.log('SecurityService: Fetching devices for user:', userId);
+      
+      // Use the new helper function for better security
       const { data, error } = await supabase
-        .from('user_devices')
-        .select('*')
-        .eq('user_id', userId)
-        .order('last_seen', { ascending: false });
+        .rpc('get_user_devices', { p_user_id: userId });
 
       if (error) {
-        console.error('Error fetching user devices:', error);
-        return [];
+        console.error('SecurityService: Error fetching user devices:', error);
+        // Fallback to direct table query if function fails
+        return this.getUserDevicesFallback(userId);
       }
 
-      return (data || []).map(device => ({
+      console.log('SecurityService: Retrieved devices:', data?.length || 0);
+
+      return (data || []).map((device: any) => ({
         fingerprint: device.device_fingerprint,
         name: device.device_name || 'Unknown Device',
         platform: device.platform || 'Unknown',
@@ -420,7 +423,38 @@ class SecurityService {
       }));
 
     } catch (error) {
-      console.error('Error fetching user devices:', error);
+      console.error('SecurityService: Exception fetching user devices:', error);
+      // Return fallback data
+      return this.getUserDevicesFallback(userId);
+    }
+  }
+
+  private async getUserDevicesFallback(userId: string): Promise<DeviceInfo[]> {
+    try {
+      console.log('SecurityService: Using fallback device query');
+      
+      const { data, error } = await supabase
+        .from('user_devices')
+        .select('*')
+        .eq('user_id', userId)
+        .order('last_seen', { ascending: false });
+
+      if (error) {
+        console.error('SecurityService: Fallback query failed:', error);
+        return [];
+      }
+
+      return (data || []).map((device: any) => ({
+        fingerprint: device.device_fingerprint,
+        name: device.device_name || 'Unknown Device',
+        platform: device.platform || 'Unknown',
+        lastSeen: new Date(device.last_seen),
+        isCurrentDevice: device.device_fingerprint === this.deviceFingerprint,
+        isTrusted: device.is_trusted || false
+      }));
+
+    } catch (error) {
+      console.error('SecurityService: Fallback query exception:', error);
       return [];
     }
   }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, ScrollView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -39,7 +39,7 @@ export default function MyListingsScreen() {
   const [toastMessage, setToastMessage] = useState('');
   const [processing, setProcessing] = useState(false);
 
-  const fetchMyListings = async () => {
+  const fetchMyListings = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -73,13 +73,13 @@ export default function MyListingsScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, activeTab]);
 
   useEffect(() => {
     if (user) {
       fetchMyListings();
     }
-  }, [user, activeTab, fetchMyListings]);
+  }, [fetchMyListings]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -300,9 +300,7 @@ export default function MyListingsScreen() {
                     <Button
                       variant="icon"
                       icon={<Edit size={16} color={theme.colors.text.primary} />}
-                      onPress={() => {
-                        Alert.alert('Coming Soon', 'Edit listing feature will be available soon');
-                      }}
+                      onPress={() => router.push(`/edit-listing/${listing.id}` as any)}
                       style={{
                         width: 32,
                         height: 32,

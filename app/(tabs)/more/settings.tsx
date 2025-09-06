@@ -35,7 +35,8 @@ import {
   Download,
   Lock,
   Users,
-  MessageCircle
+  MessageCircle,
+  ChevronDown
 } from 'lucide-react-native';
 
 export default function SettingsScreen() {
@@ -57,6 +58,12 @@ export default function SettingsScreen() {
   const [showMFASetup, setShowMFASetup] = useState(false);
   const [showPrivacySettings, setShowPrivacySettings] = useState(false);
   const [showGDPRCompliance, setShowGDPRCompliance] = useState(false);
+  
+  // Collapsible sections
+  const [themeExpanded, setThemeExpanded] = useState(false);
+  
+  // Phone visibility modal
+  const [showPhoneVisibilityModal, setShowPhoneVisibilityModal] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -180,40 +187,85 @@ export default function SettingsScreen() {
   const ThemeOption = ({ 
     mode, 
     title, 
+    description,
     icon, 
     isSelected 
   }: { 
     mode: 'light' | 'dark' | 'system'; 
     title: string; 
+    description: string;
     icon: React.ReactNode;
     isSelected: boolean;
   }) => (
     <TouchableOpacity
-      onPress={() => setThemeMode(mode)}
+      onPress={() => {
+        setThemeMode(mode);
+      }}
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'flex-start',
+        justifyContent: 'space-between',
         paddingHorizontal: theme.spacing.lg,
-        paddingVertical: theme.spacing.md,
-        borderRadius: theme.borderRadius.md,
-        backgroundColor: isSelected ? theme.colors.primary : 'transparent',
-        borderWidth: isSelected ? 0 : 1,
-        borderColor: theme.colors.primary,
-        minHeight: 52,
+        paddingVertical: theme.spacing.lg,
+        borderRadius: theme.borderRadius.lg,
+        backgroundColor: isSelected ? theme.colors.primary + '15' : theme.colors.surfaceVariant,
+        borderWidth: 2,
+        borderColor: isSelected ? theme.colors.primary : 'transparent',
+        minHeight: 64,
+        marginBottom: theme.spacing.sm,
       }}
-      activeOpacity={0.7}
+      activeOpacity={0.8}
     >
-      <View style={{ marginRight: theme.spacing.md }}>
-        {icon}
+      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+        <View style={{ 
+          marginRight: theme.spacing.md,
+          padding: theme.spacing.sm,
+          borderRadius: theme.borderRadius.md,
+          backgroundColor: isSelected ? theme.colors.primary + '20' : theme.colors.surface,
+        }}>
+          {icon}
+        </View>
+        
+        <View style={{ flex: 1 }}>
+          <Text variant="body" style={{ 
+            color: isSelected ? theme.colors.primary : theme.colors.text.primary,
+            fontWeight: isSelected ? '600' : '500',
+            marginBottom: description ? theme.spacing.xs : 0,
+          }}>
+            {title}
+          </Text>
+          {description ? (
+            <Text variant="caption" style={{ 
+              color: isSelected ? theme.colors.primary + 'CC' : theme.colors.text.muted,
+              lineHeight: 16,
+            }}>
+              {description}
+            </Text>
+          ) : null}
+        </View>
       </View>
-      <Text variant="button" style={{ 
-        color: isSelected ? theme.colors.primaryForeground : theme.colors.primary,
-        flex: 1,
-        textAlign: 'left',
+
+      {/* Selection Indicator */}
+      <View style={{
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        borderWidth: 2,
+        borderColor: isSelected ? theme.colors.primary : theme.colors.border,
+        backgroundColor: isSelected ? theme.colors.primary : 'transparent',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: theme.spacing.sm,
       }}>
-        {title}
-      </Text>
+        {isSelected && (
+          <View style={{
+            width: 8,
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: theme.colors.primaryForeground,
+          }} />
+        )}
+      </View>
     </TouchableOpacity>
   );
 
@@ -225,31 +277,45 @@ export default function SettingsScreen() {
           title: 'Theme',
           subtitle: `Currently using ${themeMode === 'system' ? `System (${isDarkMode ? 'Dark' : 'Light'})` : (themeMode || 'Default')} theme`,
           icon: <Smartphone size={20} color={theme.colors.text.primary} />,
-          onPress: () => {}, // Handled by theme options below
-          customContent: (
-            <View style={{ gap: theme.spacing.md, marginTop: theme.spacing.md }}>
+          rightIcon: (
+            <View style={{ 
+              transform: [{ rotate: themeExpanded ? '180deg' : '0deg' }]
+            }}>
+              <ChevronDown size={20} color={theme.colors.text.muted} />
+            </View>
+          ),
+          onPress: () => setThemeExpanded(!themeExpanded),
+          customContent: themeExpanded ? (
+            <View style={{ 
+              gap: theme.spacing.sm, 
+              marginTop: theme.spacing.md,
+              paddingBottom: theme.spacing.sm,
+            }}>
               <ThemeOption
                 mode="light"
                 title="Light Theme"
-                icon={<Sun size={20} color={themeMode === 'light' ? theme.colors.primaryForeground : theme.colors.primary} />}
+                description=""
+                icon={<Sun size={20} color={themeMode === 'light' ? theme.colors.primary : theme.colors.text.primary} />}
                 isSelected={themeMode === 'light'}
               />
               
               <ThemeOption
                 mode="dark"
                 title="Dark Theme"
-                icon={<Moon size={20} color={themeMode === 'dark' ? theme.colors.primaryForeground : theme.colors.primary} />}
+                description=""
+                icon={<Moon size={20} color={themeMode === 'dark' ? theme.colors.primary : theme.colors.text.primary} />}
                 isSelected={themeMode === 'dark'}
               />
               
               <ThemeOption
                 mode="system"
                 title="System Default"
-                icon={<Smartphone size={20} color={themeMode === 'system' ? theme.colors.primaryForeground : theme.colors.primary} />}
+                description=""
+                icon={<Smartphone size={20} color={themeMode === 'system' ? theme.colors.primary : theme.colors.text.primary} />}
                 isSelected={themeMode === 'system'}
               />
             </View>
-          ),
+          ) : null,
         },
       ],
     },
@@ -301,18 +367,7 @@ export default function SettingsScreen() {
           title: 'Phone Number Visibility',
           subtitle: getPhoneVisibilitySubtitle(),
           icon: <Smartphone size={20} color={theme.colors.text.primary} />,
-          onPress: () => {
-            Alert.alert(
-              'Phone Visibility',
-              'Choose who can see your phone number',
-              [
-                { text: 'Public', onPress: () => updateSetting('phone_visibility', 'public') },
-                { text: 'Contacts Only', onPress: () => updateSetting('phone_visibility', 'contacts') },
-                { text: 'Private', onPress: () => updateSetting('phone_visibility', 'private') },
-                { text: 'Cancel', style: 'cancel' },
-              ]
-            );
-          },
+          onPress: () => setShowPhoneVisibilityModal(true),
         },
         {
           title: 'Online Status',
@@ -417,8 +472,10 @@ export default function SettingsScreen() {
                     <ListItem
                       title={item.title}
                       description={item.subtitle}
-                      rightIcon={item.icon}
-                      showChevron={!(item as any).toggle}
+                      leftIcon={item.icon}
+                      rightIcon={(item as any).rightIcon}
+                      showChevron={!(item as any).toggle && item.onPress && !(item as any).rightIcon}
+                      toggle={(item as any).toggle}
                       onPress={item.onPress}
                       style={{
                         borderBottomWidth: index < section.items.length - 1 || (item as any).customContent ? 1 : 0,
@@ -430,43 +487,6 @@ export default function SettingsScreen() {
                     {(item as any).customContent && (
                       <View style={{ padding: theme.spacing.lg, paddingTop: 0 }}>
                         {(item as any).customContent}
-                      </View>
-                    )}
-
-                    {/* Toggle Switch */}
-                    {(item as any).toggle && (
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          justifyContent: 'flex-end',
-                          paddingHorizontal: theme.spacing.lg,
-                          paddingBottom: theme.spacing.lg,
-                          marginTop: -theme.spacing.md,
-                        }}
-                      >
-                        <TouchableOpacity
-                          onPress={() => (item as any).toggle!.onToggle(!(item as any).toggle!.value)}
-                          style={{
-                            width: 50,
-                            height: 30,
-                            borderRadius: 15,
-                            backgroundColor: (item as any).toggle.value ? theme.colors.primary : theme.colors.border,
-                            justifyContent: 'center',
-                            paddingHorizontal: 2,
-                          }}
-                          activeOpacity={0.8}
-                        >
-                          <View
-                            style={{
-                              width: 26,
-                              height: 26,
-                              borderRadius: 13,
-                              backgroundColor: theme.colors.surface,
-                              alignSelf: (item as any).toggle.value ? 'flex-end' : 'flex-start',
-                              ...theme.shadows.sm,
-                            }}
-                          />
-                        </TouchableOpacity>
                       </View>
                     )}
                   </View>
@@ -626,6 +646,131 @@ export default function SettingsScreen() {
         fullScreen
       >
         <GDPRCompliance />
+      </AppModal>
+
+      {/* Phone Visibility Modal */}
+      <AppModal
+        visible={showPhoneVisibilityModal}
+        onClose={() => setShowPhoneVisibilityModal(false)}
+        title="Phone Number Visibility"
+        size="lg"
+        position="bottom"
+      >
+        <View style={{ gap: theme.spacing.lg }}>
+          <Text variant="body" color="secondary" style={{ marginBottom: theme.spacing.md }}>
+            Choose who can see your phone number on your profile and listings.
+          </Text>
+
+          {[
+            {
+              value: 'public',
+              title: 'Public',
+              description: 'Anyone can see your phone number',
+              icon: '🌍',
+            },
+            {
+              value: 'contacts',
+              title: 'Contacts Only',
+              description: 'Only people you\'ve chatted with can see it',
+              icon: '👥',
+            },
+            {
+              value: 'private',
+              title: 'Private',
+              description: 'Your phone number is hidden from everyone',
+              icon: '🔒',
+            },
+          ].map((option) => {
+            const isSelected = (settings?.phone_visibility || 'contacts') === option.value;
+            
+            return (
+              <TouchableOpacity
+                key={option.value}
+                onPress={() => {
+                  updateSetting('phone_visibility', option.value);
+                  setShowPhoneVisibilityModal(false);
+                }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: theme.spacing.lg,
+                  paddingVertical: theme.spacing.lg,
+                  borderRadius: theme.borderRadius.lg,
+                  backgroundColor: isSelected ? theme.colors.primary + '15' : theme.colors.surfaceVariant,
+                  borderWidth: 2,
+                  borderColor: isSelected ? theme.colors.primary : 'transparent',
+                  minHeight: 64,
+                }}
+                activeOpacity={0.8}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                  <Text style={{ 
+                    fontSize: 24, 
+                    marginRight: theme.spacing.md,
+                  }}>
+                    {option.icon}
+                  </Text>
+                  
+                  <View style={{ flex: 1 }}>
+                    <Text variant="body" style={{ 
+                      color: isSelected ? theme.colors.primary : theme.colors.text.primary,
+                      fontWeight: isSelected ? '600' : '500',
+                      marginBottom: theme.spacing.xs,
+                    }}>
+                      {option.title}
+                    </Text>
+                    <Text variant="caption" style={{ 
+                      color: isSelected ? theme.colors.primary + 'CC' : theme.colors.text.muted,
+                      lineHeight: 16,
+                    }}>
+                      {option.description}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Selection Indicator */}
+                <View style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  borderWidth: 2,
+                  borderColor: isSelected ? theme.colors.primary : theme.colors.border,
+                  backgroundColor: isSelected ? theme.colors.primary : 'transparent',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginLeft: theme.spacing.sm,
+                }}>
+                  {isSelected && (
+                    <View style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: theme.colors.primaryForeground,
+                    }} />
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+
+          <View
+            style={{
+              backgroundColor: theme.colors.primary + '10',
+              borderRadius: theme.borderRadius.md,
+              padding: theme.spacing.md,
+              marginTop: theme.spacing.md,
+            }}
+          >
+            <Text variant="bodySmall" style={{ 
+              color: theme.colors.primary, 
+              textAlign: 'center',
+              lineHeight: 18,
+            }}>
+              💡 Your privacy is important. You can change this setting anytime.
+            </Text>
+          </View>
+        </View>
       </AppModal>
 
       {/* Toast */}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, Image, TouchableOpacity, Alert, Linking, Dimensions, StatusBar } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { dbHelpers, supabase } from '@/lib/supabase';
@@ -102,6 +102,19 @@ export default function ListingDetailScreen() {
       fetchRelatedItems();
     }
   }, [listing]);
+
+  // Refresh data when screen comes into focus (e.g., returning from edit screen)
+  useFocusEffect(
+    React.useCallback(() => {
+      if (listingId) {
+        fetchListing();
+        checkIfFavorited();
+        checkCallbackStatus();
+        checkPendingOffer();
+        // Don't increment view count on focus refresh
+      }
+    }, [listingId])
+  );
 
   const fetchListing = async () => {
     try {
@@ -1003,6 +1016,76 @@ export default function ListingDetailScreen() {
             <Text variant="body" style={{ lineHeight: 24 }}>
               {listing.description}
             </Text>
+          </View>
+
+          {/* Item Details */}
+          <View style={{ marginBottom: theme.spacing.xl }}>
+            <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+              Item Details
+            </Text>
+            <View
+              style={{
+                backgroundColor: theme.colors.surfaceVariant,
+                borderRadius: theme.borderRadius.md,
+                padding: theme.spacing.lg,
+                gap: theme.spacing.md,
+              }}
+            >
+              {/* Category */}
+              {listing.categories && (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text variant="body" color="secondary">Category</Text>
+                  <Text variant="body" style={{ fontWeight: '600' }}>
+                    {listing.categories.name}
+                  </Text>
+                </View>
+              )}
+              
+              {/* Condition */}
+              {listing.condition && (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text variant="body" color="secondary">Condition</Text>
+                  <Text variant="body" style={{ fontWeight: '600', textTransform: 'capitalize' }}>
+                    {listing.condition.replace('_', ' ')}
+                  </Text>
+                </View>
+              )}
+              
+              {/* Quantity */}
+              {listing.quantity && listing.quantity > 1 && (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text variant="body" color="secondary">Quantity Available</Text>
+                  <Text variant="body" style={{ fontWeight: '600' }}>
+                    {listing.quantity}
+                  </Text>
+                </View>
+              )}
+              
+              {/* Accept Offers */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text variant="body" color="secondary">Accepts Offers</Text>
+                <Text variant="body" style={{ fontWeight: '600', color: listing.accept_offers ? theme.colors.success : theme.colors.text.secondary }}>
+                  {listing.accept_offers ? 'Yes' : 'No'}
+                </Text>
+              </View>
+              
+              {/* Category Attributes */}
+              {listing.category_attributes && Object.keys(listing.category_attributes).length > 0 && (
+                <>
+                  <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: theme.spacing.sm }} />
+                  {Object.entries(listing.category_attributes).map(([key, value]) => (
+                    <View key={key} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text variant="body" color="secondary" style={{ textTransform: 'capitalize' }}>
+                        {key.replace('_', ' ')}
+                      </Text>
+                      <Text variant="body" style={{ fontWeight: '600' }}>
+                        {Array.isArray(value) ? value.join(', ') : String(value)}
+                      </Text>
+                    </View>
+                  ))}
+                </>
+              )}
+            </View>
           </View>
 
           {/* Location */}

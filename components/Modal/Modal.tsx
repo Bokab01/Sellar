@@ -203,7 +203,8 @@ export function AppModal({
               {/* Content */}
               <View
                 style={{
-                  padding: theme.spacing.lg,
+                  padding: fullScreen ? 0 : theme.spacing.lg,
+                  flex: fullScreen ? 1 : undefined,
                 }}
               >
                 {children}
