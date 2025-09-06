@@ -55,7 +55,7 @@ export function SearchResults({
   const { theme } = useTheme();
 
   const formatPrice = (price: number, currency: string) => {
-    return `${currency} ${price.toLocaleString()}`;
+    return `${currency} ${(price || 0).toLocaleString()}`;
   };
 
   const formatTimeAgo = (dateString: string) => {
@@ -264,7 +264,7 @@ export function SearchResults({
       >
         <Text variant="body" color="muted">
           {totalCount > 0 
-            ? `${totalCount.toLocaleString()} results${query ? ` for "${query}"` : ''}`
+            ? `${(totalCount || 0).toLocaleString()} results${query ? ` for "${query}"` : ''}`
             : query 
               ? `No results for "${query}"`
               : 'Browse all listings'

@@ -10,7 +10,7 @@ import { Stepper } from '@/components/Stepper/Stepper';
 
 interface FilterOptions {
   categories: string[];
-  priceRange: { min: number; max: number };
+  priceRange: { min?: number; max?: number };
   condition: string[];
   location: string;
   sortBy: string;
@@ -78,7 +78,7 @@ export function FilterSheet({
   const handleClear = () => {
     const clearedFilters: FilterOptions = {
       categories: [],
-      priceRange: { min: 0, max: 10000 },
+      priceRange: { min: undefined, max: undefined },
       condition: [],
       location: '',
       sortBy: 'Newest First',
@@ -103,8 +103,16 @@ export function FilterSheet({
         onPress: handleClear,
       }}
     >
-      <ScrollView style={{ maxHeight: 500 }}>
-        <View style={{ gap: theme.spacing.xl }}>
+       <ScrollView 
+         style={{ maxHeight: 500 }}
+         showsVerticalScrollIndicator={false}
+         bounces={true}
+         scrollEventThrottle={16}
+         keyboardShouldPersistTaps="handled"
+         nestedScrollEnabled={true}
+         contentContainerStyle={{ flexGrow: 1 }}
+       >
+         <View style={{ gap: theme.spacing.xl }}>
           {/* Categories */}
           <View>
             <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
@@ -137,11 +145,11 @@ export function FilterSheet({
                 <Input
                   label="Min Price"
                   placeholder="0"
-                  value={localFilters.priceRange.min.toString()}
+                  value={localFilters.priceRange.min?.toString() || ''}
                   onChangeText={(text) => 
                     setLocalFilters(prev => ({
                       ...prev,
-                      priceRange: { ...prev.priceRange, min: Number(text) || 0 }
+                      priceRange: { ...prev.priceRange, min: text ? parseFloat(text) : undefined }
                     }))
                   }
                   keyboardType="numeric"
@@ -150,12 +158,12 @@ export function FilterSheet({
               <View style={{ flex: 1 }}>
                 <Input
                   label="Max Price"
-                  placeholder="10000"
-                  value={localFilters.priceRange.max.toString()}
+                  placeholder="No limit"
+                  value={localFilters.priceRange.max?.toString() || ''}
                   onChangeText={(text) => 
                     setLocalFilters(prev => ({
                       ...prev,
-                      priceRange: { ...prev.priceRange, max: Number(text) || 10000 }
+                      priceRange: { ...prev.priceRange, max: text ? parseFloat(text) : undefined }
                     }))
                   }
                   keyboardType="numeric"

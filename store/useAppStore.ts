@@ -15,7 +15,7 @@ interface AppState {
   
   // Filters
   filters: {
-    priceRange: { min: number; max: number };
+    priceRange: { min?: number; max?: number };
     condition: string[];
     categories: string[];
     location: string;
@@ -43,7 +43,7 @@ export const useAppStore = create<AppState>((set) => ({
   
   // Filters
   filters: {
-    priceRange: { min: 0, max: 10000 },
+    priceRange: { min: undefined, max: undefined },
     condition: [],
     categories: [],
     location: '',

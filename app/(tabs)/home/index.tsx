@@ -535,6 +535,7 @@ export default function HomeScreen() {
             paddingHorizontal: theme.spacing.lg,
             paddingVertical: theme.spacing.md,
             marginHorizontal: theme.spacing.lg,
+            marginTop: theme.spacing.md,
             marginBottom: theme.spacing.md,
           }}
           activeOpacity={0.7}
@@ -800,7 +801,7 @@ export default function HomeScreen() {
           }}
           onClearFilters={() => {
             useAppStore.getState().setFilters({
-              priceRange: { min: 0, max: 10000 },
+              priceRange: { min: undefined, max: undefined },
               condition: [],
               categories: [],
               location: '',

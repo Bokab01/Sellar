@@ -155,7 +155,7 @@ export function CreditBalance({
                   <Text 
                     style={[styles.balanceText, { color: theme.colors.text.primary }]}
                   >
-                    {loading ? '...' : balance.toLocaleString()}
+                    {loading ? '...' : (balance || 0).toLocaleString()}
                   </Text>
                   <Text 
                     style={[styles.creditsLabel, { color: theme.colors.text.muted, textTransform: 'uppercase' }]}

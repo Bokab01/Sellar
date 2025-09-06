@@ -288,7 +288,7 @@ export function CounterOfferModal({
                     fontWeight: '600',
                   }}
                 >
-                  {difference.isIncrease ? '+' : '-'}GHS {difference.amount.toLocaleString()} 
+                  {difference.isIncrease ? '+' : '-'}GHS {(difference.amount || 0).toLocaleString()} 
                   ({difference.percentage}% {difference.isIncrease ? 'higher' : 'lower'})
                 </Text>
               </View>

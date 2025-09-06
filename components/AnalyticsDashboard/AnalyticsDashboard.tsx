@@ -209,7 +209,7 @@ export function AnalyticsDashboard({ tier }: AnalyticsDashboardProps) {
       </Text>
       
       <Text variant="h3" style={{ fontWeight: '700' }}>
-        {locked ? '---' : value.toLocaleString()}
+        {locked ? '---' : (value || 0).toLocaleString()}
       </Text>
     </View>
   );

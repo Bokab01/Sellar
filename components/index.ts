@@ -19,6 +19,10 @@ export { AppModal } from './Modal/Modal';
 export { Toast } from './Toast/Toast';
 export { Stepper } from './Stepper/Stepper';
 
+// Moderation Components
+export { ModerationErrorModal } from './ModerationErrorModal/ModerationErrorModal';
+export { ReportModal } from './ReportModal/ReportModal';
+
 // Community Components
 export { ChatBubble } from './ChatBubble/ChatBubble';
 export { ListItem } from './ListItem/ListItem';

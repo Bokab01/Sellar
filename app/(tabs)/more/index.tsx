@@ -359,11 +359,12 @@ export default function MoreScreen() {
                 </Text>
                 
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.lg }}>
-                  <PriceDisplay
-                    amount={walletBalance}
-                    size="md"
-                    currency="GHS"
-                  />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+                    <Zap size={16} color={theme.colors.primary} />
+                    <Text variant="h4" style={{ fontWeight: '600', color: theme.colors.primary }}>
+                      {(balance || 0).toLocaleString()} Credits
+                    </Text>
+                  </View>
                   {profile?.rating && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
                       <Star size={14} color={theme.colors.warning} fill={theme.colors.warning} />

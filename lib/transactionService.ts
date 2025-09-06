@@ -94,7 +94,7 @@ export const formatAmount = (amount: number, currency: string = 'GHS'): string =
 };
 
 export const formatCredits = (credits: number): string => {
-  return `${credits.toLocaleString()} credits`;
+  return `${(credits || 0).toLocaleString()} credits`;
 };
 
 // Transaction direction helpers

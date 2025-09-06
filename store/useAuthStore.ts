@@ -87,8 +87,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       // Check if user was created successfully
-      if (!data.user) {
-        return { error: 'Failed to create user account. Please try again.' };
+      // Supabase returns data.user = null for existing emails (to prevent email enumeration)
+      // This is the critical fix for the duplicate email signup issue
+      if (!data.user || !data.session) {
+        // This likely means the email already exists
+        // Supabase doesn't return an error, but user/session will be null
+        return { error: 'An account with this email already exists. Please sign in instead.' };
       }
 
       // Wait a moment for the trigger to execute, then check if profile was created

@@ -169,7 +169,7 @@ export default function TransactionsScreen() {
               <ArrowDownLeft size={24} color={theme.colors.success} />
             </View>
             <Text variant="h2" style={{ marginBottom: theme.spacing.xs }}>
-              {summary.credits_purchased.toLocaleString()}
+              {(summary.credits_purchased || 0).toLocaleString()}
             </Text>
             <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
               Credits Purchased
@@ -190,7 +190,7 @@ export default function TransactionsScreen() {
               <ArrowUpRight size={24} color={theme.colors.error} />
             </View>
             <Text variant="h2" style={{ marginBottom: theme.spacing.xs }}>
-              {summary.credits_used.toLocaleString()}
+              {(summary.credits_used || 0).toLocaleString()}
             </Text>
             <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
               Credits Used

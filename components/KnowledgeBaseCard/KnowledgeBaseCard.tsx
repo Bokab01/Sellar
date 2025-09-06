@@ -146,7 +146,7 @@ export function KnowledgeBaseCard({
           }}>
             <Eye size={14} color={theme.colors.text.muted} />
             <Text variant="caption" color="muted" style={{ marginLeft: theme.spacing.xs }}>
-              {article.view_count.toLocaleString()}
+              {(article.view_count || 0).toLocaleString()}
             </Text>
           </View>
 

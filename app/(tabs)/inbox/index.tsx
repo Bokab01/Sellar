@@ -174,7 +174,7 @@ export default function InboxScreen() {
                         💼 {conversation.listing.title}
                       </Text>
                       <Text variant="caption" style={{ color: theme.colors.primary, fontWeight: '600' }}>
-                        GHS {conversation.listing.price.toLocaleString()}
+                        GHS {(conversation.listing.price || 0).toLocaleString()}
                       </Text>
                     </View>
                   </View>

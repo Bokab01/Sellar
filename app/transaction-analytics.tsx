@@ -94,8 +94,8 @@ export default function TransactionAnalyticsScreen() {
   const renderOverviewCards = () => {
     if (!analytics || !summary) return null;
 
-    const totalSpent = analytics.totals.credits_spent;
-    const totalEarned = analytics.totals.credits_earned;
+    const totalSpent = analytics.totals?.credits_spent || 0;
+    const totalEarned = analytics.totals?.credits_earned || 0;
     const netChange = totalEarned - totalSpent;
 
     return (
@@ -152,7 +152,7 @@ export default function TransactionAnalyticsScreen() {
               <ArrowUpRight size={24} color={theme.colors.error} />
             </View>
             <Text variant="h2" style={{ marginBottom: theme.spacing.xs }}>
-              {totalSpent.toLocaleString()}
+              {(totalSpent || 0).toLocaleString()}
             </Text>
             <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
               Credits Spent
@@ -173,7 +173,7 @@ export default function TransactionAnalyticsScreen() {
               <ArrowDownLeft size={24} color={theme.colors.success} />
             </View>
             <Text variant="h2" style={{ marginBottom: theme.spacing.xs }}>
-              {totalEarned.toLocaleString()}
+              {(totalEarned || 0).toLocaleString()}
             </Text>
             <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
               Credits Earned
@@ -197,7 +197,7 @@ export default function TransactionAnalyticsScreen() {
               color: netChange >= 0 ? theme.colors.success : theme.colors.error,
             }}
           >
-            {netChange >= 0 ? '+' : ''}{netChange.toLocaleString()} credits
+            {netChange >= 0 ? '+' : ''}{(netChange || 0).toLocaleString()} credits
           </Text>
         </View>
       </View>

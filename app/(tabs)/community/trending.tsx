@@ -395,13 +395,13 @@ export default function TrendingTopicsScreen() {
                     <View style={{ flexDirection: 'row', gap: theme.spacing.lg, marginBottom: theme.spacing.sm }}>
                       <View style={{ alignItems: 'center' }}>
                         <Text variant="body" weight="semibold">
-                          {topic.posts_count.toLocaleString()}
+                          {(topic.posts_count || 0).toLocaleString()}
                         </Text>
                         <Text variant="caption" color="muted">Posts</Text>
                       </View>
                       <View style={{ alignItems: 'center' }}>
                         <Text variant="body" weight="semibold">
-                          {topic.engagement_count.toLocaleString()}
+                          {(topic.engagement_count || 0).toLocaleString()}
                         </Text>
                         <Text variant="caption" color="muted">Engagements</Text>
                       </View>
@@ -523,19 +523,19 @@ export default function TrendingTopicsScreen() {
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                           <Heart size={16} color={theme.colors.error} />
                           <Text variant="caption" style={{ marginLeft: theme.spacing.xs }}>
-                            {post.likes_count.toLocaleString()}
+                            {(post.likes_count || 0).toLocaleString()}
                           </Text>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                           <MessageCircle size={16} color={theme.colors.primary} />
                           <Text variant="caption" style={{ marginLeft: theme.spacing.xs }}>
-                            {post.comments_count.toLocaleString()}
+                            {(post.comments_count || 0).toLocaleString()}
                           </Text>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                           <Eye size={16} color={theme.colors.text.muted} />
                           <Text variant="caption" style={{ marginLeft: theme.spacing.xs }}>
-                            {post.views_count.toLocaleString()}
+                            {(post.views_count || 0).toLocaleString()}
                           </Text>
                         </View>
                       </View>

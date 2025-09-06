@@ -139,7 +139,7 @@ export default function MyPostsScreen() {
         verification_level: 'none',
       },
     },
-    timestamp: new Date(post.created_at).toLocaleString(),
+    timestamp: new Date(post.created_at || new Date()).toLocaleString(),
     content: post.content,
     images: post.images || [],
     likes: post.likes_count || 0,

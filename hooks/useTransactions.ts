@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, db } from '@/lib/supabase';
 import { useAuth } from './useAuth';
 
 // Transaction types
@@ -278,7 +278,24 @@ export function useTransactionSummary() {
           p_user_id: user.id
         });
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        // If function doesn't exist, provide fallback summary
+        if (fetchError.message.includes('Could not find the function') || 
+            fetchError.message.includes('schema cache')) {
+          console.warn('get_user_transaction_summary function not found, using fallback summary');
+          setSummary({
+            total_transactions: 0,
+            total_spent: 0,
+            total_earned: 0,
+            credits_purchased: 0,
+            credits_used: 0,
+            pending_transactions: 0,
+            last_transaction_date: undefined
+          });
+          return;
+        }
+        throw fetchError;
+      }
       setSummary(data);
     } catch (err) {
       console.error('Error fetching transaction summary:', err);
@@ -321,7 +338,27 @@ export function useTransactionAnalytics(startDate?: string, endDate?: string) {
           p_end_date: endDate
         });
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        if (fetchError.message.includes('Could not find the function') || fetchError.message.includes('schema cache')) {
+          console.warn('get_transaction_analytics function not found, using fallback analytics');
+          setAnalytics({
+            period: {
+              start_date: startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+              end_date: endDate || new Date().toISOString()
+            },
+            totals: {
+              transaction_count: 0,
+              total_amount: 0,
+              credits_spent: 0,
+              credits_earned: 0
+            },
+            by_type: {},
+            by_status: {}
+          });
+          return;
+        }
+        throw fetchError;
+      }
       setAnalytics(data);
     } catch (err) {
       console.error('Error fetching transaction analytics:', err);
@@ -354,14 +391,53 @@ export function useTransactionCategories() {
     setError(null);
 
     try {
-      const { data, error: fetchError } = await supabase
-        .from('transaction_categories')
+      const { data, error: fetchError } = await db.transaction_categories
         .select('*')
         .eq('is_active', true)
         .order('sort_order');
 
-      if (fetchError) throw fetchError;
-      setCategories(data || []);
+      if (fetchError) {
+        // If table doesn't exist, provide fallback categories
+        if (fetchError.message.includes('Could not find the table') || 
+            fetchError.message.includes('schema cache')) {
+          console.warn('Transaction categories table not found, using fallback categories');
+          setCategories([
+            {
+              id: '1',
+              name: 'credit_operations',
+              display_name: 'Credit Operations',
+              description: 'All credit-related transactions',
+              icon: 'credit-card',
+              color: '#3B82F6',
+              is_active: true,
+              sort_order: 1
+            },
+            {
+              id: '2',
+              name: 'listing_operations',
+              display_name: 'Listing Operations',
+              description: 'Listing boost and promotion transactions',
+              icon: 'trending-up',
+              color: '#10B981',
+              is_active: true,
+              sort_order: 2
+            },
+            {
+              id: '3',
+              name: 'earnings',
+              display_name: 'Earnings',
+              description: 'Commission and bonus earnings',
+              icon: 'dollar-sign',
+              color: '#F59E0B',
+              is_active: true,
+              sort_order: 3
+            }
+          ]);
+          return;
+        }
+        throw fetchError;
+      }
+      setCategories((data as unknown as TransactionCategory[]) || []);
     } catch (err) {
       console.error('Error fetching transaction categories:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch transaction categories');

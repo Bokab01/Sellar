@@ -353,10 +353,10 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
                       </Text>
                     </View>
                     <Text variant="h3" color="primary" style={{ fontWeight: '700' }}>
-                      {(userCredits.balance || 0).toLocaleString()}
+                      {((userCredits?.balance) || 0).toLocaleString()}
                     </Text>
                     <Text variant="caption" color="muted">
-                      Lifetime earned: {(userCredits.lifetime_earned || 0).toLocaleString()}
+                      Lifetime earned: {((userCredits?.lifetime_earned) || 0).toLocaleString()}
                     </Text>
                   </View>
                 )}

@@ -309,7 +309,7 @@ export default function PostDetailScreen() {
       isVerified: post.profiles?.is_verified,
       profile: post.profiles, // Add the full profile object for UserDisplayName
     },
-    timestamp: new Date(post.created_at).toLocaleString(),
+    timestamp: new Date(post.created_at || new Date()).toLocaleString(),
     content: post.content,
     images: post.images || [],
     likes: post.likes_count || 0,

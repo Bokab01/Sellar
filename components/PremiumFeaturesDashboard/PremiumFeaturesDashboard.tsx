@@ -399,7 +399,7 @@ export function PremiumFeaturesDashboard() {
                   <View>
                     <Text variant="bodySmall" color="muted">Impressions</Text>
                     <Text variant="body" style={{ fontWeight: '600' }}>
-                      {placement.impressions.toLocaleString()}
+                      {(placement.impressions || 0).toLocaleString()}
                     </Text>
                   </View>
                   

@@ -70,7 +70,7 @@ export function CategoryCard({
           color="muted"
           style={{ textAlign: 'center' }}
         >
-          {itemCount.toLocaleString()} items
+          {(itemCount || 0).toLocaleString()} items
         </Text>
       )}
     </TouchableOpacity>

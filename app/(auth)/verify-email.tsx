@@ -53,13 +53,12 @@ export default function VerifyEmailScreen() {
   };
 
   const handleCheckEmail = () => {
-    // This would typically refresh the auth state
-    // For now, we'll just navigate back to sign in
-    router.replace('/(auth)/sign-in');
+    // Navigate to home - if user is not verified, they'll be redirected appropriately
+    router.replace('/(tabs)/home');
   };
 
   return (
-    <SafeAreaWrapper>
+    <SafeAreaWrapper testID="verify-email-screen">
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         <Container>
           <View
@@ -143,6 +142,7 @@ export default function VerifyEmailScreen() {
                 onPress={handleCheckEmail}
                 fullWidth
                 size="lg"
+                testID="check-email-button"
               >
                 I&apos;ve Verified My Email
               </Button>
@@ -154,6 +154,7 @@ export default function VerifyEmailScreen() {
                 disabled={loading || resendCooldown > 0}
                 fullWidth
                 size="lg"
+                testID="resend-email-button"
                 icon={resendCooldown > 0 ? <Clock size={16} /> : undefined}
               >
                 {resendCooldown > 0 
@@ -183,7 +184,10 @@ export default function VerifyEmailScreen() {
             {/* Help */}
             <View style={{ alignItems: 'center', marginTop: theme.spacing.lg }}>
               <Text variant="caption" color="muted" style={{ textAlign: 'center' }}>
-                Having trouble? Contact support for help with email verification.
+                Having trouble? Check your spam folder or contact support for help.
+              </Text>
+              <Text variant="caption" color="muted" style={{ textAlign: 'center', marginTop: theme.spacing.xs }}>
+                The verification link expires in 24 hours.
               </Text>
             </View>
           </View>

@@ -151,6 +151,30 @@ export const db = {
     delete: (id: string) => supabase.from('user_subscriptions').delete().eq('id', id),
   },
   
+  // Transaction categories
+  transaction_categories: {
+    insert: (data: any) => supabase.from('transaction_categories').insert(data),
+    update: (data: any, id: string) => supabase.from('transaction_categories').update(data).eq('id', id),
+    select: (columns = '*') => supabase.from('transaction_categories').select(columns),
+    delete: (id: string) => supabase.from('transaction_categories').delete().eq('id', id),
+  },
+  
+  // Transaction receipts
+  transaction_receipts: {
+    insert: (data: any) => supabase.from('transaction_receipts').insert(data),
+    update: (data: any, id: string) => supabase.from('transaction_receipts').update(data).eq('id', id),
+    select: (columns = '*') => supabase.from('transaction_receipts').select(columns),
+    delete: (id: string) => supabase.from('transaction_receipts').delete().eq('id', id),
+  },
+  
+  // Transaction notifications
+  transaction_notifications: {
+    insert: (data: any) => supabase.from('transaction_notifications').insert(data),
+    update: (data: any, id: string) => supabase.from('transaction_notifications').update(data).eq('id', id),
+    select: (columns = '*') => supabase.from('transaction_notifications').select(columns),
+    delete: (id: string) => supabase.from('transaction_notifications').delete().eq('id', id),
+  },
+  
   // Credit packages
   credit_packages: {
     insert: (data: any) => supabase.from('credit_packages').insert(data),

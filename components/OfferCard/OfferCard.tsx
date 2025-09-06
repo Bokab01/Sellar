@@ -212,7 +212,7 @@ export function OfferCard({
             marginTop: theme.spacing.sm,
             fontWeight: '600',
           }}>
-            💰 Save GHS {(offer.originalPrice - offer.amount).toLocaleString()}
+            💰 Save GHS {((offer.originalPrice || 0) - (offer.amount || 0)).toLocaleString()}
           </Text>
         )}
       </View>

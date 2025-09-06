@@ -129,7 +129,7 @@ export default function ChatScreen() {
     setSendingOffer(true);
     try {
       // Create offer message first
-      const offerContent = `💰 Offer: GHS ${amount.toLocaleString()}${offerMessage ? `\n\n"${offerMessage}"` : ''}`;
+      const offerContent = `💰 Offer: GHS ${(amount || 0).toLocaleString()}${offerMessage ? `\n\n"${offerMessage}"` : ''}`;
       
       const { data: message, error: messageError } = await supabase
         .from('messages')
@@ -212,7 +212,7 @@ export default function ChatScreen() {
     setSendingOffer(true);
     try {
       // Create counter offer message
-      const counterContent = `💰 Counter Offer: GHS ${amount.toLocaleString()}${offerMessage ? `\n\n"${offerMessage}"` : ''}`;
+      const counterContent = `💰 Counter Offer: GHS ${(amount || 0).toLocaleString()}${offerMessage ? `\n\n"${offerMessage}"` : ''}`;
       
       const { data: message, error: messageError } = await supabase
         .from('messages')
@@ -633,7 +633,7 @@ export default function ChatScreen() {
             onChangeText={setOfferAmount}
             keyboardType="numeric"
             helper={conversation?.listings 
-              ? `Current price: GHS ${conversation.listings.price.toLocaleString()}`
+              ? `Current price: GHS ${(conversation.listings.price || 0).toLocaleString()}`
               : undefined
             }
           />

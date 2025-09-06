@@ -363,7 +363,7 @@ export function PostCard({
                 🏷️ {post.listing.title}
               </Text>
               <Text variant="caption" color="primary" style={{ fontWeight: '600' }}>
-                GHS {post.listing.price.toLocaleString()}
+                GHS {(post.listing.price || 0).toLocaleString()}
               </Text>
             </View>
             <ExternalLink size={16} color={theme.colors.text.muted} />
@@ -489,7 +489,7 @@ export function PostCard({
                 fontWeight: post.isLiked ? '600' : '500',
               }}
             >
-              {post.likes.toLocaleString()}
+              {(post.likes || 0).toLocaleString()}
             </Text>
           </TouchableOpacity>
 
@@ -507,7 +507,7 @@ export function PostCard({
           >
             <MessageCircle size={20} color={theme.colors.text.muted} />
             <Text variant="bodySmall" color="muted" style={{ fontWeight: '500' }}>
-              {post.comments.toLocaleString()}
+              {(post.comments || 0).toLocaleString()}
             </Text>
           </TouchableOpacity>
 
@@ -525,7 +525,7 @@ export function PostCard({
           >
             <Share size={20} color={theme.colors.text.muted} />
             <Text variant="bodySmall" color="muted" style={{ fontWeight: '500' }}>
-              {post.shares.toLocaleString()}
+              {(post.shares || 0).toLocaleString()}
             </Text>
           </TouchableOpacity>
 

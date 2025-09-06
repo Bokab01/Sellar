@@ -114,12 +114,19 @@ export default function VerificationScreen() {
       .filter(r => r.status === 'approved')
       .map(r => r.verification_type);
     
+    const pendingTypes = requests
+      .filter(r => r.status === 'pending' || r.status === 'in_review')
+      .map(r => r.verification_type);
+    
     // Also check if email is verified through auth (signup process)
     if (status?.email_verified) {
       completedTypes.push('email');
     }
     
-    return templates.filter(t => !completedTypes.includes(t.verification_type as any));
+    // Filter out both completed and pending verifications
+    const unavailableTypes = [...completedTypes, ...pendingTypes];
+    
+    return templates.filter(t => !unavailableTypes.includes(t.verification_type as any));
   };
 
   if (requestsLoading && statusLoading) {

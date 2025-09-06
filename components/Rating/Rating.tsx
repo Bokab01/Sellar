@@ -129,7 +129,7 @@ export function Rating({
           color="muted"
           style={{ marginLeft: theme.spacing.xs }}
         >
-          ({reviewCount.toLocaleString()})
+          ({(reviewCount || 0).toLocaleString()})
         </Text>
       )}
     </View>

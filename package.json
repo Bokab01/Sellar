@@ -9,7 +9,11 @@
     "lint": "expo lint",
     "test:backend": "node scripts/test-phase1-components.js",
     "android": "expo run:android",
-    "ios": "expo run:ios"
+    "ios": "expo run:ios",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:e2e": "detox test"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.1",
@@ -75,9 +79,20 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@testing-library/jest-native": "^5.4.3",
+    "@testing-library/react-native": "^13.3.3",
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.0.10",
+    "detox": "^20.41.1",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~9.2.0",
+    "jest": "^30.1.3",
+    "jest-environment-jsdom": "^30.1.2",
+    "jest-expo": "^53.0.9",
+    "msw": "^2.11.1",
+    "react-test-renderer": "^19.1.1",
+    "supertest": "^7.1.4",
+    "ts-jest": "^29.4.1",
     "typescript": "~5.8.3"
   }
 }

@@ -131,7 +131,7 @@ export function ReviewSummary({
             />
             
             <Text variant="body" color="secondary">
-              Based on {stats.total_reviews.toLocaleString()} review{stats.total_reviews !== 1 ? 's' : ''}
+              Based on {(stats.total_reviews || 0).toLocaleString()} review{(stats.total_reviews || 0) !== 1 ? 's' : ''}
             </Text>
           </View>
 

@@ -205,13 +205,13 @@ export default function BuyCreditsScreen() {
                 marginBottom: theme.spacing.sm,
               }}
             >
-              {balance.toLocaleString()} Credits
+              {(balance || 0).toLocaleString()} Credits
             </Text>
             <Text
               variant="caption"
               style={{ color: theme.colors.primaryForeground + 'AA' }}
             >
-              ≈ GHS {(balance * 0.167).toFixed(2)} value
+              ≈ GHS {((balance || 0) * 0.167).toFixed(2)} value
             </Text>
           </View>
 
@@ -287,7 +287,7 @@ export default function BuyCreditsScreen() {
                   <View style={{ marginBottom: theme.spacing.lg }}>
                     <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing.sm, marginBottom: theme.spacing.sm }}>
                       <Text variant="h2" style={{ fontWeight: '700' }}>
-                        {package_.credits.toLocaleString()}
+                        {(package_.credits || 0).toLocaleString()}
                       </Text>
                       <Text variant="body" color="secondary">
                         credits

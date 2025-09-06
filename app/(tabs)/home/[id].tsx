@@ -593,7 +593,7 @@ export default function ListingDetailScreen() {
       }
 
       // Create offer message first
-      const offerContent = `💰 Offer: GHS ${amount.toLocaleString()}${offerMessage ? `\n\n"${offerMessage}"` : ''}`;
+      const offerContent = `💰 Offer: GHS ${(amount || 0).toLocaleString()}${offerMessage ? `\n\n"${offerMessage}"` : ''}`;
       
       const { data: message, error: messageError } = await supabase
         .from('messages')
@@ -1012,7 +1012,7 @@ export default function ListingDetailScreen() {
                 💰 Offer Pending
               </Text>
               <Text variant="bodySmall" color="secondary">
-                Your offer of GHS {pendingOffer.amount.toLocaleString()} is waiting for the seller&apos;s response.
+                Your offer of GHS {(pendingOffer.amount || 0).toLocaleString()} is waiting for the seller&apos;s response.
               </Text>
             </View>
           )}
@@ -1589,7 +1589,7 @@ export default function ListingDetailScreen() {
             value={offerAmount}
             onChangeText={setOfferAmount}
             keyboardType="numeric"
-            helper={`Current price: GHS ${listing.price.toLocaleString()}`}
+            helper={`Current price: GHS ${(listing.price || 0).toLocaleString()}`}
           />
 
           <Input
