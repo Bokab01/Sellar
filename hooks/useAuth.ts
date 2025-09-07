@@ -3,7 +3,6 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, dbHelpers } from '@/lib/supabase';
 import { handleAuthError, analyzeAuthError } from '@/utils/authErrorHandler';
 import { useSessionTimeout } from './useSessionTimeout';
-import { useDeepLinkAuth } from './useDeepLinkAuth';
 
 export function useAuth() {
   const { 
@@ -30,46 +29,91 @@ export function useAuth() {
     refreshThresholdMs: 2 * 60 * 1000, // 2 minutes
   });
 
-  // Initialize deep link authentication
-  const { state: deepLinkState, processAuthDeepLink } = useDeepLinkAuth();
 
   useEffect(() => {
-    // Get initial session with proper error handling
+    // Get initial session with enhanced error handling
     const initializeAuth = async () => {
       try {
+        console.log('Initializing authentication...');
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.warn('Auth initialization error:', error.message);
           
-          // Use the centralized error handler
-          const result = await handleAuthError(error);
+          // Analyze the error type
+          const errorInfo = analyzeAuthError(error);
           
-          if (result.handled) {
-            console.log('Auth error handled:', result.message);
+          if (errorInfo.type === 'refresh_token') {
+            console.log('Corrupted refresh token detected during initialization, clearing silently...');
             
-            // Set auth state to unauthenticated
+            // Handle refresh token errors silently during app startup
+            try {
+              await handleAuthError(error);
+            } catch (handlerError) {
+              console.error('Error handler failed during initialization:', handlerError);
+            }
+            
+            // Set clean unauthenticated state
             setSession(null);
             setUser(null);
             setLoading(false);
+            console.log('App initialized with clean unauthenticated state');
             return;
           }
           
-          // For unhandled errors, still try to continue
+          // Use the centralized error handler for other errors
+          const result = await handleAuthError(error);
+          
+          if (result.handled) {
+            console.log('Auth error handled during initialization:', result.message);
+          }
+          
+          // Set auth state to unauthenticated
           setSession(null);
           setUser(null);
           setLoading(false);
           return;
         }
         
-        // Session retrieved successfully
+        // Validate session if it exists
+        if (session) {
+          // Check if session is expired
+          const now = Date.now();
+          const expiresAt = session.expires_at ? session.expires_at * 1000 : 0;
+          
+          if (expiresAt > 0 && now >= expiresAt) {
+            console.log('Session expired during initialization, clearing...');
+            await supabase.auth.signOut({ scope: 'local' });
+            setSession(null);
+            setUser(null);
+            setLoading(false);
+            return;
+          }
+          
+          console.log('Valid session found, user authenticated');
+        } else {
+          console.log('No session found, user unauthenticated');
+        }
+        
+        // Session retrieved successfully (or null)
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
         
-      } catch (error) {
+      } catch (error: any) {
         console.error('Unexpected error during auth initialization:', error);
-        // Fallback to unauthenticated state
+        
+        // Handle any unexpected errors gracefully
+        try {
+          const errorInfo = analyzeAuthError(error);
+          if (errorInfo.shouldSignOut) {
+            await handleAuthError(error);
+          }
+        } catch (handlerError) {
+          console.error('Failed to handle unexpected initialization error:', handlerError);
+        }
+        
+        // Fallback to clean unauthenticated state
         setSession(null);
         setUser(null);
         setLoading(false);
@@ -86,10 +130,27 @@ export function useAuth() {
         // Handle specific auth events
         if (event === 'TOKEN_REFRESHED') {
           console.log('Token refreshed successfully');
-        } else if (event === 'SIGNED_OUT') {
-          console.log('User signed out');
+        } else if (!session && event !== 'INITIAL_SESSION') {
+          console.log('User signed out or session cleared');
+          // Clear any remaining session data
+          setSession(null);
+          setUser(null);
+          setLoading(false);
+          return;
         } else if (event === 'SIGNED_IN') {
           console.log('User signed in');
+        }
+        
+        // Validate session before setting it
+        if (session) {
+          // Check if session is valid and not expired
+          const now = Date.now();
+          const expiresAt = session.expires_at ? session.expires_at * 1000 : 0;
+          
+          if (expiresAt > 0 && now >= expiresAt) {
+            console.log('Received expired session, ignoring...');
+            return;
+          }
         }
         
         setSession(session);
@@ -97,7 +158,7 @@ export function useAuth() {
         setLoading(false);
 
         // Update user online status only if we have a valid session
-        if (session?.user && event !== 'SIGNED_OUT') {
+        if (session?.user) {
           try {
             await dbHelpers.updateProfile(session.user.id, {
               is_online: true,
@@ -105,6 +166,7 @@ export function useAuth() {
             });
           } catch (error) {
             console.warn('Failed to update user online status:', error);
+            // Don't throw error for non-critical profile updates
           }
         }
       }
@@ -128,8 +190,5 @@ export function useAuth() {
     // Session timeout information
     sessionStatus,
     isRefreshing,
-    // Deep link authentication
-    deepLinkState,
-    processAuthDeepLink,
   };
 }

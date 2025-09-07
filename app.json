@@ -5,7 +5,6 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon/icon-light.png",
-    "scheme": "sellar",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {

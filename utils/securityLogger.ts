@@ -3,7 +3,7 @@
  * Tracks and logs security-related events for monitoring and analysis
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase, db } from '@/lib/supabase';
 
 export interface SecurityEvent {
   eventType: 'input_threat' | 'failed_login' | 'suspicious_activity' | 'rate_limit_exceeded' | 'account_lockout';
@@ -187,18 +187,16 @@ export class SecurityLogger {
   private async storeBatch(events: SecurityEvent[]): Promise<void> {
     try {
       // Store to security_events table (would need to be created)
-      const { error } = await supabase
-        .from('security_events')
-        .insert(events.map(event => ({
-          event_type: event.eventType,
-          severity: event.severity,
-          user_id: event.userId || null,
-          email: event.email || null,
-          ip_address: event.ipAddress || null,
-          user_agent: event.userAgent || null,
-          details: event.details,
-          created_at: event.timestamp,
-        })));
+      const { error } = await db.security_events.insert(events.map(event => ({
+        event_type: event.eventType,
+        severity: event.severity,
+        user_id: event.userId || null,
+        email: event.email || null,
+        ip_address: event.ipAddress || null,
+        user_agent: event.userAgent || null,
+        details: event.details,
+        created_at: event.timestamp,
+      })));
 
       if (error) {
         console.error('Error storing security events:', error);
@@ -315,12 +313,33 @@ export class SecurityLogger {
 export const securityLogger = SecurityLogger.getInstance();
 
 // Convenience functions
-export const logInputThreat = (details: ThreatDetails) => securityLogger.logInputThreat(details);
-export const logFailedLogin = (email: string, reason: string, details?: Record<string, any>) => 
-  securityLogger.logFailedLogin(email, reason, details);
-export const logSuspiciousActivity = (userId: string | undefined, activity: string, details: Record<string, any>) => 
-  securityLogger.logSuspiciousActivity(userId, activity, details);
-export const logRateLimitExceeded = (identifier: string, endpoint: string, attempts: number) => 
-  securityLogger.logRateLimitExceeded(identifier, endpoint, attempts);
-export const logAccountLockout = (email: string, reason: string) => 
-  securityLogger.logAccountLockout(email, reason);
+export const logInputThreat = (details: ThreatDetails) => {
+  // Re-enabled security logging with better error handling
+  securityLogger.logInputThreat(details).catch(error => {
+    console.error('Security logging failed (non-blocking):', error);
+    // Log the specific constraint violation for debugging
+    if (error.message?.includes('security_events_event_type_check')) {
+      console.error('Event type constraint violation - check allowed event types');
+    }
+  });
+};
+export const logFailedLogin = (email: string, reason: string, details?: Record<string, any>) => {
+  securityLogger.logFailedLogin(email, reason, details).catch(error => {
+    console.error('Security logging failed (non-blocking):', error);
+  });
+};
+export const logSuspiciousActivity = (userId: string | undefined, activity: string, details: Record<string, any>) => {
+  securityLogger.logSuspiciousActivity(userId, activity, details).catch(error => {
+    console.error('Security logging failed (non-blocking):', error);
+  });
+};
+export const logRateLimitExceeded = (identifier: string, endpoint: string, attempts: number) => {
+  securityLogger.logRateLimitExceeded(identifier, endpoint, attempts).catch(error => {
+    console.error('Security logging failed (non-blocking):', error);
+  });
+};
+export const logAccountLockout = (email: string, reason: string) => {
+  securityLogger.logAccountLockout(email, reason).catch(error => {
+    console.error('Security logging failed (non-blocking):', error);
+  });
+};

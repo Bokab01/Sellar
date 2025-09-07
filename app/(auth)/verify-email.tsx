@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, ScrollView, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
 import {
   Text,
   SafeAreaWrapper,
@@ -52,9 +53,64 @@ export default function VerifyEmailScreen() {
     setLoading(false);
   };
 
-  const handleCheckEmail = () => {
-    // Navigate to home - if user is not verified, they'll be redirected appropriately
-    router.replace('/(tabs)/home');
+  const handleCheckEmail = async () => {
+    setLoading(true);
+    
+    try {
+      // Check current session to see if user is actually verified
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('Error checking session:', error);
+        Alert.alert('Error', 'Unable to verify your email status. Please try again.');
+        setLoading(false);
+        return;
+      }
+      
+      if (!session || !session.user) {
+        // No session means user is not signed in (email not verified)
+        Alert.alert(
+          'Email Not Verified',
+          'Your email has not been verified yet. Please click the verification link in your email first.',
+          [
+            { text: 'OK' },
+            { 
+              text: 'Resend Email', 
+              onPress: () => handleResendVerification() 
+            }
+          ]
+        );
+        setLoading(false);
+        return;
+      }
+      
+      // Check if email is confirmed
+      if (!session.user.email_confirmed_at) {
+        Alert.alert(
+          'Email Not Verified',
+          'Your email has not been verified yet. Please click the verification link in your email first.',
+          [
+            { text: 'OK' },
+            { 
+              text: 'Resend Email', 
+              onPress: () => handleResendVerification() 
+            }
+          ]
+        );
+        setLoading(false);
+        return;
+      }
+      
+      // Email is verified - proceed to home
+      console.log('✅ Email verified successfully');
+      router.replace('/(tabs)/home');
+      
+    } catch (error) {
+      console.error('Error in handleCheckEmail:', error);
+      Alert.alert('Error', 'Unable to verify your email status. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

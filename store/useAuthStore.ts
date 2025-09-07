@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { supabase, dbHelpers } from '@/lib/supabase';
 import { handleAuthError, analyzeAuthError } from '@/utils/authErrorHandler';
 import { networkUtils } from '@/utils/networkRetry';
-import { generateEmailRedirectUrl, generateMagicLinkRedirectUrl, generatePasswordResetRedirectUrl } from '@/utils/deepLinkUtils';
 import type { User, Session } from '@supabase/supabase-js';
 
 interface AuthState {
@@ -57,7 +56,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         () => supabase.auth.signInWithOtp({
           email,
           options: {
-            emailRedirectTo: generateMagicLinkRedirectUrl(),
+            emailRedirectTo: 'https://sellar.app/auth/callback',
           },
         }),
         'magic_link_signin'
@@ -86,12 +85,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           email,
           password,
           options: {
-            emailRedirectTo: generateEmailRedirectUrl(),
+            emailRedirectTo: 'https://sellar.app/auth/callback',
             data: {
-              first_name: userData.firstName,
-              last_name: userData.lastName,
+              firstName: userData.firstName,
+              lastName: userData.lastName,
               phone: userData.phone || null,
               location: userData.location || 'Accra, Greater Accra',
+              is_business: false,
             },
           },
         }),
@@ -139,6 +139,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           return { error: 'Database error saving new user. Please try again.' };
         }
         
+        // Handle Supabase rate limiting
+        if (error.code === 'over_email_send_rate_limit' || error.message.includes('you can only request this after')) {
+          return { error: 'Please wait a moment before trying again. Supabase has rate limits to prevent spam.' };
+        }
+        
         return { error: error.message };
       }
 
@@ -153,136 +158,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
       
       if (!data?.user) {
-        // When Supabase returns no user, it means the email already exists
-        // This is Supabase's way of preventing email enumeration attacks
-        console.log('No user returned from signup - email already exists');
+        // When Supabase returns no user, it typically means signup failed
+        // This could be due to existing email or other validation issues
+        // Trust Supabase's handling and provide a generic message
+        console.log('No user returned from signup - signup failed');
         
-        // Check if we can determine the user's status for better error messaging
-        try {
-          // Try to get user info (this might not work client-side, but worth trying)
-          const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
-          if (!listError) {
-            const existingUser = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
-            if (existingUser) {
-              console.log('Found existing user:', {
-                id: existingUser.id,
-                email: existingUser.email,
-                confirmed: !!existingUser.email_confirmed_at,
-                created: existingUser.created_at
-              });
-              
-              if (!existingUser.email_confirmed_at) {
-                // User exists but email not confirmed
-                return { error: 'An account with this email already exists but is not verified. Please check your email for the verification link, or try signing in.' };
-              } else {
-                // User exists and is confirmed
-                return { error: 'An account with this email already exists and is verified. Please sign in instead.' };
-              }
-            }
-          }
-        } catch (adminError) {
-          console.log('Could not check admin users (normal for client-side):', adminError);
-        }
-        
-        // Default error when we can't determine the specific case
-        return { error: 'An account with this email already exists. Please try signing in, or check your email for a verification link if you recently registered.' };
+        return { error: 'Unable to create account. This email may already be registered. Please try signing in or use a different email.' };
       }
       
       // User created successfully (session might be null if email verification required)
       console.log('User created successfully:', data?.user?.email);
+      
+      // Since we now do pre-signup validation, we can trust the signup response
+      // If we get here, the email was available and signup should succeed
+      console.log('✅ Signup completed - pre-validation passed');
 
-      // Wait a moment for the trigger to execute, then check if profile was created
-      setTimeout(async () => {
-        try {
-          // First, ensure we have a valid session
-          const { data: { session } } = await supabase.auth.getSession();
-          if (!session) {
-            console.log('No session found, profile creation will be handled later');
-            return;
-          }
-
-          const { data: profile, error: profileError } = await dbHelpers.getProfile(data?.user?.id!);
-          
-          if (profileError || !profile) {
-            console.log('Profile not found, creating manually...');
-            
-            // Try multiple fallback strategies with proper authentication context
-            const fallbackStrategies = [
-              // Strategy 1: Use our helper function (should work with RLS)
-              async () => {
-                const { error } = await dbHelpers.createProfile(data?.user?.id!, userData);
-                if (error) throw error;
-                return 'helper';
-              },
-              
-              // Strategy 2: Use authenticated supabase client for basic profile
-              async () => {
-                const { error } = await supabase
-                  .from('profiles')
-                  .insert({
-                    id: data?.user?.id!,
-                    first_name: userData.firstName,
-                    last_name: userData.lastName,
-                    full_name: `${userData.firstName} ${userData.lastName}`.trim(),
-                    phone: userData.phone || null,
-                    location: userData.location || 'Accra, Greater Accra',
-                  } as any);
-                if (error) throw error;
-                return 'basic';
-              },
-              
-              // Strategy 3: Minimal profile with just essential fields
-              async () => {
-                const { error } = await supabase
-                  .from('profiles')
-                  .insert({
-                    id: data?.user?.id!,
-                    first_name: userData.firstName,
-                    last_name: userData.lastName,
-                  } as any);
-                if (error) throw error;
-                return 'minimal';
-              },
-              
-              // Strategy 4: Just the ID (should always work with proper RLS)
-              async () => {
-                const { error } = await supabase
-                  .from('profiles')
-                  .insert({ id: data?.user?.id! } as any);
-                if (error) throw error;
-                return 'id-only';
-              }
-            ];
-            
-            let profileCreated = false;
-            for (const [index, strategy] of fallbackStrategies.entries()) {
-              try {
-                const result = await strategy();
-                console.log(`✅ Profile created successfully using strategy ${index + 1} (${result})`);
-                profileCreated = true;
-                break;
-              } catch (error) {
-                console.error(`❌ Strategy ${index + 1} failed:`, error);
-                
-                // If it's an RLS error, provide more context
-                if (error && typeof error === 'object' && 'code' in error && error.code === '42501') {
-                  console.error('RLS Policy Error: The database security policy is preventing profile creation.');
-                  console.error('This usually means the RLS policies need to be updated.');
-                }
-              }
-            }
-            
-            if (!profileCreated) {
-              console.error('❌ All profile creation strategies failed - user signup completed but profile creation failed');
-              console.error('The user account was created successfully, but the profile will need to be created later');
-            }
-          } else {
-            console.log('✅ Profile found successfully');
-          }
-        } catch (error) {
-          console.error('Error in profile creation process:', error);
-        }
-      }, 3000); // Increased timeout to ensure session is established
+      // Trust the database trigger to handle profile creation
+      // The handle_new_user trigger should automatically create the profile
+      console.log('✅ Signup completed - database trigger will handle profile creation');
 
       return {};
     } catch (error: any) {
@@ -300,7 +193,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const { error } = await networkUtils.supabaseWithRetry(
         () => supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: generatePasswordResetRedirectUrl(),
+          redirectTo: 'https://sellar.app/auth/reset-password',
         }),
         'password_reset'
       );
@@ -339,7 +232,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           type: 'signup', 
           email: email,
           options: {
-            emailRedirectTo: generateEmailRedirectUrl(),
+            emailRedirectTo: 'https://sellar.app/auth/callback',
           },
         }),
         'email_resend'

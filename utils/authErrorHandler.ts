@@ -40,6 +40,21 @@ export function analyzeAuthError(error: any): AuthErrorInfo {
     };
   }
   
+  // Email verification errors
+  if (errorMessage.includes('Email not confirmed') ||
+      errorMessage.includes('email not confirmed') ||
+      errorMessage.includes('Email not verified') ||
+      errorMessage.includes('email not verified') ||
+      errorMessage.includes('confirm your email') ||
+      errorMessage.includes('verify your email')) {
+    return {
+      type: 'session',
+      message: 'Email not confirmed. Please check your email and click the confirmation link.',
+      shouldSignOut: false,
+      shouldRetry: false,
+    };
+  }
+  
   // Session-related errors
   if (errorMessage.includes('session') ||
       errorMessage.includes('unauthorized') ||
@@ -136,6 +151,68 @@ export async function clearStoredAuthData(): Promise<void> {
     
   } catch (error) {
     console.warn('Error clearing stored auth data:', error);
+  }
+}
+
+/**
+ * Silently recovers from corrupted sessions during app initialization
+ */
+export async function recoverFromCorruptedSession(): Promise<{
+  recovered: boolean;
+  cleanState: boolean;
+  error?: string;
+}> {
+  try {
+    console.log('Attempting session recovery...');
+    
+    // Try to get current session
+    const { data: { session }, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      const errorInfo = analyzeAuthError(error);
+      
+      if (errorInfo.shouldSignOut) {
+        console.log('Corrupted session detected, clearing silently...');
+        
+        // Clear session silently
+        await supabase.auth.signOut({ scope: 'local' });
+        await clearStoredAuthData();
+        
+        return {
+          recovered: true,
+          cleanState: true,
+        };
+      }
+      
+      return {
+        recovered: false,
+        cleanState: false,
+        error: errorInfo.message,
+      };
+    }
+    
+    // Session is valid or null
+    return {
+      recovered: true,
+      cleanState: !session, // Clean if no session, authenticated if session exists
+    };
+    
+  } catch (error: any) {
+    console.error('Session recovery failed:', error);
+    
+    // Force clean state on recovery failure
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+      await clearStoredAuthData();
+    } catch (cleanupError) {
+      console.error('Failed to cleanup after recovery failure:', cleanupError);
+    }
+    
+    return {
+      recovered: true,
+      cleanState: true,
+      error: 'Forced clean state after recovery failure',
+    };
   }
 }
 

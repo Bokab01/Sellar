@@ -115,7 +115,7 @@ const STEPS = [
 
 const CONDITIONS = [
   { value: 'new', label: 'Brand New', description: 'Never used, in original packaging' },
-  { value: 'like-new', label: 'Like New', description: 'Barely used, excellent condition' },
+  { value: 'like_new', label: 'Like New', description: 'Barely used, excellent condition' },
   { value: 'good', label: 'Good', description: 'Used but well maintained' },
   { value: 'fair', label: 'Fair', description: 'Shows wear but fully functional' },
   { value: 'poor', label: 'Poor', description: 'Significant wear, may need repairs' },
@@ -418,11 +418,14 @@ export default function CreateListingScreen() {
         location: formData.location,
         images: imageUrls,
         accept_offers: formData.acceptOffers,
+        attributes: formData.categoryAttributes,
+        seo_title: seoTitle,
+        keywords: keywords,
         status: 'active'
       };
 
       // Ensure condition is valid, fallback to 'good' if empty or invalid
-      const validConditions = ['new', 'like-new', 'good', 'fair', 'poor'];
+      const validConditions = ['new', 'like_new', 'good', 'fair', 'poor'];
       const finalCondition = validConditions.includes(formData.condition) ? formData.condition : 'good';
       
       // Update the listing data with the validated condition

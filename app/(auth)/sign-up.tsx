@@ -3,7 +3,8 @@ import { View, Alert, Platform } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useSecureAuth } from '@/hooks/useSecureAuth';
 import { validateSignUpForm } from '@/utils/validation';
-import { validatePreSignup, getSignupErrorMessage, getSignupSuggestedActions } from '@/utils/preSignupValidation';
+import { supabase } from '@/lib/supabase';
+import { checkUserStatus, getUserStatusActions } from '@/utils/checkUserStatus';
 import { sanitizeEmail, sanitizeName, sanitizePassword, InputSanitizer } from '@/utils/inputSanitization';
 import { AuthRateLimiters, rateLimitUtils } from '@/utils/rateLimiter';
 // import { checkMultipleUniqueness } from '@/utils/uniquenessValidation'; // Temporarily disabled
@@ -33,6 +34,44 @@ export default function SignUpScreen() {
   const [location, setLocation] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const handleResendConfirmation = async (email: string) => {
+    try {
+      setLoading(true);
+      console.log('Resending confirmation email for:', email);
+      
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+      });
+
+      if (error) {
+        console.error('Resend confirmation error:', error);
+        Alert.alert('Error', `Failed to resend confirmation email: ${error.message}`);
+      } else {
+        console.log('Confirmation email resent successfully');
+        Alert.alert(
+          'Email Sent!',
+          'A new confirmation email has been sent to your inbox. Please check your email and click the verification link.',
+          [
+            { text: 'OK' },
+            { 
+              text: 'Go to Verification Screen', 
+              onPress: () => router.push({
+                pathname: '/(auth)/verify-email',
+                params: { email }
+              })
+            }
+          ]
+        );
+      }
+    } catch (error: any) {
+      console.error('Resend confirmation catch error:', error);
+      Alert.alert('Error', 'Failed to resend confirmation email. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSignUp = async () => {
     // Clear previous errors
@@ -101,31 +140,54 @@ export default function SignUpScreen() {
         return;
       }
 
-      // Step 3: Pre-signup validation to handle edge cases
-      console.log('Running pre-signup validation...');
-      const preSignupResult = await validatePreSignup(sanitizedData.email);
+      // Step 3: Enhanced pre-signup validation with smart user status detection
+      console.log('Checking user status before signup...');
       
-      if (!preSignupResult.canProceed) {
-        const errorMessage = getSignupErrorMessage(preSignupResult);
-        const suggestedActions = getSignupSuggestedActions(preSignupResult);
+      try {
+        const userStatus = await checkUserStatus(sanitizedData.email);
+        console.log('User status result:', userStatus);
         
-        setErrors({ email: errorMessage });
+        if (userStatus.exists && userStatus.recommendedAction !== 'signup') {
+          setErrors({ email: userStatus.message });
+          
+          const actions = getUserStatusActions(userStatus);
+          const alertButtons = actions.map(action => ({
+            text: action.text,
+            style: action.style,
+            onPress: () => {
+              switch (action.action) {
+                case 'signin':
+                  router.replace('/(auth)/sign-in');
+                  break;
+                case 'resend':
+                  handleResendConfirmation(sanitizedData.email);
+                  break;
+                case 'signup':
+                  // Continue with signup
+                  break;
+                case 'cancel':
+                default:
+                  // Do nothing
+                  break;
+              }
+            }
+          }));
+          
+          Alert.alert(
+            userStatus.isConfirmed ? 'Account Already Verified' : 'Account Exists',
+            userStatus.message,
+            alertButtons
+          );
+          
+          setLoading(false);
+          return;
+        }
         
-        // Show detailed alert with suggested actions
-        const actionText = suggestedActions.length > 0 
-          ? '\n\nSuggested actions:\n• ' + suggestedActions.join('\n• ')
-          : '';
-        
-        Alert.alert(
-          preSignupResult.userStatus === 'confirmed' ? 'Account Already Exists' : 'Registration Issue',
-          errorMessage + actionText
-        );
-        
-        setLoading(false);
-        return;
+        console.log('Email is available - proceeding with signup');
+      } catch (statusCheckError) {
+        console.error('User status check failed:', statusCheckError);
+        // Continue with signup if check fails (fail-safe)
       }
-      
-      console.log('Pre-signup validation passed - proceeding with registration');
 
       // Step 4: Record the registration attempt
       await AuthRateLimiters.registration.recordAttempt(identifier, 'registration');

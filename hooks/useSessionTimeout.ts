@@ -8,6 +8,7 @@ import { Alert, AppState, AppStateStatus } from 'react-native';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase } from '@/lib/supabase';
 import { logSuspiciousActivity } from '@/utils/securityLogger';
+import { analyzeAuthError, handleAuthError } from '@/utils/authErrorHandler';
 
 export interface SessionTimeoutConfig {
   warningThresholdMs: number; // Show warning when this much time is left
@@ -110,14 +111,33 @@ export function useSessionTimeout(config: Partial<SessionTimeoutConfig> = {}) {
       if (error) {
         console.error('Session refresh failed:', error.message);
         
-        // Log suspicious activity if multiple refresh failures
-        if (refreshAttemptsRef.current >= 2) {
+        // Use centralized error handler for proper cleanup
+        const errorInfo = analyzeAuthError(error);
+        
+        if (errorInfo.shouldSignOut) {
+          console.log('Invalid refresh token detected, clearing session...');
+          
+          // Handle the error silently (no user alerts during auto-refresh)
+          try {
+            await handleAuthError(error);
+          } catch (handlerError) {
+            console.error('Error handler failed:', handlerError);
+          }
+          
+          // Force sign out to clear corrupted session
+          await signOut();
+          return false;
+        }
+        
+        // Log suspicious activity if multiple refresh failures (but not for invalid tokens)
+        if (refreshAttemptsRef.current >= 2 && errorInfo.type !== 'refresh_token') {
           await logSuspiciousActivity(
             user?.id,
             'multiple_session_refresh_failures',
             {
               attempts: refreshAttemptsRef.current,
               error: error.message,
+              errorType: errorInfo.type,
               userId: user?.id,
             }
           );
@@ -134,13 +154,26 @@ export function useSessionTimeout(config: Partial<SessionTimeoutConfig> = {}) {
       }
 
       return false;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Session refresh error:', error);
+      
+      // Handle unexpected errors during refresh
+      const errorInfo = analyzeAuthError(error);
+      if (errorInfo.shouldSignOut) {
+        console.log('Critical error during session refresh, signing out...');
+        try {
+          await handleAuthError(error);
+          await signOut();
+        } catch (handlerError) {
+          console.error('Failed to handle critical refresh error:', handlerError);
+        }
+      }
+      
       return false;
     } finally {
       setIsRefreshing(false);
     }
-  }, [isRefreshing, fullConfig.maxRefreshAttempts, user?.id]);
+  }, [isRefreshing, fullConfig.maxRefreshAttempts, user?.id, signOut]);
 
   /**
    * Show session expiry warning to user

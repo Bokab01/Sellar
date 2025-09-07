@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, ScrollView, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useSecureAuth } from '@/hooks/useSecureAuth';
+import { useAuthStore } from '@/store/useAuthStore';
 import { validateEmail } from '@/utils/validation';
 import { sanitizeEmail, sanitizePassword } from '@/utils/inputSanitization';
 import { AuthRateLimiters, rateLimitUtils } from '@/utils/rateLimiter';
@@ -14,20 +15,24 @@ import {
   LinkButton,
 } from '@/components';
 import { router } from 'expo-router';
-import { Mail, Lock, ArrowLeft } from 'lucide-react-native';
+import { Mail, Lock, ArrowLeft, RefreshCw } from 'lucide-react-native';
 
 export default function SignInScreen() {
   const { theme } = useTheme();
   const { secureSignIn } = useSecureAuth();
+  const { resendVerification } = useAuthStore();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
+  const [showResendOption, setShowResendOption] = useState(false);
+  const [resendingEmail, setResendingEmail] = useState(false);
 
   const handleSignIn = async () => {
-    // Clear previous errors
+    // Clear previous errors and resend option
     setEmailError('');
+    setShowResendOption(false);
 
     if (!email.trim() || !password.trim()) {
       Alert.alert('Error', 'Please fill in all fields');
@@ -84,7 +89,29 @@ export default function SignInScreen() {
         Alert.alert('MFA Required', 'Please enter your two-factor authentication code');
         // In a real app, you'd show an MFA input screen here
       } else {
-        Alert.alert('Sign In Failed', result.error || 'Unknown error occurred');
+        // Check if the error is related to email verification
+        const errorMessage = result.error || '';
+        if (errorMessage.toLowerCase().includes('email not confirmed') || 
+            errorMessage.toLowerCase().includes('email not verified') ||
+            errorMessage.toLowerCase().includes('confirm your email')) {
+          setShowResendOption(true);
+          Alert.alert(
+            'Email Not Confirmed',
+            'Please check your email and click the confirmation link to verify your account.',
+            [
+              {
+                text: 'Resend Confirmation',
+                onPress: () => handleResendConfirmation(),
+              },
+              {
+                text: 'OK',
+                style: 'cancel',
+              },
+            ]
+          );
+        } else {
+          Alert.alert('Sign In Failed', result.error || 'Unknown error occurred');
+        }
       }
     } else {
       router.replace('/(tabs)/home');
@@ -92,6 +119,35 @@ export default function SignInScreen() {
     
     setLoading(false);
   };
+
+  const handleResendConfirmation = async () => {
+    if (!email.trim()) {
+      Alert.alert('Error', 'Please enter your email address first');
+      return;
+    }
+
+    setResendingEmail(true);
+    
+    try {
+      const result = await resendVerification(email.trim());
+      
+      if (result.error) {
+        Alert.alert('Error', result.error);
+      } else {
+        Alert.alert(
+          'Confirmation Email Sent',
+          'Please check your email and click the confirmation link to verify your account.',
+          [{ text: 'OK' }]
+        );
+        setShowResendOption(false);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to resend confirmation email. Please try again.');
+    } finally {
+      setResendingEmail(false);
+    }
+  };
+
 
   return (
     <SafeAreaWrapper>
@@ -142,6 +198,8 @@ export default function SignInScreen() {
                   setEmail(text);
                   // Clear error when user starts typing
                   if (emailError) setEmailError('');
+                  // Hide resend option when user changes email
+                  if (showResendOption) setShowResendOption(false);
                 }}
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -172,6 +230,26 @@ export default function SignInScreen() {
               >
                 Sign In
               </Button>
+
+              {/* Resend Confirmation Button */}
+              {showResendOption && (
+                <Button
+                  variant="secondary"
+                  onPress={handleResendConfirmation}
+                  loading={resendingEmail}
+                  disabled={resendingEmail || !email.trim()}
+                  fullWidth
+                  size="md"
+                  style={{ marginTop: theme.spacing.lg }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+                    <RefreshCw size={16} color={theme.colors.primary} />
+                    <Text variant="button" color="primary">
+                      Resend Confirmation Email
+                    </Text>
+                  </View>
+                </Button>
+              )}
             </View>
 
             {/* Footer Links */}
@@ -195,6 +273,7 @@ export default function SignInScreen() {
                   Sign Up
                 </LinkButton>
               </View>
+
             </View>
           </View>
         </Container>

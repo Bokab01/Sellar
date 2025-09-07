@@ -14,6 +14,7 @@ import { useEffect } from 'react';
 import { securityService } from '@/lib/securityService';
 import { offlineStorage } from '@/lib/offlineStorage';
 import { memoryManager } from '@/utils/memoryManager';
+import { recoverFromCorruptedSession } from '@/utils/authErrorHandler';
 
 // App content component that uses theme context
 function AppContent() {
@@ -29,6 +30,7 @@ function AppContent() {
   // Splash screen management
   const { isAppReady, showCustomSplash, handleAppReady, handleAnimationComplete } = useSplashScreen();
 
+
   // Initialize all services
   useEffect(() => {
     const initializeServices = async () => {
@@ -36,6 +38,19 @@ function AppContent() {
       startTimer(initTimer);
 
       try {
+        // Recover from any corrupted sessions first
+        try {
+          const recovery = await recoverFromCorruptedSession();
+          if (recovery.recovered) {
+            console.log('Session recovery completed:', recovery.cleanState ? 'clean state' : 'authenticated state');
+          } else {
+            console.warn('Session recovery failed:', recovery.error);
+          }
+        } catch (error) {
+          console.error('Session recovery error:', error);
+          // Continue initialization even if recovery fails
+        }
+
         // Initialize security services
         try {
           await securityService.initialize();

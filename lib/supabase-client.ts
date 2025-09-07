@@ -175,6 +175,14 @@ export const db = {
     delete: (id: string) => supabase.from('transaction_notifications').delete().eq('id', id),
   },
   
+  // Security Events
+  security_events: {
+    insert: (data: any) => supabase.from('security_events').insert(data),
+    update: (data: any, id: string) => supabase.from('security_events').update(data).eq('id', id),
+    select: (columns = '*') => supabase.from('security_events').select(columns),
+    delete: (id: string) => supabase.from('security_events').delete().eq('id', id),
+  },
+  
   // Credit packages
   credit_packages: {
     insert: (data: any) => supabase.from('credit_packages').insert(data),
