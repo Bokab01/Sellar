@@ -11,6 +11,7 @@ import { ListingImage } from '@/components/OptimizedImage/OptimizedImage';
 import { useMemoryManager } from '@/utils/memoryManager';
 import { ImageViewer } from '@/components/ImageViewer/ImageViewer';
 import { useImageViewer } from '@/hooks/useImageViewer';
+import { Heart, Eye } from 'lucide-react-native';
 
 interface ProductCardProps {
   image: ImageSourcePropType | string | string[];
@@ -36,6 +37,12 @@ interface ProductCardProps {
   layout?: 'default' | 'grid' | 'list';
   fullWidth?: boolean; // New prop for full-width mode
   enableImageViewer?: boolean; // New prop to enable/disable ImageViewer
+  // New props for favorites and views
+  listingId?: string;
+  isFavorited?: boolean;
+  viewCount?: number;
+  onFavoritePress?: () => void;
+  onViewPress?: () => void;
 }
 
 export function ProductCard({
@@ -54,6 +61,12 @@ export function ProductCard({
   layout = 'default',
   fullWidth = false,
   enableImageViewer = true,
+  // New props for favorites and views
+  listingId,
+  isFavorited = false,
+  viewCount = 0,
+  onFavoritePress,
+  onViewPress,
 }: ProductCardProps) {
   const { theme } = useTheme();
   const { shouldLoadHeavyComponent } = useMemoryManager();
@@ -144,6 +157,62 @@ export function ProductCard({
               size={isGridLayout ? 'sm' : 'md'}
             />
           </View>
+        )}
+
+        {/* Heart/Favorite Icon */}
+        {onFavoritePress && (
+          <TouchableOpacity
+            onPress={onFavoritePress}
+            style={{
+              position: 'absolute',
+              top: theme.spacing.sm,
+              right: theme.spacing.sm,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              borderRadius: 20,
+              padding: 8,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            activeOpacity={0.7}
+          >
+            <Heart 
+              size={isGridLayout ? 16 : 18} 
+              color={isFavorited ? '#ff4757' : '#ffffff'} 
+              fill={isFavorited ? '#ff4757' : 'transparent'}
+            />
+          </TouchableOpacity>
+        )}
+
+        {/* View Count */}
+        {viewCount > 0 && (
+          <TouchableOpacity
+            onPress={onViewPress}
+            style={{
+              position: 'absolute',
+              bottom: theme.spacing.sm,
+              right: theme.spacing.sm,
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              borderRadius: 12,
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 4,
+            }}
+            activeOpacity={0.7}
+          >
+            <Eye size={12} color="#ffffff" />
+            <Text 
+              variant="caption" 
+              style={{ 
+                color: '#ffffff', 
+                fontSize: 11,
+                fontWeight: '600'
+              }}
+            >
+              {viewCount.toLocaleString()}
+            </Text>
+          </TouchableOpacity>
         )}
       </View>
 

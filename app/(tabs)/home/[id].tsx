@@ -27,6 +27,7 @@ import {
   ReviewsList,
 } from '@/components';
 import { useImageViewer } from '@/hooks/useImageViewer';
+import { useListingStats } from '@/hooks/useListingStats';
 import { Heart, Share, MessageCircle, Phone, PhoneCall, DollarSign, ArrowLeft, Package } from 'lucide-react-native';
 
 export default function ListingDetailScreen() {
@@ -93,7 +94,6 @@ export default function ListingDetailScreen() {
       checkIfFavorited();
       checkCallbackStatus();
       checkPendingOffer();
-      incrementViewCount();
       fetchRelatedItems();
     }
   }, [listingId]);
@@ -103,6 +103,18 @@ export default function ListingDetailScreen() {
       fetchRelatedItems();
     }
   }, [listing]);
+
+  // Track listing stats (favorites and views) with proper logic
+  const { 
+    isFavorited: statsIsFavorited, 
+    viewCount, 
+    toggleFavoriteStatus,
+    refreshStats 
+  } = useListingStats({ 
+    listingId: listingId || '', 
+    sellerId: listing?.user_id,
+    autoTrackView: true 
+  });
 
   // Refresh data when screen comes into focus (e.g., returning from edit screen)
   useFocusEffect(
@@ -549,6 +561,14 @@ export default function ListingDetailScreen() {
       return;
     }
 
+    // Ensure user is authenticated with Supabase
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) {
+      console.error('Session error:', sessionError);
+      Alert.alert('Authentication Error', 'Please sign in again to make offers');
+      return;
+    }
+
     if (!offerAmount.trim()) {
       Alert.alert('Error', 'Please enter an offer amount');
       return;
@@ -568,17 +588,29 @@ export default function ListingDetailScreen() {
     setSendingOffer(true);
     try {
       // Create or find conversation
-      const { data: existingConv } = await supabase
+      const { data: existingConv, error: existingConvError } = await supabase
         .from('conversations')
         .select('id')
         .eq('listing_id', listingId)
         .or(`and(participant_1.eq.${user.id},participant_2.eq.${listing.user_id}),and(participant_1.eq.${listing.user_id},participant_2.eq.${user.id})`)
         .maybeSingle();
 
+      if (existingConvError) {
+        console.error('Error finding existing conversation:', existingConvError);
+        throw new Error(`Failed to find conversation: ${existingConvError.message}`);
+      }
+
       let conversationId = (existingConv as any)?.id;
 
       if (!conversationId) {
         // Create new conversation
+        console.log('Creating new conversation with:', {
+          listing_id: listingId,
+          participant_1: user.id,
+          participant_2: listing.user_id,
+          current_user: user.id
+        });
+
         const { data: newConv, error: convError } = await supabase
           .from('conversations')
           .insert({
@@ -589,8 +621,14 @@ export default function ListingDetailScreen() {
           .select('id')
           .single();
 
-        if (convError) throw convError;
+        if (convError) {
+          console.error('Error creating conversation:', convError);
+          console.error('User ID:', user.id);
+          console.error('Listing user ID:', listing.user_id);
+          throw new Error(`Failed to create conversation: ${convError.message}`);
+        }
         conversationId = (newConv as any).id;
+        console.log('Conversation created successfully:', conversationId);
       }
 
       // Create offer message first
@@ -607,10 +645,13 @@ export default function ListingDetailScreen() {
         .select('id')
         .single();
 
-      if (messageError) throw messageError;
+      if (messageError) {
+        console.error('Error creating offer message:', messageError);
+        throw new Error(`Failed to create offer message: ${messageError.message}`);
+      }
 
       // Create offer record
-      const { error: offerError } = await dbHelpers.createOffer({
+      const { data: offerData, error: offerError } = await dbHelpers.createOffer({
         listing_id: listingId!,
         conversation_id: conversationId,
         message_id: (message as any).id,
@@ -621,7 +662,10 @@ export default function ListingDetailScreen() {
         message: offerMessage.trim() || null,
       });
 
-      if (offerError) throw offerError;
+      if (offerError) {
+        console.error('Error creating offer record:', offerError);
+        throw new Error(`Failed to create offer record: ${offerError.message}`);
+      }
 
       // Update local state
       setPendingOffer({
@@ -635,7 +679,9 @@ export default function ListingDetailScreen() {
       setOfferMessage('');
       showSuccessToast('Offer sent successfully!');
     } catch (err: any) {
-      showErrorToast('Failed to send offer');
+      console.error('Offer creation error:', err);
+      const errorMessage = err?.message || 'Failed to send offer';
+      showErrorToast(`Failed to send offer: ${errorMessage}`);
     } finally {
       setSendingOffer(false);
     }
@@ -757,7 +803,7 @@ export default function ListingDetailScreen() {
           {/* Only show favorite button if user doesn't own the listing */}
           {listing && listing.user_id !== user?.id && (
             <TouchableOpacity
-              onPress={toggleFavorite}
+              onPress={toggleFavoriteStatus}
               style={{
                 width: 40,
                 height: 40,
@@ -774,8 +820,8 @@ export default function ListingDetailScreen() {
             >
               <Heart 
                 size={20} 
-                color={isFavorited ? theme.colors.error : "white"} 
-                fill={isFavorited ? theme.colors.error : 'none'} 
+                color={statsIsFavorited ? theme.colors.error : "white"} 
+                fill={statsIsFavorited ? theme.colors.error : 'none'} 
               />
             </TouchableOpacity>
           )}
@@ -1025,10 +1071,10 @@ export default function ListingDetailScreen() {
               }}>
                 <Text style={{ fontSize: 14, color: theme.colors.primary }}>🔍</Text>
                 <Text 
-                  variant="bodySmall" 
+                  variant="caption" 
                   style={{ 
                     color: theme.colors.primary,
-                    fontWeight: '600',
+                    fontWeight: '500',
                     textTransform: 'capitalize'
                   }}
                 >
@@ -1051,10 +1097,10 @@ export default function ListingDetailScreen() {
                 }}>
                   <Text style={{ fontSize: 14, color: theme.colors.success }}>💰</Text>
                   <Text 
-                    variant="bodySmall" 
+                    variant="caption" 
                     style={{ 
                       color: theme.colors.success,
-                      fontWeight: '600'
+                      fontWeight: '500',
                     }}
                   >
                     Accepts Offers
@@ -1585,6 +1631,7 @@ export default function ListingDetailScreen() {
 
       {/* Make Offer Modal */}
       <AppModal
+      size='lg'
         visible={showOfferModal}
         onClose={() => setShowOfferModal(false)}
         title="Make an Offer"

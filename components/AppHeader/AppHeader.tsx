@@ -6,6 +6,7 @@ import { ArrowLeft } from 'lucide-react-native';
 
 interface AppHeaderProps {
   title?: string;
+  subtitle?: string;
   showBackButton?: boolean;
   showBack?: boolean;
   onBackPress?: () => void;
@@ -17,6 +18,7 @@ interface AppHeaderProps {
 
 export function AppHeader({
   title,
+  subtitle,
   showBackButton = false,
   showBack = false,
   onBackPress,
@@ -27,7 +29,7 @@ export function AppHeader({
 }: AppHeaderProps) {
   const { theme } = useTheme();
 
-  const headerHeight = Platform.OS === 'ios' ? 44 : 56;
+  const headerHeight = Platform.OS === 'ios' ? (subtitle ? 60 : 44) : (subtitle ? 72 : 56);
   const statusBarHeight = Platform.OS === 'ios' ? 44 : 24;
 
   return (
@@ -74,17 +76,33 @@ export function AppHeader({
             </View>
           )}
 
-          {title && (
-            <Text
-              variant="h3"
-              numberOfLines={1}
-              style={{
-                flex: 1,
-                textAlign: showBackButton || leftAction ? 'left' : 'center',
-              }}
-            >
-              {title}
-            </Text>
+          {(title || subtitle) && (
+            <View style={{ flex: 1, alignItems: showBackButton || leftAction ? 'flex-start' : 'center' }}>
+              {title && (
+                <Text
+                  variant="h3"
+                  numberOfLines={1}
+                  style={{
+                    textAlign: showBackButton || leftAction ? 'left' : 'center',
+                  }}
+                >
+                  {title}
+                </Text>
+              )}
+              {subtitle && (
+                <Text
+                  variant="caption"
+                  color="muted"
+                  numberOfLines={1}
+                  style={{
+                    textAlign: showBackButton || leftAction ? 'left' : 'center',
+                    marginTop: 2,
+                  }}
+                >
+                  {subtitle}
+                </Text>
+              )}
+            </View>
           )}
         </View>
 

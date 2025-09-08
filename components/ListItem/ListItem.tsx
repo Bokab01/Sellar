@@ -101,7 +101,7 @@ export function ListItem({
             style={{
               flex: 1,
               fontWeight: unreadCount ? '600' : '500',
-              marginRight: theme.spacing.sm,
+              marginRight: unreadCount ? theme.spacing.lg : theme.spacing.sm,
             }}
           >
             {title}

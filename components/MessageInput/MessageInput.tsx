@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, TouchableOpacity, TextInput } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
+import { Text } from '@/components/Typography/Text';
 import { Button } from '@/components/Button/Button';
 import { usePresence } from '@/hooks/usePresence';
 import { Send, Paperclip, Camera, Mic, Image as ImageIcon } from 'lucide-react-native';
@@ -157,11 +158,39 @@ export function MessageInput({
             minHeight: 44,
           }}
         >
+          {/* Custom placeholder overlay for single-line display */}
+          {!value && (
+            <View
+              style={{
+                position: 'absolute',
+                left: theme.spacing.md,
+                top: theme.spacing.sm + 2, // Adjust vertical alignment
+                right: theme.spacing.md,
+                pointerEvents: 'none',
+                zIndex: 1,
+                justifyContent: 'center',
+              }}
+            >
+              <Text
+                variant="body"
+                color="muted"
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                style={{
+                  fontSize: 16,
+                  lineHeight: 20,
+                }}
+              >
+                {placeholder}
+              </Text>
+            </View>
+          )}
+          
           <TextInput
             value={value}
             onChangeText={handleTextChange}
-            placeholder={placeholder}
-            placeholderTextColor={theme.colors.text.muted}
+            placeholder=""
+            placeholderTextColor="transparent"
             multiline
             style={{
               fontSize: 16,

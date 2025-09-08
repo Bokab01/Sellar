@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -7,6 +7,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { useListings } from '@/hooks/useListings';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useProfile } from '@/hooks/useProfile';
+import { useMultipleListingStats } from '@/hooks/useListingStats';
 // Temporarily disabled performance hooks to debug infinite re-render
 // import { useOfflineListings, useOfflineSync } from '@/hooks/useOfflineSync';
 // import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
@@ -306,7 +307,7 @@ export default function HomeScreen() {
   // Removed useFocusEffect to prevent blinking - relying on enhanced real-time updates
 
   // Transform database listings to component format with professional styling
-  const transformedProducts = products.map((listing: any) => {
+  const transformedProducts = useMemo(() => products.map((listing: any) => {
     // Handle both joined and simple listing data
     const seller = listing.profiles || null;
     const badges = [];
@@ -348,6 +349,17 @@ export default function HomeScreen() {
       isVerified: seller?.is_verified || false,
       category: listing.categories?.name || 'General',
     };
+  }), [products]);
+
+  // Get listing IDs for stats (memoized to prevent infinite re-renders)
+  const listingIds = useMemo(() => 
+    transformedProducts.map(product => product.id), 
+    [transformedProducts]
+  );
+  
+  // Get favorites and view counts for all listings
+  const { favorites, viewCounts, refreshStats } = useMultipleListingStats({ 
+    listingIds 
   });
 
   const handleCategoryToggle = (categoryId: string) => {
@@ -798,7 +810,24 @@ export default function HomeScreen() {
                       location={product.location}
                       layout="grid"
                       fullWidth={true}
+                      listingId={product.id}
+                      isFavorited={favorites[product.id] || false}
+                      viewCount={viewCounts[product.id] || 0}
                       onPress={() => router.push(`/(tabs)/home/${product.id}`)}
+                      onFavoritePress={() => {
+                        // Handle favorite toggle
+                        import('@/lib/favoritesAndViews').then(({ toggleFavorite }) => {
+                          toggleFavorite(product.id).then((result) => {
+                            if (!result.error) {
+                              refreshStats(); // Refresh the stats
+                            }
+                          });
+                        });
+                      }}
+                      onViewPress={() => {
+                        // Navigate to listing detail to see more details
+                        router.push(`/(tabs)/home/${product.id}`);
+                      }}
                     />
                     
                     {/* Professional Badges Overlay */}

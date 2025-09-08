@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, TouchableOpacity, Linking } from 'react-native';
+import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, TouchableOpacity, Linking, Image } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useMessages } from '@/hooks/useChat';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useChatStore } from '@/store/useChatStore';
 import { dbHelpers, supabase } from '@/lib/supabase';
+import { acceptOfferById, rejectOfferById } from '@/lib/offerStateMachine';
 import {
   Text,
   SafeAreaWrapper,
@@ -25,7 +26,7 @@ import {
   Avatar,
   Badge,
 } from '@/components';
-import { Phone, Video, MoveVertical as MoreVertical, DollarSign, Info, Eye } from 'lucide-react-native';
+import { Phone, Info, Eye, MessageCircle, EllipsisVertical } from 'lucide-react-native';
 
 export default function ChatScreen() {
   const { theme } = useTheme();
@@ -33,7 +34,7 @@ export default function ChatScreen() {
   const { user } = useAuthStore();
   const { draftMessages, setDraftMessage, clearDraftMessage, markAsRead } = useChatStore();
   
-  const { messages, loading, error, sendMessage } = useMessages(conversationId!);
+  const { messages, loading, error, sendMessage, markMessagesAsRead, refresh: refreshMessages } = useMessages(conversationId!);
   
   const [messageText, setMessageText] = useState('');
   const [showOfferModal, setShowOfferModal] = useState(false);
@@ -41,9 +42,11 @@ export default function ChatScreen() {
   const [offerAmount, setOfferAmount] = useState('');
   const [offerMessage, setOfferMessage] = useState('');
   const [sendingOffer, setSendingOffer] = useState(false);
+  const [counteringOfferId, setCounteringOfferId] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
+  const [lastSeenText, setLastSeenText] = useState('');
   
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -55,7 +58,9 @@ export default function ChatScreen() {
   useEffect(() => {
     if (conversationId) {
       fetchConversationDetails();
-      markAsRead(conversationId);
+      markAsRead(conversationId); // Update local state (may be blocked if manually marked as unread)
+      markMessagesAsRead(); // Update database (should always work)
+      console.log('📱 Chat detail screen loaded for conversation:', conversationId);
     }
   }, [conversationId]);
 
@@ -81,18 +86,34 @@ export default function ChatScreen() {
     }
   }, [messages.length]);
 
+  // Update last seen text
+  useEffect(() => {
+    if (otherUser) {
+      setLastSeenText(getLastSeenText());
+      
+      // Update every minute for real-time updates
+      const interval = setInterval(() => {
+        setLastSeenText(getLastSeenText());
+      }, 60000); // Update every minute
+      
+      return () => clearInterval(interval);
+    }
+  }, [otherUser]);
+
   const fetchConversationDetails = async () => {
     try {
-      const { data, error } = await dbHelpers.getConversations(user!.id);
-      if (data) {
-        const conv = (data as any).find((c: any) => c.id === conversationId);
-        if (conv) {
-          setConversation(conv);
-          const otherParticipant = (conv as any).participant_1_profile?.id === user!.id 
-            ? (conv as any).participant_2_profile 
-            : (conv as any).participant_1_profile;
-          setOtherUser(otherParticipant);
-        }
+      const { data: conv, error } = await dbHelpers.getConversation(conversationId!, user!.id);
+      if (error) {
+        console.error('Failed to fetch conversation details:', error);
+        return;
+      }
+      
+      if (conv) {
+        setConversation(conv);
+        const otherParticipant = conv.participant_1_profile?.id === user!.id 
+          ? conv.participant_2_profile 
+          : conv.participant_1_profile;
+        setOtherUser(otherParticipant);
       }
     } catch (err) {
       console.error('Failed to fetch conversation details:', err);
@@ -151,7 +172,7 @@ export default function ChatScreen() {
       if (messageError) throw messageError;
 
       // Create offer record
-      const { error: offerError } = await dbHelpers.createOffer({
+      const offerData = {
         listing_id: conversation?.listing_id!,
         conversation_id: conversationId!,
         message_id: message.id,
@@ -160,7 +181,12 @@ export default function ChatScreen() {
         amount,
         currency: 'GHS',
         message: offerMessage.trim() || null,
-      });
+        status: 'pending',
+      };
+      
+      console.log('🎯 Creating offer with data:', offerData);
+      const { data: createdOffer, error: offerError } = await dbHelpers.createOffer(offerData);
+      console.log('🎯 Offer creation result:', { createdOffer, offerError });
 
       if (offerError) throw offerError;
 
@@ -177,23 +203,144 @@ export default function ChatScreen() {
 
   const handleOfferAction = async (offerId: string, action: 'accept' | 'reject') => {
     try {
-      // Update offer status
-      const { error } = await dbHelpers.updateOfferStatus(offerId, action === 'accept' ? 'accepted' : 'rejected');
+      console.log('🎯 Handling offer action:', { offerId, action, userId: user?.id, userType: typeof user?.id });
       
-      if (error) {
-        throw new Error(error.message);
+      if (!user?.id) {
+        throw new Error('User not authenticated');
       }
 
-      // Send system message
+      // Use direct Supabase query instead of the helper function
+      console.log('🎯 Using direct Supabase query to update offer:', { offerId, action });
+      
+      const newStatus = action === 'accept' ? 'accepted' : 'rejected';
+      
+      // First, check if the offer exists
+      console.log('🎯 Checking if offer exists...');
+      const { data: existingOffer, error: checkError } = await supabase
+        .from('offers')
+        .select('id, status, buyer_id, seller_id')
+        .eq('id', offerId)
+        .single();
+      
+      console.log('🎯 Offer check result:', { existingOffer, checkError });
+      
+      if (checkError || !existingOffer) {
+        throw new Error(`Offer not found: ${checkError?.message || 'Offer does not exist'}`);
+      }
+      
+      // Check user permissions
+      console.log('🎯 Checking user permissions:', {
+        currentUserId: user.id,
+        offerBuyerId: existingOffer.buyer_id,
+        offerSellerId: existingOffer.seller_id,
+        isBuyer: user.id === existingOffer.buyer_id,
+        isSeller: user.id === existingOffer.seller_id,
+        canUpdate: user.id === existingOffer.buyer_id || user.id === existingOffer.seller_id
+      });
+      
+      if (user.id !== existingOffer.buyer_id && user.id !== existingOffer.seller_id) {
+        throw new Error('You do not have permission to update this offer. Only the buyer or seller can update it.');
+      }
+      
+      console.log('🎯 Found offer, proceeding with update...');
+      
+      // Direct update using Supabase client
+      const { data, error } = await supabase
+        .from('offers')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', offerId)
+        .select();
+      
+      console.log('🎯 Direct update result:', { data, error });
+      
+      if (error) {
+        console.error('🎯 Direct update error:', error);
+        throw new Error(`Database error: ${error.message}`);
+      }
+      
+      if (!data || data.length === 0) {
+        console.error('🎯 No rows updated:', { offerId, newStatus });
+        throw new Error('No offer was updated. The offer may not exist or you may not have permission to update it.');
+      }
+      
+      console.log('🎯 Successfully updated offer:', data[0]);
+
+      // If offer was accepted, handle the acceptance flow
+      if (action === 'accept') {
+        await handleOfferAcceptance(offerId, data[0]);
+      }
+
+      // Refresh messages to show updated offer status
+      setTimeout(() => {
+        refreshMessages();
+      }, 500); // Small delay to ensure database update is complete
+
+      // Determine the correct message based on user role
+      // We need to check the offer data to see who is the seller vs buyer
       const systemMessage = action === 'accept' 
-        ? `✅ Offer accepted! The seller has accepted your offer.`
-        : `❌ Offer declined. The seller has declined your offer.`;
+        ? `✅ Offer accepted! The listing has been reserved for you. Please complete the transaction within 48 hours.`
+        : `❌ Offer declined. The offer has been declined.`;
       
       await sendMessage(systemMessage, 'system');
       
       showSuccessToast(action === 'accept' ? 'Offer accepted!' : 'Offer declined');
+      
     } catch (err) {
-      showErrorToast(`Failed to ${action} offer`);
+      console.error('🎯 Error in handleOfferAction:', err);
+      showErrorToast(`Failed to ${action} offer: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleOfferAcceptance = async (offerId: string, acceptedOffer: any) => {
+    try {
+      console.log('🎯 Handling offer acceptance:', { offerId, acceptedOffer });
+
+      // 1. Update listing status to 'reserved'
+      if (conversation?.listing_id) {
+        console.log('🎯 Updating listing status to reserved:', conversation.listing_id);
+        const { error: listingError } = await supabase
+          .from('listings')
+          .update({ 
+            status: 'reserved',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', conversation.listing_id);
+
+        if (listingError) {
+          console.error('🎯 Error updating listing status:', listingError);
+        } else {
+          console.log('🎯 Successfully updated listing status to reserved');
+        }
+      }
+
+      // 2. Reject all other pending offers for this listing
+      console.log('🎯 Rejecting other pending offers for this listing');
+      const { error: rejectError } = await supabase
+        .from('offers')
+        .update({ 
+          status: 'rejected',
+          updated_at: new Date().toISOString()
+        })
+        .eq('listing_id', conversation?.listing_id)
+        .eq('status', 'pending')
+        .neq('id', offerId); // Don't reject the accepted offer
+
+      if (rejectError) {
+        console.error('🎯 Error rejecting other offers:', rejectError);
+      } else {
+        console.log('🎯 Successfully rejected other pending offers');
+      }
+
+      // 3. Create a transaction record (if you have a transactions table)
+      // This would link the buyer, seller, listing, and offer
+      console.log('🎯 Offer acceptance flow completed successfully');
+
+    } catch (err) {
+      console.error('🎯 Error in handleOfferAcceptance:', err);
+      // Don't throw error here - the offer was still accepted
     }
   };
 
@@ -209,11 +356,39 @@ export default function ChatScreen() {
       return;
     }
 
+    // Check if there's already a pending offer from the current user that hasn't been responded to
+    // Allow counter offers if the user's previous offer was "countered" (meaning the other person responded)
+    const userOffers = messages
+      .flatMap((msg: any) => msg.offers || [])
+      .filter((offer: any) => offer.buyer_id === user?.id)
+      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    const lastUserOffer = userOffers[0];
+    
+    if (lastUserOffer && lastUserOffer.status === 'pending') {
+      Alert.alert('Error', 'You already have a pending offer. Please wait for a response before making another offer.');
+      return;
+    }
+
+    // Check 3-attempt limit for rejected offers
+    const rejectedOffers = userOffers.filter((offer: any) => offer.status === 'rejected');
+    if (rejectedOffers.length >= 3) {
+      Alert.alert(
+        'Offer Limit Reached', 
+        'You have reached the maximum of 3 offer attempts for this listing. Please contact the seller directly or try a different listing.',
+        [
+          { text: 'OK', style: 'default' }
+        ]
+      );
+      return;
+    }
+
     setSendingOffer(true);
     try {
       // Create counter offer message
       const counterContent = `💰 Counter Offer: GHS ${(amount || 0).toLocaleString()}${offerMessage ? `\n\n"${offerMessage}"` : ''}`;
       
+      console.log('🎯 Creating counter offer message...');
       const { data: message, error: messageError } = await supabase
         .from('messages')
         .insert({
@@ -228,29 +403,93 @@ export default function ChatScreen() {
             listing_id: conversation?.listing_id,
           },
         })
-        .select('id')
-        .single();
+        .select('id');
 
-      if (messageError) throw messageError;
+      console.log('🎯 Message creation result:', { message, messageError });
 
-      // Create counter offer record
-      const { error: offerError } = await dbHelpers.createOffer({
+      if (messageError) {
+        console.error('🎯 Message creation error:', messageError);
+        throw new Error(`Failed to create message: ${messageError.message}`);
+      }
+
+      if (!message || message.length === 0) {
+        throw new Error('Failed to create message: No data returned');
+      }
+
+      const messageId = message[0].id;
+
+      // Create counter offer record using direct Supabase query
+      // For counter offers, the current user becomes the buyer (making the offer)
+      // and the other user becomes the seller (receiving the offer)
+      console.log('🎯 Creating counter offer with data:', {
         listing_id: conversation?.listing_id!,
         conversation_id: conversationId!,
-        message_id: message.id,
-        buyer_id: otherUser?.id!,
-        seller_id: user!.id,
+        message_id: messageId,
+        buyer_id: user!.id, // Current user is the buyer (making the counter offer)
+        seller_id: otherUser?.id!, // Other user is the seller (receiving the counter offer)
+        parent_offer_id: counteringOfferId, // Link to the original offer
         amount,
         currency: 'GHS',
         message: offerMessage.trim() || null,
+        status: 'pending',
       });
 
-      if (offerError) throw offerError;
+      const { data: counterOffer, error: offerError } = await supabase
+        .from('offers')
+        .insert({
+          listing_id: conversation?.listing_id!,
+          conversation_id: conversationId!,
+          message_id: messageId,
+          buyer_id: user!.id, // Current user is the buyer
+          seller_id: otherUser?.id!, // Other user is the seller
+          parent_offer_id: counteringOfferId, // Link to the original offer
+          amount,
+          currency: 'GHS',
+          message: offerMessage.trim() || null,
+          status: 'pending',
+        })
+        .select();
+
+      console.log('🎯 Counter offer creation result:', { counterOffer, offerError });
+
+      if (offerError) {
+        console.error('🎯 Counter offer creation error:', offerError);
+        throw new Error(`Failed to create counter offer: ${offerError.message}`);
+      }
+
+      if (!counterOffer || counterOffer.length === 0) {
+        throw new Error('Failed to create counter offer: No data returned');
+      }
+
+      // Update the original offer's status to "countered"
+      if (counteringOfferId) {
+        console.log('🎯 Updating original offer status to countered:', counteringOfferId);
+        const { error: updateOriginalError } = await supabase
+          .from('offers')
+          .update({ 
+            status: 'countered',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', counteringOfferId);
+
+        if (updateOriginalError) {
+          console.error('🎯 Error updating original offer:', updateOriginalError);
+          // Don't throw error here, just log it - the counter offer was still created
+        } else {
+          console.log('🎯 Successfully updated original offer status to countered');
+        }
+      }
 
       setShowCounterModal(false);
       setOfferAmount('');
       setOfferMessage('');
+      setCounteringOfferId(null);
       showSuccessToast('Counter offer sent!');
+      
+      // Refresh messages to show updated offer statuses
+      setTimeout(() => {
+        refreshMessages();
+      }, 500);
     } catch (err) {
       showErrorToast('Failed to send counter offer');
     } finally {
@@ -312,8 +551,12 @@ export default function ChatScreen() {
     );
   }
 
+  const truncateText = (text: string, maxLength: number = 30) => {
+    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+  };
+
   const getLastSeenText = () => {
-    if (!otherUser?.last_seen) return '';
+    if (!otherUser?.last_seen) return 'Last seen unknown';
     
     if (otherUser.is_online) {
       return 'Online now';
@@ -325,19 +568,51 @@ export default function ChatScreen() {
     const diffMins = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
+    const diffWeeks = Math.floor(diffDays / 7);
+    const diffMonths = Math.floor(diffDays / 30);
     
+    // Handle edge cases
+    if (diffMs < 0) return 'Just now'; // Future time (clock sync issues)
+    
+    // Recent activity
     if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffMins < 60) return `Last seen ${diffMins} minute${diffMins === 1 ? '' : 's'} ago`;
     
-    return lastSeen.toLocaleDateString();
+    // Hours
+    if (diffHours < 24) {
+      if (diffHours === 1) return 'Last seen 1 hour ago';
+      return `Last seen ${diffHours} hours ago`;
+    }
+    
+    // Days
+    if (diffDays < 7) {
+      if (diffDays === 1) return 'Last seen yesterday';
+      return `Last seen ${diffDays} days ago`;
+    }
+    
+    // Weeks
+    if (diffWeeks < 4) {
+      if (diffWeeks === 1) return 'Last seen 1 week ago';
+      return `Last seen ${diffWeeks} weeks ago`;
+    }
+    
+    // Months
+    if (diffMonths < 12) {
+      if (diffMonths === 1) return 'Last seen 1 month ago';
+      return `Last seen ${diffMonths} months ago`;
+    }
+    
+    // Years
+    const diffYears = Math.floor(diffMonths / 12);
+    if (diffYears === 1) return 'Last seen 1 year ago';
+    return `Last seen ${diffYears} years ago`;
   };
 
   return (
     <SafeAreaWrapper>
       <AppHeader
-        title={otherUser ? `${otherUser.first_name} ${otherUser.last_name}` : 'Chat'}
+        title={otherUser ? `${otherUser.first_name || 'User'} ${otherUser.last_name || ''}`.trim() : 'Chat'}
+        subtitle={otherUser ? lastSeenText : ''}
         showBackButton
         onBackPress={() => router.back()}
         rightActions={[
@@ -349,7 +624,7 @@ export default function ChatScreen() {
               onPress={() => {
                 Alert.alert(
                   'Call User',
-                  `Call ${otherUser.first_name}?`,
+                  `Call ${otherUser.first_name || 'User'}?`,
                   [
                     { text: 'Cancel', style: 'cancel' },
                     { text: 'Call', onPress: () => Linking.openURL(`tel:${otherUser.phone}`) },
@@ -361,7 +636,7 @@ export default function ChatScreen() {
           <Button
             key="more-options"
             variant="icon"
-            icon={<MoreVertical size={20} color={theme.colors.text.primary} />}
+            icon={<EllipsisVertical size={20} color={theme.colors.text.primary} />}
             onPress={() => {
               Alert.alert('Coming Soon', 'More options will be available soon');
             }}
@@ -370,9 +645,9 @@ export default function ChatScreen() {
       />
 
       {/* Listing Context Banner */}
-      {conversation?.listings && (
+      {conversation?.listing?.title && conversation?.listing?.id && (
         <TouchableOpacity
-          onPress={() => router.push(`/(tabs)/home/${conversation.listings.id}`)}
+          onPress={() => router.push(`/(tabs)/home/${conversation.listing.id}`)}
           style={{
             backgroundColor: theme.colors.primary + '10',
             borderBottomWidth: 1,
@@ -383,30 +658,90 @@ export default function ChatScreen() {
           activeOpacity={0.7}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+            {/* Listing Image */}
             <View
               style={{
-                backgroundColor: theme.colors.primary,
+                width: 48,
+                height: 48,
                 borderRadius: theme.borderRadius.sm,
-                padding: theme.spacing.sm,
+                overflow: 'hidden',
+                backgroundColor: theme.colors.surfaceVariant,
               }}
             >
-              <Eye size={16} color={theme.colors.primaryForeground} />
+              {conversation.listing.images && conversation.listing.images.length > 0 ? (
+                <Image
+                  source={{ uri: conversation.listing.images[0] }}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                  }}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    backgroundColor: theme.colors.primary,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Eye size={16} color={theme.colors.primaryForeground} />
+                </View>
+              )}
             </View>
+            
             <View style={{ flex: 1 }}>
               <Text variant="bodySmall" style={{ fontWeight: '600', color: theme.colors.primary }}>
-                💼 About: {conversation.listings.title}
+                💼 About: {conversation.listing.title}
               </Text>
-              <PriceDisplay
-                amount={conversation.listings.price}
-                size="sm"
-                style={{ marginTop: theme.spacing.xs }}
-              />
+              {conversation.listing.price && (
+                <PriceDisplay
+                  amount={conversation.listing.price}
+                  size="sm"
+                  style={{ marginTop: theme.spacing.xs }}
+                />
+              )}
             </View>
             <Text variant="caption" style={{ color: theme.colors.primary }}>
               View Listing →
             </Text>
           </View>
         </TouchableOpacity>
+      )}
+
+      {/* General Conversation Banner (when no listing) */}
+      {!conversation?.listing?.title && (
+        <View
+          style={{
+            backgroundColor: theme.colors.surfaceVariant,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.colors.border,
+            paddingHorizontal: theme.spacing.lg,
+            paddingVertical: theme.spacing.md,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+            <View
+              style={{
+                backgroundColor: theme.colors.text.muted,
+                borderRadius: theme.borderRadius.sm,
+                padding: theme.spacing.sm,
+              }}
+            >
+              <MessageCircle size={16} color={theme.colors.background} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text variant="bodySmall" style={{ fontWeight: '600', color: theme.colors.text.primary }}>
+                💬 General Conversation
+              </Text>
+              <Text variant="caption" style={{ color: theme.colors.text.muted, marginTop: theme.spacing.xs }}>
+                Chat with {otherUser?.first_name ? otherUser.first_name : 'User'}
+              </Text>
+            </View>
+          </View>
+        </View>
       )}
 
       <KeyboardAvoidingView
@@ -424,8 +759,8 @@ export default function ChatScreen() {
           {messages.length === 0 ? (
             <EmptyState
               title="Start the conversation"
-              description={conversation?.listings 
-                ? `Send a message about "${conversation.listings.title}"`
+              description={conversation?.listing?.title 
+                ? `Send a message about "${conversation.listing.title}"`
                 : "Send a message to begin chatting"
               }
             />
@@ -436,9 +771,31 @@ export default function ChatScreen() {
                 hour: '2-digit',
                 minute: '2-digit',
               });
+              
+              // Ensure message content is safe
+              const safeMessageContent = String(message.content || '');
 
               if (message.message_type === 'offer') {
                 const offer = message.offers?.[0];
+                console.log('🎯 Offer data:', { offer, messageId: message.id, messageType: message.message_type, offersArray: message.offers });
+                
+                // If offer is undefined, try to fetch it manually
+                if (!offer && message.offers && message.offers.length === 0) {
+                  console.log('🎯 No offer found for message, this might be an old offer message without proper offer data');
+                  // For now, render as a regular message if no offer data is available
+                  return (
+                    <ChatBubble
+                      key={message.id}
+                      message={safeMessageContent}
+                      isOwn={isOwn}
+                      timestamp={timestamp}
+                      type={message.message_type}
+                      status={message.status}
+                      senderName={!isOwn ? `${message.sender?.first_name || 'User'} ${message.sender?.last_name || ''}`.trim() : undefined}
+                    />
+                  );
+                }
+                
                 if (offer) {
                   return (
                     <View key={message.id} style={{ paddingHorizontal: theme.spacing.lg }}>
@@ -447,21 +804,36 @@ export default function ChatScreen() {
                           id: offer.id,
                           amount: offer.amount,
                           currency: offer.currency,
-                          originalPrice: conversation?.listings?.price,
+                          originalPrice: conversation?.listing?.price,
                           status: offer.status,
                           timestamp,
                           expiresAt: offer.expires_at,
                           buyer: {
-                            name: `${message.sender?.first_name} ${message.sender?.last_name}`,
+                            name: `${message.sender?.first_name || 'User'} ${message.sender?.last_name || ''}`.trim(),
                             avatar: message.sender?.avatar_url,
                             rating: message.sender?.rating,
                           },
-                          message: offer.message,
+                          message: offer.message ? String(offer.message) : undefined,
                           isOwn,
                         }}
-                        onAccept={() => handleOfferAction(offer.id, 'accept')}
-                        onReject={() => handleOfferAction(offer.id, 'reject')}
+                        onAccept={() => {
+                          console.log('🎯 Accept button clicked for offer:', { 
+                            offerId: offer.id, 
+                            offerType: typeof offer.id,
+                            fullOffer: offer 
+                          });
+                          handleOfferAction(offer.id, 'accept');
+                        }}
+                        onReject={() => {
+                          console.log('🎯 Reject button clicked for offer:', { 
+                            offerId: offer.id, 
+                            offerType: typeof offer.id,
+                            fullOffer: offer 
+                          });
+                          handleOfferAction(offer.id, 'reject');
+                        }}
                         onCounter={() => {
+                          setCounteringOfferId(offer.id);
                           setShowCounterModal(true);
                           setOfferAmount('');
                           setOfferMessage('');
@@ -494,7 +866,7 @@ export default function ChatScreen() {
                           fontWeight: '500',
                         }}
                       >
-                        {message.content}
+                        {safeMessageContent}
                       </Text>
                     </View>
                   </View>
@@ -504,12 +876,12 @@ export default function ChatScreen() {
               return (
                 <ChatBubble
                   key={message.id}
-                  message={message.content}
+                  message={safeMessageContent}
                   isOwn={isOwn}
                   timestamp={timestamp}
                   type={message.message_type}
                   status={message.status}
-                  senderName={!isOwn ? `${message.sender?.first_name} ${message.sender?.last_name}` : undefined}
+                  senderName={!isOwn ? `${message.sender?.first_name || 'User'} ${message.sender?.last_name || ''}`.trim() : undefined}
                 />
               );
             })
@@ -528,7 +900,7 @@ export default function ChatScreen() {
                 }}
               >
                 <Text variant="bodySmall" color="muted" style={{ fontStyle: 'italic' }}>
-                  {otherUser?.first_name} is typing...
+                  {otherUser?.first_name ? `${otherUser.first_name} is typing...` : 'User is typing...'}
                 </Text>
               </View>
             </View>
@@ -544,49 +916,15 @@ export default function ChatScreen() {
             Alert.alert('Coming Soon', 'Camera feature will be available soon');
           }}
           onImagePicker={() => Alert.alert('Coming Soon', 'Image sharing feature will be available soon')}
-          placeholder={conversation?.listings 
-            ? `Message about ${conversation.listings.title}...`
-            : "Type a message..."
-          }
+          placeholder={conversation?.listing?.title 
+            ? `Message about ${truncateText(String(conversation.listing.title))}...` 
+            : "Type a message..."}
           style={{
             borderTopWidth: 1,
             borderTopColor: theme.colors.border,
           }}
         />
 
-        {/* Quick Actions */}
-        {conversation?.listings && (
-          <View
-            style={{
-              backgroundColor: theme.colors.surface,
-              borderTopWidth: 1,
-              borderTopColor: theme.colors.border,
-              paddingHorizontal: theme.spacing.lg,
-              paddingVertical: theme.spacing.md,
-            }}
-          >
-            <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
-              <Button
-                variant="secondary"
-                icon={<DollarSign size={18} color={theme.colors.primary} />}
-                onPress={() => setShowOfferModal(true)}
-                style={{ flex: 1 }}
-                size="sm"
-              >
-                Make Offer
-              </Button>
-              
-              <Button
-                variant="tertiary"
-                onPress={() => router.push(`/(tabs)/home/${conversation.listings.id}`)}
-                style={{ flex: 1 }}
-                size="sm"
-              >
-                View Listing
-              </Button>
-            </View>
-          </View>
-        )}
       </KeyboardAvoidingView>
 
       {/* Make Offer Modal */}
@@ -594,6 +932,7 @@ export default function ChatScreen() {
         visible={showOfferModal}
         onClose={() => setShowOfferModal(false)}
         title="Make an Offer"
+        size="lg"
         primaryAction={{
           text: 'Send Offer',
           onPress: handleSendOffer,
@@ -605,7 +944,7 @@ export default function ChatScreen() {
         }}
       >
         <View style={{ gap: theme.spacing.lg }}>
-          {conversation?.listings && (
+          {conversation?.listing?.title && (
             <View
               style={{
                 backgroundColor: theme.colors.surfaceVariant,
@@ -617,12 +956,14 @@ export default function ChatScreen() {
                 Making offer for:
               </Text>
               <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.sm }}>
-                {conversation.listings.title}
+                {conversation.listing.title}
               </Text>
-              <PriceDisplay
-                amount={conversation.listings.price}
-                size="md"
-              />
+              {conversation.listing.price && (
+                <PriceDisplay
+                  amount={conversation.listing.price}
+                  size="md"
+                />
+              )}
             </View>
           )}
 
@@ -632,8 +973,8 @@ export default function ChatScreen() {
             value={offerAmount}
             onChangeText={setOfferAmount}
             keyboardType="numeric"
-            helper={conversation?.listings 
-              ? `Current price: GHS ${(conversation.listings.price || 0).toLocaleString()}`
+            helper={conversation?.listing?.price 
+              ? `Current price: GHS ${(conversation.listing.price || 0).toLocaleString()}`
               : undefined
             }
           />
@@ -654,6 +995,7 @@ export default function ChatScreen() {
         visible={showCounterModal}
         onClose={() => setShowCounterModal(false)}
         title="Make Counter Offer"
+        size="lg"
         primaryAction={{
           text: 'Send Counter Offer',
           onPress: handleCounterOffer,

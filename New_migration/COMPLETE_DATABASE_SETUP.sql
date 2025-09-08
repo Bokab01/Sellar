@@ -2033,25 +2033,59 @@ CREATE POLICY "System can manage transaction notifications" ON transaction_notif
 CREATE POLICY "Users can view active listings" ON listings FOR SELECT USING (status = 'active');
 CREATE POLICY "Users can manage own listings" ON listings FOR ALL USING (auth.uid() = user_id);
 
+-- Conversations RLS policies
+CREATE POLICY "Users can view conversations they participate in" ON conversations
+    FOR SELECT USING (
+        auth.uid() = participant_1 OR 
+        auth.uid() = participant_2
+    );
+
+CREATE POLICY "Users can create conversations" ON conversations
+    FOR INSERT WITH CHECK (
+        auth.uid() = participant_1 OR 
+        auth.uid() = participant_2
+    );
+
+CREATE POLICY "Users can update conversations they participate in" ON conversations
+    FOR UPDATE USING (
+        auth.uid() = participant_1 OR 
+        auth.uid() = participant_2
+    );
+
 -- Messages RLS policies
 CREATE POLICY "Users can view messages in their conversations" ON messages FOR SELECT USING (
-    conversation_id IN (
-        SELECT id FROM conversations 
-        WHERE participant_1 = auth.uid() OR participant_2 = auth.uid()
+    EXISTS (
+        SELECT 1 FROM conversations 
+        WHERE conversations.id = messages.conversation_id 
+        AND (conversations.participant_1 = auth.uid() OR conversations.participant_2 = auth.uid())
     )
 );
-CREATE POLICY "Users can send messages in their conversations" ON messages FOR INSERT WITH CHECK (
-    conversation_id IN (
-        SELECT id FROM conversations 
-        WHERE participant_1 = auth.uid() OR participant_2 = auth.uid()
+CREATE POLICY "Users can create messages in their conversations" ON messages FOR INSERT WITH CHECK (
+    auth.uid() = sender_id AND
+    EXISTS (
+        SELECT 1 FROM conversations 
+        WHERE conversations.id = messages.conversation_id 
+        AND (conversations.participant_1 = auth.uid() OR conversations.participant_2 = auth.uid())
     )
+);
+CREATE POLICY "Users can update their own messages" ON messages FOR UPDATE USING (
+    auth.uid() = sender_id
 );
 
 -- Offers RLS policies
 CREATE POLICY "Users can view offers they're involved in" ON offers FOR SELECT USING (
     buyer_id = auth.uid() OR seller_id = auth.uid()
 );
-CREATE POLICY "Users can create offers" ON offers FOR INSERT WITH CHECK (buyer_id = auth.uid());
+CREATE POLICY "Users can create offers" ON offers FOR INSERT WITH CHECK (
+    auth.uid() = buyer_id AND
+    auth.uid() != seller_id
+);
+CREATE POLICY "Sellers can update their offers" ON offers FOR UPDATE USING (
+    auth.uid() = seller_id
+);
+CREATE POLICY "Buyers can update their own offers" ON offers FOR UPDATE USING (
+    auth.uid() = buyer_id
+);
 
 -- Additional RLS policies for new tables
 
@@ -3676,11 +3710,19 @@ CREATE INDEX idx_listings_search_vector ON listings USING GIN(search_vector);
 CREATE INDEX idx_messages_conversation_id ON messages(conversation_id);
 CREATE INDEX idx_messages_sender_id ON messages(sender_id);
 CREATE INDEX idx_messages_created_at ON messages(created_at);
+CREATE INDEX idx_messages_message_type ON messages(message_type);
+
+-- Conversations indexes
+CREATE INDEX idx_conversations_participant_1 ON conversations(participant_1);
+CREATE INDEX idx_conversations_participant_2 ON conversations(participant_2);
+CREATE INDEX idx_conversations_listing_id ON conversations(listing_id);
+CREATE INDEX idx_conversations_status ON conversations(status);
 
 -- Offers indexes
 CREATE INDEX idx_offers_buyer_id ON offers(buyer_id);
 CREATE INDEX idx_offers_seller_id ON offers(seller_id);
 CREATE INDEX idx_offers_listing_id ON offers(listing_id);
+CREATE INDEX idx_offers_conversation_id ON offers(conversation_id);
 CREATE INDEX idx_offers_status ON offers(status);
 
 -- Posts indexes
@@ -3765,6 +3807,14 @@ ON messages(conversation_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_unread 
 ON messages(conversation_id, read_at) 
 WHERE read_at IS NULL;
+
+-- Conversations performance indexes
+CREATE INDEX IF NOT EXISTS idx_conversations_participants_listing 
+ON conversations(participant_1, participant_2, listing_id);
+
+CREATE INDEX IF NOT EXISTS idx_conversations_last_message 
+ON conversations(last_message_at DESC) 
+WHERE status = 'active';
 
 -- Posts performance indexes
 CREATE INDEX IF NOT EXISTS idx_posts_user_created 
@@ -3897,7 +3947,8 @@ DECLARE
         'paystack_transactions', 'feature_purchases', 'plan_entitlements',
         'user_reward_history', 'reward_triggers', 'kb_articles', 'kb_article_feedback',
         'faq_categories', 'faq_items', 'search_suggestions', 'user_activity_log',
-        'popular_searches'
+        'popular_searches', 'referral_tracking', 'data_export_requests', 'data_deletion_requests',
+        'business_categories'
     ];
     missing_tables TEXT[] := ARRAY[]::TEXT[];
     current_table TEXT;

@@ -14,6 +14,11 @@ interface ChatState {
   setUnreadCount: (conversationId: string, count: number) => void;
   markAsRead: (conversationId: string) => void;
   
+  // Manually marked as unread (to prevent auto-marking as read)
+  manuallyMarkedAsUnread: Set<string>; // conversationId -> true
+  markAsUnread: (conversationId: string) => void;
+  clearManuallyMarkedAsUnread: (conversationId: string) => void;
+  
   // Draft messages
   draftMessages: Record<string, string>; // conversationId -> draft text
   setDraftMessage: (conversationId: string, text: string) => void;
@@ -59,11 +64,50 @@ export const useChatStore = create<ChatState>((set, get) => ({
       },
     });
   },
-  markAsRead: (conversationId) => {
-    const { unreadCounts } = get();
+  markAsRead: async (conversationId) => {
+    const { unreadCounts, manuallyMarkedAsUnread } = get();
+    
+    // Don't auto-mark as read if manually marked as unread
+    if (manuallyMarkedAsUnread.has(conversationId)) {
+      console.log('🚫 Skipping auto-mark as read - conversation manually marked as unread');
+      return;
+    }
+    
     const newCounts = { ...unreadCounts };
     delete newCounts[conversationId];
     set({ unreadCounts: newCounts });
+    
+    // Also mark messages as read in the database
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        await supabase
+          .from('messages')
+          .update({ read_at: new Date().toISOString() })
+          .eq('conversation_id', conversationId)
+          .neq('sender_id', user.id)
+          .is('read_at', null);
+      }
+    } catch (error) {
+      console.error('Failed to mark messages as read in database:', error);
+    }
+  },
+  
+  // Manually marked as unread
+  manuallyMarkedAsUnread: new Set(),
+  markAsUnread: (conversationId) => {
+    const { manuallyMarkedAsUnread } = get();
+    const newSet = new Set(manuallyMarkedAsUnread);
+    newSet.add(conversationId);
+    set({ manuallyMarkedAsUnread: newSet });
+  },
+  clearManuallyMarkedAsUnread: (conversationId) => {
+    const { manuallyMarkedAsUnread } = get();
+    const newSet = new Set(manuallyMarkedAsUnread);
+    newSet.delete(conversationId);
+    set({ manuallyMarkedAsUnread: newSet });
   },
   
   // Draft messages

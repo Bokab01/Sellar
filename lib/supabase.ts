@@ -132,14 +132,26 @@ export const dbHelpers = {
   },
 
   async getMessages(conversationId: string, limit = 50, offset = 0) {
+    console.log('🎯 getMessages called for conversation:', conversationId);
     const { data, error } = await db.messages
       .select(`
         *,
-        profiles!messages_sender_id_fkey(*)
+        profiles!messages_sender_id_fkey(*),
+        offers(*)
       `)
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
+
+    console.log('🎯 getMessages result:', { data: data?.length, error });
+    if (data) {
+      const offerMessages = data.filter(msg => msg.message_type === 'offer');
+      console.log('🎯 Offer messages found:', offerMessages.map(msg => ({ 
+        id: msg.id, 
+        hasOffers: msg.offers?.length > 0, 
+        offersCount: msg.offers?.length || 0 
+      })));
+    }
 
     return { data, error };
   },
@@ -287,13 +299,35 @@ export const dbHelpers = {
 
   // Offer operations
   async createOffer(offer: any) {
-    const { data, error } = await db.offers.insert(offer).select().single();
-    return { data, error };
+    console.log('🎯 createOffer called with:', offer);
+    const { data, error } = await db.offers.insert(offer).select();
+    console.log('🎯 createOffer result:', { data, error });
+    
+    if (error) {
+      return { data: null, error };
+    }
+    
+    if (!data || data.length === 0) {
+      return { data: null, error: { message: 'Failed to create offer' } };
+    }
+    
+    return { data: data[0], error: null };
   },
 
   async updateOffer(offerId: string, status: string) {
-    const { data, error } = await db.offers.update({ status }, offerId).select().single();
-    return { data, error };
+    console.log('🎯 updateOffer called:', { offerId, status });
+    const { data, error } = await db.offers.update({ status }, offerId).select();
+    console.log('🎯 updateOffer result:', { data, error });
+    
+    if (error) {
+      return { data: null, error };
+    }
+    
+    if (!data || data.length === 0) {
+      return { data: null, error: { message: 'Failed to update offer' } };
+    }
+    
+    return { data: data[0], error: null };
   },
 
   // Notification operations
@@ -483,32 +517,91 @@ export const dbHelpers = {
   // Chat operations
   async getConversations(userId: string) {
     try {
-      // First, try the full query with joins
-      const { data, error } = await db.conversations
-        .select(`
-          *,
-          buyer_profile:profiles!conversations_buyer_id_fkey(*),
-          seller_profile:profiles!conversations_seller_id_fkey(*),
-          listing:listings!conversations_listing_id_fkey(*),
-          messages!conversations_messages_conversation_id_fkey(*)
-        `)
-        .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
+      // Get conversations with basic data first
+      const { data: conversations, error: convError } = await db.conversations
+        .select('*')
+        .or(`participant_1.eq.${userId},participant_2.eq.${userId}`)
         .order('last_message_at', { ascending: false });
 
-      // If the joined query fails, try a simpler query without joins
-      if (error && (error.message.includes('schema cache') || error.message.includes('relationship'))) {
-        console.log('🔄 Falling back to simple conversations query without joins');
-        
-        const { data: simpleData, error: simpleError } = await db.conversations
-          .select('*')
-          .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
-          .order('last_message_at', { ascending: false });
-        
-        return { data: simpleData, error: simpleError };
+      if (convError) {
+        console.error('❌ Error fetching conversations:', convError);
+        return { data: null, error: convError };
       }
-      
-      return { data, error };
+
+      if (!conversations || conversations.length === 0) {
+        return { data: [], error: null };
+      }
+
+      // Get all participant IDs
+      const participantIds = new Set<string>();
+      conversations.forEach(conv => {
+        if (conv.participant_1) participantIds.add(conv.participant_1);
+        if (conv.participant_2) participantIds.add(conv.participant_2);
+      });
+
+      // Fetch all profiles
+      const { data: profiles, error: profilesError } = await db.profiles
+        .select('*')
+        .in('id', Array.from(participantIds));
+
+      if (profilesError) {
+        console.error('❌ Error fetching profiles:', profilesError);
+        return { data: conversations, error: null }; // Return conversations without profiles
+      }
+
+      // Create profiles map
+      const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+      // Get all listing IDs
+      const listingIds = conversations
+        .map(conv => conv.listing_id)
+        .filter(Boolean);
+
+      let listingsMap = new Map();
+      if (listingIds.length > 0) {
+        const { data: listings, error: listingsError } = await db.listings
+          .select('*')
+          .in('id', listingIds);
+
+        if (!listingsError && listings) {
+          listingsMap = new Map(listings.map(l => [l.id, l]));
+        }
+      }
+
+      // Get messages for each conversation
+      const conversationIds = conversations.map(conv => conv.id);
+      const { data: messages, error: messagesError } = await db.messages
+        .select('*')
+        .in('conversation_id', conversationIds)
+        .order('created_at', { ascending: false });
+
+      if (messagesError) {
+        console.error('❌ Error fetching messages:', messagesError);
+      }
+
+      // Group messages by conversation
+      const messagesMap = new Map();
+      if (messages) {
+        messages.forEach(msg => {
+          if (!messagesMap.has(msg.conversation_id)) {
+            messagesMap.set(msg.conversation_id, []);
+          }
+          messagesMap.get(msg.conversation_id).push(msg);
+        });
+      }
+
+      // Combine all data
+      const enrichedConversations = conversations.map(conv => ({
+        ...conv,
+        participant_1_profile: profilesMap.get(conv.participant_1) || null,
+        participant_2_profile: profilesMap.get(conv.participant_2) || null,
+        listing: conv.listing_id ? listingsMap.get(conv.listing_id) || null : null,
+        messages: messagesMap.get(conv.id) || [],
+      }));
+
+      return { data: enrichedConversations, error: null };
     } catch (err) {
+      console.error('❌ Error in getConversations:', err);
       return { data: null, error: err };
     }
   },
@@ -516,6 +609,110 @@ export const dbHelpers = {
   async sendMessage(messageData: any) {
     const { data, error } = await db.messages.insert(messageData).select().single();
     return { data, error };
+  },
+
+  async getUnreadMessageCounts(userId: string) {
+    try {
+      // First get the user's conversation IDs
+      const { data: conversations, error: convError } = await db.conversations
+        .select('id')
+        .or(`participant_1.eq.${userId},participant_2.eq.${userId}`);
+
+      if (convError) {
+        console.error('❌ Error fetching user conversations:', convError);
+        return { data: {}, error: convError };
+      }
+
+      if (!conversations || conversations.length === 0) {
+        return { data: {}, error: null };
+      }
+
+      const conversationIds = conversations.map(conv => conv.id);
+
+      // Then get unread messages for those conversations (using read_at IS NULL)
+      const { data, error } = await db.messages
+        .select('conversation_id')
+        .is('read_at', null)
+        .neq('sender_id', userId)
+        .in('conversation_id', conversationIds);
+
+      if (error) {
+        console.error('❌ Error fetching unread counts:', error);
+        return { data: {}, error };
+      }
+
+      // Count unread messages per conversation
+      const unreadCounts: Record<string, number> = {};
+      data?.forEach(msg => {
+        unreadCounts[msg.conversation_id] = (unreadCounts[msg.conversation_id] || 0) + 1;
+      });
+
+      console.log('📊 Unread counts calculated:', unreadCounts);
+      return { data: unreadCounts, error: null };
+    } catch (err) {
+      console.error('❌ Error in getUnreadMessageCounts:', err);
+      return { data: {}, error: err };
+    }
+  },
+
+  async getConversation(conversationId: string, userId: string) {
+    try {
+      // Get the conversation with basic data
+      const { data: conversation, error: convError } = await db.conversations
+        .select('*')
+        .eq('id', conversationId)
+        .or(`participant_1.eq.${userId},participant_2.eq.${userId}`)
+        .single();
+
+      if (convError) {
+        console.error('❌ Error fetching conversation:', convError);
+        return { data: null, error: convError };
+      }
+
+      if (!conversation) {
+        return { data: null, error: null };
+      }
+
+      // Get participant profiles
+      const participantIds = [conversation.participant_1, conversation.participant_2].filter(Boolean);
+      const { data: profiles, error: profilesError } = await db.profiles
+        .select('*')
+        .in('id', participantIds);
+
+      if (profilesError) {
+        console.error('❌ Error fetching profiles:', profilesError);
+        return { data: conversation, error: null }; // Return conversation without profiles
+      }
+
+      // Create profiles map
+      const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+      // Get listing if it exists
+      let listing = null;
+      if (conversation.listing_id) {
+        const { data: listingData, error: listingError } = await db.listings
+          .select('*')
+          .eq('id', conversation.listing_id)
+          .single();
+
+        if (!listingError && listingData) {
+          listing = listingData;
+        }
+      }
+
+      // Combine all data
+      const enrichedConversation = {
+        ...conversation,
+        participant_1_profile: profilesMap.get(conversation.participant_1) || null,
+        participant_2_profile: profilesMap.get(conversation.participant_2) || null,
+        listing: listing,
+      };
+
+      return { data: enrichedConversation, error: null };
+    } catch (err) {
+      console.error('❌ Error in getConversation:', err);
+      return { data: null, error: err };
+    }
   },
 
   // Listing operations
@@ -616,8 +813,70 @@ export const dbHelpers = {
   },
 
   // Offer operations
-  async updateOfferStatus(offerId: string, status: string) {
-    const { data, error } = await db.offers.update({ status }, offerId).select().single();
+  async testOfferConnection() {
+    console.log('🎯 Testing offer database connection...');
+    const { data, error } = await db.offers.select('id').limit(1);
+    console.log('🎯 Test connection result:', { data, error });
     return { data, error };
+  },
+
+  async updateOfferStatus(offerId: string, status: string) {
+    console.log('🎯 updateOfferStatus called:', { offerId, status, type: typeof offerId });
+    
+    // First check if the offer exists with more detailed logging
+    console.log('🎯 Querying offers table for ID:', offerId);
+    const { data: existingOffers, error: checkError } = await db.offers
+      .select('id, status, buyer_id, seller_id, created_at, updated_at')
+      .eq('id', offerId);
+    
+    console.log('🎯 Check offer query result:', { 
+      existingOffers, 
+      checkError, 
+      count: existingOffers?.length || 0,
+      queryUsed: `SELECT * FROM offers WHERE id = '${offerId}'`
+    });
+    
+    if (checkError) {
+      console.log('🎯 Error checking offer:', { offerId, checkError });
+      return { data: null, error: { message: 'Error checking offer status' } };
+    }
+    
+    if (!existingOffers || existingOffers.length === 0) {
+      console.log('🎯 Offer not found in database:', { offerId });
+      
+      // Let's also check all offers to see what's in the database
+      const { data: allOffers, error: allError } = await db.offers
+        .select('id, status, created_at')
+        .limit(10);
+      console.log('🎯 All offers in database:', { allOffers, allError });
+      
+      // Let's also try a different approach - check if the ID format is correct
+      const { data: similarOffers, error: similarError } = await db.offers
+        .select('id, status, created_at')
+        .ilike('id', `%${offerId.slice(-8)}%`); // Check for similar IDs
+      console.log('🎯 Similar offers found:', { similarOffers, similarError });
+      
+      return { data: null, error: { message: 'Offer not found or has been deleted' } };
+    }
+    
+    console.log('🎯 Found existing offer:', existingOffers[0]);
+    
+    // Now update the offer with more detailed logging
+    console.log('🎯 Attempting to update offer:', { offerId, status });
+    const { data, error } = await db.offers.update({ status }, offerId).select();
+    console.log('🎯 updateOfferStatus result:', { data, error });
+    
+    if (error) {
+      console.log('🎯 Update error details:', error);
+      return { data: null, error };
+    }
+    
+    if (!data || data.length === 0) {
+      console.log('🎯 No rows updated for offer:', { offerId, status });
+      return { data: null, error: { message: 'Failed to update offer' } };
+    }
+    
+    console.log('🎯 Successfully updated offer:', data[0]);
+    return { data: data[0], error: null };
   },
 };

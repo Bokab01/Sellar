@@ -1,11 +1,16 @@
 import React, { useMemo } from 'react';
 import { Tabs } from 'expo-router';
-import { View } from 'react-native';
+import { View, Text } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { MessageCircle, Plus, Users, EllipsisVertical, House } from 'lucide-react-native';
+import { useChatStore } from '@/store/useChatStore';
 
 export default function TabLayout() {
   const { theme } = useTheme();
+  const { unreadCounts } = useChatStore();
+  
+  // Calculate total unread count for inbox badge
+  const totalUnreadCount = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
 
   // Memoize screen options to prevent unnecessary re-renders
   const screenOptions = useMemo(() => ({
@@ -51,8 +56,39 @@ export default function TabLayout() {
         name="inbox"
         options={{
           title: 'Inbox',
+          tabBarStyle: {
+            display: 'none',
+          },
           tabBarIcon: ({ size, color }) => (
-            <MessageCircle size={size} color={color} />
+            <View style={{ position: 'relative' }}>
+              <MessageCircle size={size} color={color} />
+              {totalUnreadCount > 0 && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: -2,
+                    right: -2,
+                    backgroundColor: theme.colors.error,
+                    borderRadius: 8,
+                    minWidth: 16,
+                    height: 16,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    paddingHorizontal: 4,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#FFF',
+                      fontSize: 10,
+                      fontWeight: '600',
+                    }}
+                  >
+                    {totalUnreadCount > 9 ? '9+' : totalUnreadCount}
+                  </Text>
+                </View>
+              )}
+            </View>
           ),
         }}
       />

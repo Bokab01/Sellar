@@ -26,9 +26,19 @@ export function useRealtime({
   }, [onInsert, onUpdate, onDelete]);
 
   useEffect(() => {
-    // Create channel
+    // Clean up existing channel first
+    if (channelRef.current) {
+      console.log(`🔗 Cleaning up existing real-time subscription for ${table}`);
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    console.log(`🔗 Setting up real-time subscription for table: ${table}, filter: ${filter}`);
+    
+    // Create channel with unique name to avoid conflicts
+    const channelName = `realtime-${table}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const channel = supabase
-      .channel(`realtime-${table}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -38,6 +48,7 @@ export function useRealtime({
           filter,
         },
         (payload) => {
+          console.log(`🔗 Real-time event received for ${table}:`, payload.eventType, payload);
           switch (payload.eventType) {
             case 'INSERT':
               callbacksRef.current.onInsert?.(payload.new);
@@ -51,13 +62,22 @@ export function useRealtime({
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`🔗 Real-time subscription status for ${table}:`, status);
+        if (status === 'SUBSCRIBED') {
+          console.log(`🔗 Successfully subscribed to ${table} real-time updates`);
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error(`🔗 Error subscribing to ${table} real-time updates`);
+        }
+      });
 
     channelRef.current = channel;
 
     return () => {
+      console.log(`🔗 Cleaning up real-time subscription for ${table}`);
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
       }
     };
   }, [table, filter]); // Only depend on table and filter, not callbacks
@@ -67,10 +87,14 @@ export function useRealtime({
 
 // Specific hooks for different features
 export function useChatRealtime(conversationId: string, onNewMessage: (message: any) => void) {
+  console.log('🔗 Setting up chat real-time for conversation:', conversationId);
   return useRealtime({
     table: 'messages',
     filter: `conversation_id=eq.${conversationId}`,
-    onInsert: onNewMessage,
+    onInsert: (payload) => {
+      console.log('🔗 Real-time message insert received:', payload);
+      onNewMessage(payload);
+    },
   });
 }
 
