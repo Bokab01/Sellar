@@ -5,7 +5,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 export interface Review {
   id: string;
   reviewer_id: string;
-  reviewed_id: string;
+  reviewed_user_id: string;
   listing_id: string | null;
   rating: number;
   comment: string;
@@ -46,7 +46,7 @@ export interface ReviewStats {
 }
 
 export interface CreateReviewData {
-  reviewed_id: string;
+  reviewed_user_id: string;
   listing_id?: string;
   rating: number;
   comment: string;
@@ -83,13 +83,13 @@ export function useReviews(options: {
         .from('reviews')
         .select(`
           *,
-          reviewer:profiles!reviews_reviewer_id_fkey(
+          reviewer:profiles!reviews_reviewer_fkey(
             id,
             full_name,
             avatar_url,
             username
           ),
-          reviewed:profiles!reviews_reviewed_id_fkey(
+          reviewed:profiles!reviews_reviewed_user_fkey(
             id,
             full_name,
             avatar_url,
@@ -100,7 +100,7 @@ export function useReviews(options: {
 
       // Apply filters
       if (userId) {
-        query = query.eq('reviewed_id', userId);
+        query = query.eq('reviewed_user_id', userId);
       }
       if (listingId) {
         query = query.eq('listing_id', listingId);
@@ -213,7 +213,7 @@ export function useReviewStats(userId: string) {
         const { data: reviews, error: fetchError } = await supabase
           .from('reviews')
           .select('rating')
-          .eq('reviewed_id', userId);
+          .eq('reviewed_user_id', userId);
 
         if (fetchError) throw fetchError;
 
@@ -279,13 +279,13 @@ export function useCreateReview() {
         })
         .select(`
           *,
-          reviewer:profiles!reviews_reviewer_id_fkey(
+          reviewer:profiles!reviews_reviewer_fkey(
             id,
             full_name,
             avatar_url,
             username
           ),
-          reviewed:profiles!reviews_reviewed_id_fkey(
+          reviewed:profiles!reviews_reviewed_user_fkey(
             id,
             full_name,
             avatar_url,
@@ -332,13 +332,13 @@ export function useUpdateReview() {
         .eq('reviewer_id', user.id) // Ensure user can only update their own reviews
         .select(`
           *,
-          reviewer:profiles!reviews_reviewer_id_fkey(
+          reviewer:profiles!reviews_reviewer_fkey(
             id,
             full_name,
             avatar_url,
             username
           ),
-          reviewed:profiles!reviews_reviewed_id_fkey(
+          reviewed:profiles!reviews_reviewed_user_fkey(
             id,
             full_name,
             avatar_url,

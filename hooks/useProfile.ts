@@ -133,8 +133,48 @@ export function useProfile(userId?: string) {
         .eq('id', targetUserId)
         .single();
 
-      if (fetchError) throw fetchError;
-      setProfile(data);
+      if (fetchError) {
+        // If profile doesn't exist, try to create it
+        if (fetchError.code === 'PGRST116' || fetchError.message.includes('0 rows')) {
+          console.log('Profile not found, attempting to create missing profile...');
+          
+          // Get user data from auth
+          const { data: authUser, error: authError } = await supabase.auth.getUser();
+          
+          if (authError || !authUser.user) {
+            throw new Error('Unable to get user information');
+          }
+
+          // Create the missing profile
+          const firstName = authUser.user.user_metadata?.firstName || '';
+          const lastName = authUser.user.user_metadata?.lastName || '';
+          const fullName = firstName && lastName ? `${firstName} ${lastName}`.trim() : 'User';
+          
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert({
+              id: targetUserId,
+              full_name: fullName,
+              email: authUser.user.email || '',
+              phone: authUser.user.user_metadata?.phone || null,
+              location: authUser.user.user_metadata?.location || 'Accra, Greater Accra',
+              is_business: authUser.user.user_metadata?.is_business || false,
+            })
+            .select()
+            .single();
+
+          if (createError) {
+            console.error('Failed to create missing profile:', createError);
+            throw new Error('Profile not found and could not be created');
+          }
+
+          setProfile(newProfile);
+        } else {
+          throw fetchError;
+        }
+      } else {
+        setProfile(data);
+      }
     } catch (err) {
       console.error('Error fetching profile:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch profile');
@@ -512,12 +552,25 @@ export function useProfileCompletion(userId?: string) {
     if (!targetUserId) return;
 
     try {
+      // First try to get completion data from the database function
       const { data: completionData, error } = await supabase
         .rpc('calculate_profile_completion', { user_uuid: targetUserId });
 
-      if (error) throw error;
+      console.log('Profile completion RPC result:', { completionData, error });
 
-      // Get profile to analyze missing fields
+      // If the function works, use its data
+      if (!error && completionData && typeof completionData === 'object') {
+        console.log('Using database function completion data:', completionData);
+        setCompletion({
+          percentage: completionData.percentage || 0,
+          missingFields: completionData.missing_fields || [],
+          suggestions: completionData.suggestions || [],
+        });
+        return;
+      }
+
+      // Fallback: Calculate completion manually if function fails
+      console.log('Database function failed, using fallback calculation');
       const { data: profile } = await supabase
         .from('profiles')
         .select('*')
@@ -527,45 +580,72 @@ export function useProfileCompletion(userId?: string) {
       if (profile) {
         const missingFields: string[] = [];
         const suggestions: string[] = [];
+        let completedFields = 0;
+        let totalFields = 0;
 
         // Check basic fields
-        if (!profile.full_name) {
-          missingFields.push('full_name');
-          suggestions.push('Add your full name to help others identify you');
-        }
-        if (!profile.bio) {
-          missingFields.push('bio');
-          suggestions.push('Write a bio to tell others about yourself');
-        }
-        if (!profile.avatar_url) {
-          missingFields.push('avatar_url');
-          suggestions.push('Upload a profile picture to increase trust');
-        }
-        if (!profile.phone) {
-          missingFields.push('phone');
-          suggestions.push('Add your phone number for better communication');
-        }
+        const fieldsToCheck = [
+          { field: 'full_name', suggestion: 'Add your full name to help others identify you' },
+          { field: 'bio', suggestion: 'Write a bio to tell others about yourself' },
+          { field: 'avatar_url', suggestion: 'Upload a profile picture to increase trust' },
+          { field: 'phone', suggestion: 'Add your phone number for better communication' },
+          { field: 'location', suggestion: 'Add your location' },
+        ];
+
+        fieldsToCheck.forEach(({ field, suggestion }) => {
+          totalFields++;
+          if (profile[field] && profile[field] !== '') {
+            completedFields++;
+          } else {
+            missingFields.push(field);
+            suggestions.push(suggestion);
+          }
+        });
 
         // Business profile suggestions
         if (profile.is_business) {
-          if (!profile.business_description) {
-            missingFields.push('business_description');
-            suggestions.push('Add a business description to attract customers');
-          }
-          if (!profile.business_category_id) {
-            missingFields.push('business_category_id');
-            suggestions.push('Select your business category for better discoverability');
-          }
+          const businessFields = [
+            { field: 'business_description', suggestion: 'Add a business description to attract customers' },
+            { field: 'business_category_id', suggestion: 'Select your business category for better discoverability' },
+          ];
+
+          businessFields.forEach(({ field, suggestion }) => {
+            totalFields++;
+            if (profile[field] && profile[field] !== '') {
+              completedFields++;
+            } else {
+              missingFields.push(field);
+              suggestions.push(suggestion);
+            }
+          });
         }
 
+        // Calculate percentage
+        const percentage = totalFields > 0 ? Math.round((completedFields / totalFields) * 100) : 0;
+
+        console.log('Fallback completion calculation:', { percentage, completedFields, totalFields, missingFields });
+
         setCompletion({
-          percentage: completionData || 0,
+          percentage,
           missingFields,
           suggestions,
+        });
+      } else {
+        console.log('No profile found, setting completion to 0');
+        setCompletion({
+          percentage: 0,
+          missingFields: [],
+          suggestions: ['Create your profile to get started'],
         });
       }
     } catch (err) {
       console.error('Error calculating profile completion:', err);
+      // Set a default completion state on error
+      setCompletion({
+        percentage: 0,
+        missingFields: [],
+        suggestions: ['Unable to calculate profile completion'],
+      });
     }
   };
 

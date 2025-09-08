@@ -69,6 +69,8 @@ export function usePushNotifications() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false); // Prevent double initialization
+  const [retryCount, setRetryCount] = useState(0);
+  const [maxRetries] = useState(3); // Maximum retry attempts
 
   const notificationListener = useRef<Notifications.Subscription | null>(null);
   const responseListener = useRef<Notifications.Subscription | null>(null);
@@ -110,12 +112,12 @@ export function usePushNotifications() {
    * Initialize push notifications when user logs in - with double initialization prevention
    */
   useEffect(() => {
-    if (user && !isInitialized && !isInitializing) {
+    if (user && !isInitialized && !isInitializing && retryCount < maxRetries) {
       initializePushNotifications();
     } else if (!user && (isInitialized || isInitializing)) {
       cleanup();
     }
-  }, [user, isInitialized, isInitializing]);
+  }, [user, isInitialized, isInitializing, retryCount, maxRetries]);
 
   /**
    * Set up app state listener to handle background/foreground transitions
@@ -151,8 +153,14 @@ export function usePushNotifications() {
    * Initialize push notification system with improved error handling and double initialization prevention
    */
   const initializePushNotifications = async () => {
-    if (!user || isInitializing || isInitialized) {
-      console.log('Skipping initialization:', { user: !!user, isInitializing, isInitialized });
+    if (!user || isInitializing || isInitialized || retryCount >= maxRetries) {
+      console.log('Skipping initialization:', { 
+        user: !!user, 
+        isInitializing, 
+        isInitialized, 
+        retryCount, 
+        maxRetries 
+      });
       return;
     }
 
@@ -167,9 +175,10 @@ export function usePushNotifications() {
         setError('Initialization timeout');
         setIsInitializing(false);
         setLoading(false);
+        setRetryCount(prev => prev + 1);
       }, 30000) as any; // 30 second timeout
 
-      console.log('Initializing push notifications for user:', user.id);
+      console.log(`Initializing push notifications for user: ${user.id} (attempt ${retryCount + 1}/${maxRetries})`);
 
       // Initialize push notification service
       const success = await pushNotificationService.initialize(user.id);
@@ -192,14 +201,23 @@ export function usePushNotifications() {
         await updateBadgeCount();
 
         setIsInitialized(true);
+        setRetryCount(0); // Reset retry count on success
         console.log('Push notifications initialized successfully');
       } else {
         setHasPermission(false);
         setError('Failed to initialize push notifications - permission denied');
+        setRetryCount(prev => prev + 1);
       }
     } catch (err) {
       console.error('Error initializing push notifications:', err);
       setError(`Failed to initialize push notifications: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setRetryCount(prev => prev + 1);
+      
+      // If we've exceeded max retries, disable push notifications temporarily
+      if (retryCount + 1 >= maxRetries) {
+        console.warn('Push notification initialization failed after maximum retries. Disabling push notifications temporarily.');
+        setError('Push notifications disabled due to repeated failures. Please restart the app to try again.');
+      }
     } finally {
       // Clear timeout
       if (initializationTimeoutRef.current) {
@@ -605,6 +623,7 @@ export function usePushNotifications() {
       setPreferences(null);
       setError(null);
       setLoading(false);
+      setRetryCount(0); // Reset retry count on cleanup
 
       console.log('Push notifications cleanup completed');
     } catch (err) {

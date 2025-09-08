@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, Alert } from 'react-native';
+import { View, ScrollView, Alert, AppState, AppStateStatus } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
@@ -21,6 +21,7 @@ export default function VerifyEmailScreen() {
   const [loading, setLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [emailSent, setEmailSent] = useState(false);
+  const [appState, setAppState] = useState(AppState.currentState);
 
   const userEmail = email || user?.email || '';
 
@@ -33,6 +34,41 @@ export default function VerifyEmailScreen() {
     }
     return () => clearInterval(interval);
   }, [resendCooldown]);
+
+  // Auto-check email verification when app becomes active
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (appState.match(/inactive|background/) && nextAppState === 'active') {
+        // App came to foreground, check if email was verified
+        console.log('App became active, checking email verification status...');
+        checkEmailVerificationStatus();
+      }
+      setAppState(nextAppState);
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, [appState]);
+
+  // Function to check email verification status without showing alerts
+  const checkEmailVerificationStatus = async () => {
+    try {
+      console.log('Checking email verification status...');
+      const { data: { session }, error } = await supabase.auth.refreshSession();
+      
+      if (error) {
+        console.warn('Session refresh failed during auto-check:', error.message);
+        return;
+      }
+      
+      if (session?.user?.email_confirmed_at) {
+        console.log('✅ Email verified automatically detected!');
+        router.replace('/(tabs)/home');
+      }
+    } catch (error) {
+      console.warn('Auto-check email verification failed:', error);
+    }
+  };
 
   const handleResendVerification = async () => {
     if (!userEmail) {
@@ -57,16 +93,66 @@ export default function VerifyEmailScreen() {
     setLoading(true);
     
     try {
-      // Check current session to see if user is actually verified
-      const { data: { session }, error } = await supabase.auth.getSession();
+      // First, try to refresh the session to get the latest user data
+      console.log('Refreshing session to check email verification status...');
+      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
       
-      if (error) {
-        console.error('Error checking session:', error);
-        Alert.alert('Error', 'Unable to verify your email status. Please try again.');
-        setLoading(false);
+      if (refreshError) {
+        console.warn('Session refresh failed, trying to get current session:', refreshError.message);
+        // If refresh fails, try to get the current session
+        const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('Error getting session:', sessionError);
+          Alert.alert('Error', 'Unable to verify your email status. Please try again.');
+          setLoading(false);
+          return;
+        }
+        
+        // Use current session if refresh failed
+        const finalSession = currentSession;
+        
+        if (!finalSession || !finalSession.user) {
+          // No session means user is not signed in (email not verified)
+          Alert.alert(
+            'Email Not Verified',
+            'Your email has not been verified yet. Please click the verification link in your email first.',
+            [
+              { text: 'OK' },
+              { 
+                text: 'Resend Email', 
+                onPress: () => handleResendVerification() 
+              }
+            ]
+          );
+          setLoading(false);
+          return;
+        }
+        
+        // Check if email is confirmed
+        if (!finalSession.user.email_confirmed_at) {
+          Alert.alert(
+            'Email Not Verified',
+            'Your email has not been verified yet. Please click the verification link in your email first.',
+            [
+              { text: 'OK' },
+              { 
+                text: 'Resend Email', 
+                onPress: () => handleResendVerification() 
+              }
+            ]
+          );
+          setLoading(false);
+          return;
+        }
+        
+        // Email is verified - proceed to home
+        console.log('✅ Email verified successfully (current session)');
+        router.replace('/(tabs)/home');
         return;
       }
       
+      // Session refresh was successful
       if (!session || !session.user) {
         // No session means user is not signed in (email not verified)
         Alert.alert(
@@ -102,7 +188,7 @@ export default function VerifyEmailScreen() {
       }
       
       // Email is verified - proceed to home
-      console.log('✅ Email verified successfully');
+      console.log('✅ Email verified successfully (refreshed session)');
       router.replace('/(tabs)/home');
       
     } catch (error) {
@@ -184,7 +270,7 @@ export default function VerifyEmailScreen() {
                       Return to this app after clicking the link
                     </Text>
                     <Text variant="caption" color="muted">
-                      Your account will be automatically verified
+                      Then tap "Check Email Status" to continue
                     </Text>
                   </View>
                 </View>
@@ -200,7 +286,7 @@ export default function VerifyEmailScreen() {
                 size="lg"
                 testID="check-email-button"
               >
-                I&apos;ve Verified My Email
+                Check Email Status
               </Button>
 
               <Button

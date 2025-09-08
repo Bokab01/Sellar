@@ -74,7 +74,7 @@ export function ReviewForm({
         });
       } else {
         const reviewData: CreateReviewData = {
-          reviewed_id: reviewedUserId,
+          reviewed_user_id: reviewedUserId,
           rating,
           comment: comment.trim(),
           is_verified_purchase: isVerifiedPurchase
@@ -206,10 +206,10 @@ export function ReviewForm({
             placeholder="Share your experience with this seller..."
             value={comment}
             onChangeText={setComment}
-            multiline
-            numberOfLines={4}
+            autoExpand
+            minHeight={100}
+            maxHeight={200}
             maxLength={1000}
-            style={{ minHeight: 100 }}
           />
 
           <View

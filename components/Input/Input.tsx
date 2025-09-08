@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   TextInput,
   TextInputProps,
@@ -26,6 +26,9 @@ interface InputProps extends Omit<TextInputProps, 'style'> {
   fullWidth?: boolean;
   containerStyle?: any;
   style?: any; // Allow style prop for container styling
+  autoExpand?: boolean; // New prop for auto-expanding multiline inputs
+  minHeight?: number; // Minimum height for auto-expanding inputs
+  maxHeight?: number; // Maximum height for auto-expanding inputs
 }
 
 export function Input({
@@ -39,17 +42,30 @@ export function Input({
   fullWidth = true,
   containerStyle,
   style,
+  autoExpand = false,
+  minHeight = 80,
+  maxHeight = 200,
   ...props
 }: InputProps) {
   const { theme } = useTheme();
   const [isFocused, setIsFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [inputHeight, setInputHeight] = useState(minHeight);
   const inputRef = useRef<TextInput>(null);
   const focusContext = useInputFocus();
   
   const isDisabled = state === 'disabled' || props.editable === false;
   const hasError = state === 'error' || !!error;
   const currentState = hasError ? 'error' : isFocused ? 'focus' : state;
+  const isMultiline = variant === 'multiline' || props.multiline || autoExpand;
+
+  // Handle auto-expand functionality
+  const handleContentSizeChange = (event: any) => {
+    if (autoExpand) {
+      const newHeight = Math.max(minHeight, Math.min(maxHeight, event.nativeEvent.contentSize.height + 20));
+      setInputHeight(newHeight);
+    }
+  };
 
   const getBorderColor = () => {
     switch (currentState) {
@@ -78,14 +94,14 @@ export function Input({
 
   const inputContainerStyles = {
     flexDirection: 'row' as const,
-    alignItems: 'center' as const,
+    alignItems: isMultiline ? 'flex-start' as const : 'center' as const,
     borderWidth: 1,
     borderColor: getBorderColor(),
     borderRadius: theme.borderRadius.md,
     backgroundColor: getBackgroundColor(),
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.xs, // Add vertical padding for better alignment
-    minHeight: variant === 'multiline' ? 80 : 52, // Slightly increase height for better proportions
+    minHeight: isMultiline ? (autoExpand ? inputHeight : 80) : 52, // Use dynamic height for auto-expand
     ...(variant === 'search' && {
       paddingLeft: theme.spacing.sm,
     }),
@@ -100,8 +116,8 @@ export function Input({
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: 0, // Remove horizontal padding to prevent alignment issues
     includeFontPadding: false, // Android: Remove extra font padding
-    textAlignVertical: 'center' as const,
-    height: 40, // Fixed height for single-line inputs
+    textAlignVertical: isMultiline ? ('top' as const) : ('center' as const),
+    height: isMultiline ? (autoExpand ? inputHeight - 20 : 60) : 40, // Dynamic height for multiline
   };
 
   const renderLeftIcon = () => {
@@ -127,9 +143,9 @@ export function Input({
           marginRight: theme.spacing.sm,
           alignItems: 'center',
           justifyContent: 'center',
-          height: variant === 'multiline' ? 60 : 40, // Match input height
+          height: isMultiline ? 60 : 40, // Match input height
           width: 24, // Fixed width for consistent alignment
-          paddingTop: variant === 'multiline' ? theme.spacing.md : 0,
+          paddingTop: isMultiline ? theme.spacing.md : 0,
         }}>
           {leftIcon}
         </View>
@@ -167,9 +183,9 @@ export function Input({
           marginLeft: theme.spacing.sm,
           alignItems: 'center',
           justifyContent: 'center',
-          height: variant === 'multiline' ? 60 : 40, // Match input height
+          height: isMultiline ? 60 : 40, // Match input height
           width: 24, // Fixed width for consistent alignment
-          paddingTop: variant === 'multiline' ? theme.spacing.md : 0,
+          paddingTop: isMultiline ? theme.spacing.md : 0,
         }}>
           {rightIcon}
         </View>
@@ -201,9 +217,10 @@ export function Input({
           selectionColor={theme.colors.primary}
           cursorColor={theme.colors.primary}
           secureTextEntry={variant === 'password' && !showPassword}
-          multiline={false}
-          numberOfLines={1}
+          multiline={isMultiline}
+          numberOfLines={isMultiline ? (autoExpand ? undefined : props.numberOfLines || 4) : 1}
           editable={!isDisabled}
+          onContentSizeChange={autoExpand ? handleContentSizeChange : props.onContentSizeChange}
           onFocus={(e) => {
             setIsFocused(true);
             if (inputRef.current && focusContext) {

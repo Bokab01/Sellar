@@ -12,7 +12,8 @@ import {
   Avatar,
   Badge,
   PriceDisplay,
-
+  ItemDetailsTable,
+  ListingStatsTable,
   CompactReviewSummary,
   EmptyState,
   ErrorState,
@@ -121,12 +122,12 @@ export default function ListingDetailScreen() {
       setLoading(true);
       setError(null);
 
-      // First, try the joined query
+      // First, try the joined query with explicit relationship naming
       let { data, error: fetchError } = await supabase
         .from('listings')
         .select(`
           *,
-          profiles (
+          profiles!listings_seller_fkey (
             id,
             first_name,
             last_name,
@@ -278,7 +279,7 @@ export default function ListingDetailScreen() {
         .from('listings')
         .select(`
           *,
-          profiles (
+          profiles!listings_seller_fkey (
             id,
             first_name,
             last_name,
@@ -342,7 +343,7 @@ export default function ListingDetailScreen() {
         .from('listings')
         .select(`
           *,
-          profiles (
+          profiles!listings_seller_fkey (
             id,
             first_name,
             last_name,
@@ -919,22 +920,32 @@ export default function ListingDetailScreen() {
         </View>
         {/* Seller Profile - Moved to top */}
         {listing.profiles && (
-          <View style={{ 
-            backgroundColor: theme.colors.surface,
-            paddingHorizontal: theme.spacing.lg,
-            paddingVertical: theme.spacing.lg,
-            borderBottomWidth: 1,
-            borderBottomColor: theme.colors.border,
-          }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+          <TouchableOpacity
+            onPress={() => {
+              // Only navigate to profile if it's not the user's own listing
+              if (!isOwnListing) {
+                router.push(`/profile/${listing.profiles.id}`);
+              }
+            }}
+            disabled={isOwnListing}
+            activeOpacity={isOwnListing ? 1 : 0.7}
+            style={{ 
+              backgroundColor: theme.colors.surface,
+              paddingHorizontal: theme.spacing.lg,
+              paddingVertical: theme.spacing.lg,
+              borderBottomWidth: 1,
+              borderBottomColor: theme.colors.border,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, borderColor: theme.colors.border, padding: theme.spacing.sm, borderRadius: theme.borderRadius.xl, borderWidth: 1 }}>
               <Avatar
                 name={`${listing.profiles.first_name} ${listing.profiles.last_name}`}
                 source={listing.profiles.avatar_url}
-                size="lg"
+                size="md"
               />
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1}}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-                  <Text variant="h4" style={{ fontWeight: '600' }}>
+                  <Text variant="bodySmall" style={{ fontWeight: '600' }}>
                     {listing.profiles.first_name} {listing.profiles.last_name}
                   </Text>
                   {listing.profiles.is_verified && (
@@ -945,8 +956,13 @@ export default function ListingDetailScreen() {
                   <CompactReviewSummary userId={listing.profiles.id} />
                 </View>
                 <Text variant="bodySmall" color="secondary" style={{ marginTop: theme.spacing.xs }}>
-                  📍 {listing.profiles.location}
+                  {listing.profiles.location}
                 </Text>
+                {!isOwnListing && (
+                  <Text variant="caption" color="muted" style={{ marginTop: theme.spacing.xs }}>
+                    Tap to view profile
+                  </Text>
+                )}
               </View>
               
               {/* Call Seller Button */}
@@ -970,8 +986,9 @@ export default function ListingDetailScreen() {
                 </TouchableOpacity>
               )}
             </View>
-          </View>
+          </TouchableOpacity>
         )}
+
 
         <View style={{ paddingHorizontal: theme.spacing.lg }}>
           {/* Title and Price */}
@@ -987,11 +1004,114 @@ export default function ListingDetailScreen() {
               style={{ marginBottom: theme.spacing.md }}
             />
 
-            <View style={{ flexDirection: 'row', gap: theme.spacing.sm, flexWrap: 'wrap' }}>
-              <Badge text={listing.condition} variant="info" />
-              <Badge text={`${listing.quantity} available`} variant="neutral" />
+            {/* Professional Badge Section */}
+            <View style={{ 
+              flexDirection: 'row', 
+              gap: theme.spacing.sm, 
+              flexWrap: 'wrap',
+              marginTop: theme.spacing.sm,
+            }}>
+              {/* Condition Badge */}
+              <View style={{
+                backgroundColor: theme.colors.primary + '15',
+                borderWidth: 1,
+                borderColor: theme.colors.primary + '30',
+                borderRadius: theme.borderRadius.full,
+                paddingHorizontal: theme.spacing.md,
+                paddingVertical: theme.spacing.sm,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.xs,
+              }}>
+                <Text style={{ fontSize: 14, color: theme.colors.primary }}>🔍</Text>
+                <Text 
+                  variant="bodySmall" 
+                  style={{ 
+                    color: theme.colors.primary,
+                    fontWeight: '600',
+                    textTransform: 'capitalize'
+                  }}
+                >
+                  {listing.condition?.replace('_', ' ') || 'Unknown'}
+                </Text>
+              </View>
+
+              {/* Accepts Offers Badge */}
               {listing.accept_offers && (
-                <Badge text="Accepts Offers" variant="success" />
+                <View style={{
+                  backgroundColor: theme.colors.success + '15',
+                  borderWidth: 1,
+                  borderColor: theme.colors.success + '30',
+                  borderRadius: theme.borderRadius.full,
+                  paddingHorizontal: theme.spacing.md,
+                  paddingVertical: theme.spacing.sm,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: theme.spacing.xs,
+                }}>
+                  <Text style={{ fontSize: 14, color: theme.colors.success }}>💰</Text>
+                  <Text 
+                    variant="bodySmall" 
+                    style={{ 
+                      color: theme.colors.success,
+                      fontWeight: '600'
+                    }}
+                  >
+                    Accepts Offers
+                  </Text>
+                </View>
+              )}
+
+              {/* Boost Badge */}
+              {listing.boost_until && new Date(listing.boost_until) > new Date() && (
+                <View style={{
+                  backgroundColor: theme.colors.warning + '15',
+                  borderWidth: 1,
+                  borderColor: theme.colors.warning + '30',
+                  borderRadius: theme.borderRadius.full,
+                  paddingHorizontal: theme.spacing.md,
+                  paddingVertical: theme.spacing.sm,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: theme.spacing.xs,
+                }}>
+                  <Text style={{ fontSize: 14, color: theme.colors.warning }}>⚡</Text>
+                  <Text 
+                    variant="bodySmall" 
+                    style={{ 
+                      color: theme.colors.warning,
+                      fontWeight: '600'
+                    }}
+                  >
+                    Boosted
+                  </Text>
+                </View>
+              )}
+
+              {/* Verification Badge */}
+              {listing.profiles?.is_verified && (
+                <View style={{
+                  backgroundColor: theme.colors.success + '15',
+                  borderWidth: 1,
+                  borderColor: theme.colors.success + '30',
+                  borderRadius: theme.borderRadius.full,
+                  paddingHorizontal: theme.spacing.md,
+                  paddingVertical: theme.spacing.sm,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: theme.spacing.xs,
+                }}>
+                  <Text style={{ fontSize: 14, color: theme.colors.success }}>✅</Text>
+                  <Text 
+                    variant="bodySmall" 
+                    style={{ 
+                      color: theme.colors.success,
+                      fontWeight: '600'
+                    }}
+                  >
+                    Verified Seller
+                  </Text>
+                </View>
               )}
             </View>
           </View>
@@ -1000,20 +1120,36 @@ export default function ListingDetailScreen() {
           {pendingOffer && (
             <View
               style={{
-                backgroundColor: theme.colors.warning + '10',
-                borderColor: theme.colors.warning,
+                backgroundColor: theme.colors.warning + '15',
+                borderColor: theme.colors.warning + '30',
                 borderWidth: 1,
-                borderRadius: theme.borderRadius.md,
+                borderRadius: theme.borderRadius.lg,
                 padding: theme.spacing.lg,
                 marginBottom: theme.spacing.lg,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.md,
               }}
             >
-              <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.sm }}>
-                💰 Offer Pending
-              </Text>
-              <Text variant="bodySmall" color="secondary">
-                Your offer of GHS {(pendingOffer.amount || 0).toLocaleString()} is waiting for the seller&apos;s response.
-              </Text>
+              <View style={{
+                backgroundColor: theme.colors.warning + '20',
+                borderRadius: theme.borderRadius.full,
+                padding: theme.spacing.sm,
+              }}>
+                <Text style={{ fontSize: 20 }}>💰</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text variant="body" style={{ 
+                  fontWeight: '600', 
+                  color: theme.colors.warning,
+                  marginBottom: theme.spacing.xs 
+                }}>
+                  Offer Pending
+                </Text>
+                <Text variant="bodySmall" style={{ color: theme.colors.text.secondary }}>
+                  Your offer of GHS {(pendingOffer.amount || 0).toLocaleString()} is waiting for the seller&apos;s response.
+                </Text>
+              </View>
             </View>
           )}
 
@@ -1023,78 +1159,13 @@ export default function ListingDetailScreen() {
               Description
             </Text>
             <Text variant="body" style={{ lineHeight: 24 }}>
-              {listing.description}
+              {listing.description?.split('\n\n📋')[0] || listing.description}
             </Text>
           </View>
 
-          {/* Item Details */}
+          {/* Item Details Table */}
           <View style={{ marginBottom: theme.spacing.xl }}>
-            <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
-              Item Details
-            </Text>
-            <View
-              style={{
-                backgroundColor: theme.colors.surfaceVariant,
-                borderRadius: theme.borderRadius.md,
-                padding: theme.spacing.lg,
-                gap: theme.spacing.md,
-              }}
-            >
-              {/* Category */}
-              {listing.categories && (
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text variant="body" color="secondary">Category</Text>
-                  <Text variant="body" style={{ fontWeight: '600' }}>
-                    {listing.categories.name}
-                  </Text>
-                </View>
-              )}
-              
-              {/* Condition */}
-              {listing.condition && (
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text variant="body" color="secondary">Condition</Text>
-                  <Text variant="body" style={{ fontWeight: '600', textTransform: 'capitalize' }}>
-                    {listing.condition.replace('_', ' ')}
-                  </Text>
-                </View>
-              )}
-              
-              {/* Quantity */}
-              {listing.quantity && listing.quantity > 1 && (
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text variant="body" color="secondary">Quantity Available</Text>
-                  <Text variant="body" style={{ fontWeight: '600' }}>
-                    {listing.quantity}
-                  </Text>
-                </View>
-              )}
-              
-              {/* Accept Offers */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text variant="body" color="secondary">Accepts Offers</Text>
-                <Text variant="body" style={{ fontWeight: '600', color: listing.accept_offers ? theme.colors.success : theme.colors.text.secondary }}>
-                  {listing.accept_offers ? 'Yes' : 'No'}
-                </Text>
-              </View>
-              
-              {/* Category Attributes */}
-              {listing.category_attributes && Object.keys(listing.category_attributes).length > 0 && (
-                <>
-                  <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: theme.spacing.sm }} />
-                  {Object.entries(listing.category_attributes).map(([key, value]) => (
-                    <View key={key} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text variant="body" color="secondary" style={{ textTransform: 'capitalize' }}>
-                        {key.replace('_', ' ')}
-                      </Text>
-                      <Text variant="body" style={{ fontWeight: '600' }}>
-                        {Array.isArray(value) ? value.join(', ') : String(value)}
-                      </Text>
-                    </View>
-                  ))}
-                </>
-              )}
-            </View>
+            <ItemDetailsTable listing={listing} />
           </View>
 
           {/* Location */}
@@ -1107,41 +1178,9 @@ export default function ListingDetailScreen() {
             </Text>
           </View>
 
-          {/* Stats */}
-          <View
-            style={{
-              backgroundColor: theme.colors.surfaceVariant,
-              borderRadius: theme.borderRadius.md,
-              padding: theme.spacing.lg,
-              marginBottom: theme.spacing.xl,
-            }}
-          >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
-              <View style={{ alignItems: 'center' }}>
-                <Text variant="h4" style={{ fontWeight: '700' }}>
-                  {listing.views_count || 0}
-                </Text>
-                <Text variant="caption" color="muted">
-                  Views
-                </Text>
-              </View>
-              <View style={{ alignItems: 'center' }}>
-                <Text variant="h4" style={{ fontWeight: '700' }}>
-                  {listing.favorites_count || 0}
-                </Text>
-                <Text variant="caption" color="muted">
-                  Favorites
-                </Text>
-              </View>
-              <View style={{ alignItems: 'center' }}>
-                <Text variant="h4" style={{ fontWeight: '700' }}>
-                  {new Date(listing.created_at).toLocaleDateString()}
-                </Text>
-                <Text variant="caption" color="muted">
-                  Listed
-                </Text>
-              </View>
-            </View>
+          {/* Listing Statistics Table */}
+          <View style={{ marginBottom: theme.spacing.xl }}>
+            <ListingStatsTable listing={listing} />
           </View>
         </View>
 

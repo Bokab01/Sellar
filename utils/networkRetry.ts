@@ -135,17 +135,25 @@ export class NetworkRetryManager {
     
     // Log suspicious activity for excessive failures
     if (fullConfig.maxAttempts >= 3 && fullConfig.enableLogging) {
-      await logSuspiciousActivity(
-        undefined,
-        'network_operation_failed_all_retries',
-        {
-          context,
-          attempts: fullConfig.maxAttempts,
-          totalTime,
-          error: lastError?.message,
-          networkStatus: this.networkStatus,
-        }
-      );
+      // TEMPORARILY DISABLED: Security logging to prevent infinite loops
+      console.warn('Security logging disabled: network operation failed all retries', {
+        context,
+        attempts: fullConfig.maxAttempts,
+        totalTime,
+        error: lastError?.message,
+        networkStatus: this.networkStatus,
+      });
+      // await logSuspiciousActivity(
+      //   undefined,
+      //   'network_operation_failed_all_retries',
+      //   {
+      //     context,
+      //     attempts: fullConfig.maxAttempts,
+      //     totalTime,
+      //     error: lastError?.message,
+      //     networkStatus: this.networkStatus,
+      //   }
+      // );
     }
 
     return {

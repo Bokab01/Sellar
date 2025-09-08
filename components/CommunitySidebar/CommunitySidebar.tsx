@@ -3,6 +3,7 @@ import { View, ScrollView, TouchableOpacity, Dimensions, Animated, Alert } from 
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useProfile } from '@/hooks/useProfile';
+import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
 import {
@@ -68,8 +69,8 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
   const { theme } = useTheme();
   const { user } = useAuthStore();
   const { profile } = useProfile();
+  const { balance: creditBalance, lifetimeEarned, refreshCredits } = useMonetizationStore();
   const [userStats, setUserStats] = useState<UserStats | null>(null);
-  const [userCredits, setUserCredits] = useState<UserCredits | null>(null);
   const [trendingUsers, setTrendingUsers] = useState<TrendingUser[]>([]);
   const [loading, setLoading] = useState(true);
   const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
@@ -77,6 +78,10 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
   useEffect(() => {
     if (isVisible) {
       fetchSidebarData();
+      // Refresh credits when sidebar opens
+      if (user && creditBalance === 0) {
+        refreshCredits();
+      }
       // Animate in
       Animated.timing(slideAnim, {
         toValue: 0,
@@ -91,7 +96,7 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
         useNativeDriver: true,
       }).start();
     }
-  }, [isVisible, user]);
+  }, [isVisible, user, creditBalance, refreshCredits]);
 
   const fetchSidebarData = async () => {
     try {
@@ -122,22 +127,7 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
           });
         }
 
-        // Fetch user credits (safely handle if RPC doesn't exist yet)
-        try {
-          const { data: credits, error: creditsError } = await supabase.rpc('get_user_credits', { 
-            user_uuid: user.id 
-          });
-          
-          if (credits && !creditsError) {
-            setUserCredits(credits);
-          } else {
-            // Set default credits if RPC doesn't exist or returns error
-            setUserCredits({ balance: 0, lifetime_earned: 0 });
-          }
-        } catch (creditsError) {
-          console.log('Credits RPC not available yet:', creditsError);
-          setUserCredits({ balance: 0, lifetime_earned: 0 });
-        }
+        // Credits are now handled by the monetization store
       }
 
       // Fetch trending users (most followers in last 30 days)
@@ -336,30 +326,28 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
             ) : (
               <View style={{ gap: theme.spacing.md }}>
                 {/* Credits Section */}
-                {userCredits && (
-                  <View
-                    style={{
-                      backgroundColor: theme.colors.primary + '10',
-                      borderRadius: theme.borderRadius.md,
-                      padding: theme.spacing.md,
-                      borderWidth: 1,
-                      borderColor: theme.colors.primary + '20',
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.xs }}>
-                      <Coins size={16} color={theme.colors.primary} />
-                      <Text variant="caption" style={{ marginLeft: theme.spacing.xs, fontWeight: '600' }}>
-                        Available Credits
-                      </Text>
-                    </View>
-                    <Text variant="h3" color="primary" style={{ fontWeight: '700' }}>
-                      {((userCredits?.balance) || 0).toLocaleString()}
-                    </Text>
-                    <Text variant="caption" color="muted">
-                      Lifetime earned: {((userCredits?.lifetime_earned) || 0).toLocaleString()}
+                <View
+                  style={{
+                    backgroundColor: theme.colors.primary + '10',
+                    borderRadius: theme.borderRadius.md,
+                    padding: theme.spacing.md,
+                    borderWidth: 1,
+                    borderColor: theme.colors.primary + '20',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.xs }}>
+                    <Coins size={16} color={theme.colors.primary} />
+                    <Text variant="caption" style={{ marginLeft: theme.spacing.xs, fontWeight: '600' }}>
+                      Available Credits
                     </Text>
                   </View>
-                )}
+                  <Text variant="h3" color="primary" style={{ fontWeight: '700' }}>
+                    {(creditBalance || 0).toLocaleString()}
+                  </Text>
+                  <Text variant="caption" color="muted">
+                    Lifetime earned: {(lifetimeEarned || 0).toLocaleString()}
+                  </Text>
+                </View>
 
                 {/* Stats Grid */}
                 {userStats && (

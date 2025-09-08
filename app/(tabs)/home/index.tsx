@@ -21,6 +21,9 @@ import {
   FilterSheet,
   EmptyState,
   LoadingSkeleton,
+  ProfessionalBadge,
+  BoostBadge,
+  VerifiedBadge,
   // Temporarily disabled performance components
   // ProductVirtualizedList,
   // LazyComponent,
@@ -302,7 +305,7 @@ export default function HomeScreen() {
   // Real-time updates should handle new listings automatically
   // Removed useFocusEffect to prevent blinking - relying on enhanced real-time updates
 
-  // Transform database listings to component format with full-bleed styling
+  // Transform database listings to component format with professional styling
   const transformedProducts = products.map((listing: any) => {
     // Handle both joined and simple listing data
     const seller = listing.profiles || null;
@@ -339,6 +342,11 @@ export default function HomeScreen() {
       views: listing.views_count || 0,
       favorites: listing.favorites_count || 0,
       isBoosted: listing.boost_until && new Date(listing.boost_until) > new Date(),
+      // Additional data for professional badges
+      condition: listing.condition,
+      acceptOffers: listing.accept_offers,
+      isVerified: seller?.is_verified || false,
+      category: listing.categories?.name || 'General',
     };
   });
 
@@ -629,7 +637,7 @@ export default function HomeScreen() {
                     alignItems: 'center',
                     paddingHorizontal: theme.spacing.lg,
                     paddingVertical: theme.spacing.md,
-                    borderRadius: 25, // Pill shape
+                    borderRadius: theme.borderRadius.full,
                     backgroundColor: isSelected 
                       ? theme.colors.primary 
                       : theme.colors.surface,
@@ -639,7 +647,11 @@ export default function HomeScreen() {
                       : theme.colors.border,
                     gap: theme.spacing.sm,
                     minHeight: 48,
-                    ...theme.shadows.sm,
+                    shadowColor: isSelected ? theme.colors.primary : theme.colors.text.primary,
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: isSelected ? 0.3 : 0.1,
+                    shadowRadius: 4,
+                    elevation: isSelected ? 4 : 2,
                   }}
                   activeOpacity={0.7}
                 >
@@ -676,13 +688,17 @@ export default function HomeScreen() {
                   <View
                     style={{
                       backgroundColor: isSelected 
-                        ? theme.colors.primaryForeground + '20' 
-                        : theme.colors.primary + '10',
-                      borderRadius: 12,
+                        ? theme.colors.primaryForeground + '25' 
+                        : theme.colors.primary + '15',
+                      borderRadius: theme.borderRadius.full,
                       paddingHorizontal: theme.spacing.sm,
-                      paddingVertical: 2,
-                      minWidth: 24,
+                      paddingVertical: theme.spacing.xs,
+                      minWidth: 28,
                       alignItems: 'center',
+                      borderWidth: 1,
+                      borderColor: isSelected 
+                        ? theme.colors.primaryForeground + '30' 
+                        : theme.colors.primary + '20',
                     }}
                   >
                     <Text
@@ -692,7 +708,7 @@ export default function HomeScreen() {
                           ? theme.colors.primaryForeground 
                           : theme.colors.primary,
                         fontSize: 11,
-                        fontWeight: '600',
+                        fontWeight: '700',
                       }}
                     >
                       {categoryCountsLoading 
@@ -769,21 +785,43 @@ export default function HomeScreen() {
                 />
               }
             >
-              {/* Full-Width ProductCard Grid */}
+              {/* Enhanced ProductCard Grid with Professional Badges */}
               <Grid columns={2} spacing={4}>
                 {transformedProducts.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    image={product.image}
-                    title={product.title}
-                    price={product.price}
-                    seller={product.seller}
-                    badge={product.badge}
-                    location={product.location}
-                    layout="grid"
-                    fullWidth={true}
-                    onPress={() => router.push(`/(tabs)/home/${product.id}`)}
-                  />
+                  <View key={product.id} style={{ position: 'relative' }}>
+                    <ProductCard
+                      image={product.image}
+                      title={product.title}
+                      price={product.price}
+                      seller={product.seller}
+                      badge={product.badge}
+                      location={product.location}
+                      layout="grid"
+                      fullWidth={true}
+                      onPress={() => router.push(`/(tabs)/home/${product.id}`)}
+                    />
+                    
+                    {/* Professional Badges Overlay */}
+                    <View style={{
+                      position: 'absolute',
+                      top: theme.spacing.sm,
+                      left: theme.spacing.sm,
+                      right: theme.spacing.sm,
+                      flexDirection: 'row',
+                      flexWrap: 'wrap',
+                      gap: theme.spacing.xs,
+                    }}>
+                      {/* Boost Badge */}
+                      {product.isBoosted && (
+                        <BoostBadge size="sm" />
+                      )}
+                      
+                      {/* Verified Seller Badge */}
+                      {product.isVerified && (
+                        <VerifiedBadge size="sm" />
+                      )}
+                    </View>
+                  </View>
                 ))}
               </Grid>
             </ScrollView>

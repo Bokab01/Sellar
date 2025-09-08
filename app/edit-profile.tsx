@@ -270,8 +270,9 @@ export default function EditProfileScreen() {
   };
 
   const getCompletionColor = () => {
-    if (completion.percentage >= 80) return theme.colors.success;
-    if (completion.percentage >= 50) return theme.colors.warning;
+    const percentage = completion?.percentage || 0;
+    if (percentage >= 80) return theme.colors.success;
+    if (percentage >= 50) return theme.colors.warning;
     return theme.colors.error;
   };
 
@@ -417,8 +418,8 @@ export default function EditProfileScreen() {
             }}>
               <Text style={{ fontSize: 18, fontWeight: '600' }}>Profile Completion</Text>
               <Badge 
-                text={`${completion.percentage}%`}
-                variant={completion.percentage >= 80 ? 'success' : completion.percentage >= 50 ? 'warning' : 'error'}
+                text={`${completion?.percentage || 0}%`}
+                variant={(completion?.percentage || 0) >= 80 ? 'success' : (completion?.percentage || 0) >= 50 ? 'warning' : 'error'}
               />
             </View>
 
@@ -430,7 +431,7 @@ export default function EditProfileScreen() {
             }}>
               <View style={{
                 height: '100%',
-                width: `${completion.percentage}%`,
+                width: `${completion?.percentage || 0}%`,
                 backgroundColor: getCompletionColor(),
                 borderRadius: 4,
               }} />
@@ -506,8 +507,9 @@ export default function EditProfileScreen() {
                 value={formData.bio}
                 onChangeText={(value) => updateFormField('bio', value)}
                 placeholder="Tell others about yourself"
-                multiline
-                numberOfLines={4}
+                autoExpand
+                minHeight={80}
+                maxHeight={200}
               />
             </View>
           )}
@@ -684,8 +686,9 @@ export default function EditProfileScreen() {
                     value={formData.business_description}
                     onChangeText={(value) => updateFormField('business_description', value)}
                     placeholder="Describe your business"
-                    multiline
-                    numberOfLines={3}
+                    autoExpand
+                    minHeight={80}
+                    maxHeight={150}
                   />
 
                   <Input

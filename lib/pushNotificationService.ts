@@ -213,7 +213,7 @@ class PushNotificationService {
       const { error } = await supabase
         .from('device_tokens')
         .upsert(deviceInfo, {
-          onConflict: 'user_id,token',
+          onConflict: 'token',
         });
 
       if (error) {

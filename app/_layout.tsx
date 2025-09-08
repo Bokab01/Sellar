@@ -1,4 +1,7 @@
 import 'react-native-get-random-values'; // Must be imported before any crypto operations
+
+// EMERGENCY: Disable security logging to stop infinite loops
+
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
@@ -21,7 +24,10 @@ function AppContent() {
   const { theme, isDarkMode } = useTheme();
   
   useFrameworkReady();
-  usePushNotifications();
+  
+  // Temporarily disable push notifications to prevent infinite loop
+  // TODO: Re-enable after fixing the database constraint issue
+  // usePushNotifications();
   
   // Initialize performance monitoring
   const { startTimer, endTimer } = usePerformanceMonitor();

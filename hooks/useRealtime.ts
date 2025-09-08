@@ -18,6 +18,12 @@ export function useRealtime({
   onDelete,
 }: UseRealtimeOptions) {
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const callbacksRef = useRef({ onInsert, onUpdate, onDelete });
+
+  // Update callbacks ref when they change
+  useEffect(() => {
+    callbacksRef.current = { onInsert, onUpdate, onDelete };
+  }, [onInsert, onUpdate, onDelete]);
 
   useEffect(() => {
     // Create channel
@@ -34,13 +40,13 @@ export function useRealtime({
         (payload) => {
           switch (payload.eventType) {
             case 'INSERT':
-              onInsert?.(payload.new);
+              callbacksRef.current.onInsert?.(payload.new);
               break;
             case 'UPDATE':
-              onUpdate?.(payload.new);
+              callbacksRef.current.onUpdate?.(payload.new);
               break;
             case 'DELETE':
-              onDelete?.(payload.old);
+              callbacksRef.current.onDelete?.(payload.old);
               break;
           }
         }
@@ -54,7 +60,7 @@ export function useRealtime({
         supabase.removeChannel(channelRef.current);
       }
     };
-  }, [table, filter, onInsert, onUpdate, onDelete]);
+  }, [table, filter]); // Only depend on table and filter, not callbacks
 
   return channelRef.current;
 }
@@ -126,8 +132,54 @@ export function useListingsRealtime(onListingUpdate: (listing: any) => void) {
 export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
   return useRealtime({
     table: 'posts',
-    onInsert: onPostUpdate,
-    onUpdate: onPostUpdate,
+    onInsert: async (payload) => {
+      // Fetch the complete post data with joins for new posts
+      try {
+        const { data, error } = await supabase
+          .from('posts')
+          .select(`
+            *,
+            profiles!posts_user_id_fkey(*),
+            listings!posts_listing_id_fkey(*)
+          `)
+          .eq('id', payload.id)
+          .single();
+        
+        if (!error && data) {
+          onPostUpdate(data);
+        } else {
+          // Fallback to the raw payload if fetch fails
+          onPostUpdate(payload);
+        }
+      } catch (err) {
+        // Fallback to the raw payload if fetch fails
+        onPostUpdate(payload);
+      }
+    },
+    onUpdate: async (payload) => {
+      // Fetch the complete post data with joins for updated posts
+      try {
+        const { data, error } = await supabase
+          .from('posts')
+          .select(`
+            *,
+            profiles!posts_user_id_fkey(*),
+            listings!posts_listing_id_fkey(*)
+          `)
+          .eq('id', payload.id)
+          .single();
+        
+        if (!error && data) {
+          onPostUpdate(data);
+        } else {
+          // Fallback to the raw payload if fetch fails
+          onPostUpdate(payload);
+        }
+      } catch (err) {
+        // Fallback to the raw payload if fetch fails
+        onPostUpdate(payload);
+      }
+    },
   });
 }
 

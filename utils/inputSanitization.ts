@@ -180,12 +180,20 @@ export class InputSanitizer {
 
     // Step 9: Log suspicious activity if enabled
     if (logSuspiciousActivity && threats.length > 0) {
-      // Use setTimeout to avoid blocking the main thread
-      setTimeout(() => {
-        InputSanitizer.logSecurityThreat(original, threats, 'input_field').catch(error => {
-          console.error('Failed to log security threat:', error);
-        });
-      }, 0);
+      // TEMPORARILY DISABLED: Log to console only until security_events table is created
+      console.warn('Security threat detected (database logging disabled):', {
+        field: 'input_field',
+        threats: threats.length,
+        severity: threats.map(t => t.severity),
+        patterns: threats.map(t => t.pattern.substring(0, 20))
+      });
+      
+      // TODO: Re-enable when security_events table is created
+      // setTimeout(() => {
+      //   InputSanitizer.logSecurityThreat(original, threats, 'input_field').catch(error => {
+      //     console.error('Failed to log security threat:', error);
+      //   });
+      // }, 0);
     }
 
     return {

@@ -267,12 +267,13 @@ export function ProfileEditModal({ visible, onClose, onProfileUpdated }: Profile
               />
 
               <Input
-                variant="multiline"
                 label="Bio"
                 placeholder="Tell others about yourself..."
                 value={formData.bio}
                 onChangeText={(text) => setFormData(prev => ({ ...prev, bio: text }))}
-                style={{ minHeight: 80 }}
+                autoExpand
+                minHeight={80}
+                maxHeight={200}
                 maxLength={500}
               />
 

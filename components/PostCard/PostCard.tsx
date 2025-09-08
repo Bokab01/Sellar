@@ -13,6 +13,7 @@ import { Rating } from '@/components/Rating/Rating';
 import { Badge } from '@/components/Badge/Badge';
 import { ImageViewer } from '@/components/ImageViewer';
 import { useImageViewer } from '@/hooks/useImageViewer';
+import { PostImage, ThumbnailImage } from '@/components/ResponsiveImage/ResponsiveImage';
 import { 
   Heart, 
   MessageCircle, 
@@ -347,15 +348,11 @@ export function PostCard({
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
             {post.listing.image && (
-              <Image
+              <ThumbnailImage
                 source={{ uri: post.listing.image }}
-                style={{
-                  width: 60,
-                  height: 60,
-                  borderRadius: theme.borderRadius.sm,
-                  backgroundColor: theme.colors.border,
-                }}
-                resizeMode="cover"
+                size={60}
+                borderRadius={theme.borderRadius.sm}
+                backgroundColor={theme.colors.border}
               />
             )}
             <View style={{ flex: 1 }}>
@@ -379,14 +376,12 @@ export function PostCard({
               activeOpacity={0.9}
               onPress={() => openImageViewer(0)}
             >
-              <Image
+              <PostImage
                 source={{ uri: post.images[0] }}
-                style={{
-                  width: '100%',
-                  height: 250,
+                containerStyle={{
                   backgroundColor: theme.colors.surfaceVariant,
+                  borderRadius: theme.borderRadius.sm,
                 }}
-                resizeMode="cover"
               />
               {/* Image viewer indicator */}
               <View style={{
@@ -417,15 +412,11 @@ export function PostCard({
                   activeOpacity={0.9}
                   onPress={() => openImageViewer(index)}
                 >
-                  <Image
+                  <ThumbnailImage
                     source={{ uri: imageUrl }}
-                    style={{
-                      width: 200,
-                      height: 200,
-                      borderRadius: theme.borderRadius.md,
-                      backgroundColor: theme.colors.surfaceVariant,
-                    }}
-                    resizeMode="cover"
+                    size={200}
+                    borderRadius={theme.borderRadius.md}
+                    backgroundColor={theme.colors.surfaceVariant}
                   />
                   {/* Multiple images indicator */}
                   {index === 0 && post.images && post.images.length > 1 && (

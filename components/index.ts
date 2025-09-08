@@ -224,3 +224,18 @@ export * from '../hooks/useVerification';
 
 // Verification Services
 export * from '../lib/verificationService';
+
+// Data Table Components
+export { DataTable, ItemDetailsTable, SellerInfoTable, ListingStatsTable } from './DataTable';
+export type { DataTableProps, DataTableRow } from './DataTable';
+
+// Professional Badge Components
+export { 
+  ProfessionalBadge, 
+  ConditionBadge, 
+  OffersBadge, 
+  BoostBadge, 
+  VerifiedBadge, 
+  QuantityBadge 
+} from './ProfessionalBadge';
+export type { ProfessionalBadgeProps } from './ProfessionalBadge';

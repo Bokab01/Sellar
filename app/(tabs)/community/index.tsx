@@ -50,34 +50,54 @@ export default function CommunityScreen() {
   };
 
   // Transform database posts to component format with enhanced features
-  const transformedPosts = posts.map((post: any) => ({
-    id: post.id,
-    type: post.type || (post.listings ? 'listing' : 'general'), // Determine post type
-    author: {
-      id: post.profiles?.id,
-      name: `${post.profiles?.first_name || 'User'} ${post.profiles?.last_name || ''}`,
-      avatar: post.profiles?.avatar_url,
-      rating: post.profiles?.rating_average || 0, // Use actual rating_average from database
-      reviewCount: post.profiles?.rating_count || post.profiles?.total_reviews || 0, // Use actual review count
-      isVerified: post.profiles?.is_verified,
-      location: post.profiles?.location, // Use actual location from database
-      profile: post.profiles, // Add the full profile object for UserDisplayName
-    },
-    timestamp: new Date(post.created_at || new Date()).toLocaleString(),
-    content: post.content,
-    images: post.images || [],
-    likes: post.likes_count || 0,
-    comments: post.comments_count || 0,
-    shares: post.shares_count || 0,
-    isLiked: false, // TODO: Check if current user liked this post
-    location: post.location,
-    listing: post.listings ? {
-      id: post.listings.id,
-      title: post.listings.title,
-      price: post.listings.price,
-      image: post.listings.images?.[0],
-    } : undefined,
-  }));
+  const transformedPosts = posts.map((post: any) => {
+    // Safety check for post data
+    if (!post || typeof post !== 'object') {
+      console.warn('Invalid post data:', post);
+      return null;
+    }
+
+    return {
+      id: post.id || 'unknown',
+      type: post.type || (post.listings ? 'listing' : 'general'),
+      author: {
+        id: post.profiles?.id || 'unknown',
+        name: (() => {
+          const firstName = post.profiles?.first_name || '';
+          const lastName = post.profiles?.last_name || '';
+          if (firstName && lastName) {
+            return `${firstName} ${lastName}`.trim();
+          } else if (firstName) {
+            return firstName.trim();
+          } else if (lastName) {
+            return lastName.trim();
+          } else {
+            return 'User';
+          }
+        })(),
+        avatar: post.profiles?.avatar_url || null,
+        rating: Number(post.profiles?.rating) || 0,
+        reviewCount: Number(post.profiles?.rating_count || post.profiles?.total_reviews) || 0,
+        isVerified: Boolean(post.profiles?.is_verified),
+        location: post.profiles?.location || null,
+        profile: post.profiles || null,
+      },
+      timestamp: new Date(post.created_at || new Date()).toLocaleString(),
+      content: post.content || '',
+      images: Array.isArray(post.images) ? post.images : [],
+      likes: Number(post.likes_count) || 0,
+      comments: Number(post.comments_count) || 0,
+      shares: Number(post.shares_count) || 0,
+      isLiked: false,
+      location: post.location || null,
+      listing: post.listings ? {
+        id: post.listings.id || 'unknown',
+        title: post.listings.title || 'Untitled',
+        price: Number(post.listings.price) || 0,
+        image: post.listings.images?.[0] || null,
+      } : undefined,
+    };
+  }).filter(Boolean); // Remove any null entries
 
 
   return (

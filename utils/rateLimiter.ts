@@ -94,7 +94,16 @@ export class RateLimiter {
 
         // Log rate limit exceeded
         if (this.config.enableLogging) {
-          await logRateLimitExceeded(identifier, action, validAttempts.length);
+          // TEMPORARILY DISABLED: Log to console only until security_events table is created
+          console.warn('Rate limit exceeded (database logging disabled):', {
+            identifier,
+            action,
+            attempts: validAttempts.length,
+            maxAttempts: this.config.maxAttempts
+          });
+          
+          // TODO: Re-enable when security_events table is created
+          // await logRateLimitExceeded(identifier, action, validAttempts.length);
         }
 
         return {
@@ -236,16 +245,25 @@ export class RateLimiter {
       // Suspicious if more than 3 attempts in the last minute
       if (recentAttempts.length > 3) {
         if (this.config.enableLogging) {
-          await logSuspiciousActivity(
-            undefined,
-            'rapid_authentication_attempts',
-            {
-              identifier,
-              action,
-              attemptsInLastMinute: recentAttempts.length,
-              totalAttempts: record.attempts.length,
-            }
-          );
+          // TEMPORARILY DISABLED: Log to console only until security_events table is created
+          console.warn('Rate limit suspicious activity detected (database logging disabled):', {
+            identifier,
+            action,
+            attemptsInLastMinute: recentAttempts.length,
+            totalAttempts: record.attempts.length,
+          });
+          
+          // TODO: Re-enable when security_events table is created
+          // await logSuspiciousActivity(
+          //   undefined,
+          //   'rapid_authentication_attempts',
+          //   {
+          //     identifier,
+          //     action,
+          //     attemptsInLastMinute: recentAttempts.length,
+          //     totalAttempts: record.attempts.length,
+          //   }
+          // );
         }
         return true;
       }

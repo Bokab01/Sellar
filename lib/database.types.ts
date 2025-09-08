@@ -475,7 +475,7 @@ export interface Database {
         Row: {
           id: string;
           reviewer_id: string;
-          reviewed_id: string;
+          reviewed_user_id: string;
           listing_id: string | null;
           rating: number;
           comment: string;
@@ -487,7 +487,7 @@ export interface Database {
         Insert: {
           id?: string;
           reviewer_id: string;
-          reviewed_id: string;
+          reviewed_user_id: string;
           listing_id?: string | null;
           rating: number;
           comment: string;
@@ -499,7 +499,7 @@ export interface Database {
         Update: {
           id?: string;
           reviewer_id?: string;
-          reviewed_id?: string;
+          reviewed_user_id?: string;
           listing_id?: string | null;
           rating?: number;
           comment?: string;

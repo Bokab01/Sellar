@@ -75,11 +75,13 @@ export default function MoreScreen() {
   useEffect(() => {
     if (user) {
       fetchUserData();
-      // Don't call refreshCredits here - it causes infinite re-renders
-      // Credits should already be loaded from the store
+      // Refresh credits if balance is 0 (likely not loaded yet)
+      if (balance === 0) {
+        refreshCredits();
+      }
       refreshSubscription();
     }
-  }, [user]);
+  }, [user, balance, refreshCredits, refreshSubscription]);
 
   const fetchUserData = async () => {
     if (!user) return;
@@ -164,7 +166,7 @@ export default function MoreScreen() {
   const lastName = user?.user_metadata?.last_name || profile?.last_name || '';
   const fullName = `${firstName || 'User'} ${lastName || ''}`.trim() || 'User';
   const walletBalance = profile?.wallet_balance || 0;
-  const creditBalance = profile?.credit_balance || 0;
+  const creditBalance = balance; // Use monetization store balance
 
   const menuSections = [
     {

@@ -131,16 +131,23 @@ export function useSessionTimeout(config: Partial<SessionTimeoutConfig> = {}) {
         
         // Log suspicious activity if multiple refresh failures (but not for invalid tokens)
         if (refreshAttemptsRef.current >= 2 && errorInfo.type !== 'refresh_token') {
-          await logSuspiciousActivity(
-            user?.id,
-            'multiple_session_refresh_failures',
-            {
-              attempts: refreshAttemptsRef.current,
-              error: error.message,
-              errorType: errorInfo.type,
-              userId: user?.id,
-            }
-          );
+          // TEMPORARILY DISABLED: Security logging to prevent infinite loops
+          console.warn('Security logging disabled: multiple session refresh failures', {
+            attempts: refreshAttemptsRef.current,
+            error: error.message,
+            errorType: errorInfo.type,
+            userId: user?.id,
+          });
+          // await logSuspiciousActivity(
+          //   user?.id,
+          //   'multiple_session_refresh_failures',
+          //   {
+          //     attempts: refreshAttemptsRef.current,
+          //     error: error.message,
+          //     errorType: errorInfo.type,
+          //     userId: user?.id,
+          //   }
+          // );
         }
         
         return false;

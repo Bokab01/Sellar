@@ -117,7 +117,7 @@ export default function MyPostsScreen() {
       id: user?.id || '',
       name: profile?.full_name || `${user?.user_metadata?.first_name || 'User'} ${user?.user_metadata?.last_name || ''}`,
       avatar: profile?.avatar_url || user?.user_metadata?.avatar_url,
-      rating: (profile as any)?.rating_average || 0, // Use actual rating_average from profile
+      rating: (profile as any)?.rating || 0, // Use actual rating from profile
       reviewCount: (profile as any)?.rating_count || (profile as any)?.total_reviews || 0, // Use actual review count
       isVerified: profile?.is_verified || false,
       location: profile?.location, // Use actual location from profile

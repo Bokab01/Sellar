@@ -31,14 +31,41 @@ export const storageHelpers = {
       try {
         console.log(`Upload attempt ${attempt}/${retries} for image: ${uri}`);
         
-        // Enhanced compression with multiple sizes
+        // Get original image dimensions first
+        const originalImageInfo = await ImageManipulator.manipulateAsync(uri, [], { format: ImageManipulator.SaveFormat.JPEG });
+        
+        // Calculate optimal dimensions while preserving aspect ratio
+        const maxWidth = 1920;
+        const maxHeight = 1920;
+        
+        let targetWidth = originalImageInfo.width;
+        let targetHeight = originalImageInfo.height;
+        
+        // Only resize if the image is larger than our maximum dimensions
+        if (originalImageInfo.width > maxWidth || originalImageInfo.height > maxHeight) {
+          const aspectRatio = originalImageInfo.width / originalImageInfo.height;
+          
+          if (originalImageInfo.width > originalImageInfo.height) {
+            // Landscape: limit by width
+            targetWidth = maxWidth;
+            targetHeight = Math.round(maxWidth / aspectRatio);
+          } else {
+            // Portrait or square: limit by height
+            targetHeight = maxHeight;
+            targetWidth = Math.round(maxHeight * aspectRatio);
+          }
+        }
+        
+        console.log(`Original: ${originalImageInfo.width}x${originalImageInfo.height}, Target: ${targetWidth}x${targetHeight}`);
+        
+        // Enhanced compression with aspect ratio preservation
         const manipulatedImage = await ImageManipulator.manipulateAsync(
           uri,
           [
-            { resize: { width: 1920, height: 1080 } }, // Max size for high quality
+            { resize: { width: targetWidth, height: targetHeight } }, // Preserve aspect ratio
           ],
           {
-            compress: 0.85, // Higher quality for original
+            compress: 0.9, // Higher quality (0.9 instead of 0.85)
             format: ImageManipulator.SaveFormat.JPEG,
           }
         );
@@ -145,18 +172,81 @@ export const storageHelpers = {
           console.log('Base64 upload failed, trying blob method...', b64UploadError);
         }
 
-        const { data, error } = { data: null, error: { message: 'All direct methods failed' } };
-
-        if (error) {
-          console.log('Direct upload failed, trying blob method...', error.message);
+        // If we reach here, all direct upload methods failed
+        console.log('All direct upload methods failed, trying improved blob method...');
+        
+        // Improved fallback to blob method with better error handling
+        try {
+          // Try to read the file directly using FileSystem instead of fetch
+          console.log('Reading file using FileSystem...');
+          const fileInfo = await FileSystem.getInfoAsync(manipulatedImage.uri);
           
-          // Fallback to blob method
+          if (!fileInfo.exists) {
+            throw new Error('Manipulated image file does not exist');
+          }
+          
+          console.log('File info:', fileInfo);
+          
+          // Read file as base64 and convert to Uint8Array
+          const base64Data = await FileSystem.readAsStringAsync(manipulatedImage.uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          
+          // Convert base64 to Uint8Array
+          const binaryString = atob(base64Data);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          
+          console.log('File converted to bytes, size:', bytes.length);
+          
+          const { data: blobData, error: blobError } = await supabase.storage
+            .from(bucket)
+            .upload(filename, bytes, {
+              contentType: 'image/jpeg',
+              upsert: true,
+            });
+
+          if (blobError) {
+            throw new Error(`Upload failed: ${blobError.message}`);
+          }
+          
+          console.log('Blob upload successful:', blobData.path);
+          
+          // Get public URL
+          const { data: urlData } = supabase.storage
+            .from(bucket)
+            .getPublicUrl(blobData.path);
+
+          // Trigger image optimization pipeline if enabled
+          if (enableOptimization && userId) {
+            try {
+              console.log('🔄 Triggering image optimization pipeline...');
+              await triggerImageOptimization(bucket, blobData.path, userId);
+            } catch (optimizationError) {
+              console.warn('⚠️ Image optimization failed (non-critical):', optimizationError);
+              // Don't fail the upload if optimization fails
+            }
+          }
+
+          return {
+            url: urlData.publicUrl,
+            path: blobData.path,
+          };
+        } catch (fileSystemError) {
+          console.log('FileSystem method failed, trying fetch with retry...', fileSystemError);
+          
+          // Last resort: try fetch with retry and better error handling
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 30000);
+          const timeoutId = setTimeout(() => controller.abort(), 45000); // Increased timeout
           
           try {
             const response = await fetch(manipulatedImage.uri, {
               signal: controller.signal,
+              headers: {
+                'Accept': 'image/*',
+              },
             });
             clearTimeout(timeoutId);
             
@@ -191,32 +281,9 @@ export const storageHelpers = {
             };
           } catch (fetchError) {
             clearTimeout(timeoutId);
-            throw fetchError;
+            throw new Error(`All upload methods failed. Last error: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`);
           }
         }
-
-        console.log('Direct upload successful:', (data as any)?.path);
-
-        // Get public URL
-        const { data: urlData } = supabase.storage
-          .from(bucket)
-          .getPublicUrl((data as any)?.path || '');
-
-        // Trigger image optimization pipeline if enabled
-        if (enableOptimization && userId) {
-          try {
-            console.log('🔄 Triggering image optimization pipeline...');
-            await triggerImageOptimization(bucket, (data as any)?.path || '', userId);
-          } catch (optimizationError) {
-            console.warn('⚠️ Image optimization failed (non-critical):', optimizationError);
-            // Don't fail the upload if optimization fails
-          }
-        }
-
-        return {
-          url: urlData.publicUrl,
-          path: (data as any)?.path || '',
-        };
       } catch (error) {
         lastError = error as Error;
         console.error(`Upload attempt ${attempt} failed:`, error);

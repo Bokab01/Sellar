@@ -56,14 +56,29 @@ export function useNewUserDetection() {
           return;
         }
 
-        // Check if user was created within the last 24 hours
+        // Check if user has completed onboarding
         // Use type assertion with unknown first for safety
         const typedProfile = profile as unknown as Profile;
+        
+        // Check if onboarding_completed field exists and is true
+        const hasCompletedOnboarding = (typedProfile as any).onboarding_completed === true;
+        
+        if (hasCompletedOnboarding) {
+          // User has completed onboarding, they are not new
+          setState({
+            isNewUser: false,
+            loading: false,
+            error: null,
+          });
+          return;
+        }
+
+        // If no onboarding_completed field, check if user was created within the last 24 hours
         const profileCreatedAt = new Date(typedProfile.created_at);
         const now = new Date();
         const hoursSinceCreation = (now.getTime() - profileCreatedAt.getTime()) / (1000 * 60 * 60);
 
-        // Consider user "new" if profile was created within last 24 hours
+        // Consider user "new" if profile was created within last 24 hours and hasn't completed onboarding
         const isNewUser = hoursSinceCreation < 24;
 
         setState({
@@ -91,10 +106,20 @@ export function useNewUserDetection() {
 // Helper function to mark user as "not new" (call this after they complete onboarding)
 export async function markUserAsExisting(userId: string): Promise<void> {
   try {
-    // We could update a field in the profile to mark them as having completed onboarding
-    // For now, we'll just log it - the 24-hour window will handle the rest
-    console.log(`User ${userId} has completed onboarding`);
+    // Update the profile to mark that the user has completed onboarding
+    const { error } = await dbHelpers.updateProfile(userId, {
+      onboarding_completed: true,
+      onboarding_completed_at: new Date().toISOString(),
+    });
+
+    if (error) {
+      console.error('Error updating profile for onboarding completion:', error);
+      throw error;
+    }
+
+    console.log(`User ${userId} has completed onboarding and been marked as existing`);
   } catch (error) {
     console.error('Error marking user as existing:', error);
+    throw error;
   }
 }

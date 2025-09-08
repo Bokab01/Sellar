@@ -30,6 +30,37 @@ export const dbHelpers = {
 
   async getProfile(userId: string) {
     const { data, error } = await db.profiles.select('*').eq('id', userId).single();
+    
+    // If profile doesn't exist, try to create it
+    if (error && (error.code === 'PGRST116' || error.message.includes('0 rows'))) {
+      console.log('Profile not found, attempting to create missing profile...');
+      
+      // Get user data from auth
+      const { data: authUser, error: authError } = await supabase.auth.getUser();
+      
+      if (!authError && authUser.user) {
+        const firstName = authUser.user.user_metadata?.firstName || '';
+        const lastName = authUser.user.user_metadata?.lastName || '';
+        const fullName = firstName && lastName ? `${firstName} ${lastName}`.trim() : 'User';
+        
+        const { data: newProfile, error: createError } = await db.profiles
+          .insert({
+            id: userId,
+            full_name: fullName,
+            email: authUser.user.email || '',
+            phone: authUser.user.user_metadata?.phone || null,
+            location: authUser.user.user_metadata?.location || 'Accra, Greater Accra',
+            is_business: authUser.user.user_metadata?.is_business || false,
+          })
+          .select()
+          .single();
+        
+        if (!createError) {
+          return { data: newProfile, error: null };
+        }
+      }
+    }
+    
     return { data, error };
   },
 

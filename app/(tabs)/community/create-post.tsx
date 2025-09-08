@@ -94,7 +94,7 @@ export default function CreatePostScreen() {
         setSelectedListing(null);
         setPostType('general');
         router.back();
-      }, 1500);
+      }, 2000); // Increased delay to allow real-time update to process
     } catch (error: any) {
       console.error('Error creating post:', error);
       Alert.alert('Error', 'Failed to create post. Please try again.');

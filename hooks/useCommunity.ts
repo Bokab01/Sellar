@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { dbHelpers, supabase } from '@/lib/supabase';
 import { useCommunityRealtime } from './useRealtime';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -10,7 +10,7 @@ export function useCommunityPosts(options: { following?: boolean; limit?: number
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchPosts = async (isRefresh = false) => {
+  const fetchPosts = useCallback(async (isRefresh = false) => {
     try {
       if (isRefresh) {
         setRefreshing(true);
@@ -36,10 +36,10 @@ export function useCommunityPosts(options: { following?: boolean; limit?: number
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [options.following, options.userId, options.limit]);
 
   // Real-time updates
-  useCommunityRealtime((newPost) => {
+  const handleRealtimeUpdate = useCallback((newPost: any) => {
     setPosts(prev => {
       const exists = prev.find(item => item.id === newPost.id);
       if (exists) {
@@ -48,7 +48,9 @@ export function useCommunityPosts(options: { following?: boolean; limit?: number
         return [newPost, ...prev];
       }
     });
-  });
+  }, []);
+
+  useCommunityRealtime(handleRealtimeUpdate);
 
   useEffect(() => {
     fetchPosts();
@@ -77,7 +79,7 @@ export function useCommunityPosts(options: { following?: boolean; limit?: number
     }
   };
 
-  const refresh = () => fetchPosts(true);
+  const refresh = useCallback(() => fetchPosts(true), [fetchPosts]);
 
   const likePost = async (postId: string) => {
     if (!user) return { error: 'Not authenticated' };

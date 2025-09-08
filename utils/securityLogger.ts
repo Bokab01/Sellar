@@ -37,6 +37,9 @@ export class SecurityLogger {
   private static instance: SecurityLogger;
   private eventQueue: SecurityEvent[] = [];
   private isProcessing = false;
+  private retryCount = 0;
+  private maxRetries = 3;
+  private isDisabled = false; // Temporary disable flag
 
   static getInstance(): SecurityLogger {
     if (!SecurityLogger.instance) {
@@ -49,6 +52,22 @@ export class SecurityLogger {
    * Log a security event
    */
   async logSecurityEvent(event: Omit<SecurityEvent, 'timestamp'>): Promise<void> {
+    // Check global disable flag
+    if ((global as any).__SECURITY_LOGGING_DISABLED__) {
+      console.warn('Security logging globally disabled:', event.eventType);
+      return;
+    }
+    
+    // If disabled, only log to console
+    if (this.isDisabled) {
+      const securityEvent: SecurityEvent = {
+        ...event,
+        timestamp: new Date().toISOString(),
+      };
+      this.logToConsole(securityEvent);
+      return;
+    }
+
     const securityEvent: SecurityEvent = {
       ...event,
       timestamp: new Date().toISOString(),
@@ -170,12 +189,36 @@ export class SecurityLogger {
       const batchSize = 10;
       while (this.eventQueue.length > 0) {
         const batch = this.eventQueue.splice(0, batchSize);
-        await this.storeBatch(batch);
+        const success = await this.storeBatch(batch);
+        
+        if (!success) {
+          // If storage failed, check retry count
+          if (this.retryCount < this.maxRetries) {
+            this.retryCount++;
+            console.warn(`Security event storage failed, retry ${this.retryCount}/${this.maxRetries}`);
+            // Re-queue the batch for retry
+            this.eventQueue.unshift(...batch);
+            // Wait before retrying (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, Math.pow(2, this.retryCount) * 1000));
+          } else {
+            console.error('Max retries reached for security event storage, temporarily disabling database logging');
+            this.retryCount = 0; // Reset for future events
+            this.isDisabled = true; // Temporarily disable database logging
+            // Re-enable after 5 minutes
+            setTimeout(() => {
+              this.isDisabled = false;
+              console.log('Security event database logging re-enabled');
+            }, 5 * 60 * 1000);
+            break;
+          }
+        } else {
+          // Reset retry count on success
+          this.retryCount = 0;
+        }
       }
     } catch (error) {
       console.error('Error processing security event queue:', error);
-      // Re-queue failed events (simple retry mechanism)
-      // In production, you might want more sophisticated retry logic
+      // Don't re-queue on unexpected errors to prevent infinite loops
     } finally {
       this.isProcessing = false;
     }
@@ -184,7 +227,7 @@ export class SecurityLogger {
   /**
    * Store a batch of events to the database
    */
-  private async storeBatch(events: SecurityEvent[]): Promise<void> {
+  private async storeBatch(events: SecurityEvent[]): Promise<boolean> {
     try {
       // Store to security_events table (would need to be created)
       const { error } = await db.security_events.insert(events.map(event => ({
@@ -200,10 +243,13 @@ export class SecurityLogger {
 
       if (error) {
         console.error('Error storing security events:', error);
-        // In production, you might want to fall back to a different storage method
+        return false; // Indicate failure
       }
+      
+      return true; // Indicate success
     } catch (error) {
       console.error('Error in storeBatch:', error);
+      return false; // Indicate failure
     }
   }
 
@@ -246,6 +292,22 @@ export class SecurityLogger {
       case 'low': return '📝';
       default: return '🔍';
     }
+  }
+
+  /**
+   * Temporarily disable database logging (console logging still works)
+   */
+  disableDatabaseLogging(): void {
+    this.isDisabled = true;
+    console.log('Security event database logging disabled');
+  }
+
+  /**
+   * Re-enable database logging
+   */
+  enableDatabaseLogging(): void {
+    this.isDisabled = false;
+    console.log('Security event database logging enabled');
   }
 
   /**
@@ -314,6 +376,12 @@ export const securityLogger = SecurityLogger.getInstance();
 
 // Convenience functions
 export const logInputThreat = (details: ThreatDetails) => {
+  // Check global disable flag
+  if ((global as any).__SECURITY_LOGGING_DISABLED__) {
+    console.warn('Security logging globally disabled: input threat');
+    return;
+  }
+  
   // Re-enabled security logging with better error handling
   securityLogger.logInputThreat(details).catch(error => {
     console.error('Security logging failed (non-blocking):', error);
@@ -324,21 +392,37 @@ export const logInputThreat = (details: ThreatDetails) => {
   });
 };
 export const logFailedLogin = (email: string, reason: string, details?: Record<string, any>) => {
+  if ((global as any).__SECURITY_LOGGING_DISABLED__) {
+    console.warn('Security logging globally disabled: failed login');
+    return;
+  }
   securityLogger.logFailedLogin(email, reason, details).catch(error => {
     console.error('Security logging failed (non-blocking):', error);
   });
 };
 export const logSuspiciousActivity = (userId: string | undefined, activity: string, details: Record<string, any>) => {
+  if ((global as any).__SECURITY_LOGGING_DISABLED__) {
+    console.warn('Security logging globally disabled: suspicious activity');
+    return;
+  }
   securityLogger.logSuspiciousActivity(userId, activity, details).catch(error => {
     console.error('Security logging failed (non-blocking):', error);
   });
 };
 export const logRateLimitExceeded = (identifier: string, endpoint: string, attempts: number) => {
+  if ((global as any).__SECURITY_LOGGING_DISABLED__) {
+    console.warn('Security logging globally disabled: rate limit exceeded');
+    return;
+  }
   securityLogger.logRateLimitExceeded(identifier, endpoint, attempts).catch(error => {
     console.error('Security logging failed (non-blocking):', error);
   });
 };
 export const logAccountLockout = (email: string, reason: string) => {
+  if ((global as any).__SECURITY_LOGGING_DISABLED__) {
+    console.warn('Security logging globally disabled: account lockout');
+    return;
+  }
   securityLogger.logAccountLockout(email, reason).catch(error => {
     console.error('Security logging failed (non-blocking):', error);
   });

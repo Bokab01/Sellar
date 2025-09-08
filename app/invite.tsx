@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { View, ScrollView, Share, Linking, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, ScrollView, Share, Linking, Alert, Clipboard } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { router } from 'expo-router';
+import { supabase } from '@/lib/supabase';
 import {
   Text,
   SafeAreaWrapper,
@@ -31,22 +32,55 @@ export default function InviteScreen() {
   
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
-
-  // Mock data - TODO: Get from backend
-  const inviteStats = {
-    totalInvites: 12,
-    successfulInvites: 8,
-    pendingInvites: 4,
-    totalEarned: 80.00,
-  };
+  const [inviteStats, setInviteStats] = useState({
+    totalInvites: 0,
+    successfulInvites: 0,
+    pendingInvites: 0,
+    totalEarned: 0,
+  });
+  const [loading, setLoading] = useState(true);
 
   const referralCode = user?.id?.slice(-8).toUpperCase() || 'SELLAR123';
   const inviteLink = `https://sellar.gh/join?ref=${referralCode}`;
   const inviteMessage = `Hey! I've been using Sellar to buy and sell in Ghana and it's amazing! 🇬🇭\n\nJoin me and get started with free credits: ${inviteLink}\n\nUse my code: ${referralCode}`;
 
+  // Fetch referral stats
+  useEffect(() => {
+    fetchReferralStats();
+  }, [user]);
+
+  const fetchReferralStats = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.rpc('get_user_referral_stats', {
+        p_user_id: user.id
+      });
+
+      if (error) {
+        console.error('Error fetching referral stats:', error);
+        return;
+      }
+
+      if (data) {
+        setInviteStats({
+          totalInvites: data.total_invites || 0,
+          successfulInvites: data.successful_invites || 0,
+          pendingInvites: data.pending_invites || 0,
+          totalEarned: data.total_earned || 0,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching referral stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCopyLink = async () => {
     try {
-      // TODO: Implement clipboard copy
+      await Clipboard.setString(inviteLink);
       setToastMessage('Invite link copied to clipboard!');
       setShowToast(true);
     } catch (error) {
@@ -56,7 +90,7 @@ export default function InviteScreen() {
 
   const handleCopyCode = async () => {
     try {
-      // TODO: Implement clipboard copy
+      await Clipboard.setString(referralCode);
       setToastMessage('Referral code copied!');
       setShowToast(true);
     } catch (error) {
@@ -121,7 +155,7 @@ export default function InviteScreen() {
                 marginBottom: theme.spacing.sm,
               }}
             >
-              Earn GHS 10
+              Earn 20 Credits
             </Text>
             <Text
               variant="body"
@@ -131,7 +165,7 @@ export default function InviteScreen() {
                 lineHeight: 22,
               }}
             >
-              For each friend who joins and makes their first sale
+              For each friend who joins using your referral code
             </Text>
           </View>
 
@@ -164,7 +198,7 @@ export default function InviteScreen() {
             >
               <View style={{ alignItems: 'center' }}>
                 <Text variant="h3" style={{ fontWeight: '700', color: theme.colors.primary }}>
-                  {inviteStats.totalInvites}
+                  {loading ? '...' : inviteStats.totalInvites}
                 </Text>
                 <Text variant="caption" color="muted">
                   Total Invites
@@ -172,7 +206,7 @@ export default function InviteScreen() {
               </View>
               <View style={{ alignItems: 'center' }}>
                 <Text variant="h3" style={{ fontWeight: '700', color: theme.colors.success }}>
-                  {inviteStats.successfulInvites}
+                  {loading ? '...' : inviteStats.successfulInvites}
                 </Text>
                 <Text variant="caption" color="muted">
                   Successful
@@ -180,7 +214,7 @@ export default function InviteScreen() {
               </View>
               <View style={{ alignItems: 'center' }}>
                 <Text variant="h3" style={{ fontWeight: '700', color: theme.colors.warning }}>
-                  {inviteStats.pendingInvites}
+                  {loading ? '...' : inviteStats.pendingInvites}
                 </Text>
                 <Text variant="caption" color="muted">
                   Pending
@@ -192,11 +226,16 @@ export default function InviteScreen() {
               <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.sm }}>
                 Total Earned
               </Text>
-              <PriceDisplay
-                amount={inviteStats.totalEarned}
-                size="lg"
-                currency="GHS"
-              />
+              <Text 
+                variant="h2" 
+                style={{ 
+                  color: theme.colors.success, 
+                  fontWeight: '700',
+                  textAlign: 'center'
+                }}
+              >
+                {loading ? '...' : `${inviteStats.totalEarned} Credits`}
+              </Text>
             </View>
           </View>
 
@@ -378,7 +417,7 @@ export default function InviteScreen() {
                     You both earn rewards
                   </Text>
                   <Text variant="bodySmall" color="secondary">
-                    Get GHS 10 when they make their first sale, they get 20 free credits
+                    You both get 20 credits when they complete signup using your code
                   </Text>
                 </View>
               </View>

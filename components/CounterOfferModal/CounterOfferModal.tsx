@@ -300,8 +300,9 @@ export function CounterOfferModal({
               value={counterMessage}
               onChangeText={setCounterMessage}
               placeholder="Explain your counter offer..."
-              multiline
-              numberOfLines={3}
+              autoExpand
+              minHeight={80}
+              maxHeight={150}
               maxLength={300}
               style={{ marginBottom: theme.spacing.md }}
             />

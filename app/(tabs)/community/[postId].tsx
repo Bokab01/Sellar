@@ -48,7 +48,7 @@ export default function PostDetailScreen() {
             last_name,
             full_name,
             avatar_url,
-            rating_average,
+            rating,
             rating_count,
             total_reviews,
             location,
