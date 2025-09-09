@@ -2,6 +2,9 @@ import React from 'react';
 import { View, TouchableOpacity, Image } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
+import { ReadReceipt } from '@/components/ReadReceipt/ReadReceipt';
+import { ImageViewer } from '@/components/ImageViewer/ImageViewer';
+import { useImageViewer } from '@/hooks/useImageViewer';
 
 type MessageType = 'text' | 'image' | 'offer' | 'system';
 type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
@@ -30,6 +33,18 @@ export function ChatBubble({
   images,
 }: ChatBubbleProps) {
   const { theme } = useTheme();
+  
+  // Image viewer hook
+  const {
+    visible: imageViewerVisible,
+    openViewer,
+    closeViewer,
+    shareImage,
+    downloadImage,
+  } = useImageViewer({
+    images: images || [],
+    initialIndex: 0,
+  });
 
   const getBubbleColors = () => {
     if (type === 'system') {
@@ -161,10 +176,14 @@ export function ChatBubble({
           </Text>
 
           {/* Images */}
-          {images && images.length > 0 && (
+          {images && Array.isArray(images) && images.length > 0 && (
             <View style={{ marginBottom: theme.spacing.sm }}>
               {images.map((imageUrl, index) => (
-                <TouchableOpacity key={index} activeOpacity={0.8}>
+                <TouchableOpacity 
+                  key={index} 
+                  activeOpacity={0.8}
+                  onPress={() => openViewer(index)}
+                >
                   <Image
                     source={{ uri: imageUrl }}
                     style={{
@@ -176,6 +195,29 @@ export function ChatBubble({
                     }}
                     resizeMode="cover"
                   />
+                  {/* Image overlay indicator */}
+                  <View
+                    style={{
+                      position: 'absolute',
+                      bottom: (index < images.length - 1 ? theme.spacing.sm : 0) + theme.spacing.xs,
+                      right: theme.spacing.xs,
+                      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                      borderRadius: theme.borderRadius.sm,
+                      paddingHorizontal: theme.spacing.sm,
+                      paddingVertical: theme.spacing.xs,
+                    }}
+                  >
+                    <Text
+                      variant="caption"
+                      style={{
+                        color: 'white',
+                        fontSize: 10,
+                        fontWeight: '600',
+                      }}
+                    >
+                      {images.length > 1 ? `${index + 1}/${images.length}` : '📷'}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               ))}
             </View>
@@ -201,24 +243,26 @@ export function ChatBubble({
               {timestamp}
             </Text>
 
-            {getStatusIcon() && (
-              <Text
-                style={{
-                  color: status === 'read' 
-                    ? theme.colors.success 
-                    : isOwn 
-                    ? 'rgba(255,255,255,0.7)'
-                    : theme.colors.text.muted,
-                  fontSize: 12,
-                  marginLeft: theme.spacing.sm,
-                }}
-              >
-                {getStatusIcon()}
-              </Text>
+            {isOwn && (
+              <ReadReceipt
+                isRead={status === 'read'}
+                isDelivered={status !== 'sending' && status !== 'failed'}
+                size={12}
+                style={{ marginLeft: theme.spacing.sm }}
+              />
             )}
           </View>
         </View>
       </TouchableOpacity>
+
+      {/* Image Viewer */}
+      <ImageViewer
+        visible={imageViewerVisible}
+        images={images || []}
+        onClose={closeViewer}
+        onShare={shareImage}
+        onDownload={downloadImage}
+      />
     </View>
   );
 }

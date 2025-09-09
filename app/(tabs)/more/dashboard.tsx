@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { router } from 'expo-router';
@@ -25,6 +25,8 @@ import {
 } from 'lucide-react-native';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { useAuth } from '@/hooks/useAuth';
+import { useBusinessFeatures } from '@/hooks/useBusinessFeatures';
+import { useAnalytics, type QuickStats, type AnalyticsData } from '@/lib/analyticsService';
 
 // Import dashboard components with direct imports to avoid circular dependencies
 import { AnalyticsDashboard } from '@/components/AnalyticsDashboard/AnalyticsDashboard';
@@ -38,7 +40,7 @@ interface TabConfig {
   id: DashboardTab;
   label: string;
   icon: React.ReactNode;
-  requiredTier: 'starter' | 'pro' | 'premium' | 'free';
+  requiredTier: 'business' | 'free';
   badge?: string;
 }
 
@@ -47,25 +49,27 @@ export default function BusinessDashboardScreen() {
   const { user } = useAuth();
   // Use selective subscriptions to prevent unnecessary re-renders
   const currentSubscription = useMonetizationStore(state => state.currentSubscription);
-  const hasBusinessPlan = useMonetizationStore(state => state.hasBusinessPlan);
   const refreshSubscription = useMonetizationStore(state => state.refreshSubscription);
-  const entitlements = useMonetizationStore(state => state.entitlements);
-
+  
+  // Use simplified business features hook
+  const businessFeatures = useBusinessFeatures();
+  const { getQuickStats, getBusinessAnalytics } = useAnalytics();
 
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [quickStats, setQuickStats] = useState<QuickStats>({
+    profileViews: 0,
+    totalMessages: 0,
+    totalReviews: 0,
+    averageRating: 0,
+  });
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
 
-  // Memoize current plan tier calculation
-  const currentTier = useMemo((): 'free' | 'starter' | 'pro' | 'premium' => {
-    if (!hasBusinessPlan()) return 'free';
-    
-    const planName = currentSubscription?.subscription_plans?.name?.toLowerCase();
-    if (planName?.includes('premium')) return 'premium';
-    if (planName?.includes('pro')) return 'pro';
-    if (planName?.includes('starter')) return 'starter';
-    return 'free';
-  }, [currentSubscription]); // Remove hasBusinessPlan from dependencies as it's a Zustand function
+  // Simplified tier calculation for unified plan
+  const currentTier = useMemo((): 'free' | 'business' => {
+    return businessFeatures.isBusinessUser ? 'business' : 'free';
+  }, [businessFeatures.isBusinessUser]);
 
   // Memoize available tabs to prevent unnecessary re-renders
   const availableTabs = useMemo((): TabConfig[] => {
@@ -78,64 +82,76 @@ export default function BusinessDashboardScreen() {
       },
     ];
 
-    // Add tabs based on tier
-    if (currentTier !== 'free') {
+    // Simplified: Add all business features for unified plan
+    if (currentTier === 'business') {
       tabs.push({
         id: 'analytics',
         label: 'Analytics',
         icon: <TrendingUp size={18} color={theme.colors.text.primary} />,
-        requiredTier: 'starter',
-        badge: currentTier === 'starter' ? 'Basic' : currentTier === 'pro' ? 'Advanced' : 'Full',
+        requiredTier: 'business',
+        badge: 'Comprehensive',
       });
-    }
 
-    if (currentTier === 'pro' || currentTier === 'premium') {
       tabs.push({
         id: 'autoboost',
         label: 'Auto-boost',
         icon: <Zap size={18} color={theme.colors.warning} />,
-        requiredTier: 'pro',
+        requiredTier: 'business',
       });
-    }
 
-    if (currentTier === 'premium') {
       tabs.push({
         id: 'support',
         label: 'Priority Support',
         icon: <HeadphonesIcon size={18} color={theme.colors.success} />,
-        requiredTier: 'premium',
+        requiredTier: 'business',
       });
 
       tabs.push({
         id: 'premium',
-        label: 'Premium Features',
+        label: 'Business Features',
         icon: <Crown size={18} color={theme.colors.primary} />,
-        requiredTier: 'premium',
+        requiredTier: 'business',
       });
     }
 
     return tabs;
   }, [currentTier, theme]);
 
-  useEffect(() => {
-    const initializeDashboard = async () => {
-      try {
-        setLoading(true);
-        await refreshSubscription();
-      } catch (error) {
-        console.error('Failed to initialize dashboard:', error);
-      } finally {
-        setLoading(false);
+  // Load dashboard data
+  const loadDashboardData = useCallback(async () => {
+    if (!user?.id) return;
+    
+    try {
+      setLoading(true);
+      
+      // Load subscription data
+      await refreshSubscription();
+      
+      // Load analytics data for business users
+      if (businessFeatures.isBusinessUser) {
+        const [stats, analytics] = await Promise.all([
+          getQuickStats(),
+          getBusinessAnalytics()
+        ]);
+        
+        setQuickStats(stats);
+        setAnalyticsData(analytics);
       }
-    };
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id, businessFeatures.isBusinessUser, refreshSubscription, getQuickStats, getBusinessAnalytics]);
 
-    initializeDashboard();
-  }, []); // Zustand store functions are stable and don't need to be in dependencies
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await refreshSubscription();
+      await loadDashboardData();
     } catch (error) {
       console.error('Failed to refresh dashboard:', error);
     } finally {
@@ -330,21 +346,21 @@ export default function BusinessDashboardScreen() {
               <View>
                 <Text variant="bodySmall" color="muted">Monthly Credits</Text>
                 <Text variant="h4" style={{ fontWeight: '600' }}>
-                  {entitlements.monthlyCredits || 0}
+                  120
                 </Text>
               </View>
               
               <View>
                 <Text variant="bodySmall" color="muted">Max Listings</Text>
                 <Text variant="h4" style={{ fontWeight: '600' }}>
-                  {entitlements.maxListings ? entitlements.maxListings : '∞'}
+                  ∞
                 </Text>
               </View>
               
               <View>
                 <Text variant="bodySmall" color="muted">Analytics</Text>
-                <Text variant="h4" style={{ fontWeight: '600', textTransform: 'capitalize' }}>
-                  {entitlements.analyticsLevel || 'None'}
+                <Text variant="h4" style={{ fontWeight: '600' }}>
+                  Comprehensive
                 </Text>
               </View>
             </View>
@@ -381,7 +397,7 @@ export default function BusinessDashboardScreen() {
             }}>
               <Users size={24} color={theme.colors.primary} />
               <Text variant="h4" style={{ fontWeight: '600', marginTop: theme.spacing.sm }}>
-                0
+                {loading ? '...' : quickStats.profileViews}
               </Text>
               <Text variant="bodySmall" color="muted">
                 Profile Views
@@ -399,7 +415,7 @@ export default function BusinessDashboardScreen() {
             }}>
               <MessageSquare size={24} color={theme.colors.success} />
               <Text variant="h4" style={{ fontWeight: '600', marginTop: theme.spacing.sm }}>
-                0
+                {loading ? '...' : quickStats.totalMessages}
               </Text>
               <Text variant="bodySmall" color="muted">
                 Messages
@@ -417,13 +433,92 @@ export default function BusinessDashboardScreen() {
             }}>
               <Star size={24} color={theme.colors.warning} />
               <Text variant="h4" style={{ fontWeight: '600', marginTop: theme.spacing.sm }}>
-                0
+                {loading ? '...' : quickStats.totalReviews}
               </Text>
               <Text variant="bodySmall" color="muted">
-                Reviews
+                Reviews ({quickStats.averageRating.toFixed(1)}★)
               </Text>
             </View>
           </View>
+
+          {/* Analytics Overview */}
+          {analyticsData && (
+            <View style={{
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.borderRadius.lg,
+              padding: theme.spacing.lg,
+              marginBottom: theme.spacing.lg,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+            }}>
+              <Text variant="h4" style={{ marginBottom: theme.spacing.lg }}>
+                Analytics Overview
+              </Text>
+              
+              {/* Key Metrics Row */}
+              <View style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                marginBottom: theme.spacing.lg,
+              }}>
+                <View style={{ alignItems: 'center' }}>
+                  <Text variant="h3" style={{ fontWeight: '600', color: theme.colors.primary }}>
+                    {analyticsData.totalViews}
+                  </Text>
+                  <Text variant="bodySmall" color="muted">Total Views</Text>
+                  <Text variant="caption" color={analyticsData.viewsThisWeek > analyticsData.viewsLastWeek ? 'success' : 'muted'}>
+                    {analyticsData.viewsThisWeek > analyticsData.viewsLastWeek ? '+' : ''}
+                    {((analyticsData.viewsThisWeek - analyticsData.viewsLastWeek) / Math.max(analyticsData.viewsLastWeek, 1) * 100).toFixed(0)}% this week
+                  </Text>
+                </View>
+                
+                <View style={{ alignItems: 'center' }}>
+                  <Text variant="h3" style={{ fontWeight: '600', color: theme.colors.success }}>
+                    {analyticsData.conversionRate.toFixed(1)}%
+                  </Text>
+                  <Text variant="bodySmall" color="muted">Conversion</Text>
+                  <Text variant="caption" color="muted">Views to Messages</Text>
+                </View>
+                
+                <View style={{ alignItems: 'center' }}>
+                  <Text variant="h3" style={{ fontWeight: '600', color: theme.colors.warning }}>
+                    {analyticsData.totalOffers}
+                  </Text>
+                  <Text variant="bodySmall" color="muted">Total Offers</Text>
+                  <Text variant="caption" color="muted">{analyticsData.activeListings} active listings</Text>
+                </View>
+              </View>
+
+              {/* Top Performing Listing */}
+              {analyticsData.topPerformingListings.length > 0 && (
+                <View>
+                  <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.md }}>
+                    Top Performing Listing
+                  </Text>
+                  <View style={{
+                    backgroundColor: theme.colors.surfaceVariant,
+                    borderRadius: theme.borderRadius.md,
+                    padding: theme.spacing.md,
+                  }}>
+                    <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.sm }}>
+                      {analyticsData.topPerformingListings[0].title}
+                    </Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text variant="bodySmall" color="muted">
+                        {analyticsData.topPerformingListings[0].views} views
+                      </Text>
+                      <Text variant="bodySmall" color="muted">
+                        {analyticsData.topPerformingListings[0].messages} messages
+                      </Text>
+                      <Text variant="bodySmall" color="muted">
+                        {analyticsData.topPerformingListings[0].offers} offers
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+            </View>
+          )}
 
           {/* Feature Access Cards */}
           <View style={{ gap: theme.spacing.md }}>
@@ -469,7 +564,7 @@ export default function BusinessDashboardScreen() {
         </ScrollView>
       </Container>
     );
-  }, [currentTier, theme, currentSubscription, entitlements, availableTabs]);
+  }, [currentTier, theme, currentSubscription, businessFeatures, availableTabs]);
 
   // Memoize tab content
   const renderTabContent = useMemo(() => {

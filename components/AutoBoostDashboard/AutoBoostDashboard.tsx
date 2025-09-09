@@ -20,6 +20,7 @@ import {
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
+import { useBusinessFeatures } from '@/hooks/useBusinessFeatures';
 import { supabase } from '@/lib/supabase';
 
 interface AutoBoostSettings {
@@ -40,7 +41,8 @@ interface AutoBoostSettings {
 export function AutoBoostDashboard() {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { entitlements, creditBalance } = useMonetizationStore();
+  const { creditBalance } = useMonetizationStore();
+  const businessFeatures = useBusinessFeatures();
   
   const [settings, setSettings] = useState<AutoBoostSettings>({
     enabled: false,
@@ -62,12 +64,11 @@ export function AutoBoostDashboard() {
 
     setLoading(true);
     try {
-      // Simulate fetching auto-boost settings
-      // In a real implementation, this would fetch from your database
+      // Fetch auto-boost settings for unified business plan
       const mockSettings: AutoBoostSettings = {
-        enabled: true,
-        boostDuration: entitlements.autoBoostDays || 3,
-        maxBoostsPerMonth: Math.floor((entitlements.monthlyCredits || 0) / 15), // 15 credits per boost
+        enabled: businessFeatures.hasAutoBoost,
+        boostDuration: 3, // Unified plan gets 3-day boosts
+        maxBoostsPerMonth: Math.floor(120 / 15), // 120 credits / 15 credits per boost = 8 boosts
         boostCreditsUsed: Math.floor(Math.random() * 50),
         nextBoostDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
         activeBoosts: [
@@ -124,7 +125,7 @@ export function AutoBoostDashboard() {
   };
 
   const getRemainingCredits = () => {
-    return Math.max(0, (entitlements.monthlyCredits || 0) - settings.boostCreditsUsed);
+    return Math.max(0, 120 - settings.boostCreditsUsed); // Unified plan has 120 monthly credits
   };
 
   const getEstimatedBoosts = () => {
@@ -200,7 +201,7 @@ export function AutoBoostDashboard() {
           <View>
             <Text variant="bodySmall" color="muted">Credits Used This Month</Text>
             <Text variant="h4" style={{ fontWeight: '600' }}>
-              {settings.boostCreditsUsed} / {entitlements.monthlyCredits || 0}
+              {settings.boostCreditsUsed} / 120
             </Text>
           </View>
           

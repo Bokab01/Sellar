@@ -4,6 +4,7 @@ import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { dbHelpers, supabase } from '@/lib/supabase';
+import { checkOfferLimit, type OfferLimitResult } from '@/utils/offerLimits';
 import {
   Text,
   SafeAreaWrapper,
@@ -64,6 +65,12 @@ export default function ListingDetailScreen() {
   // Status states
   // const [callbackRequested, setCallbackRequested] = useState(false);
   const [pendingOffer, setPendingOffer] = useState<any>(null);
+  const [offerLimitStatus, setOfferLimitStatus] = useState<OfferLimitResult>({
+    canMakeOffer: true,
+    totalOffers: 0,
+    remainingOffers: 3,
+    limitReached: false
+  });
   
   // Toast
   const [showToast, setShowToast] = useState(false);
@@ -248,6 +255,11 @@ export default function ListingDetailScreen() {
     if (!user) return;
 
     try {
+      // Check offer limits first
+      const limitResult = await checkOfferLimit(user.id, listingId!);
+      setOfferLimitStatus(limitResult);
+
+      // Check for pending offers
       const { data } = await supabase
         .from('offers')
         .select('*')
@@ -569,6 +581,12 @@ export default function ListingDetailScreen() {
       return;
     }
 
+    // Check offer limits
+    if (!offerLimitStatus.canMakeOffer) {
+      Alert.alert('Offer Limit Reached', offerLimitStatus.reason || 'You cannot make more offers for this listing.');
+      return;
+    }
+
     if (!offerAmount.trim()) {
       Alert.alert('Error', 'Please enter an offer amount');
       return;
@@ -673,6 +691,9 @@ export default function ListingDetailScreen() {
         status: 'pending',
         created_at: new Date().toISOString(),
       });
+
+      // Refresh offer limit status
+      await checkPendingOffer();
 
       setShowOfferModal(false);
       setOfferAmount('');
@@ -1461,7 +1482,7 @@ export default function ListingDetailScreen() {
         >
           <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
             {/* Make an Offer Button */}
-            {canMakeOffer ? (
+            {offerLimitStatus.canMakeOffer && !pendingOffer ? (
               <TouchableOpacity
                 onPress={() => setShowOfferModal(true)}
                 style={{
@@ -1502,6 +1523,28 @@ export default function ListingDetailScreen() {
                 <DollarSign size={20} color={theme.colors.text.muted} />
                 <Text variant="button" style={{ color: theme.colors.text.muted, fontWeight: '600' }}>
                   Offer Pending
+                </Text>
+              </TouchableOpacity>
+            ) : offerLimitStatus.limitReached ? (
+              <TouchableOpacity
+                disabled
+                style={{
+                  flex: 1,
+                  backgroundColor: theme.colors.error + '10',
+                  borderWidth: 1,
+                  borderColor: theme.colors.error + '30',
+                  borderRadius: theme.borderRadius.md,
+                  paddingVertical: theme.spacing.lg,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: theme.spacing.sm,
+                  opacity: 0.8,
+                }}
+              >
+                <DollarSign size={20} color={theme.colors.error} />
+                <Text variant="button" style={{ color: theme.colors.error, fontWeight: '600' }}>
+                  Offer Limit Reached
                 </Text>
               </TouchableOpacity>
             ) : null}

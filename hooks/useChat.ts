@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { dbHelpers, supabase } from '@/lib/supabase';
-import { useChatRealtime } from './useRealtime';
+import { useChatRealtime, useOffersRealtime } from './useRealtime';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useChatStore } from '@/store/useChatStore';
 
@@ -76,7 +76,7 @@ export function useMessages(conversationId: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -95,7 +95,7 @@ export function useMessages(conversationId: string) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [conversationId]);
 
   // Real-time message updates
   const handleNewMessage = useCallback(async (newMessage: any) => {
@@ -118,17 +118,20 @@ export function useMessages(conversationId: string) {
     }
     
     setMessages(prev => {
-      // Avoid duplicates
-      const exists = prev.find(msg => msg.id === newMessage.id);
-      if (exists) {
-        console.log('📨 Message already exists, skipping:', newMessage.id);
-        return prev;
+      // Check if message already exists
+      const existingIndex = prev.findIndex(msg => msg.id === newMessage.id);
+      
+      if (existingIndex !== -1) {
+        // Update existing message (for read receipts, status changes, etc.)
+        console.log('📨 Updating existing message:', newMessage.id);
+        const updatedMessages = [...prev];
+        updatedMessages[existingIndex] = { ...updatedMessages[existingIndex], ...newMessage };
+        return updatedMessages;
       }
       
       console.log('📨 Adding new message to list. Previous count:', prev.length);
       
-      // Add new message at the end (since we want chronological order)
-      // and ensure proper sorting by created_at
+      // Add new message and sort by created_at to maintain chronological order
       const updatedMessages = [...prev, newMessage].sort((a, b) => 
         new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       );
@@ -140,26 +143,46 @@ export function useMessages(conversationId: string) {
 
   useChatRealtime(conversationId, handleNewMessage);
 
+  // Real-time offer updates
+  const handleOfferUpdate = useCallback(async (updatedOffer: any) => {
+    console.log('🔗 Offer update received via real-time:', updatedOffer);
+    
+    // Refresh messages to get updated offer data
+    // This ensures the UI shows the latest offer statuses
+    setTimeout(() => {
+      fetchMessages();
+    }, 100); // Small delay to ensure database consistency
+  }, [fetchMessages]);
+
+  useOffersRealtime(conversationId, handleOfferUpdate);
+
   useEffect(() => {
     if (conversationId) {
       fetchMessages();
     }
   }, [conversationId]);
 
-  const sendMessage = async (content: string, messageType = 'text', offerData?: any) => {
+  const sendMessage = async (content: string, messageType = 'text', images?: string[], offerData?: any) => {
     const { user } = useAuthStore.getState();
     if (!user) return { error: 'Not authenticated' };
 
-    console.log('📤 Sending message:', { content, messageType, conversationId, senderId: user.id });
+    console.log('📤 Sending message:', { content, messageType, conversationId, senderId: user.id, images });
 
     try {
-      const { data, error } = await dbHelpers.sendMessage({
+      const messageData: any = {
         conversation_id: conversationId,
         sender_id: user.id,
         content,
         message_type: messageType,
         offer_data: offerData,
-      });
+      };
+
+      // Add images if provided
+      if (images && images.length > 0) {
+        messageData.images = JSON.stringify(images);
+      }
+
+      const { data, error } = await dbHelpers.sendMessage(messageData);
 
       if (error) {
         console.error('📤 Error sending message:', error);

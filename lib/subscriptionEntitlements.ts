@@ -96,24 +96,25 @@ class SubscriptionEntitlementsService {
       return this.getFreeUserEntitlements();
     }
 
+    // Simplified: Since we only have one business plan, all business users get all features
     const baseEntitlements: PlanEntitlements = {
       maxListings: plan.maxListings,
       freeListings: 5, // All plans get 5 free listings
       monthlyCredits: plan.boostCredits,
       boostCredits: plan.boostCredits,
       businessBadge: plan.badges.includes('business'),
-      prioritySellerBadge: (plan.badges as any).includes('priority_seller'),
-      premiumBadge: (plan.badges as any).includes('premium'),
-      autoBoost: plan.features.autoBoost || false,
-      autoBoostDays: (plan.features as any).autoBoostDays || 0,
-      analyticsLevel: plan.features.analytics as any || 'none',
-      prioritySupport: plan.features.prioritySupport || false,
-      accountManager: (plan.features as any).accountManager || false,
-      homepagePlacement: (plan.features as any).homepagePlacement || false,
-      premiumBranding: (plan.features as any).homepagePlacement || false, // Same as homepage placement
-      sponsoredPosts: (plan.features as any).accountManager || false, // Premium feature
-      bulkOperations: plan.maxListings === null, // Unlimited plans get bulk ops
-      apiAccess: (plan.features as any).accountManager || false, // Premium feature
+      prioritySellerBadge: plan.badges.includes('priority_seller'),
+      premiumBadge: plan.badges.includes('premium'),
+      autoBoost: plan.features.autoBoost,
+      autoBoostDays: plan.features.autoBoostDays || 3,
+      analyticsLevel: plan.features.analytics as any,
+      prioritySupport: plan.features.prioritySupport,
+      accountManager: plan.features.accountManager || false,
+      homepagePlacement: plan.features.homepagePlacement,
+      premiumBranding: plan.features.premiumBranding,
+      sponsoredPosts: plan.features.sponsoredPosts,
+      bulkOperations: plan.features.bulkOperations,
+      apiAccess: plan.features.apiAccess || false,
     };
 
     return baseEntitlements;
@@ -188,6 +189,44 @@ class SubscriptionEntitlementsService {
   async hasFeatureAccess(userId: string, feature: keyof PlanEntitlements): Promise<boolean> {
     const entitlements = await this.getUserEntitlements(userId);
     return Boolean(entitlements[feature]);
+  }
+
+  /**
+   * Simplified check if user is a business user (has any active subscription)
+   */
+  async isBusinessUser(userId: string): Promise<boolean> {
+    const subscription = await this.getCurrentSubscription(userId);
+    return subscription !== null && subscription.status === 'active';
+  }
+
+  /**
+   * Get all business features for a user (simplified for unified plan)
+   */
+  async getBusinessFeatures(userId: string): Promise<{
+    isBusinessUser: boolean;
+    hasAnalytics: boolean;
+    hasAutoBoost: boolean;
+    hasPrioritySupport: boolean;
+    hasUnlimitedListings: boolean;
+    hasHomepagePlacement: boolean;
+    hasPremiumBranding: boolean;
+    hasSponsoredPosts: boolean;
+    hasBulkOperations: boolean;
+  }> {
+    const isBusinessUser = await this.isBusinessUser(userId);
+    
+    // For unified plan, if user is business user, they get all features
+    return {
+      isBusinessUser,
+      hasAnalytics: isBusinessUser,
+      hasAutoBoost: isBusinessUser,
+      hasPrioritySupport: isBusinessUser,
+      hasUnlimitedListings: isBusinessUser,
+      hasHomepagePlacement: isBusinessUser,
+      hasPremiumBranding: isBusinessUser,
+      hasSponsoredPosts: isBusinessUser,
+      hasBulkOperations: isBusinessUser,
+    };
   }
 
   /**
@@ -442,4 +481,13 @@ export async function getUserSubscriptionBadges(userId: string) {
 
 export async function getUserAnalyticsAccess(userId: string) {
   return await subscriptionEntitlementsService.getSubscriptionAnalytics(userId);
+}
+
+// Simplified helpers for unified business plan
+export async function isBusinessUser(userId: string): Promise<boolean> {
+  return await subscriptionEntitlementsService.isBusinessUser(userId);
+}
+
+export async function getBusinessFeatures(userId: string) {
+  return await subscriptionEntitlementsService.getBusinessFeatures(userId);
 }

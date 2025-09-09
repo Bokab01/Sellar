@@ -7,6 +7,15 @@ import { AppModal } from '@/components/Modal/Modal';
 import { Chip } from '@/components/Chip/Chip';
 import { Input } from '@/components/Input/Input';
 import { Stepper } from '@/components/Stepper/Stepper';
+import { 
+  Filter, 
+  Tag, 
+  DollarSign, 
+  MapPin, 
+  ArrowUpDown, 
+  CheckCircle,
+  X
+} from 'lucide-react-native';
 
 interface FilterOptions {
   categories: string[];
@@ -97,6 +106,7 @@ export function FilterSheet({
       primaryAction={{
         text: 'Apply Filters',
         onPress: handleApply,
+        icon: <CheckCircle size={16} color="white" />,
       }}
       secondaryAction={{
         text: 'Clear All',
@@ -115,9 +125,23 @@ export function FilterSheet({
          <View style={{ gap: theme.spacing.xl }}>
           {/* Categories */}
           <View>
-            <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
-              Categories
-            </Text>
+            <View style={{ 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              marginBottom: theme.spacing.lg,
+              gap: theme.spacing.sm 
+            }}>
+              <View style={{
+                backgroundColor: theme.colors.primary + '15',
+                borderRadius: theme.borderRadius.md,
+                padding: theme.spacing.sm,
+              }}>
+                <Tag size={18} color={theme.colors.primary} />
+              </View>
+              <Text variant="h4" style={{ fontWeight: '600', color: theme.colors.text.primary }}>
+                Categories
+              </Text>
+            </View>
             <View style={{ 
               flexDirection: 'row', 
               flexWrap: 'wrap', 
@@ -137,10 +161,30 @@ export function FilterSheet({
 
           {/* Price Range */}
           <View>
-            <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
-              Price Range (GHS)
-            </Text>
-            <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
+            <View style={{ 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              marginBottom: theme.spacing.lg,
+              gap: theme.spacing.sm 
+            }}>
+              <View style={{
+                backgroundColor: theme.colors.success + '15',
+                borderRadius: theme.borderRadius.md,
+                padding: theme.spacing.sm,
+              }}>
+                <DollarSign size={18} color={theme.colors.success} />
+              </View>
+              <Text variant="h4" style={{ fontWeight: '600', color: theme.colors.text.primary }}>
+                Price Range (GHS)
+              </Text>
+            </View>
+            <View style={{ 
+              flexDirection: 'row', 
+              gap: theme.spacing.md,
+              backgroundColor: theme.colors.surfaceVariant,
+              padding: theme.spacing.md,
+              borderRadius: theme.borderRadius.md,
+            }}>
               <View style={{ flex: 1 }}>
                 <Input
                   label="Min Price"
@@ -154,6 +198,15 @@ export function FilterSheet({
                   }
                   keyboardType="numeric"
                 />
+              </View>
+              <View style={{ 
+                justifyContent: 'center', 
+                alignItems: 'center',
+                paddingHorizontal: theme.spacing.sm 
+              }}>
+                <Text variant="bodySmall" color="muted" style={{ fontWeight: '500' }}>
+                  to
+                </Text>
               </View>
               <View style={{ flex: 1 }}>
                 <Input
@@ -174,9 +227,23 @@ export function FilterSheet({
 
           {/* Condition */}
           <View>
-            <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
-              Condition
-            </Text>
+            <View style={{ 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              marginBottom: theme.spacing.lg,
+              gap: theme.spacing.sm 
+            }}>
+              <View style={{
+                backgroundColor: theme.colors.warning + '15',
+                borderRadius: theme.borderRadius.md,
+                padding: theme.spacing.sm,
+              }}>
+                <CheckCircle size={18} color={theme.colors.warning} />
+              </View>
+              <Text variant="h4" style={{ fontWeight: '600', color: theme.colors.text.primary }}>
+                Condition
+              </Text>
+            </View>
             <View style={{ 
               flexDirection: 'row', 
               flexWrap: 'wrap', 
@@ -196,23 +263,57 @@ export function FilterSheet({
 
           {/* Location */}
           <View>
-            <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
-              Location
-            </Text>
-            <Input
-              placeholder="Enter city or region"
-              value={localFilters.location}
-              onChangeText={(text) => 
-                setLocalFilters(prev => ({ ...prev, location: text }))
-              }
-            />
+            <View style={{ 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              marginBottom: theme.spacing.lg,
+              gap: theme.spacing.sm 
+            }}>
+              <View style={{
+                backgroundColor: theme.colors.info + '15',
+                borderRadius: theme.borderRadius.md,
+                padding: theme.spacing.sm,
+              }}>
+                <MapPin size={18} color={theme.colors.info} />
+              </View>
+              <Text variant="h4" style={{ fontWeight: '600', color: theme.colors.text.primary }}>
+                Location
+              </Text>
+            </View>
+            <View style={{
+              backgroundColor: theme.colors.surfaceVariant,
+              padding: theme.spacing.md,
+              borderRadius: theme.borderRadius.md,
+            }}>
+              <Input
+                placeholder="Enter city or region"
+                value={localFilters.location}
+                onChangeText={(text) => 
+                  setLocalFilters(prev => ({ ...prev, location: text }))
+                }
+              />
+            </View>
           </View>
 
           {/* Sort By */}
           <View>
-            <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
-              Sort By
-            </Text>
+            <View style={{ 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              marginBottom: theme.spacing.lg,
+              gap: theme.spacing.sm 
+            }}>
+              <View style={{
+                backgroundColor: theme.colors.secondary + '15',
+                borderRadius: theme.borderRadius.md,
+                padding: theme.spacing.sm,
+              }}>
+                <ArrowUpDown size={18} color={theme.colors.secondary} />
+              </View>
+              <Text variant="h4" style={{ fontWeight: '600', color: theme.colors.text.primary }}>
+                Sort By
+              </Text>
+            </View>
             <View style={{ 
               flexDirection: 'row', 
               flexWrap: 'wrap', 

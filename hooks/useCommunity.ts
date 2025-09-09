@@ -56,7 +56,7 @@ export function useCommunityPosts(options: { following?: boolean; limit?: number
     fetchPosts();
   }, [options.following, options.userId]);
 
-  const createPost = async (content: string, images: string[] = [], listingId?: string) => {
+  const createPost = async (content: string, images: string[] = [], listingId?: string, type?: string) => {
     if (!user) return { error: 'Not authenticated' };
 
     try {
@@ -65,6 +65,7 @@ export function useCommunityPosts(options: { following?: boolean; limit?: number
         content,
         images,
         listing_id: listingId,
+        type: type || 'general', // Default to 'general' if no type provided
       };
       
       const { data, error } = await dbHelpers.createPost(postData);
@@ -80,6 +81,51 @@ export function useCommunityPosts(options: { following?: boolean; limit?: number
   };
 
   const refresh = useCallback(() => fetchPosts(true), [fetchPosts]);
+
+  const updatePost = async (postId: string, updates: { content?: string; images?: string[]; type?: string; location?: string }) => {
+    if (!user) return { error: 'Not authenticated' };
+
+    try {
+      const { data, error } = await dbHelpers.updatePost(postId, {
+        ...updates,
+        updated_at: new Date().toISOString(),
+      });
+
+      if (error) {
+        return { error: error.message };
+      }
+
+      // Update local state
+      setPosts(prev => prev.map(post => 
+        post.id === postId 
+          ? { ...post, ...updates, updated_at: new Date().toISOString() }
+          : post
+      ));
+
+      return { data };
+    } catch (err) {
+      return { error: 'Failed to update post' };
+    }
+  };
+
+  const deletePost = async (postId: string) => {
+    if (!user) return { error: 'Not authenticated' };
+
+    try {
+      const { data, error } = await dbHelpers.deletePost(postId);
+
+      if (error) {
+        return { error: error.message };
+      }
+
+      // Remove from local state
+      setPosts(prev => prev.filter(post => post.id !== postId));
+
+      return { data };
+    } catch (err) {
+      return { error: 'Failed to delete post' };
+    }
+  };
 
   const likePost = async (postId: string) => {
     if (!user) return { error: 'Not authenticated' };
@@ -146,6 +192,8 @@ export function useCommunityPosts(options: { following?: boolean; limit?: number
     refreshing,
     refresh,
     createPost,
+    updatePost,
+    deletePost,
     likePost,
     sharePost,
   };

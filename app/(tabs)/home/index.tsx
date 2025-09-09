@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl, Alert } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl, Alert, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -29,6 +29,7 @@ import {
   // ProductVirtualizedList,
   // LazyComponent,
 } from '@/components';
+import { FeaturedListings } from '@/components/FeaturedListings/FeaturedListings';
 // Removed SmartSearchModal import - now using dedicated screen
 import { 
   Bell, 
@@ -46,7 +47,8 @@ import {
   Zap,
   Grid3X3,
   Search,
-  Filter
+  Filter,
+  ListFilterPlus
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 
@@ -96,12 +98,87 @@ export default function HomeScreen() {
   const [categoryContentWidth, setCategoryContentWidth] = useState(0);
   const [categoryScrollViewWidth, setCategoryScrollViewWidth] = useState(0);
 
+  // Scroll animation values
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerHeight = 160; // Approximate header height
+  const searchBarHeight = 70; // Search bar height with padding
+  const lastScrollY = useRef(0);
+  const scrollDirection = useRef<'up' | 'down'>('down');
+
+  // Animated values for header and search bar
+  const headerTranslateY = useRef(new Animated.Value(0)).current;
+  const searchBarOpacity = useRef(new Animated.Value(0)).current;
+  const searchBarTranslateY = useRef(new Animated.Value(-searchBarHeight)).current;
+
   // Category counts from database
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
   const [categoryCountsLoading, setCategoryCountsLoading] = useState(true);
   const [categoryIdMap, setCategoryIdMap] = useState<Record<string, string>>({});
 
   // Smart search modal removed - now using dedicated screen
+
+  // Handle scroll animations
+  const handleScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    {
+      useNativeDriver: true,
+      listener: (event: any) => {
+        const currentScrollY = event.nativeEvent.contentOffset.y;
+        const diff = currentScrollY - lastScrollY.current;
+        
+        // Determine scroll direction
+        if (diff > 0 && currentScrollY > 50) {
+          // Scrolling down
+          if (scrollDirection.current !== 'down') {
+            scrollDirection.current = 'down';
+            // Hide header, show sticky search
+            Animated.parallel([
+              Animated.timing(headerTranslateY, {
+                toValue: -headerHeight,
+                duration: 300,
+                useNativeDriver: true,
+              }),
+              Animated.timing(searchBarOpacity, {
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: true,
+              }),
+              Animated.timing(searchBarTranslateY, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+              }),
+            ]).start();
+          }
+        } else if (diff < 0 || currentScrollY <= 50) {
+          // Scrolling up or at top
+          if (scrollDirection.current !== 'up') {
+            scrollDirection.current = 'up';
+            // Show header, hide sticky search
+            Animated.parallel([
+              Animated.timing(headerTranslateY, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+              }),
+              Animated.timing(searchBarOpacity, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+              }),
+              Animated.timing(searchBarTranslateY, {
+                toValue: -searchBarHeight,
+                duration: 300,
+                useNativeDriver: true,
+              }),
+            ]).start();
+          }
+        }
+        
+        lastScrollY.current = currentScrollY;
+      },
+    }
+  );
 
   // Fetch user credit balance
   useEffect(() => {
@@ -386,21 +463,83 @@ export default function HomeScreen() {
     <View style={{ 
       flex: 1, 
       backgroundColor: theme.colors.background,
-      paddingTop: insets.top,
-      paddingLeft: insets.left,
-      paddingRight: insets.right,
     }}>
-      {/* Header */}
-      <View
+      {/* Sticky Search Bar - Appears when scrolling down */}
+      <Animated.View
         style={{
-          backgroundColor: theme.colors.surface,
-          paddingHorizontal: theme.spacing.lg,
-          paddingVertical: theme.spacing.md,
-          borderBottomWidth: 1,
-          borderBottomColor: theme.colors.border,
-          ...theme.shadows.sm,
+          position: 'absolute',
+          top: insets.top,
+          left: 0,
+          right: 0,
+          zIndex: 1000,
+          backgroundColor: 'transparent',
+          paddingHorizontal: 0, // No horizontal padding for full-width
+          paddingTop: theme.spacing.sm,
+          paddingBottom: theme.spacing.md, // Add bottom padding for spacing
+          borderWidth: 1,
+          borderColor: 'transparent',
+          opacity: searchBarOpacity,
+          transform: [{ translateY: searchBarTranslateY }],
         }}
       >
+        <TouchableOpacity
+          onPress={() => router.push('/smart-search')}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.borderRadius.lg,
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+            paddingHorizontal: theme.spacing.lg,
+            paddingVertical: theme.spacing.md,
+            marginHorizontal: theme.spacing.md, // Minimal margin for visual breathing room
+          }}
+          activeOpacity={0.7}
+        >
+          <Search size={20} color={theme.colors.text.secondary} />
+          <Text 
+            variant="body" 
+            color="muted" 
+            style={{ 
+              flex: 1, 
+              marginLeft: theme.spacing.md,
+            }}
+          >
+            {searchQuery || "Search for anything..."}
+          </Text>
+          <TouchableOpacity
+            onPress={() => setShowFilters(true)}
+            style={{
+              padding: theme.spacing.xs,
+            }}
+          >
+            <ListFilterPlus size={20} color={theme.colors.text.primary} />
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* Main Content Container */}
+      <View style={{ 
+        flex: 1,
+        paddingTop: insets.top,
+        paddingLeft: insets.left,
+        paddingRight: insets.right,
+      }}>
+        {/* Animated Header */}
+        <Animated.View
+          style={{
+            backgroundColor: theme.colors.surface,
+            paddingHorizontal: theme.spacing.lg,
+            paddingVertical: theme.spacing.xs,
+            borderBottomLeftRadius: theme.borderRadius.xl,
+            borderBottomRightRadius: theme.borderRadius.xl,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.colors.border,
+            ...theme.shadows.sm,
+            transform: [{ translateY: headerTranslateY }],
+          }}
+        >
           {/* Top Row - Profile & Actions */}
           <View
             style={{
@@ -516,227 +655,10 @@ export default function HomeScreen() {
           </View>
 
           {/* Compact Location Display */}
-          <TouchableOpacity
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginTop: theme.spacing.xs,
-            }}
-            activeOpacity={0.7}
-            onPress={() => {
-              Alert.alert('Coming Soon', 'Location picker will be available soon');
-            }}
-          >
-            <MapPin size={14} color={theme.colors.text.secondary} />
-            <Text
-              variant="caption"
-              style={{
-                color: theme.colors.text.secondary,
-                marginLeft: theme.spacing.xs,
-                fontWeight: '500',
-              }}
-            >
-              {currentLocation}
-            </Text>
-            <ChevronDown size={12} color={theme.colors.text.secondary} style={{ marginLeft: theme.spacing.xs }} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Search Bar Trigger */}
-        <TouchableOpacity
-          onPress={() => router.push('/smart-search')}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.borderRadius.lg,
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-            paddingHorizontal: theme.spacing.lg,
-            paddingVertical: theme.spacing.md,
-            marginHorizontal: theme.spacing.lg,
-            marginTop: theme.spacing.md,
-            marginBottom: theme.spacing.md,
-          }}
-          activeOpacity={0.7}
-        >
-          <Search size={20} color={theme.colors.text.secondary} />
-          <Text 
-            variant="body" 
-            color="muted" 
-            style={{ 
-              flex: 1, 
-              marginLeft: theme.spacing.md,
-            }}
-          >
-            {searchQuery || "Search for anything..."}
-          </Text>
-          <TouchableOpacity
-            onPress={() => setShowFilters(true)}
-            style={{
-              padding: theme.spacing.xs,
-            }}
-          >
-            <Filter size={20} color={theme.colors.text.primary} />
-          </TouchableOpacity>
-        </TouchableOpacity>
-
-        {/* Enhanced Categories with Icons and Scroll Indicator */}
-        <View style={{ paddingVertical: theme.spacing.md, position: 'relative' }}>
-          {/* Professional Scroll Indicator - Top Right */}
-          {categoryContentWidth > categoryScrollViewWidth && (
-            <View
-              style={{
-                position: 'absolute',
-                top: theme.spacing.sm,
-                right: theme.spacing.lg,
-                width: screenWidth / 3, // 1/3 of screen width
-                height: 3,
-                backgroundColor: theme.colors.border,
-                borderRadius: 1.5,
-                overflow: 'hidden',
-                zIndex: 10,
-              }}
-            >
-              <View
-                style={{
-                  height: '100%',
-                  backgroundColor: theme.colors.primary,
-                  borderRadius: 1.5,
-                  width: `${Math.min(100, (categoryScrollViewWidth / categoryContentWidth) * 100)}%`,
-                  transform: [
-                    {
-                      translateX: (categoryScrollX / (categoryContentWidth - categoryScrollViewWidth)) * 
-                        ((screenWidth / 3) - ((screenWidth / 3) * (categoryScrollViewWidth / categoryContentWidth))),
-                    },
-                  ],
-                }}
-              />
-            </View>
-          )}
           
-          <ScrollView
-            ref={categoryScrollRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            onScroll={(event) => {
-              setCategoryScrollX(event.nativeEvent.contentOffset.x);
-            }}
-            onContentSizeChange={(width) => {
-              setCategoryContentWidth(width);
-            }}
-            onLayout={(event) => {
-              setCategoryScrollViewWidth(event.nativeEvent.layout.width);
-            }}
-            scrollEventThrottle={16}
-            contentContainerStyle={{
-              paddingHorizontal: theme.spacing.lg,
-              gap: theme.spacing.sm,
-              alignItems: 'center',
-              paddingTop: theme.spacing.md, // Add top padding to account for indicator
-            }}
-          >
-            {categories.map((category) => {
-              const isSelected = category.id === 'all' 
-                ? selectedCategories.length === 0 
-                : selectedCategories.includes(category.id);
-              return (
-                <TouchableOpacity
-                  key={category.id}
-                  onPress={() => handleCategoryToggle(category.id)}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    paddingHorizontal: theme.spacing.lg,
-                    paddingVertical: theme.spacing.md,
-                    borderRadius: theme.borderRadius.full,
-                    backgroundColor: isSelected 
-                      ? theme.colors.primary 
-                      : theme.colors.surface,
-                    borderWidth: 1,
-                    borderColor: isSelected 
-                      ? theme.colors.primary 
-                      : theme.colors.border,
-                    gap: theme.spacing.sm,
-                    minHeight: 48,
-                    shadowColor: isSelected ? theme.colors.primary : theme.colors.text.primary,
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: isSelected ? 0.3 : 0.1,
-                    shadowRadius: 4,
-                    elevation: isSelected ? 4 : 2,
-                  }}
-                  activeOpacity={0.7}
-                >
-                  {/* Category Icon */}
-                  <View style={{ 
-                    width: 24, 
-                    height: 24, 
-                    justifyContent: 'center', 
-                    alignItems: 'center' 
-                  }}>
-                    {React.cloneElement(category.icon as React.ReactElement, {
-                      size: 20,
-                      color: isSelected 
-                        ? theme.colors.primaryForeground 
-                        : theme.colors.primary,
-                    } as any)}
-                  </View>
-                  
-                  {/* Category Label */}
-                  <Text
-                    variant="body"
-                    style={{
-                      color: isSelected 
-                        ? theme.colors.primaryForeground 
-                        : theme.colors.text.primary,
-                      fontWeight: isSelected ? '600' : '500',
-                      fontSize: 14,
-                    }}
-                  >
-                    {category.label}
-                  </Text>
-                  
-                  {/* Category Count Badge */}
-                  <View
-                    style={{
-                      backgroundColor: isSelected 
-                        ? theme.colors.primaryForeground + '25' 
-                        : theme.colors.primary + '15',
-                      borderRadius: theme.borderRadius.full,
-                      paddingHorizontal: theme.spacing.sm,
-                      paddingVertical: theme.spacing.xs,
-                      minWidth: 28,
-                      alignItems: 'center',
-                      borderWidth: 1,
-                      borderColor: isSelected 
-                        ? theme.colors.primaryForeground + '30' 
-                        : theme.colors.primary + '20',
-                    }}
-                  >
-                    <Text
-                      variant="caption"
-                      style={{
-                        color: isSelected 
-                          ? theme.colors.primaryForeground 
-                          : theme.colors.primary,
-                        fontSize: 11,
-                        fontWeight: '700',
-                      }}
-                    >
-                      {categoryCountsLoading 
-                        ? '...' 
-                        : category.count > 999 
-                          ? `${Math.floor(category.count / 1000)}k` 
-                          : category.count}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
+        </Animated.View>
 
-        {/* Products Grid - Full Bleed Implementation */}
+        {/* Main Content Area - Scrollable */}
         <View style={{ flex: 1 }}>
           {error ? (
             <View style={{ paddingHorizontal: theme.spacing.lg }}>
@@ -782,7 +704,7 @@ export default function HomeScreen() {
               />
             </View>
           ) : (
-            <ScrollView
+            <Animated.ScrollView
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{
                 // Full-bleed implementation: no horizontal padding on container
@@ -796,7 +718,240 @@ export default function HomeScreen() {
                   colors={[theme.colors.primary]}
                 />
               }
+              onScroll={handleScroll}
+              scrollEventThrottle={16}
             >
+               {/* Location Picker Trigger */}
+              <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginTop: theme.spacing.md,
+              marginLeft: theme.spacing.lg,
+            }}
+            activeOpacity={0.7}
+            onPress={() => {
+              Alert.alert('Coming Soon', 'Location picker will be available soon');
+            }}
+          >
+            <MapPin size={14} color={theme.colors.text.secondary} />
+            <Text
+              variant="caption"
+              style={{
+                color: theme.colors.text.secondary,
+                marginLeft: theme.spacing.xs,
+                fontWeight: '500',
+              }}
+            >
+              {currentLocation}
+            </Text>
+            <ChevronDown size={12} color={theme.colors.text.secondary} style={{ marginLeft: theme.spacing.xs }} />
+                </TouchableOpacity>
+              {/* Search Bar Trigger */}
+              <TouchableOpacity
+                onPress={() => router.push('/smart-search')}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: theme.colors.surface,
+                  borderRadius: theme.borderRadius.lg,
+                  borderWidth: 1,
+                  borderColor: theme.colors.border,
+                  paddingHorizontal: theme.spacing.lg,
+                  paddingVertical: theme.spacing.md,
+                  marginHorizontal: theme.spacing.lg,
+                  marginTop: theme.spacing.md,
+                  marginBottom: theme.spacing.md,
+                }}
+                activeOpacity={0.7}
+              >
+                <Search size={20} color={theme.colors.text.secondary} />
+                <Text 
+                  variant="body" 
+                  color="muted" 
+                  style={{ 
+                    flex: 1, 
+                    marginLeft: theme.spacing.md,
+                  }}
+                >
+                  {searchQuery || "Search for anything..."}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setShowFilters(true)}
+                  style={{
+                    padding: theme.spacing.xs,
+                  }}
+                >
+                  <ListFilterPlus size={20} color={theme.colors.text.primary} />
+                </TouchableOpacity>
+              </TouchableOpacity>
+
+              {/* Enhanced Categories with Icons and Scroll Indicator */}
+              <View style={{ paddingVertical: theme.spacing.md, position: 'relative' }}>
+                {/* Professional Scroll Indicator - Top Right */}
+                {categoryContentWidth > categoryScrollViewWidth && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: theme.spacing.sm,
+                      right: theme.spacing.lg,
+                      width: screenWidth / 3, // 1/3 of screen width
+                      height: 3,
+                      backgroundColor: theme.colors.border,
+                      borderRadius: 1.5,
+                      overflow: 'hidden',
+                      zIndex: 10,
+                    }}
+                  >
+                    <View
+                      style={{
+                        height: '100%',
+                        backgroundColor: theme.colors.primary,
+                        borderRadius: 1.5,
+                        width: `${Math.min(100, (categoryScrollViewWidth / categoryContentWidth) * 100)}%`,
+                        transform: [
+                          {
+                            translateX: (categoryScrollX / (categoryContentWidth - categoryScrollViewWidth)) * 
+                              ((screenWidth / 3) - ((screenWidth / 3) * (categoryScrollViewWidth / categoryContentWidth))),
+                          },
+                        ],
+                      }}
+                    />
+                  </View>
+                )}
+                
+                <ScrollView
+                  ref={categoryScrollRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  onScroll={(event) => {
+                    setCategoryScrollX(event.nativeEvent.contentOffset.x);
+                  }}
+                  onContentSizeChange={(width) => {
+                    setCategoryContentWidth(width);
+                  }}
+                  onLayout={(event) => {
+                    setCategoryScrollViewWidth(event.nativeEvent.layout.width);
+                  }}
+                  scrollEventThrottle={16}
+                  contentContainerStyle={{
+                    paddingHorizontal: theme.spacing.lg,
+                    gap: theme.spacing.sm,
+                    alignItems: 'center',
+                    paddingTop: theme.spacing.md, // Add top padding to account for indicator
+                  }}
+                >
+                  {categories.map((category) => {
+                    const isSelected = category.id === 'all' 
+                      ? selectedCategories.length === 0 
+                      : selectedCategories.includes(category.id);
+                    return (
+                      <TouchableOpacity
+                        key={category.id}
+                        onPress={() => handleCategoryToggle(category.id)}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingHorizontal: theme.spacing.lg,
+                          paddingVertical: theme.spacing.md,
+                          borderRadius: theme.borderRadius.full,
+                          backgroundColor: isSelected 
+                            ? theme.colors.primary 
+                            : theme.colors.surface,
+                          borderWidth: 1,
+                          borderColor: isSelected 
+                            ? theme.colors.primary 
+                            : theme.colors.border,
+                          gap: theme.spacing.sm,
+                          minHeight: 48,
+                          shadowColor: isSelected ? theme.colors.primary : theme.colors.text.primary,
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: isSelected ? 0.3 : 0.1,
+                          shadowRadius: 4,
+                          elevation: isSelected ? 4 : 2,
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        {/* Category Icon */}
+                        <View style={{ 
+                          width: 24, 
+                          height: 24, 
+                          justifyContent: 'center', 
+                          alignItems: 'center' 
+                        }}>
+                          {React.cloneElement(category.icon as React.ReactElement, {
+                            size: 20,
+                            color: isSelected 
+                              ? theme.colors.primaryForeground 
+                              : theme.colors.primary,
+                          } as any)}
+                        </View>
+                        
+                        {/* Category Label */}
+                        <Text
+                          variant="body"
+                          style={{
+                            color: isSelected 
+                              ? theme.colors.primaryForeground 
+                              : theme.colors.text.primary,
+                            fontWeight: isSelected ? '600' : '500',
+                            fontSize: 14,
+                          }}
+                        >
+                          {category.label}
+                        </Text>
+                        
+                        {/* Category Count Badge */}
+                        <View
+                          style={{
+                            backgroundColor: isSelected 
+                              ? theme.colors.primaryForeground + '25' 
+                              : theme.colors.primary + '15',
+                            borderRadius: theme.borderRadius.full,
+                            paddingHorizontal: theme.spacing.sm,
+                            paddingVertical: theme.spacing.xs,
+                            minWidth: 28,
+                            alignItems: 'center',
+                            borderWidth: 1,
+                            borderColor: isSelected 
+                              ? theme.colors.primaryForeground + '30' 
+                              : theme.colors.primary + '20',
+                          }}
+                        >
+                          <Text
+                            variant="caption"
+                            style={{
+                              color: isSelected 
+                                ? theme.colors.primaryForeground 
+                                : theme.colors.primary,
+                              fontSize: 11,
+                              fontWeight: '700',
+                            }}
+                          >
+                            {categoryCountsLoading 
+                              ? '...' 
+                              : category.count > 999 
+                                ? `${Math.floor(category.count / 1000)}k` 
+                                : category.count}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+
+              {/* Featured Business Listings */}
+              <FeaturedListings
+                maxItems={6}
+                layout="horizontal"
+                onViewAll={() => {
+                  setSelectedCategories([]);
+                  setSearchQuery('');
+                  // Could add a business filter here in the future
+                }}
+              />
+
               {/* Enhanced ProductCard Grid with Professional Badges */}
               <Grid columns={2} spacing={4}>
                 {transformedProducts.map((product) => (
@@ -814,8 +969,8 @@ export default function HomeScreen() {
                       isFavorited={favorites[product.id] || false}
                       viewCount={viewCounts[product.id] || 0}
                       onPress={() => router.push(`/(tabs)/home/${product.id}`)}
-                      onFavoritePress={() => {
-                        // Handle favorite toggle
+                      onFavoritePress={user?.id !== product.seller.id ? () => {
+                        // Handle favorite toggle - only show for other users' listings
                         import('@/lib/favoritesAndViews').then(({ toggleFavorite }) => {
                           toggleFavorite(product.id).then((result) => {
                             if (!result.error) {
@@ -823,7 +978,7 @@ export default function HomeScreen() {
                             }
                           });
                         });
-                      }}
+                      } : undefined}
                       onViewPress={() => {
                         // Navigate to listing detail to see more details
                         router.push(`/(tabs)/home/${product.id}`);
@@ -853,30 +1008,32 @@ export default function HomeScreen() {
                   </View>
                 ))}
               </Grid>
-            </ScrollView>
+            </Animated.ScrollView>
           )}
         </View>
 
-        {/* Filter Sheet */}
-        <FilterSheet
-          visible={showFilters}
-          onClose={() => setShowFilters(false)}
-          filters={filters}
-          onApplyFilters={(newFilters) => {
-            useAppStore.getState().setFilters(newFilters);
-            setShowFilters(false);
-          }}
-          onClearFilters={() => {
-            useAppStore.getState().setFilters({
-              priceRange: { min: undefined, max: undefined },
-              condition: [],
-              categories: [],
-              location: '',
-              sortBy: 'Newest First',
-            });
-            setSelectedCategories([]);
-          }}
-        />
       </View>
+
+      {/* Filter Sheet */}
+      <FilterSheet
+        visible={showFilters}
+        onClose={() => setShowFilters(false)}
+        filters={filters}
+        onApplyFilters={(newFilters) => {
+          useAppStore.getState().setFilters(newFilters);
+          setShowFilters(false);
+        }}
+        onClearFilters={() => {
+          useAppStore.getState().setFilters({
+            priceRange: { min: undefined, max: undefined },
+            condition: [],
+            categories: [],
+            location: '',
+            sortBy: 'Newest First',
+          });
+          setSelectedCategories([]);
+        }}
+      />
+    </View>
   );
 }

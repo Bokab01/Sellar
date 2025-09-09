@@ -167,6 +167,24 @@ export const dbHelpers = {
     return { data, error };
   },
 
+  async updatePost(postId: string, updates: any) {
+    const { data, error } = await db.posts
+      .update(updates)
+      .eq('id', postId)
+      .select()
+      .single();
+    return { data, error };
+  },
+
+  async deletePost(postId: string) {
+    const { data, error } = await db.posts
+      .delete()
+      .eq('id', postId)
+      .select()
+      .single();
+    return { data, error };
+  },
+
   async getPosts(options: any = {}) {
     const limit = options.limit || 20;
     const offset = options.offset || 0;
@@ -191,15 +209,6 @@ export const dbHelpers = {
     return { data, error };
   },
 
-  async updatePost(postId: string, updates: any) {
-    const { data, error } = await db.posts.update(updates, postId).select().single();
-    return { data, error };
-  },
-
-  async deletePost(postId: string) {
-    const { error } = await db.posts.delete(postId);
-    return { error };
-  },
 
   // Comment operations
   async createComment(comment: any) {
@@ -728,6 +737,10 @@ export const dbHelpers = {
         .eq('status', 'active'); // Only get active listings
 
       // Apply filters
+      if (options.userId) {
+        query = query.eq('user_id', options.userId);
+      }
+      
       if (options.category) {
         query = query.eq('category_id', options.category);
       }
@@ -768,6 +781,10 @@ export const dbHelpers = {
           .eq('status', 'active');
 
         // Apply the same filters to the simple query
+        if (options.userId) {
+          simpleQuery = simpleQuery.eq('user_id', options.userId);
+        }
+        
         if (options.category) {
           simpleQuery = simpleQuery.eq('category_id', options.category);
         }

@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, TouchableOpacity, Linking, Image } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useMessages } from '@/hooks/useChat';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useChatStore } from '@/store/useChatStore';
+import { getOfferLimitFromMessages, type OfferLimitResult } from '@/utils/offerLimits';
+import { formatChatTimestamp, isDifferentDay } from '@/utils/dateUtils';
 import { dbHelpers, supabase } from '@/lib/supabase';
 import { acceptOfferById, rejectOfferById } from '@/lib/offerStateMachine';
 import {
@@ -25,11 +28,16 @@ import {
   Toast,
   Avatar,
   Badge,
+  DateSeparator,
+  ChatImagePicker,
+  ChatMenu,
+  ChatInlineMenu,
 } from '@/components';
 import { Phone, Info, Eye, MessageCircle, EllipsisVertical } from 'lucide-react-native';
 
 export default function ChatScreen() {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const { id: conversationId } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuthStore();
   const { draftMessages, setDraftMessage, clearDraftMessage, markAsRead } = useChatStore();
@@ -134,6 +142,18 @@ export default function ChatScreen() {
     }
   };
 
+  const handleSendImage = async (imageUrl: string) => {
+    try {
+      // Send image message with the image URL
+      const { error } = await sendMessage('📷 Image', 'image', [imageUrl]);
+      if (error) {
+        showErrorToast('Failed to send image');
+      }
+    } catch (err) {
+      showErrorToast('Failed to send image');
+    }
+  };
+
 
   const handleSendOffer = async () => {
     if (!offerAmount.trim()) {
@@ -144,6 +164,20 @@ export default function ChatScreen() {
     const amount = Number(offerAmount);
     if (isNaN(amount) || amount <= 0) {
       Alert.alert('Error', 'Please enter a valid amount');
+      return;
+    }
+
+    // Check offer limits using the new system
+    const offerLimitStatus = getOfferLimitFromMessages(messages, user?.id!);
+    
+    if (!offerLimitStatus.canMakeOffer) {
+      Alert.alert(
+        'Offer Limit Reached', 
+        offerLimitStatus.reason || 'You cannot make more offers for this listing.',
+        [
+          { text: 'OK', style: 'default' }
+        ]
+      );
       return;
     }
 
@@ -193,6 +227,12 @@ export default function ChatScreen() {
       setShowOfferModal(false);
       setOfferAmount('');
       setOfferMessage('');
+      
+      // Refresh messages to show the new offer
+      setTimeout(() => {
+        refreshMessages();
+      }, 500);
+      
       showSuccessToast('Offer sent successfully!');
     } catch (err) {
       showErrorToast('Failed to send offer');
@@ -356,26 +396,13 @@ export default function ChatScreen() {
       return;
     }
 
-    // Check if there's already a pending offer from the current user that hasn't been responded to
-    // Allow counter offers if the user's previous offer was "countered" (meaning the other person responded)
-    const userOffers = messages
-      .flatMap((msg: any) => msg.offers || [])
-      .filter((offer: any) => offer.buyer_id === user?.id)
-      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-    const lastUserOffer = userOffers[0];
+    // Check offer limits using the new system
+    const offerLimitStatus = getOfferLimitFromMessages(messages, user?.id!);
     
-    if (lastUserOffer && lastUserOffer.status === 'pending') {
-      Alert.alert('Error', 'You already have a pending offer. Please wait for a response before making another offer.');
-      return;
-    }
-
-    // Check 3-attempt limit for rejected offers
-    const rejectedOffers = userOffers.filter((offer: any) => offer.status === 'rejected');
-    if (rejectedOffers.length >= 3) {
+    if (!offerLimitStatus.canMakeOffer) {
       Alert.alert(
         'Offer Limit Reached', 
-        'You have reached the maximum of 3 offer attempts for this listing. Please contact the seller directly or try a different listing.',
+        offerLimitStatus.reason || 'You cannot make more offers for this listing.',
         [
           { text: 'OK', style: 'default' }
         ]
@@ -615,6 +642,16 @@ export default function ChatScreen() {
         subtitle={otherUser ? lastSeenText : ''}
         showBackButton
         onBackPress={() => router.back()}
+        leftAction={
+          otherUser ? (
+            <Avatar
+              name={`${otherUser.first_name || 'User'} ${otherUser.last_name || ''}`.trim()}
+              source={otherUser.avatar_url}
+              size="sm"
+              style={{ marginLeft: theme.spacing.sm }}
+            />
+          ) : undefined
+        }
         rightActions={[
           otherUser?.phone && (
             <Button
@@ -633,13 +670,17 @@ export default function ChatScreen() {
               }}
             />
           ),
-          <Button
-            key="more-options"
-            variant="icon"
-            icon={<EllipsisVertical size={20} color={theme.colors.text.primary} />}
-            onPress={() => {
-              Alert.alert('Coming Soon', 'More options will be available soon');
-            }}
+          <ChatInlineMenu
+            key="chat-inline-menu"
+            conversationId={conversationId!}
+            otherUser={otherUser}
+            conversation={conversation}
+            onBlock={() => console.log('Block user')}
+            onReport={() => console.log('Report user')}
+            onDelete={() => console.log('Delete conversation')}
+            onArchive={() => console.log('Archive conversation')}
+            onMute={() => console.log('Mute conversation')}
+            onUnmute={() => console.log('Unmute conversation')}
           />,
         ].filter(Boolean)}
       />
@@ -765,12 +806,26 @@ export default function ChatScreen() {
               }
             />
           ) : (
-            messages.map((message: any) => {
+            messages.map((message: any, index: number) => {
               const isOwn = message.sender_id === user?.id;
-              const timestamp = new Date(message.created_at).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              });
+              const messageDate = new Date(message.created_at);
+              const timestamp = formatChatTimestamp(messageDate);
+              
+              // Check if we need a date separator
+              const showDateSeparator = index === 0 || 
+                (index > 0 && isDifferentDay(message.created_at, messages[index - 1].created_at));
+              
+              const elements = [];
+              
+              // Add date separator if needed
+              if (showDateSeparator) {
+                elements.push(
+                  <DateSeparator
+                    key={`date-${message.id}`}
+                    date={messageDate}
+                  />
+                );
+              }
               
               // Ensure message content is safe
               const safeMessageContent = String(message.content || '');
@@ -783,7 +838,7 @@ export default function ChatScreen() {
                 if (!offer && message.offers && message.offers.length === 0) {
                   console.log('🎯 No offer found for message, this might be an old offer message without proper offer data');
                   // For now, render as a regular message if no offer data is available
-                  return (
+                  elements.push(
                     <ChatBubble
                       key={message.id}
                       message={safeMessageContent}
@@ -794,10 +849,11 @@ export default function ChatScreen() {
                       senderName={!isOwn ? `${message.sender?.first_name || 'User'} ${message.sender?.last_name || ''}`.trim() : undefined}
                     />
                   );
+                  return elements;
                 }
                 
                 if (offer) {
-                  return (
+                  elements.push(
                     <View key={message.id} style={{ paddingHorizontal: theme.spacing.lg }}>
                       <OfferCard
                         offer={{
@@ -843,11 +899,12 @@ export default function ChatScreen() {
                       />
                     </View>
                   );
+                  return elements;
                 }
               }
 
               if (message.message_type === 'system') {
-                return (
+                elements.push(
                   <View key={message.id} style={{ alignItems: 'center', marginVertical: theme.spacing.md }}>
                     <View
                       style={{
@@ -871,19 +928,46 @@ export default function ChatScreen() {
                     </View>
                   </View>
                 );
+                return elements;
               }
 
-              return (
+              // Determine message status for read receipts
+              let messageStatus = message.status || 'sent';
+              
+              // If it's our own message, check if the other user has read it
+              if (isOwn) {
+                if (message.read_at) {
+                  messageStatus = 'read';
+                } else if (message.delivered_at) {
+                  messageStatus = 'delivered';
+                } else {
+                  messageStatus = 'sent';
+                }
+              }
+
+              elements.push(
                 <ChatBubble
                   key={message.id}
                   message={safeMessageContent}
                   isOwn={isOwn}
                   timestamp={timestamp}
                   type={message.message_type}
-                  status={message.status}
-                  senderName={!isOwn ? `${message.sender?.first_name || 'User'} ${message.sender?.last_name || ''}`.trim() : undefined}
+                  status={messageStatus}
+                  senderName={!isOwn ? `${message.sender?.first_name || otherUser?.first_name || 'User'} ${message.sender?.last_name || otherUser?.last_name || ''}`.trim() : undefined}
+                  images={message.message_type === 'image' && message.images ? 
+                    (() => {
+                      try {
+                        return typeof message.images === 'string' ? JSON.parse(message.images) : message.images;
+                      } catch (e) {
+                        console.warn('Failed to parse message images:', e);
+                        return undefined;
+                      }
+                    })()
+                    : undefined}
                 />
               );
+              
+              return elements;
             })
           )}
 
@@ -908,22 +992,42 @@ export default function ChatScreen() {
         </ScrollView>
 
         {/* Message Input */}
-        <MessageInput
-          value={messageText}
-          onChangeText={setMessageText}
-          onSend={handleSendMessage}
-          onCamera={() => {
-            Alert.alert('Coming Soon', 'Camera feature will be available soon');
-          }}
-          onImagePicker={() => Alert.alert('Coming Soon', 'Image sharing feature will be available soon')}
-          placeholder={conversation?.listing?.title 
-            ? `Message about ${truncateText(String(conversation.listing.title))}...` 
-            : "Type a message..."}
+        <View
           style={{
+            flexDirection: 'row',
+            alignItems: 'flex-end',
+            backgroundColor: theme.colors.surface,
             borderTopWidth: 1,
             borderTopColor: theme.colors.border,
+            paddingHorizontal: theme.spacing.lg,
+            paddingTop: theme.spacing.md,
+            paddingBottom: Platform.OS === 'android' ? Math.max(insets.bottom, theme.spacing.md) : theme.spacing.md,
+            gap: theme.spacing.sm,
           }}
-        />
+        >
+          {/* Image Picker */}
+          <ChatImagePicker
+            onImageSelected={handleSendImage}
+            disabled={false}
+          />
+
+          {/* Message Input */}
+          <MessageInput
+            value={messageText}
+            onChangeText={setMessageText}
+            onSend={handleSendMessage}
+            placeholder={conversation?.listing?.title 
+              ? `Message about ${truncateText(String(conversation.listing.title))}...` 
+              : "Type a message..."}
+            style={{
+              flex: 1,
+              borderTopWidth: 0,
+              paddingHorizontal: 0,
+              paddingVertical: 0,
+            }}
+            conversationId={conversationId}
+          />
+        </View>
 
       </KeyboardAvoidingView>
 

@@ -125,82 +125,42 @@ export const FEATURE_CATALOG = {
   },
 } as const;
 
-// Business subscription plans
+// Unified Business subscription plan
 export const BUSINESS_PLANS = [
   {
-    id: 'starter_business',
-    name: 'Starter Business',
-    priceGHS: 100,
-    priceMonthly: 100,
-    billingPeriod: 'monthly',
-    boostCredits: 20,
-    maxListings: 20,
-    features: {
-      analytics: 'basic',
-      autoBoost: false,
-      prioritySupport: false,
-    },
-    badges: ['business'],
-    description: 'Perfect for small businesses',
-    highlights: [
-      '20 boost credits (3-day boosts)',
-      'Up to 20 active listings',
-      'Business badge',
-      'Basic analytics',
-    ],
-    popular: false,
-  },
-  {
-    id: 'pro_business',
-    name: 'Pro Business',
-    priceGHS: 250,
-    priceMonthly: 250,
-    billingPeriod: 'monthly',
-    boostCredits: 80,
-    maxListings: null, // unlimited
-    features: {
-      analytics: 'advanced',
-      autoBoost: true,
-      autoBoostDays: 3,
-      prioritySupport: false,
-    },
-    badges: ['business', 'priority_seller'],
-    description: 'For growing businesses',
-    highlights: [
-      '80 boost credits (flexible mix)',
-      'Unlimited listings',
-      'Business + Priority Seller badges',
-      'Auto-boost (3 days)',
-      'Advanced analytics',
-    ],
-    popular: true,
-  },
-  {
-    id: 'premium_business',
-    name: 'Premium Business',
+    id: 'sellar_business',
+    name: 'Sellar Business',
     priceGHS: 400,
     priceMonthly: 400,
     billingPeriod: 'monthly',
-    boostCredits: 150,
+    boostCredits: 120, // Generous monthly allocation
     maxListings: null, // unlimited
     features: {
-      analytics: 'full',
+      analytics: 'comprehensive', // Single comprehensive analytics suite
       autoBoost: true,
+      autoBoostDays: 3,
       prioritySupport: true,
       homepagePlacement: true,
-      accountManager: true,
+      premiumBranding: true,
+      sponsoredPosts: true,
+      bulkOperations: true,
+      apiAccess: false, // Keep for future expansion
+      accountManager: false, // Removed complex feature
     },
     badges: ['business', 'priority_seller', 'premium'],
-    description: 'Complete business solution',
+    description: 'Complete business solution for serious sellers',
     highlights: [
-      '150 boost credits (flexible)',
+      '120 boost credits monthly',
       'Unlimited listings',
-      'Premium branding & homepage placement',
-      'Full analytics suite',
-      'Priority support & account manager',
+      'Auto-boost your listings',
+      'Comprehensive analytics dashboard',
+      'Priority support',
+      'Homepage placement',
+      'Premium branding',
       'Sponsored posts',
+      'Bulk operations',
     ],
-    popular: false,
+    popular: true, // Only plan, so it's popular
   },
 ] as const;
 

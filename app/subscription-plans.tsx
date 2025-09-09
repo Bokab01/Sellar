@@ -46,12 +46,8 @@ export default function SubscriptionPlansScreen() {
   }, []);
 
   const getPlanIcon = (planId: string) => {
-    switch (planId) {
-      case 'starter_business': return <Building size={40} color={theme.colors.primary} />;
-      case 'pro_business': return <Star size={40} color={theme.colors.warning} />;
-      case 'premium_business': return <Crown size={40} color={theme.colors.success} />;
-      default: return <Building size={40} color={theme.colors.text.muted} />;
-    }
+    // Unified plan gets a premium crown icon
+    return <Crown size={40} color={theme.colors.primary} />;
   };
 
   const handleSubscribe = async (planId: string) => {
@@ -162,7 +158,7 @@ export default function SubscriptionPlansScreen() {
   return (
     <SafeAreaWrapper>
       <AppHeader
-        title="Business Plans"
+        title="Business Plan"
         showBackButton
         onBackPress={() => router.back()}
       />

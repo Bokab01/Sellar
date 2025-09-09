@@ -59,7 +59,7 @@ export default function WalletScreen() {
     router.push('/buy-credits');
   }, []);
 
-  const handleBusinessPlans = useCallback(() => {
+  const handleBusinessPlan = useCallback(() => {
     router.push('/subscription-plans');
   }, []);
 
@@ -237,7 +237,7 @@ export default function WalletScreen() {
             balance={creditBalance}
             maxCredits={1000}
             onTopUp={handleTopUp}
-            onBusinessPlans={handleBusinessPlans}
+            onBusinessPlans={handleBusinessPlan}
             loading={creditLoading}
           />
 
@@ -427,14 +427,14 @@ export default function WalletScreen() {
             </View>
           </View>
 
-          {/* Business Plans Preview */}
+          {/* Business Plan Preview */}
           <View style={styles.sectionContainer}>
             <Text variant="h3" style={{ marginBottom: theme.spacing.lg }}>
-              Business Plans
+              Sellar Business Plan
             </Text>
             
             <TouchableOpacity
-              onPress={handleBusinessPlans}
+              onPress={handleBusinessPlan}
               style={[
                 styles.businessPlanCard,
                 { borderColor: theme.colors.primary + '30' },
@@ -458,16 +458,16 @@ export default function WalletScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text variant="h4" style={{ marginBottom: theme.spacing.xs }}>
-                    Pro Business Plan
+                    Sellar Business
                   </Text>
                   <Text variant="bodySmall" color="muted">
-                    80 credits monthly • Unlimited listings • Auto-boost
+                    120 credits monthly • Unlimited listings • Premium features
                   </Text>
                 </View>
-                <PriceDisplay amount={250} currency="GHS" size="lg" />
+                <PriceDisplay amount={400} currency="GHS" size="lg" />
               </View>
               <Text variant="caption" color="muted" style={{ textAlign: 'center' }}>
-                Tap to view all business plans →
+                Tap to explore business features →
               </Text>
             </TouchableOpacity>
           </View>

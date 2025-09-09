@@ -20,6 +20,7 @@ import {
   ArrowRight
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
+import { useBusinessFeatures } from '@/hooks/useBusinessFeatures';
 import { router } from 'expo-router';
 
 interface SupportTicket {
@@ -45,6 +46,7 @@ interface AccountManager {
 export function PrioritySupportDashboard() {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const businessFeatures = useBusinessFeatures();
   
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);

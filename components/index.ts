@@ -11,7 +11,11 @@ export { MultiStepForm, useMultiStepForm } from './MultiStepForm/MultiStepForm';
 
 // Marketplace Components
 export { ProductCard } from './Card/Card';
+export { PremiumProductCard } from './PremiumProductCard/PremiumProductCard';
 export { Badge } from './Badge/Badge';
+export { BusinessBadge, BusinessBadges } from './BusinessBadge/BusinessBadge';
+export { SponsoredPost, SponsoredPostManager } from './SponsoredPost/SponsoredPost';
+export { FeaturedListings, CompactFeaturedListings } from './FeaturedListings/FeaturedListings';
 export { Avatar } from './Avatar/Avatar';
 export { Chip } from './Chip/Chip';
 export { PriceDisplay } from './PriceDisplay/PriceDisplay';
@@ -208,6 +212,14 @@ export {
   AdaptiveComponentLoader
 } from './LazyScreens/LazyScreens';
 export { PerformanceDashboard, usePerformanceDashboard } from './PerformanceDashboard/PerformanceDashboard';
+
+// Chat Components
+export { ReadReceipt } from './ReadReceipt/ReadReceipt';
+export { DateSeparator } from './DateSeparator/DateSeparator';
+export { ChatImagePicker } from './ChatImagePicker/ChatImagePicker';
+export { ChatMenu } from './ChatMenu/ChatMenu';
+export { ChatInlineMenu } from './ChatInlineMenu/ChatInlineMenu';
+export { PostInlineMenu } from './PostInlineMenu/PostInlineMenu';
 export { IntegrationStatus, useIntegrationStatus } from './IntegrationStatus/IntegrationStatus';
 
 // Performance Services & Hooks

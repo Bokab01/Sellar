@@ -516,7 +516,7 @@ class DataProtectionService {
       // Delete from tables with CASCADE relationships
       const tablesToDelete = [
         'user_privacy_settings',
-        'user_devices',
+        'device_tokens',
         'security_events',
         'notifications',
         'credit_transactions',

@@ -67,7 +67,7 @@ export default function FavoritesScreen() {
       // Fetch listings data
       const { data: listingsData, error: listingsError } = await supabase
         .from('listings')
-        .select('id, title, description, price, currency, condition, location, images, status, boost_until, user_id, category_id')
+        .select('id, title, description, price, currency, condition, location, images, status, boost_expires_at, user_id, category_id')
         .in('id', listingIds);
 
       if (listingsError) {
@@ -130,34 +130,21 @@ export default function FavoritesScreen() {
     setRefreshing(false);
   };
 
-  const handleRemoveFavorite = async (favoriteId: string, listingTitle: string) => {
-    Alert.alert(
-      'Remove Favorite',
-      `Remove "${listingTitle}" from your favorites?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('favorites')
-                .delete()
-                .eq('id', favoriteId);
+  const handleToggleFavorite = async (favoriteId: string, listingTitle: string) => {
+    try {
+      const { error } = await supabase
+        .from('favorites')
+        .delete()
+        .eq('id', favoriteId);
 
-              if (error) throw error;
+      if (error) throw error;
 
-              setFavorites(prev => prev.filter(fav => fav.id !== favoriteId));
-              setToastMessage('Removed from favorites');
-              setShowToast(true);
-            } catch (err) {
-              Alert.alert('Error', 'Failed to remove favorite');
-            }
-          },
-        },
-      ]
-    );
+      setFavorites(prev => prev.filter(fav => fav.id !== favoriteId));
+      setToastMessage('Removed from favorites');
+      setShowToast(true);
+    } catch (err) {
+      Alert.alert('Error', 'Failed to remove favorite');
+    }
   };
 
   // Transform favorites to product format
@@ -177,7 +164,7 @@ export default function FavoritesScreen() {
         rating: seller?.rating || 0,
         badges: seller?.account_type === 'business' ? ['business'] : [],
       },
-      badge: listing.boost_until && new Date(listing.boost_until) > new Date() 
+      badge: listing.boost_expires_at && new Date(listing.boost_expires_at) > new Date() 
         ? { text: 'Boosted', variant: 'featured' as const }
         : undefined,
       location: listing.location,
@@ -268,7 +255,7 @@ export default function FavoritesScreen() {
                     onPress={() => router.push(`/(tabs)/home/${product.id}`)}
                   />
 
-                  {/* Remove Button */}
+                  {/* Heart/Favorite Icon */}
                   <View
                     style={{
                       position: 'absolute',
@@ -278,13 +265,13 @@ export default function FavoritesScreen() {
                   >
                     <Button
                       variant="icon"
-                      icon={<Trash2 size={16} color={theme.colors.error} />}
-                      onPress={() => handleRemoveFavorite(product.favoriteId, product.title)}
+                      icon={<Heart size={16} color="#ff4757" fill="#ff4757" />}
+                      onPress={() => handleToggleFavorite(product.favoriteId, product.title)}
                       style={{
                         width: 32,
                         height: 32,
-                        backgroundColor: theme.colors.surface + 'E6',
-                        borderRadius: theme.borderRadius.md,
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        borderRadius: 20,
                         ...theme.shadows.md,
                       }}
                     />

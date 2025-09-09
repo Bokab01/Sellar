@@ -50,10 +50,20 @@ export function useListings(options: UseListingsOptions = {}) {
   // Real-time updates
   useListingsRealtime((newListing) => {
     setListings(prev => {
+      // Handle removal (delete or status change to inactive)
+      if (newListing._shouldRemove) {
+        console.log('🔗 Removing listing from UI:', newListing.id);
+        return prev.filter(item => item.id !== newListing.id);
+      }
+      
       const exists = prev.find(item => item.id === newListing.id);
       if (exists) {
+        // Update existing listing
+        console.log('🔗 Updating existing listing in UI:', newListing.id);
         return prev.map(item => item.id === newListing.id ? newListing : item);
       } else {
+        // Add new listing
+        console.log('🔗 Adding new listing to UI:', newListing.id);
         return [newListing, ...prev];
       }
     });

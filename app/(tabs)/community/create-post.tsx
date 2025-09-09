@@ -15,7 +15,7 @@ import {
   LocationPicker,
   Toast,
   LinearProgress,
-
+  OptimizedImage,
   EmptyState,
   LoadingSkeleton,
   PriceDisplay,
@@ -77,7 +77,8 @@ export default function CreatePostScreen() {
       const { error } = await createPost(
         content.trim(),
         imageUrls,
-        selectedListing?.id // Attach selected listing
+        selectedListing?.id, // Attach selected listing
+        postType // Pass the selected post type
       );
 
       if (error) {
@@ -342,12 +343,15 @@ export default function CreatePostScreen() {
                       height: 60,
                       borderRadius: theme.borderRadius.md,
                       overflow: 'hidden',
+                      backgroundColor: theme.colors.surface,
                     }}>
-                      <CustomImagePicker
-                        value={[{ id: '1', uri: selectedListing.images[0] }]}
-                        onChange={() => {}}
-                        disabled={true}
-                        limit={1}
+                      <OptimizedImage
+                        source={{ uri: selectedListing.images[0] }}
+                        style={{
+                          width: 60,
+                          height: 60,
+                        }}
+                        resizeMode="cover"
                       />
                     </View>
                   )}
@@ -434,15 +438,36 @@ export default function CreatePostScreen() {
             backgroundColor: theme.colors.background,
             borderTopLeftRadius: theme.borderRadius.xl,
             borderTopRightRadius: theme.borderRadius.xl,
-            maxHeight: '80%',
-            paddingTop: theme.spacing.lg,
+            maxHeight: '90%',
+            minHeight: '60%',
+            flex: 1,
+            marginTop: 100, // Leave space for status bar and some top margin
+            display: 'flex',
+            flexDirection: 'column',
+            ...theme.shadows.lg,
+            shadowOffset: { width: 0, height: -4 },
           }}>
+            {/* Modal Handle */}
+            <View style={{
+              alignItems: 'center',
+              paddingTop: theme.spacing.sm,
+              paddingBottom: theme.spacing.xs,
+            }}>
+              <View style={{
+                width: 40,
+                height: 4,
+                backgroundColor: theme.colors.border,
+                borderRadius: 2,
+              }} />
+            </View>
+
             {/* Modal Header */}
             <View style={{
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
               paddingHorizontal: theme.spacing.lg,
+              paddingTop: theme.spacing.lg,
               paddingBottom: theme.spacing.md,
               borderBottomWidth: 1,
               borderBottomColor: theme.colors.border,
@@ -473,7 +498,15 @@ export default function CreatePostScreen() {
             </View>
 
             {/* Listings List */}
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: theme.spacing.lg }}>
+            <ScrollView 
+              style={{ flex: 1 }} 
+              contentContainerStyle={{ 
+                padding: theme.spacing.lg,
+                paddingBottom: theme.spacing.xl, // Extra bottom padding for better scrolling
+                flexGrow: 1
+              }}
+              showsVerticalScrollIndicator={true}
+            >
               {listingsLoading ? (
                 <View style={{ gap: theme.spacing.md }}>
                   {Array.from({ length: 3 }).map((_, index) => (
@@ -511,11 +544,13 @@ export default function CreatePostScreen() {
                             overflow: 'hidden',
                             backgroundColor: theme.colors.background,
                           }}>
-                            <CustomImagePicker
-                              value={[{ id: '1', uri: listing.images[0] }]}
-                              onChange={() => {}}
-                              disabled={true}
-                              limit={1}
+                            <OptimizedImage
+                              source={{ uri: listing.images[0] }}
+                              style={{
+                                width: 60,
+                                height: 60,
+                              }}
+                              resizeMode="cover"
                             />
                           </View>
                         )}
@@ -542,6 +577,8 @@ export default function CreatePostScreen() {
                   justifyContent: 'center',
                   padding: theme.spacing.xl,
                   gap: theme.spacing.lg,
+                  flex: 1,
+                  minHeight: 300,
                 }}>
                   <View style={{
                     backgroundColor: theme.colors.surface,

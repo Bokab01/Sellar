@@ -21,6 +21,7 @@ import {
 } from '@/components';
 import { MessageCircle, Plus, Users, CheckSquare, Square, Trash2, Mail, MailOpen, X } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import { formatConversationTimestamp } from '@/utils/dateUtils';
 
 export default function InboxScreen() {
   const { theme } = useTheme();
@@ -346,10 +347,7 @@ export default function InboxScreen() {
       subtitle: safeSubtitle,
       description: safeDescription,
       timestamp: conv.last_message_at 
-        ? new Date(conv.last_message_at).toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          })
+        ? formatConversationTimestamp(conv.last_message_at)
         : '',
       unreadCount: unreadCounts[conv.id] || 0,
       avatar: {
@@ -377,6 +375,8 @@ export default function InboxScreen() {
       <AppHeader
         title={isSelectionMode ? `${selectedConversations.size} selected` : "Inbox"}
         subtitle={isSelectionMode ? "Tap conversations to select" : undefined}
+        showBackButton={true}
+        onBackPress={() => router.back()}
         rightActions={isSelectionMode ? [
           // Selection mode actions
           selectedConversations.size > 0 && (
@@ -617,6 +617,8 @@ export default function InboxScreen() {
                       borderRadius: theme.borderRadius.md,
                       borderTopLeftRadius: 0,
                       borderTopRightRadius: 0,
+                      borderWidth: 1,
+                      borderColor: theme.colors.border,
                     }}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>

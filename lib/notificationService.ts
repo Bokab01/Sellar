@@ -81,14 +81,25 @@ class NotificationService {
       }
 
       // Queue push notification for processing
-      await dbHelpers.queuePushNotification(
-        eligibleUsers,
-        payload.title,
-        payload.body,
-        payload.type,
-        payload.data,
-        scheduledFor
-      );
+      try {
+        await dbHelpers.queuePushNotification(
+          eligibleUsers,
+          payload.title,
+          payload.body,
+          payload.type,
+          payload.data,
+          scheduledFor
+        );
+      } catch (queueError) {
+        console.error('Failed to queue push notification, sending directly:', queueError);
+        // If queuing fails, send directly as fallback
+        await pushNotificationService.sendPushNotification(eligibleUsers, {
+          title: payload.title,
+          body: payload.body,
+          type: payload.type,
+          data: payload.data,
+        });
+      }
 
       // Send immediately if not scheduled
       if (!scheduledFor) {
@@ -115,9 +126,22 @@ class NotificationService {
       const eligibleUsers: string[] = [];
 
       for (const userId of userIds) {
-        const { data: preferences } = await dbHelpers.getNotificationPreferences(userId);
-        
-        if (this.shouldSendNotification(preferences, notificationType)) {
+        try {
+          const { data: preferences, error } = await dbHelpers.getNotificationPreferences(userId);
+          
+          if (error) {
+            console.warn(`Failed to get preferences for user ${userId}:`, error);
+            // If we can't get preferences, assume user wants notifications (safer default)
+            eligibleUsers.push(userId);
+            continue;
+          }
+          
+          if (this.shouldSendNotification(preferences, notificationType)) {
+            eligibleUsers.push(userId);
+          }
+        } catch (userError) {
+          console.warn(`Error checking preferences for user ${userId}:`, userError);
+          // If we can't check preferences for this user, include them (safer default)
           eligibleUsers.push(userId);
         }
       }

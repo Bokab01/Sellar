@@ -215,10 +215,7 @@ class SecurityService {
    */
   private async updateDeviceInfo(userId: string, isTrusted: boolean): Promise<void> {
     try {
-      // Temporarily disabled due to RLS policy issues
-      console.log('Device info update skipped due to RLS policy issues');
-      return;
-      
+      // Try to track device in user_devices table, but don't fail if table doesn't exist
       const { error } = await supabase
         .from('user_devices')
         .upsert({
@@ -228,16 +225,20 @@ class SecurityService {
           platform: this.getPlatform(),
           last_seen: new Date().toISOString(),
           is_trusted: isTrusted,
-          is_current: true
+          is_active: true
         }, {
           onConflict: 'user_id,device_fingerprint'
         });
 
       if (error) {
-        console.error('Error updating device info:', error);
+        console.warn('SecurityService: Could not track device in user_devices table:', error.message);
+        // This is not critical, continue without failing
+      } else {
+        console.log('SecurityService: Device tracked successfully');
       }
     } catch (error) {
-      console.error('Error updating device info:', error);
+      console.warn('SecurityService: user_devices table not available for device tracking:', error);
+      // This is not critical, continue without failing
     }
   }
 
@@ -401,26 +402,34 @@ class SecurityService {
     try {
       console.log('SecurityService: Fetching devices for user:', userId);
       
-      // Use the new helper function for better security
-      const { data, error } = await supabase
-        .rpc('get_user_devices', { p_user_id: userId });
+      // Try user_devices table first (for proper device tracking)
+      try {
+        const { data: userDevicesData, error: userDevicesError } = await supabase
+          .from('user_devices')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('is_active', true)
+          .order('last_seen', { ascending: false });
 
-      if (error) {
-        console.error('SecurityService: Error fetching user devices:', error);
-        // Fallback to direct table query if function fails
-        return this.getUserDevicesFallback(userId);
+        if (!userDevicesError && userDevicesData && userDevicesData.length > 0) {
+          console.log('SecurityService: Retrieved devices from user_devices:', userDevicesData.length);
+          
+          return userDevicesData.map((device: any) => ({
+            fingerprint: device.device_fingerprint,
+            name: device.device_name || 'Unknown Device',
+            platform: device.platform || 'Unknown',
+            lastSeen: new Date(device.last_seen),
+            isCurrentDevice: device.device_fingerprint === this.deviceFingerprint,
+            isTrusted: device.is_trusted || false
+          }));
+        }
+      } catch (userDevicesException) {
+        console.log('SecurityService: user_devices table not available:', userDevicesException);
       }
 
-      console.log('SecurityService: Retrieved devices:', data?.length || 0);
-
-      return (data || []).map((device: any) => ({
-        fingerprint: device.device_fingerprint,
-        name: device.device_name || 'Unknown Device',
-        platform: device.platform || 'Unknown',
-        lastSeen: new Date(device.last_seen),
-        isCurrentDevice: device.device_fingerprint === this.deviceFingerprint,
-        isTrusted: device.is_trusted || false
-      }));
+      console.log('SecurityService: Using device_tokens fallback');
+      // Fallback to device_tokens table
+      return this.getUserDevicesFallback(userId);
 
     } catch (error) {
       console.error('SecurityService: Exception fetching user devices:', error);
@@ -434,10 +443,10 @@ class SecurityService {
       console.log('SecurityService: Using fallback device query');
       
       const { data, error } = await supabase
-        .from('user_devices')
+        .from('device_tokens')
         .select('*')
         .eq('user_id', userId)
-        .order('last_seen', { ascending: false });
+        .order('last_used_at', { ascending: false });
 
       if (error) {
         console.error('SecurityService: Fallback query failed:', error);
@@ -445,12 +454,12 @@ class SecurityService {
       }
 
       return (data || []).map((device: any) => ({
-        fingerprint: device.device_fingerprint,
-        name: device.device_name || 'Unknown Device',
+        fingerprint: device.device_id || device.token.slice(-8), // Use device_id or last 8 chars of token as fingerprint
+        name: device.device_name || `${device.platform} Device`,
         platform: device.platform || 'Unknown',
-        lastSeen: new Date(device.last_seen),
-        isCurrentDevice: device.device_fingerprint === this.deviceFingerprint,
-        isTrusted: device.is_trusted || false
+        lastSeen: new Date(device.last_used_at || device.updated_at),
+        isCurrentDevice: false, // We can't determine this from device_tokens alone
+        isTrusted: device.is_active || false
       }));
 
     } catch (error) {
@@ -464,7 +473,7 @@ class SecurityService {
    */
   async revokeDeviceAccess(userId: string, deviceFingerprint: string): Promise<boolean> {
     try {
-      // Remove device from trusted devices
+      // Try to remove device from user_devices table
       const { error: deviceError } = await supabase
         .from('user_devices')
         .delete()
@@ -472,8 +481,18 @@ class SecurityService {
         .eq('device_fingerprint', deviceFingerprint);
 
       if (deviceError) {
-        console.error('Error revoking device access:', deviceError);
-        return false;
+        console.warn('SecurityService: Could not revoke device from user_devices table:', deviceError.message);
+        // Try to revoke from device_tokens table as fallback
+        const { error: tokenError } = await supabase
+          .from('device_tokens')
+          .update({ is_active: false })
+          .eq('user_id', userId)
+          .eq('device_id', deviceFingerprint);
+
+        if (tokenError) {
+          console.error('Error revoking device access from both tables:', tokenError);
+          return false;
+        }
       }
 
       // Log security event
@@ -561,7 +580,7 @@ class SecurityService {
 
       // Remove all device records
       const { error: deviceError } = await supabase
-        .from('user_devices')
+        .from('device_tokens')
         .delete()
         .eq('user_id', userId);
 

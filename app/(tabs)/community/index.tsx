@@ -24,7 +24,7 @@ export default function CommunityScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
   const { profile } = useProfile();
-  const { posts, loading, error, refreshing, refresh } = useCommunityPosts();
+  const { posts, loading, error, refreshing, refresh, updatePost, deletePost } = useCommunityPosts();
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [followingStates, setFollowingStates] = useState<Record<string, boolean>>({});
 
@@ -49,6 +49,24 @@ export default function CommunityScreen() {
     }
   };
 
+  // Handle edit post
+  const handleEditPost = (postId: string) => {
+    router.push(`/(tabs)/community/edit-post/${postId}`);
+  };
+
+  // Handle delete post
+  const handleDeletePost = async (postId: string) => {
+    try {
+      const { error } = await deletePost(postId);
+      if (error) {
+        console.error('Error deleting post:', error);
+        // Could show an alert here
+      }
+    } catch (error) {
+      console.error('Error deleting post:', error);
+    }
+  };
+
   // Transform database posts to component format with enhanced features
   const transformedPosts = posts.map((post: any) => {
     // Safety check for post data
@@ -60,6 +78,7 @@ export default function CommunityScreen() {
     return {
       id: post.id || 'unknown',
       type: post.type || (post.listings ? 'listing' : 'general'),
+      user_id: post.user_id, // Preserve the original user_id for ownership checks
       author: {
         id: post.profiles?.id || 'unknown',
         name: (() => {
@@ -213,6 +232,8 @@ export default function CommunityScreen() {
                   console.log('Shared post:', post.id);
                   // TODO: Implement share functionality
                 }}
+                onEdit={() => handleEditPost(post.id)}
+                onDelete={() => handleDeletePost(post.id)}
                 onFollow={() => handleFollow(post.author.id)}
                 onUnfollow={() => handleUnfollow(post.author.id)}
                 onReport={() => {
