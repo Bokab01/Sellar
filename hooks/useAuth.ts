@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, dbHelpers } from '@/lib/supabase';
 import { handleAuthError, analyzeAuthError } from '@/utils/authErrorHandler';
-import { useSessionTimeout } from './useSessionTimeout';
 
 export function useAuth() {
   const { 
@@ -21,13 +20,6 @@ export function useAuth() {
     setLoading
   } = useAuthStore();
 
-  // Initialize session timeout monitoring
-  const { sessionStatus, isRefreshing } = useSessionTimeout({
-    enableWarnings: true,
-    enableAutoRefresh: true,
-    warningThresholdMs: 5 * 60 * 1000, // 5 minutes
-    refreshThresholdMs: 2 * 60 * 1000, // 2 minutes
-  });
 
 
   useEffect(() => {
@@ -187,8 +179,5 @@ export function useAuth() {
     resendVerification,
     signOut,
     isAuthenticated: !!user,
-    // Session timeout information
-    sessionStatus,
-    isRefreshing,
   };
 }

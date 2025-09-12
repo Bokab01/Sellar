@@ -99,8 +99,10 @@ export default function EditPostScreen() {
 
       if (newImages.length > 0) {
         const uploadResults = await storageHelpers.uploadMultipleImages(
-          newImages,
+          newImages.map(img => img.uri),
           'posts',
+          '',
+          user?.id,
           setUploadProgress
         );
         const newImageUrls = uploadResults.map(result => result.url);
@@ -238,7 +240,7 @@ export default function EditPostScreen() {
             title="Post Not Found"
             description="The post you're trying to edit could not be found."
             action={{
-              label: 'Go Back',
+              text: 'Go Back',
               onPress: () => router.back(),
             }}
           />
@@ -261,7 +263,7 @@ export default function EditPostScreen() {
             title="Access Denied"
             description="You can only edit your own posts."
             action={{
-              label: 'Go Back',
+              text: 'Go Back',
               onPress: () => router.back(),
             }}
           />
@@ -390,9 +392,8 @@ export default function EditPostScreen() {
           </Text>
           <LocationPicker
             value={location}
-            onChange={setLocation}
+            onLocationSelect={setLocation}
             placeholder="Add location..."
-            disabled={loading}
           />
         </View>
 
@@ -478,7 +479,7 @@ export default function EditPostScreen() {
           onPress={handleSubmit}
           disabled={loading || !content.trim()}
           style={{ marginBottom: theme.spacing.xl }}
-          leftIcon={loading ? undefined : <Send size={20} color={theme.colors.white} />}
+          leftIcon={loading ? undefined : <Send size={20} color={theme.colors.text.inverse} />}
         >
           {loading ? 'Updating Post...' : 'Update Post'}
         </Button>
@@ -488,7 +489,7 @@ export default function EditPostScreen() {
       <Toast
         visible={showSuccess}
         message="Post updated successfully!"
-        type="success"
+        variant="success"
         onHide={() => setShowSuccess(false)}
       />
     </SafeAreaWrapper>

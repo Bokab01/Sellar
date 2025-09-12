@@ -11,7 +11,7 @@ import {
   LoadingSkeleton,
   Badge,
 } from '@/components';
-import { useTransaction } from '@/hooks/useTransactions';
+import { useFinancialTransaction } from '@/hooks/useTransactions';
 import { 
   formatTransactionType, 
   formatTransactionStatus, 
@@ -42,7 +42,7 @@ import {
 export default function TransactionDetailsScreen() {
   const { theme } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { transaction, loading, error, refetch } = useTransaction(id!);
+  const { transaction, loading, error, refresh } = useFinancialTransaction(id!);
 
   if (loading) {
     return (

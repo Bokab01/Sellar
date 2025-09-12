@@ -68,7 +68,7 @@ export function useRealtime({
                   callbacksRef.current.onDelete?.(payload.old);
                   break;
                 default:
-                  console.warn(`🔗 Unknown event type: ${payload.eventType}`);
+                  console.warn(`🔗 Unknown event type: ${(payload as any).eventType}`);
               }
             } catch (err) {
               console.error(`🔗 Error handling real-time event for ${table}:`, err);

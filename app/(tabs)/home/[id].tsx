@@ -26,6 +26,7 @@ import {
   ProductCard,
   ImageViewer,
   ReviewsList,
+  SimpleCallbackRequestButton,
 } from '@/components';
 import { useImageViewer } from '@/hooks/useImageViewer';
 import { useListingStats } from '@/hooks/useListingStats';
@@ -1569,6 +1570,21 @@ export default function ListingDetailScreen() {
               </Text>
             </TouchableOpacity>
           </View>
+
+          {/* Callback Request Button */}
+          {!isOwnListing && listing.profiles?.phone && (
+            <View style={{ marginTop: theme.spacing.md }}>
+              <SimpleCallbackRequestButton
+                listingId={listingId!}
+                sellerId={listing.user_id}
+                sellerName={`${listing.profiles.first_name} ${listing.profiles.last_name}`.trim()}
+                sellerPhone={listing.profiles.phone}
+                listingTitle={listing.title}
+                variant="secondary"
+                size="md"
+              />
+            </View>
+          )}
         </View>
       )}
 

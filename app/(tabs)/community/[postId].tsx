@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, ScrollView, RefreshControl, Alert } from 'react-native';
+import { View, ScrollView, RefreshControl, Alert, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase } from '@/lib/supabase';
+import { UserProfile } from '@/hooks/useProfile';
 import {
   Text,
   SafeAreaWrapper,
@@ -35,29 +36,30 @@ export default function PostDetailScreen() {
   const [submittingComment, setSubmittingComment] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  
+  // Reply state
+  const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
 
   const fetchPost = useCallback(async () => {
     try {
+      console.log('Fetching post with ID:', postId);
       const { data, error: fetchError } = await supabase
         .from('posts')
         .select(`
           *,
-          profiles:user_id (
+          profiles!posts_user_id_fkey (
             id,
             first_name,
             last_name,
             full_name,
             avatar_url,
             rating,
-            rating_count,
-            total_reviews,
             location,
             is_verified,
             is_business,
             business_name,
             display_business_name,
-            business_name_priority,
-            verification_level
+            business_name_priority
           ),
           listings:listing_id (
             id,
@@ -69,33 +71,44 @@ export default function PostDetailScreen() {
         .eq('id', postId)
         .single();
 
+
       if (fetchError) {
+        console.error('Post fetch error:', fetchError);
         setError(fetchError.message);
       } else {
         setPost(data);
       }
-    } catch {
+    } catch (err) {
+      console.error('Post fetch exception:', err);
       setError('Failed to load post');
     }
   }, [postId]);
 
   const fetchComments = async () => {
     try {
+      console.log('Fetching comments for post ID:', postId);
       const { data, error: fetchError } = await supabase
         .from('comments')
         .select(`
           *,
-          profiles:user_id (
+          profiles!comments_user_id_fkey (
             id,
             first_name,
             last_name,
+            full_name,
             avatar_url,
-            is_verified
+            is_verified,
+            is_business,
+            business_name,
+            display_business_name,
+            business_name_priority
           )
         `)
         .eq('post_id', postId)
         .is('parent_id', null) // Only top-level comments
         .order('created_at', { ascending: true });
+
+      console.log('Comments fetch result:', { data, error: fetchError });
 
       if (fetchError) {
         console.error('Failed to fetch comments:', fetchError);
@@ -107,12 +120,17 @@ export default function PostDetailScreen() {
               .from('comments')
               .select(`
                 *,
-                profiles:user_id (
+                profiles!comments_user_id_fkey (
                   id,
                   first_name,
                   last_name,
+                  full_name,
                   avatar_url,
-                  is_verified
+                  is_verified,
+                  is_business,
+                  business_name,
+                  display_business_name,
+                  business_name_priority
                 )
               `)
               .eq('parent_id', comment.id)
@@ -127,10 +145,8 @@ export default function PostDetailScreen() {
 
         setComments(commentsWithReplies);
       }
-    } catch {
-      console.error('Failed to fetch comments');
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      console.error('Failed to fetch comments:', err);
     }
   };
 
@@ -186,42 +202,30 @@ export default function PostDetailScreen() {
           post_id: postId!,
           user_id: user.id,
           content: commentText.trim(),
+          parent_id: replyingTo?.id || null, // Add parent_id if replying
         });
 
       if (error) throw error;
 
       setCommentText('');
-      setToastMessage('Comment added successfully!');
+      setReplyingTo(null); // Clear reply state
+      setToastMessage(replyingTo ? 'Reply added successfully!' : 'Comment added successfully!');
       setShowToast(true);
+      
+      // Refresh comments and post data to get updated counts from database
       await fetchComments();
+      await fetchPost();
     } catch {
-      Alert.alert('Error', 'Failed to add comment');
+      Alert.alert('Error', replyingTo ? 'Failed to add reply' : 'Failed to add comment');
     } finally {
       setSubmittingComment(false);
     }
   };
 
-  const handleReplyToComment = async (parentId: string, content: string) => {
-    if (!user) return;
-
-    try {
-      const { error } = await supabase
-        .from('comments')
-        .insert({
-          post_id: postId!,
-          user_id: user.id,
-          content,
-          parent_id: parentId,
-        });
-
-      if (error) throw error;
-
-      setToastMessage('Reply added successfully!');
-      setShowToast(true);
-      await fetchComments();
-    } catch (err) {
-      Alert.alert('Error', 'Failed to add reply');
-    }
+  const handleReplyToComment = (parentId: string, authorName: string) => {
+    // Set reply state to focus the unified input
+    setReplyingTo({ id: parentId, name: authorName });
+    setCommentText(''); // Clear any existing text
   };
 
   const handleLikeComment = async (commentId: string) => {
@@ -258,6 +262,17 @@ export default function PostDetailScreen() {
       console.error('Failed to toggle comment like:', err);
     }
   };
+
+  // Fetch post and comments when component mounts or postId changes
+  useEffect(() => {
+    if (postId) {
+      setLoading(true);
+      setError(null);
+      Promise.all([fetchPost(), fetchComments()]).finally(() => {
+        setLoading(false);
+      });
+    }
+  }, [postId, fetchPost]);
 
   if (loading) {
     return (
@@ -299,24 +314,62 @@ export default function PostDetailScreen() {
   }
 
   // Transform post data
+
+
+  // Count total comments including replies
+  const totalCommentsCount = comments.reduce((total, comment) => {
+    return total + 1 + (comment.replies?.length || 0);
+  }, 0);
+
   const transformedPost = {
     id: post.id,
+    type: post.type || 'general', // Add post type
+    user_id: post.user_id, // Add user_id for ownership checks
     author: {
-      id: post.profiles?.id,
-      name: `${post.profiles?.first_name || 'User'} ${post.profiles?.last_name || ''}`,
-      avatar: post.profiles?.avatar_url,
-      rating: post.profiles?.rating || 0,
-      isVerified: post.profiles?.is_verified,
-      profile: post.profiles, // Add the full profile object for UserDisplayName
+      id: post.profiles?.id || post.user_id,
+      name: (() => {
+        const firstName = post.profiles?.first_name || '';
+        const lastName = post.profiles?.last_name || '';
+        if (firstName && lastName) {
+          return `${firstName} ${lastName}`.trim();
+        } else if (firstName) {
+          return firstName.trim();
+        } else if (lastName) {
+          return lastName.trim();
+        } else {
+          return 'User';
+        }
+      })(),
+      avatar: post.profiles?.avatar_url || null,
+      rating: Number(post.profiles?.rating) || 0,
+      reviewCount: 0, // Set to 0 since we don't have this data
+      isVerified: Boolean(post.profiles?.is_verified),
+      location: post.profiles?.location || null,
+      profile: post.profiles ? {
+        ...post.profiles,
+        full_name: post.profiles.full_name || (() => {
+          const firstName = post.profiles.first_name || '';
+          const lastName = post.profiles.last_name || '';
+          if (firstName && lastName) {
+            return `${firstName} ${lastName}`.trim();
+          } else if (firstName) {
+            return firstName.trim();
+          } else if (lastName) {
+            return lastName.trim();
+          } else {
+            return 'User';
+          }
+        })(),
+      } as UserProfile : null, // Add the full profile object for UserDisplayName
     },
     timestamp: new Date(post.created_at || new Date()).toLocaleString(),
-    content: post.content,
-    images: post.images || [],
-    likes: post.likes_count || 0,
-    comments: post.comments_count || 0,
-    shares: post.shares_count || 0,
+    content: post.content || '',
+    images: Array.isArray(post.images) ? post.images : [],
+    likes: Number(post.likes_count) || 0,
+    comments: totalCommentsCount, // Use total comments including replies
+    shares: Number(post.shares_count) || 0,
     isLiked: false, // TODO: Check if current user liked this post
-    location: post.location,
+    location: post.location || null,
     listing: post.listings ? {
       id: post.listings.id,
       title: post.listings.title,
@@ -324,6 +377,7 @@ export default function PostDetailScreen() {
       image: post.listings.images?.[0],
     } : undefined,
   };
+
 
   // Transform comments data
   const transformedComments = comments.map((comment) => ({
@@ -369,92 +423,149 @@ export default function PostDetailScreen() {
         onBackPress={() => router.back()}
       />
 
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: theme.spacing.xl }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={theme.colors.primary}
-          />
-        }
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        {/* Post */}
-        <View style={{ marginBottom: theme.spacing.lg }}>
-          <PostCard
-            post={transformedPost}
-            onLike={handleLikePost}
-            onComment={() => {}}
-            onShare={() => {}}
-          />
-        </View>
-
-        {/* Comments Section */}
-        <View style={{ paddingHorizontal: theme.spacing.lg }}>
-          <Text variant="h4" style={{ marginBottom: theme.spacing.lg }}>
-            Comments ({comments.length})
-          </Text>
-
-          {/* Add Comment */}
-          <View
-            style={{
-              backgroundColor: theme.colors.surface,
-              borderRadius: theme.borderRadius.lg,
-              padding: theme.spacing.lg,
-              marginBottom: theme.spacing.lg,
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-            }}
-          >
-            <View style={{ flexDirection: 'row', gap: theme.spacing.md, alignItems: 'flex-start' }}>
-              <Avatar
-                source={user?.user_metadata?.avatar_url}
-                name={`${user?.user_metadata?.first_name || 'User'} ${user?.user_metadata?.last_name || ''}`}
-                size="sm"
-              />
-              <View style={{ flex: 1 }}>
-                <Input
-                  variant="multiline"
-                  placeholder="Write a comment..."
-                  value={commentText}
-                  onChangeText={setCommentText}
-                  style={{ minHeight: 60 }}
-                />
-                <Button
-                  variant="primary"
-                  onPress={handleAddComment}
-                  loading={submittingComment}
-                  disabled={!commentText.trim() || submittingComment}
-                  size="sm"
-                  style={{ marginTop: theme.spacing.md, alignSelf: 'flex-end' }}
-                >
-                  Comment
-                </Button>
-              </View>
-            </View>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: theme.spacing.md }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.colors.primary}
+            />
+          }
+        >
+          {/* Post */}
+          <View style={{ marginBottom: theme.spacing.lg }}>
+            <PostCard
+              key={`${transformedPost.id}-${transformedPost.comments}`}
+              post={transformedPost}
+              onLike={handleLikePost}
+              onComment={() => {}}
+              onShare={() => {}}
+            />
           </View>
 
-          {/* Comments List */}
-          {transformedComments.length > 0 ? (
-            <View style={{ gap: theme.spacing.md }}>
-              {transformedComments.map((comment) => (
-                <CommentCard
-                  key={comment.id}
-                  comment={comment}
-                  onLike={() => handleLikeComment(comment.id)}
-                  onReply={(content) => handleReplyToComment(comment.id, content)}
-                />
-              ))}
+          {/* Comments Section */}
+          <View style={{ paddingHorizontal: theme.spacing.lg }}>
+            <Text variant="h4" style={{ marginBottom: theme.spacing.lg }}>
+              Comments ({totalCommentsCount})
+            </Text>
+
+            {/* Comments List */}
+            {transformedComments.length > 0 ? (
+              <View style={{ gap: theme.spacing.md, marginBottom: theme.spacing.xl }}>
+                {transformedComments.map((comment) => (
+                  <CommentCard
+                    key={comment.id}
+                    comment={comment}
+                    onLike={() => handleLikeComment(comment.id)}
+                    onReply={(commentId, authorName) => handleReplyToComment(commentId, authorName)}
+                  />
+                ))}
+              </View>
+            ) : (
+              <EmptyState
+                icon={<MessageCircle size={48} color={theme.colors.text.muted} />}
+                title="No comments yet"
+                description="Be the first to comment on this post"
+                style={{ marginBottom: theme.spacing.xl }}
+              />
+            )}
+          </View>
+        </ScrollView>
+
+        {/* Fixed Comment Input at Bottom */}
+        <View
+          style={{
+            backgroundColor: theme.colors.background,
+            borderTopWidth: 1,
+            borderTopColor: theme.colors.border,
+            paddingHorizontal: theme.spacing.lg,
+            paddingVertical: theme.spacing.md,
+            paddingBottom: Platform.OS === 'ios' ? theme.spacing.lg : theme.spacing.md,
+          }}
+        >
+          {/* Reply indicator */}
+          {replyingTo && (
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: theme.colors.surface,
+              paddingHorizontal: theme.spacing.md,
+              paddingVertical: theme.spacing.sm,
+              borderRadius: theme.borderRadius.md,
+              marginBottom: theme.spacing.sm,
+            }}>
+              <Text variant="bodySmall" color="muted">
+                Replying to {replyingTo.name}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setReplyingTo(null)}
+                style={{ padding: theme.spacing.xs }}
+              >
+                <Text variant="bodySmall" color="primary" style={{ fontWeight: '600' }}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
             </View>
-          ) : (
-            <EmptyState
-              icon={<MessageCircle size={48} color={theme.colors.text.muted} />}
-              title="No comments yet"
-              description="Be the first to comment on this post"
-            />
           )}
+
+          <View style={{ flexDirection: 'row', gap: theme.spacing.md, alignItems: 'flex-end' }}>
+            <Avatar
+              source={user?.user_metadata?.avatar_url}
+              name={(() => {
+                const firstName = user?.user_metadata?.first_name || '';
+                const lastName = user?.user_metadata?.last_name || '';
+                if (firstName && lastName) {
+                  return `${firstName} ${lastName}`.trim();
+                } else if (firstName) {
+                  return firstName.trim();
+                } else if (lastName) {
+                  return lastName.trim();
+                } else {
+                  return user?.email?.split('@')[0] || 'User';
+                }
+              })()}
+              size="sm"
+            />
+            <View style={{ flex: 1 }}>
+              <Input
+                variant="multiline"
+                placeholder={replyingTo ? `Reply to ${replyingTo.name}...` : "Write a comment..."}
+                value={commentText}
+                onChangeText={setCommentText}
+                style={{ 
+                  minHeight: 36,
+                  maxHeight: 100,
+                  borderRadius: theme.borderRadius.lg,
+                  paddingHorizontal: theme.spacing.md,
+                  paddingVertical: theme.spacing.sm,
+                }}
+              />
+            </View>
+            <Button
+              variant="primary"
+              onPress={handleAddComment}
+              loading={submittingComment}
+              disabled={!commentText.trim() || submittingComment}
+              size="sm"
+              style={{ 
+                borderRadius: theme.borderRadius.full,
+                minWidth: 60,
+                height: 36,
+              }}
+            >
+              {submittingComment ? '...' : 'Send'}
+            </Button>
+          </View>
         </View>
-      </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Toast */}
       <Toast

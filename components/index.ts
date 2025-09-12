@@ -36,6 +36,18 @@ export { ReviewForm } from './ReviewForm/ReviewForm';
 export { ReviewsList } from './ReviewsList/ReviewsList';
 export { ReviewSummary, CompactReviewSummary } from './ReviewSummary/ReviewSummary';
 
+// Transaction-Based Review System Components
+export { TransactionCompletionModal } from './TransactionCompletionModal/TransactionCompletionModal';
+export { TransactionCompletionButton } from './TransactionCompletionButton/TransactionCompletionButton';
+export { EnhancedReviewCard, CompactEnhancedReviewCard } from './EnhancedReviewCard/EnhancedReviewCard';
+export { TransactionBasedReviewForm } from './TransactionBasedReviewForm/TransactionBasedReviewForm';
+export { TrustMetricsDisplay, TrustIndicator } from './TrustMetricsDisplay/TrustMetricsDisplay';
+export { ReviewModerationModal, QuickReportButton } from './ReviewModerationModal/ReviewModerationModal';
+
+// Callback Request System Components
+export { SimpleCallbackRequestButton } from './SimpleCallbackRequestButton/SimpleCallbackRequestButton';
+export { CallbackMessage } from './CallbackMessage/CallbackMessage';
+
 // Support System Components
 export { SupportTicketCard } from './SupportTicketCard/SupportTicketCard';
 export { CreateTicketModal } from './CreateTicketModal/CreateTicketModal';
@@ -136,7 +148,7 @@ export { UserProfile } from './UserProfile/UserProfile';
 export { MessageInput } from './MessageInput/MessageInput';
 
 // Monetization Components
-export { BusinessBadge } from './BusinessBadge/BusinessBadge';
+// BusinessBadge already exported above
 
 // Community Components
 export { CommunitySidebar } from './CommunitySidebar/CommunitySidebar';

@@ -8,6 +8,7 @@ import { useListings } from '@/hooks/useListings';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useProfile } from '@/hooks/useProfile';
 import { useMultipleListingStats } from '@/hooks/useListingStats';
+import { useAppResume } from '@/hooks/useAppResume';
 // Temporarily disabled performance hooks to debug infinite re-render
 // import { useOfflineListings, useOfflineSync } from '@/hooks/useOfflineSync';
 // import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
@@ -78,6 +79,17 @@ export default function HomeScreen() {
 
   // Get notifications for badge
   const { unreadCount } = useNotifications();
+
+  // App resume handling - refresh listings when app comes back from background
+  const { isRefreshing, isReconnecting } = useAppResume({
+    onResume: async () => {
+      console.log('📱 Home screen: App resumed, refreshing listings...');
+      await refresh();
+      // Also refresh user credit
+      await fetchUserCredit();
+    },
+    debug: true,
+  });
 
   // Temporarily disabled offline listings
   // const { 
@@ -180,38 +192,39 @@ export default function HomeScreen() {
     }
   );
 
-  // Fetch user credit balance
-  useEffect(() => {
-    const fetchUserCredit = async () => {
-      if (!user?.id) {
-        setCreditLoading(false);
-        return;
-      }
+  // Fetch user credit balance function
+  const fetchUserCredit = async () => {
+    if (!user?.id) {
+      setCreditLoading(false);
+      return;
+    }
 
-      try {
-        setCreditLoading(true);
-        
-        // Try to get user credits from the user_credits table
-        const { data: creditData, error: creditError } = await supabase
-          .from('user_credits')
-          .select('balance')
-          .eq('user_id', user.id)
-          .single();
+    try {
+      setCreditLoading(true);
+      
+      // Try to get user credits from the user_credits table
+      const { data: creditData, error: creditError } = await supabase
+        .from('user_credits')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single();
 
-        if (creditError) {
-          console.log('Error fetching user credits:', creditError.message);
-          setUserCredit(0);
-        } else {
-          setUserCredit((creditData as any)?.balance || 0);
-        }
-      } catch (err) {
-        console.log('Failed to fetch user credits:', err);
+      if (creditError) {
+        console.log('Error fetching user credits:', creditError.message);
         setUserCredit(0);
-      } finally {
-        setCreditLoading(false);
+      } else {
+        setUserCredit((creditData as any)?.balance || 0);
       }
-    };
+    } catch (err) {
+      console.log('Failed to fetch user credits:', err);
+      setUserCredit(0);
+    } finally {
+      setCreditLoading(false);
+    }
+  };
 
+  // Fetch user credit balance on mount
+  useEffect(() => {
     fetchUserCredit();
   }, [user?.id]);
 

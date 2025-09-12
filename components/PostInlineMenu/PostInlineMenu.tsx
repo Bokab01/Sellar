@@ -45,14 +45,14 @@ export function PostInlineMenu({
   const [showMenu, setShowMenu] = useState(false);
   const [buttonLayout, setButtonLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const menuAnimation = useRef(new Animated.Value(0)).current;
-  const buttonRef = useRef<TouchableOpacity>(null);
+  const buttonRef = useRef<View | null>(null);
 
   const isOwnPost = user?.id === postAuthorId;
 
   const toggleMenu = () => {
     if (!showMenu) {
       // Measure button position before showing menu
-      buttonRef.current?.measureInWindow((x, y, width, height) => {
+      buttonRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
         setButtonLayout({ x, y, width, height });
         setShowMenu(true);
         

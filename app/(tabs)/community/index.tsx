@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, ScrollView, TouchableOpacity, RefreshControl, Pressable } from 'react-native';
+import { View, ScrollView, TouchableOpacity, RefreshControl, Pressable, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useCommunityPosts } from '@/hooks/useCommunity';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useProfile } from '@/hooks/useProfile';
-import { router } from 'expo-router';
+import { useAppResume } from '@/hooks/useAppResume';
+import { router, useFocusEffect } from 'expo-router';
 import {
   Text,
   SafeAreaWrapper,
@@ -27,6 +28,22 @@ export default function CommunityScreen() {
   const { posts, loading, error, refreshing, refresh, updatePost, deletePost } = useCommunityPosts();
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [followingStates, setFollowingStates] = useState<Record<string, boolean>>({});
+
+  // App resume handling - refresh posts when app comes back from background
+  const { isRefreshing, isReconnecting } = useAppResume({
+    onResume: async () => {
+      console.log('📱 Community screen: App resumed, refreshing posts...');
+      await refresh();
+    },
+    debug: true,
+  });
+
+  // Refresh posts when screen comes into focus (e.g., after navigating back from post detail)
+  useFocusEffect(
+    React.useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
 
   // Handle follow/unfollow functionality
   const handleFollow = async (userId: string) => {
@@ -51,19 +68,38 @@ export default function CommunityScreen() {
 
   // Handle edit post
   const handleEditPost = (postId: string) => {
+    console.log('Attempting to edit post with ID:', postId, typeof postId);
+    
+    if (!postId || postId === 'unknown' || postId === 'undefined') {
+      console.error('Invalid post ID for editing:', postId);
+      Alert.alert('Error', 'Cannot edit post: Invalid post ID');
+      return;
+    }
+    
     router.push(`/(tabs)/community/edit-post/${postId}`);
   };
 
   // Handle delete post
   const handleDeletePost = async (postId: string) => {
+    console.log('Attempting to delete post with ID:', postId, typeof postId);
+    
+    if (!postId || postId === 'unknown' || postId === 'undefined') {
+      console.error('Invalid post ID for deletion:', postId);
+      Alert.alert('Error', 'Cannot delete post: Invalid post ID');
+      return;
+    }
+    
     try {
       const { error } = await deletePost(postId);
       if (error) {
         console.error('Error deleting post:', error);
-        // Could show an alert here
+        Alert.alert('Error', `Failed to delete post: ${error}`);
+      } else {
+        Alert.alert('Success', 'Post deleted successfully');
       }
     } catch (error) {
       console.error('Error deleting post:', error);
+      Alert.alert('Error', 'Failed to delete post');
     }
   };
 
@@ -75,7 +111,7 @@ export default function CommunityScreen() {
       return null;
     }
 
-    return {
+    const transformedPost = {
       id: post.id || 'unknown',
       type: post.type || (post.listings ? 'listing' : 'general'),
       user_id: post.user_id, // Preserve the original user_id for ownership checks
@@ -116,6 +152,17 @@ export default function CommunityScreen() {
         image: post.listings.images?.[0] || null,
       } : undefined,
     };
+
+    // Debug log for posts with invalid IDs
+    if (!post.id || post.id === 'unknown') {
+      console.warn('Post with invalid ID detected:', { 
+        originalId: post.id, 
+        transformedId: transformedPost.id,
+        postData: post 
+      });
+    }
+
+    return transformedPost;
   }).filter(Boolean); // Remove any null entries
 
 
@@ -218,30 +265,33 @@ export default function CommunityScreen() {
             </TouchableOpacity>
 
             {/* Posts Feed */}
-            {transformedPosts.map((post) => (
-              <PostCard 
-                key={post.id} 
-                post={post}
-                isFollowing={followingStates[post.author.id] || false}
-                onLike={() => {
-                  console.log('Liked post:', post.id);
-                  // TODO: Implement like functionality
-                }}
-                onComment={() => router.push(`/(tabs)/community/${post.id}`)}
-                onShare={() => {
-                  console.log('Shared post:', post.id);
-                  // TODO: Implement share functionality
-                }}
-                onEdit={() => handleEditPost(post.id)}
-                onDelete={() => handleDeletePost(post.id)}
-                onFollow={() => handleFollow(post.author.id)}
-                onUnfollow={() => handleUnfollow(post.author.id)}
-                onReport={() => {
-                  console.log('Reported post:', post.id);
-                  // TODO: Implement report functionality
-                }}
-              />
-            ))}
+            {transformedPosts.map((post) => {
+              if (!post) return null;
+              return (
+                <PostCard 
+                  key={post.id} 
+                  post={post}
+                  isFollowing={followingStates[post.author.id] || false}
+                  onLike={() => {
+                    console.log('Liked post:', post.id);
+                    // TODO: Implement like functionality
+                  }}
+                  onComment={() => router.push(`/(tabs)/community/${post.id}`)}
+                  onShare={() => {
+                    console.log('Shared post:', post.id);
+                    // TODO: Implement share functionality
+                  }}
+                  onEdit={() => handleEditPost(post.id)}
+                  onDelete={() => handleDeletePost(post.id)}
+                  onFollow={() => handleFollow(post.author.id)}
+                  onUnfollow={() => handleUnfollow(post.author.id)}
+                  onReport={() => {
+                    console.log('Reported post:', post.id);
+                    // TODO: Implement report functionality
+                  }}
+                />
+              );
+            })}
           </ScrollView>
         ) : (
           <EmptyState

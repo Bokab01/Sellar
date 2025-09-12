@@ -27,6 +27,8 @@ import {
   Chip,
   FullUserBadges,
   UserDisplayName,
+  TrustMetricsDisplay,
+  EnhancedReviewCard,
 } from '@/components';
 import { 
   MessageCircle, 
@@ -58,6 +60,7 @@ export default function UserProfileScreen() {
   const [activeTab, setActiveTab] = useState<TabType>((tab as TabType) || 'listings');
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [trustMetrics, setTrustMetrics] = useState<any>(null);
 
   // Get user's listings
   const { 
@@ -101,11 +104,30 @@ export default function UserProfileScreen() {
         setError(fetchError.message);
       } else {
         setProfile(data);
+        // Fetch trust metrics
+        await fetchTrustMetrics();
       }
     } catch (err) {
       setError('Failed to load profile');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTrustMetrics = async () => {
+    try {
+      // Get trust metrics using the database function
+      const { data, error } = await supabase
+        .rpc('get_user_trust_metrics', { p_user_id: profileId });
+
+      if (error) {
+        console.error('Error fetching trust metrics:', error);
+        return;
+      }
+
+      setTrustMetrics(data);
+    } catch (err) {
+      console.error('Error fetching trust metrics:', err);
     }
   };
 
@@ -351,6 +373,15 @@ export default function UserProfileScreen() {
       case 'about':
         return (
           <View style={{ gap: theme.spacing.lg }}>
+            {/* Trust Metrics */}
+            {trustMetrics && (
+              <TrustMetricsDisplay
+                metrics={trustMetrics}
+                variant="full"
+                showDetails={true}
+              />
+            )}
+
             {profile.bio && (
               <View>
                 <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>

@@ -295,21 +295,20 @@ export function PremiumProductCard({
 
         {/* Image Section */}
         <View style={{ height: imageHeight, position: 'relative' }}>
-          {shouldLoadHeavyComponent ? (
+          {shouldLoadHeavyComponent() ? (
             imagePath ? (
-              <ListingImage
-                imagePath={imagePath}
-                style={[
-                  {
+              <TouchableOpacity onPress={handleImagePress} style={{ flex: 1 }}>
+                <ListingImage
+                  path={imagePath}
+                  style={{
                     width: '100%',
                     height: '100%',
                     borderTopLeftRadius: theme.borderRadius.lg,
                     borderTopRightRadius: theme.borderRadius.lg,
-                  },
-                  imageStyles
-                ]}
-                onPress={handleImagePress}
-              />
+                    ...imageStyles
+                  }}
+                />
+              </TouchableOpacity>
             ) : (
               <TouchableOpacity onPress={handleImagePress} style={{ flex: 1 }}>
                 <Image

@@ -21,7 +21,8 @@ import {
   Star,
   ArrowUpRight,
   Lock,
-  ArrowUpRight as Upgrade
+  ArrowUpRight as Upgrade,
+  PhoneCall
 } from 'lucide-react-native';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { useAuth } from '@/hooks/useAuth';
@@ -39,7 +40,7 @@ type DashboardTab = 'overview' | 'analytics' | 'autoboost' | 'support' | 'premiu
 interface TabConfig {
   id: DashboardTab;
   label: string;
-  icon: React.ReactNode;
+  icon: (color: string) => React.ReactNode;
   requiredTier: 'business' | 'free';
   badge?: string;
 }
@@ -66,10 +67,13 @@ export default function BusinessDashboardScreen() {
   });
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
 
+  // Extract and memoize boolean to prevent dependency issues
+  const isBusinessUser = useMemo(() => businessFeatures.isBusinessUser, [businessFeatures.isBusinessUser]);
+
   // Simplified tier calculation for unified plan
   const currentTier = useMemo((): 'free' | 'business' => {
-    return businessFeatures.isBusinessUser ? 'business' : 'free';
-  }, [businessFeatures.isBusinessUser]);
+    return isBusinessUser ? 'business' : 'free';
+  }, [isBusinessUser]);
 
   // Memoize available tabs to prevent unnecessary re-renders
   const availableTabs = useMemo((): TabConfig[] => {
@@ -77,39 +81,38 @@ export default function BusinessDashboardScreen() {
       {
         id: 'overview',
         label: 'Overview',
-        icon: <BarChart3 size={18} color={theme.colors.text.primary} />,
+        icon: (color: string) => <BarChart3 size={18} color={color} />,
         requiredTier: 'free',
+      },
+      {
+        id: 'analytics',
+        label: 'Analytics',
+        icon: (color: string) => <TrendingUp size={18} color={color} />,
+        requiredTier: 'free',
+        badge: currentTier === 'free' ? 'Basic' : 'Comprehensive',
       },
     ];
 
-    // Simplified: Add all business features for unified plan
+    // Add business-only features for business users
     if (currentTier === 'business') {
-      tabs.push({
-        id: 'analytics',
-        label: 'Analytics',
-        icon: <TrendingUp size={18} color={theme.colors.text.primary} />,
-        requiredTier: 'business',
-        badge: 'Comprehensive',
-      });
-
       tabs.push({
         id: 'autoboost',
         label: 'Auto-boost',
-        icon: <Zap size={18} color={theme.colors.warning} />,
+        icon: (color: string) => <Zap size={18} color={color} />,
         requiredTier: 'business',
       });
 
       tabs.push({
         id: 'support',
         label: 'Priority Support',
-        icon: <HeadphonesIcon size={18} color={theme.colors.success} />,
+        icon: (color: string) => <HeadphonesIcon size={18} color={color} />,
         requiredTier: 'business',
       });
 
       tabs.push({
         id: 'premium',
         label: 'Business Features',
-        icon: <Crown size={18} color={theme.colors.primary} />,
+        icon: (color: string) => <Crown size={18} color={color} />,
         requiredTier: 'business',
       });
     }
@@ -117,7 +120,7 @@ export default function BusinessDashboardScreen() {
     return tabs;
   }, [currentTier, theme]);
 
-  // Load dashboard data
+  // Load dashboard data - remove problematic function dependencies
   const loadDashboardData = useCallback(async () => {
     if (!user?.id) return;
     
@@ -125,16 +128,20 @@ export default function BusinessDashboardScreen() {
       setLoading(true);
       
       // Load subscription data
-      await refreshSubscription();
+      try {
+        await refreshSubscription();
+      } catch (error) {
+        console.warn('Failed to refresh subscription:', error);
+      }
       
-      // Load analytics data for business users
-      if (businessFeatures.isBusinessUser) {
-        const [stats, analytics] = await Promise.all([
-          getQuickStats(),
-          getBusinessAnalytics()
-        ]);
-        
-        setQuickStats(stats);
+      // Load basic analytics for all users, comprehensive for business users
+      const [stats, analytics] = await Promise.all([
+        getQuickStats(),
+        isBusinessUser ? getBusinessAnalytics() : null
+      ]);
+      
+      setQuickStats(stats);
+      if (analytics) {
         setAnalyticsData(analytics);
       }
     } catch (error) {
@@ -142,22 +149,40 @@ export default function BusinessDashboardScreen() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, businessFeatures.isBusinessUser, refreshSubscription, getQuickStats, getBusinessAnalytics]);
+  }, [user?.id, isBusinessUser]);
 
   useEffect(() => {
     loadDashboardData();
   }, [loadDashboardData]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
+    if (!user?.id) return;
+    
     setRefreshing(true);
     try {
-      await loadDashboardData();
+      // Load subscription data
+      try {
+        await refreshSubscription();
+      } catch (error) {
+        console.warn('Failed to refresh subscription:', error);
+      }
+      
+      // Load basic analytics for all users, comprehensive for business users
+      const [stats, analytics] = await Promise.all([
+        getQuickStats(),
+        isBusinessUser ? getBusinessAnalytics() : null
+      ]);
+      
+      setQuickStats(stats);
+      if (analytics) {
+        setAnalyticsData(analytics);
+      }
     } catch (error) {
       console.error('Failed to refresh dashboard:', error);
     } finally {
       setRefreshing(false);
     }
-  };
+  }, [user?.id, isBusinessUser]);
 
   // Memoize tab bar styles
   const tabBarStyles = useMemo(() => ({
@@ -171,119 +196,89 @@ export default function BusinessDashboardScreen() {
     },
   }), [theme]);
 
-  // Render tab bar
+  // Render tab bar with pill-shaped tabs
   const renderTabBar = useMemo(() => (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={tabBarStyles.scrollView}
-      contentContainerStyle={tabBarStyles.contentContainer}
-    >
-      {availableTabs.map((tab) => {
-        const isActive = activeTab === tab.id;
-        
-        return (
-          <TouchableOpacity
-            key={tab.id}
-            onPress={() => setActiveTab(tab.id)}
-            style={{
-              paddingVertical: theme.spacing.md,
-              paddingHorizontal: theme.spacing.lg,
-              marginRight: theme.spacing.sm,
-              backgroundColor: isActive ? theme.colors.primary + '15' : 'transparent',
-              borderRadius: theme.borderRadius.md,
-              borderColor: isActive ? theme.colors.primary + '30' : 'transparent',
-              borderWidth: 1,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: theme.spacing.xs,
-            }}
-          >
-            {tab.icon}
-            <Text
-              variant="bodySmall"
+    <View style={{
+      backgroundColor: theme.colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+      paddingHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.md,
+    }}>
+      {/* Pill-shaped tab container */}
+      <View style={{
+        backgroundColor: theme.colors.surfaceVariant,
+        borderRadius: 50, // Full pill shape
+        padding: theme.spacing.xs,
+        flexDirection: 'row',
+        alignSelf: 'flex-start', // Only take needed width
+      }}>
+        {availableTabs.map((tab, index) => {
+          const isActive = activeTab === tab.id;
+          
+          return (
+            <TouchableOpacity
+              key={tab.id}
+              onPress={() => setActiveTab(tab.id)}
               style={{
-                color: isActive ? theme.colors.primary : theme.colors.text.primary,
-                fontWeight: isActive ? '600' : '400',
+                paddingVertical: theme.spacing.sm,
+                paddingHorizontal: theme.spacing.lg,
+                backgroundColor: isActive ? theme.colors.primary : 'transparent',
+                borderRadius: 50, // Full pill shape
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.xs,
+                marginRight: index < availableTabs.length - 1 ? theme.spacing.xs : 0,
               }}
             >
-              {tab.label}
-            </Text>
-            {tab.badge && (
-              <Badge
-                text={tab.badge}
-                variant="info"
-              />
-            )}
-          </TouchableOpacity>
-        );
-      })}
-    </ScrollView>
-  ), [availableTabs, activeTab, theme, tabBarStyles]);
+              {tab.icon(isActive ? theme.colors.text.inverse : theme.colors.text.primary)}
+              <Text
+                variant="bodySmall"
+                style={{
+                  color: isActive ? theme.colors.text.inverse : theme.colors.text.primary,
+                  fontWeight: isActive ? '600' : '500',
+                }}
+              >
+                {tab.label}
+              </Text>
+              {tab.badge && (
+                <Badge
+                  text={tab.badge}
+                  variant={isActive ? "secondary" : "info"}
+                  style={{
+                    backgroundColor: isActive ? theme.colors.text.inverse + '20' : undefined,
+                  }}
+                />
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  ), [availableTabs, activeTab, theme]);
 
   // Memoize overview tab
   const renderOverviewTab = useMemo(() => {
     if (currentTier === 'free') {
       return (
-        <Container style={{ paddingTop: theme.spacing.xl }}>
+        <Container style={{ paddingTop: theme.spacing.lg }}>
+          {/* Compact Business Features Card */}
           <View style={{
             backgroundColor: theme.colors.surface,
             borderRadius: theme.borderRadius.lg,
-            padding: theme.spacing.xl,
-            alignItems: 'center',
+            padding: theme.spacing.lg,
             marginBottom: theme.spacing.lg,
             borderWidth: 1,
             borderColor: theme.colors.border,
           }}>
-            <Crown size={48} color={theme.colors.primary} style={{ marginBottom: theme.spacing.lg }} />
-            
-            <Text variant="h3" style={{ 
-              textAlign: 'center', 
-              marginBottom: theme.spacing.md,
-              fontWeight: '600',
-            }}>
-              Unlock Business Features
-            </Text>
-            
-            <Text variant="body" color="secondary" style={{ 
-              textAlign: 'center', 
-              marginBottom: theme.spacing.xl,
-              lineHeight: 24,
-            }}>
-              Get access to powerful business tools, analytics, and priority support with a business plan.
-            </Text>
-
-            <View style={{ gap: theme.spacing.md, width: '100%' }}>
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingVertical: theme.spacing.sm,
-              }}>
-                <BarChart3 size={20} color={theme.colors.success} />
-                <Text variant="body" style={{ marginLeft: theme.spacing.md }}>
-                  Business analytics & insights
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
+              <Crown size={24} color={theme.colors.primary} />
+              <View style={{ marginLeft: theme.spacing.md, flex: 1 }}>
+                <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
+                  Unlock Business Features
                 </Text>
-              </View>
-
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingVertical: theme.spacing.sm,
-              }}>
-                <Zap size={20} color={theme.colors.warning} />
-                <Text variant="body" style={{ marginLeft: theme.spacing.md }}>
-                  Auto-boost for listings
-                </Text>
-              </View>
-
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingVertical: theme.spacing.sm,
-              }}>
-                <HeadphonesIcon size={20} color={theme.colors.primary} />
-                <Text variant="body" style={{ marginLeft: theme.spacing.md }}>
-                  Priority customer support
+                <Text variant="bodySmall" color="secondary">
+                  Analytics, auto-boost & priority support
                 </Text>
               </View>
             </View>
@@ -291,13 +286,11 @@ export default function BusinessDashboardScreen() {
             <Button
               variant="primary"
               onPress={() => router.push('/subscription-plans')}
-              style={{ 
-                marginTop: theme.spacing.xl,
-                width: '100%',
-              }}
+              style={{ width: '100%' }}
+              size="sm"
             >
-              <Upgrade size={18} color={theme.colors.surface} />
-              <Text variant="body" style={{ 
+              <Upgrade size={16} color={theme.colors.surface} />
+              <Text variant="bodySmall" style={{ 
                 color: theme.colors.surface, 
                 marginLeft: theme.spacing.sm,
                 fontWeight: '600',
@@ -306,6 +299,111 @@ export default function BusinessDashboardScreen() {
               </Text>
             </Button>
           </View>
+
+          {/* Quick Stats Grid */}
+          <View style={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: theme.spacing.sm,
+            marginBottom: theme.spacing.lg,
+          }}>
+            <View style={{
+              flex: 1,
+              minWidth: '48%',
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.borderRadius.md,
+              padding: theme.spacing.md,
+              alignItems: 'center',
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+            }}>
+              <Users size={20} color={theme.colors.primary} />
+              <Text variant="body" style={{ fontWeight: '600', marginTop: theme.spacing.xs }}>
+                {loading ? '...' : quickStats.profileViews}
+              </Text>
+              <Text variant="caption" color="muted">Profile Views</Text>
+            </View>
+
+            <View style={{
+              flex: 1,
+              minWidth: '48%',
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.borderRadius.md,
+              padding: theme.spacing.md,
+              alignItems: 'center',
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+            }}>
+              <MessageSquare size={20} color={theme.colors.success} />
+              <Text variant="body" style={{ fontWeight: '600', marginTop: theme.spacing.xs }}>
+                {loading ? '...' : quickStats.totalMessages}
+              </Text>
+              <Text variant="caption" color="muted">Messages</Text>
+            </View>
+
+            <View style={{
+              flex: 1,
+              minWidth: '48%',
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.borderRadius.md,
+              padding: theme.spacing.md,
+              alignItems: 'center',
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+            }}>
+              <Star size={20} color={theme.colors.warning} />
+              <Text variant="body" style={{ fontWeight: '600', marginTop: theme.spacing.xs }}>
+                {loading ? '...' : quickStats.totalReviews}
+              </Text>
+              <Text variant="caption" color="muted">Reviews</Text>
+            </View>
+
+            <View style={{
+              flex: 1,
+              minWidth: '48%',
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.borderRadius.md,
+              padding: theme.spacing.md,
+              alignItems: 'center',
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+            }}>
+              <Star size={20} color={theme.colors.warning} />
+              <Text variant="body" style={{ fontWeight: '600', marginTop: theme.spacing.xs }}>
+                {loading ? '...' : quickStats.averageRating.toFixed(1)}
+              </Text>
+              <Text variant="caption" color="muted">Avg Rating</Text>
+            </View>
+          </View>
+
+
+          {/* Analytics Tab Prompt */}
+          <TouchableOpacity
+            onPress={() => setActiveTab('analytics')}
+            style={{
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.borderRadius.lg,
+              padding: theme.spacing.md,
+              marginBottom: theme.spacing.lg,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+            }}
+          >
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <TrendingUp size={20} color={theme.colors.primary} />
+                <Text variant="body" style={{ fontWeight: '600', marginLeft: theme.spacing.sm }}>
+                  View Analytics
+                </Text>
+                <Badge text="Basic" variant="info" style={{ marginLeft: theme.spacing.sm }} />
+              </View>
+              <ArrowUpRight size={16} color={theme.colors.text.muted} />
+            </View>
+          </TouchableOpacity>
         </Container>
       );
     }
@@ -537,7 +635,7 @@ export default function BusinessDashboardScreen() {
                 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                  {tab.icon}
+                  {tab.icon(theme.colors.text.primary)}
                   <View style={{ marginLeft: theme.spacing.md, flex: 1 }}>
                     <Text variant="body" style={{ fontWeight: '600' }}>
                       {tab.label}
@@ -564,7 +662,134 @@ export default function BusinessDashboardScreen() {
         </ScrollView>
       </Container>
     );
-  }, [currentTier, theme, currentSubscription, businessFeatures, availableTabs]);
+  }, [currentTier, theme, currentSubscription, isBusinessUser, loading, quickStats, analyticsData]);
+
+  // Render basic analytics for free users
+  const renderBasicAnalytics = useMemo(() => (
+    <Container style={{ paddingTop: theme.spacing.lg }}>
+      {/* Compact Stats Grid */}
+        <View style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: theme.spacing.sm,
+          marginBottom: theme.spacing.lg,
+        }}>
+          <View style={{
+            flex: 1,
+            minWidth: '48%',
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.borderRadius.md,
+            padding: theme.spacing.md,
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+          }}>
+            <Users size={20} color={theme.colors.primary} />
+            <Text variant="body" style={{ fontWeight: '600', marginTop: theme.spacing.xs }}>
+              {loading ? '...' : quickStats.profileViews}
+            </Text>
+            <Text variant="caption" color="muted">
+              Profile Views
+            </Text>
+          </View>
+
+          <View style={{
+            flex: 1,
+            minWidth: '48%',
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.borderRadius.md,
+            padding: theme.spacing.md,
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+          }}>
+            <MessageSquare size={20} color={theme.colors.success} />
+            <Text variant="body" style={{ fontWeight: '600', marginTop: theme.spacing.xs }}>
+              {loading ? '...' : quickStats.totalMessages}
+            </Text>
+            <Text variant="caption" color="muted">
+              Messages
+            </Text>
+          </View>
+
+          <View style={{
+            flex: 1,
+            minWidth: '48%',
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.borderRadius.md,
+            padding: theme.spacing.md,
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+          }}>
+            <Star size={20} color={theme.colors.warning} />
+            <Text variant="body" style={{ fontWeight: '600', marginTop: theme.spacing.xs }}>
+              {loading ? '...' : quickStats.totalReviews}
+            </Text>
+            <Text variant="caption" color="muted">
+              Reviews
+            </Text>
+          </View>
+
+          <View style={{
+            flex: 1,
+            minWidth: '48%',
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.borderRadius.md,
+            padding: theme.spacing.md,
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+          }}>
+            <Star size={20} color={theme.colors.warning} />
+            <Text variant="body" style={{ fontWeight: '600', marginTop: theme.spacing.xs }}>
+              {loading ? '...' : quickStats.averageRating.toFixed(1)}
+            </Text>
+            <Text variant="caption" color="muted">
+              Avg Rating
+            </Text>
+          </View>
+        </View>
+
+        {/* Compact Upgrade Prompt */}
+        <View style={{
+          backgroundColor: theme.colors.surface,
+          borderRadius: theme.borderRadius.lg,
+          padding: theme.spacing.lg,
+          marginBottom: theme.spacing.lg,
+          borderWidth: 1,
+          borderColor: theme.colors.border,
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
+            <Lock size={24} color={theme.colors.text.muted} />
+            <View style={{ marginLeft: theme.spacing.md, flex: 1 }}>
+              <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
+                Get Advanced Analytics
+              </Text>
+              <Text variant="bodySmall" color="secondary">
+                Detailed insights, trends & conversion tracking
+              </Text>
+            </View>
+          </View>
+
+          <Button
+            variant="primary"
+            onPress={() => router.push('/subscription-plans')}
+            style={{ width: '100%' }}
+            size="sm"
+          >
+            <ArrowUpRight size={16} color={theme.colors.text.inverse} />
+            <Text variant="bodySmall" style={{ 
+              color: theme.colors.text.inverse, 
+              marginLeft: theme.spacing.sm,
+              fontWeight: '600',
+            }}>
+              Upgrade to Business
+            </Text>
+          </Button>
+        </View>
+    </Container>
+  ), [theme, loading, quickStats]);
 
   // Memoize tab content
   const renderTabContent = useMemo(() => {
@@ -582,7 +807,9 @@ export default function BusinessDashboardScreen() {
       case 'overview':
         return renderOverviewTab;
       case 'analytics':
-        return <AnalyticsDashboard tier={currentTier === 'free' ? 'starter' : currentTier} />;
+        return currentTier === 'free' 
+          ? renderBasicAnalytics 
+          : <AnalyticsDashboard tier={currentTier === 'business' ? 'pro' : currentTier} />;
       case 'autoboost':
         return <AutoBoostDashboard />;
       case 'support':
@@ -592,7 +819,7 @@ export default function BusinessDashboardScreen() {
       default:
         return renderOverviewTab;
     }
-  }, [loading, activeTab, currentTier, theme, renderOverviewTab]);
+  }, [loading, activeTab, currentTier]);
 
   return (
     <SafeAreaWrapper>
@@ -611,3 +838,4 @@ export default function BusinessDashboardScreen() {
     </SafeAreaWrapper>
   );
 }
+

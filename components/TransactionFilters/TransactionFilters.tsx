@@ -3,8 +3,7 @@ import { View, ScrollView } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text, Button, Input, AppModal } from '@/components';
 import { Filter, Calendar, Search, X } from 'lucide-react-native';
-import { TransactionType, TransactionStatus } from '@/hooks/useTransactions';
-import { useTransactionCategories } from '@/hooks/useTransactions';
+import { TransactionType, TransactionStatus, useTransactionCategories } from '@/hooks/useTransactions';
 import { 
   formatTransactionType, 
   formatTransactionStatus,
@@ -273,13 +272,13 @@ export function TransactionFilters({
                   </Button>
                   {categories.map((category) => (
                     <Button
-                      key={category.id}
-                      variant={tempFilters.category === category.name ? 'primary' : 'tertiary'}
+                      key={category}
+                      variant={tempFilters.category === category ? 'primary' : 'tertiary'}
                       size="md"
-                      onPress={() => setTempFilters({ ...tempFilters, category: category.name })}
+                      onPress={() => setTempFilters({ ...tempFilters, category: category })}
                       style={{ justifyContent: 'flex-start' }}
                     >
-                      {category.display_name}
+                      {category}
                     </Button>
                   ))}
                 </View>

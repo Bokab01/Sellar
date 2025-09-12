@@ -117,10 +117,10 @@ export function FeaturedListings({
           images: Array.isArray(listing.images) ? listing.images : [],
           location: listing.location || '',
           seller: {
-            id: profile?.id || listing.user_id,
-            name: `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() || 'Business User',
-            avatar: profile?.avatar_url,
-            rating: profile?.rating,
+            id: (profile as any)?.id || listing.user_id,
+            name: `${(profile as any)?.first_name || ''} ${(profile as any)?.last_name || ''}`.trim() || 'Business User',
+            avatar: (profile as any)?.avatar_url,
+            rating: (profile as any)?.rating,
             isBusinessUser: true, // All these listings are from business users
           },
           isBoosted: Math.random() > 0.5, // Simulate boost status

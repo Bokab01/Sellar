@@ -6,6 +6,7 @@ import { useConversations } from '@/hooks/useChat';
 import { usePresence } from '@/hooks/usePresence';
 import { useChatStore } from '@/store/useChatStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useAppResume } from '@/hooks/useAppResume';
 import { router } from 'expo-router';
 import {
   Text,
@@ -30,6 +31,15 @@ export default function InboxScreen() {
   const { isUserOnline, getTypingUsers } = usePresence();
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+
+  // App resume handling - refresh conversations when app comes back from background
+  const { isRefreshing, isReconnecting } = useAppResume({
+    onResume: async () => {
+      console.log('📱 Inbox screen: App resumed, refreshing conversations...');
+      await refresh();
+    },
+    debug: true,
+  });
   
   // Bulk operations state
   const [isSelectionMode, setIsSelectionMode] = useState(false);

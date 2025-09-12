@@ -12,7 +12,7 @@ import {
   AlertTriangle,
   RefreshCw
 } from 'lucide-react-native';
-import { Transaction } from '@/hooks/useTransactions';
+import { FinancialTransaction as Transaction } from '@/hooks/useTransactions';
 import { 
   formatTransactionType, 
   formatTransactionStatus, 

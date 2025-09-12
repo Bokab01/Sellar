@@ -14,9 +14,9 @@ import {
 import { TransactionCard } from '@/components/TransactionCard/TransactionCard';
 import { TransactionFiltersState, TransactionFilters as FilterComponent } from '@/components/TransactionFilters/TransactionFilters';
 import { 
-  useTransactions, 
+  useFinancialTransactions, 
   useTransactionSummary,
-  Transaction 
+  FinancialTransaction as Transaction 
 } from '@/hooks/useTransactions';
 import { 
   formatAmount, 
@@ -42,7 +42,7 @@ export default function TransactionsScreen() {
   const [filters, setFilters] = useState<TransactionFiltersState>({});
   const [refreshing, setRefreshing] = useState(false);
 
-  const { transactions, loading, error, refetch } = useTransactions();
+  const { transactions, loading, error, refresh } = useFinancialTransactions();
   const { summary, loading: summaryLoading } = useTransactionSummary();
 
   // Filter and search transactions
@@ -98,7 +98,7 @@ export default function TransactionsScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await refetch();
+    await refresh();
     setRefreshing(false);
   };
 
@@ -148,7 +148,7 @@ export default function TransactionsScreen() {
               <BarChart3 size={24} color={theme.colors.primary} />
             </View>
             <Text variant="h2" style={{ marginBottom: theme.spacing.xs }}>
-              {summary.total_transactions}
+              {summary.totalTransactions}
             </Text>
             <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
               Total Transactions
@@ -169,7 +169,7 @@ export default function TransactionsScreen() {
               <ArrowDownLeft size={24} color={theme.colors.success} />
             </View>
             <Text variant="h2" style={{ marginBottom: theme.spacing.xs }}>
-              {(summary.credits_purchased || 0).toLocaleString()}
+              {(summary.totalCredits || 0).toLocaleString()}
             </Text>
             <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
               Credits Purchased
@@ -190,7 +190,7 @@ export default function TransactionsScreen() {
               <ArrowUpRight size={24} color={theme.colors.error} />
             </View>
             <Text variant="h2" style={{ marginBottom: theme.spacing.xs }}>
-              {(summary.credits_used || 0).toLocaleString()}
+              {(summary.totalAmount || 0).toLocaleString()}
             </Text>
             <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
               Credits Used

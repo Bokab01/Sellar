@@ -2,7 +2,7 @@
 export { supabase, db, rpc } from './supabase-client';
 
 // Import for use in this file
-import { db, rpc } from './supabase-client';
+import { supabase, db, rpc } from './supabase-client';
 
 // Helper functions for common database operations
 export const dbHelpers = {
@@ -145,8 +145,8 @@ export const dbHelpers = {
 
     console.log('🎯 getMessages result:', { data: data?.length, error });
     if (data) {
-      const offerMessages = data.filter(msg => msg.message_type === 'offer');
-      console.log('🎯 Offer messages found:', offerMessages.map(msg => ({ 
+      const offerMessages = data.filter((msg: any) => msg.message_type === 'offer');
+      console.log('🎯 Offer messages found:', offerMessages.map((msg: any) => ({ 
         id: msg.id, 
         hasOffers: msg.offers?.length > 0, 
         offersCount: msg.offers?.length || 0 
@@ -168,21 +168,57 @@ export const dbHelpers = {
   },
 
   async updatePost(postId: string, updates: any) {
-    const { data, error } = await db.posts
-      .update(updates)
-      .eq('id', postId)
-      .select()
-      .single();
-    return { data, error };
+    console.log('dbHelpers.updatePost called with:', postId, typeof postId, updates);
+    
+    if (!postId || postId === 'undefined' || postId === 'null') {
+      console.error('Invalid postId in dbHelpers.updatePost:', postId);
+      return { data: null, error: new Error('Invalid post ID') };
+    }
+    
+    try {
+      console.log('About to execute Supabase update query with postId:', postId);
+      
+      // Try using the direct supabase client instead of db reference
+      const { data, error } = await supabase
+        .from('posts')
+        .update(updates)
+        .eq('id', postId)
+        .select()
+        .single();
+      
+      console.log('Direct supabase update query executed, result:', { data, error, postId });
+      return { data, error };
+    } catch (err) {
+      console.error('Exception in dbHelpers.updatePost:', err);
+      return { data: null, error: err };
+    }
   },
 
   async deletePost(postId: string) {
-    const { data, error } = await db.posts
-      .delete()
-      .eq('id', postId)
-      .select()
-      .single();
-    return { data, error };
+    console.log('dbHelpers.deletePost called with:', postId, typeof postId);
+    
+    if (!postId || postId === 'undefined' || postId === 'null') {
+      console.error('Invalid postId in dbHelpers.deletePost:', postId);
+      return { data: null, error: new Error('Invalid post ID') };
+    }
+    
+    try {
+      console.log('About to execute Supabase delete query with postId:', postId);
+      
+      // Try using the direct supabase client instead of db reference
+      const { data, error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', postId)
+        .select()
+        .single();
+      
+      console.log('Direct supabase query executed, result:', { data, error, postId });
+      return { data, error };
+    } catch (err) {
+      console.error('Exception in dbHelpers.deletePost:', err);
+      return { data: null, error: err };
+    }
   },
 
   async getPosts(options: any = {}) {
@@ -543,7 +579,7 @@ export const dbHelpers = {
 
       // Get all participant IDs
       const participantIds = new Set<string>();
-      conversations.forEach(conv => {
+      conversations.forEach((conv: any) => {
         if (conv.participant_1) participantIds.add(conv.participant_1);
         if (conv.participant_2) participantIds.add(conv.participant_2);
       });
@@ -559,11 +595,11 @@ export const dbHelpers = {
       }
 
       // Create profiles map
-      const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
+      const profilesMap = new Map(profiles?.map((p: any) => [p.id, p]) || []);
 
       // Get all listing IDs
       const listingIds = conversations
-        .map(conv => conv.listing_id)
+        .map((conv: any) => conv.listing_id)
         .filter(Boolean);
 
       let listingsMap = new Map();
@@ -573,12 +609,12 @@ export const dbHelpers = {
           .in('id', listingIds);
 
         if (!listingsError && listings) {
-          listingsMap = new Map(listings.map(l => [l.id, l]));
+          listingsMap = new Map(listings.map((l: any) => [l.id, l]));
         }
       }
 
       // Get messages for each conversation
-      const conversationIds = conversations.map(conv => conv.id);
+      const conversationIds = conversations.map((conv: any) => conv.id);
       const { data: messages, error: messagesError } = await db.messages
         .select('*')
         .in('conversation_id', conversationIds)
@@ -591,7 +627,7 @@ export const dbHelpers = {
       // Group messages by conversation
       const messagesMap = new Map();
       if (messages) {
-        messages.forEach(msg => {
+        messages.forEach((msg: any) => {
           if (!messagesMap.has(msg.conversation_id)) {
             messagesMap.set(msg.conversation_id, []);
           }
@@ -600,7 +636,7 @@ export const dbHelpers = {
       }
 
       // Combine all data
-      const enrichedConversations = conversations.map(conv => ({
+      const enrichedConversations = conversations.map((conv: any) => ({
         ...conv,
         participant_1_profile: profilesMap.get(conv.participant_1) || null,
         participant_2_profile: profilesMap.get(conv.participant_2) || null,
@@ -636,7 +672,7 @@ export const dbHelpers = {
         return { data: {}, error: null };
       }
 
-      const conversationIds = conversations.map(conv => conv.id);
+      const conversationIds = conversations.map((conv: any) => conv.id);
 
       // Then get unread messages for those conversations (using read_at IS NULL)
       const { data, error } = await db.messages
@@ -652,7 +688,7 @@ export const dbHelpers = {
 
       // Count unread messages per conversation
       const unreadCounts: Record<string, number> = {};
-      data?.forEach(msg => {
+      data?.forEach((msg: any) => {
         unreadCounts[msg.conversation_id] = (unreadCounts[msg.conversation_id] || 0) + 1;
       });
 
@@ -683,7 +719,7 @@ export const dbHelpers = {
       }
 
       // Get participant profiles
-      const participantIds = [conversation.participant_1, conversation.participant_2].filter(Boolean);
+      const participantIds = [(conversation as any).participant_1, (conversation as any).participant_2].filter(Boolean);
       const { data: profiles, error: profilesError } = await db.profiles
         .select('*')
         .in('id', participantIds);
@@ -694,14 +730,14 @@ export const dbHelpers = {
       }
 
       // Create profiles map
-      const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
+      const profilesMap = new Map(profiles?.map((p: any) => [p.id, p]) || []);
 
       // Get listing if it exists
       let listing = null;
-      if (conversation.listing_id) {
+      if ((conversation as any).listing_id) {
         const { data: listingData, error: listingError } = await db.listings
           .select('*')
-          .eq('id', conversation.listing_id)
+          .eq('id', (conversation as any).listing_id)
           .single();
 
         if (!listingError && listingData) {
@@ -711,9 +747,9 @@ export const dbHelpers = {
 
       // Combine all data
       const enrichedConversation = {
-        ...conversation,
-        participant_1_profile: profilesMap.get(conversation.participant_1) || null,
-        participant_2_profile: profilesMap.get(conversation.participant_2) || null,
+        ...(conversation as any),
+        participant_1_profile: profilesMap.get((conversation as any).participant_1) || null,
+        participant_2_profile: profilesMap.get((conversation as any).participant_2) || null,
         listing: listing,
       };
 

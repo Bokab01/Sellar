@@ -44,10 +44,7 @@ export default function TransactionAnalyticsScreen() {
   const datePresets = getDateRangePresets();
   const currentPeriod = datePresets[selectedPeriod];
 
-  const { analytics, loading: analyticsLoading, refetch: refetchAnalytics } = useTransactionAnalytics(
-    currentPeriod.start.toISOString(),
-    currentPeriod.end.toISOString()
-  );
+  const { analytics, loading: analyticsLoading, refetch: refetchAnalytics } = useTransactionAnalytics();
   const { summary, loading: summaryLoading, refetch: refetchSummary } = useTransactionSummary();
   const { transactions } = useTransactions();
 

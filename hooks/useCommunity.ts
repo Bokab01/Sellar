@@ -83,16 +83,22 @@ export function useCommunityPosts(options: { following?: boolean; limit?: number
   const refresh = useCallback(() => fetchPosts(true), [fetchPosts]);
 
   const updatePost = async (postId: string, updates: { content?: string; images?: string[]; type?: string; location?: string }) => {
+    console.log('updatePost hook called with:', postId, typeof postId, updates);
+    
     if (!user) return { error: 'Not authenticated' };
+    if (!postId) return { error: 'Post ID is required' };
 
     try {
+      console.log('Calling dbHelpers.updatePost with:', postId, updates);
       const { data, error } = await dbHelpers.updatePost(postId, {
         ...updates,
         updated_at: new Date().toISOString(),
       });
+      console.log('dbHelpers.updatePost result:', { data, error });
 
       if (error) {
-        return { error: error.message };
+        console.error('Database error in updatePost:', error);
+        return { error: (error as any)?.message || error.toString() };
       }
 
       // Update local state
@@ -104,18 +110,25 @@ export function useCommunityPosts(options: { following?: boolean; limit?: number
 
       return { data };
     } catch (err) {
+      console.error('Exception in updatePost:', err);
       return { error: 'Failed to update post' };
     }
   };
 
   const deletePost = async (postId: string) => {
+    console.log('deletePost hook called with:', postId, typeof postId);
+    
     if (!user) return { error: 'Not authenticated' };
+    if (!postId) return { error: 'Post ID is required' };
 
     try {
+      console.log('Calling dbHelpers.deletePost with:', postId);
       const { data, error } = await dbHelpers.deletePost(postId);
+      console.log('dbHelpers.deletePost result:', { data, error });
 
       if (error) {
-        return { error: error.message };
+        console.error('Database error in deletePost:', error);
+        return { error: (error as any)?.message || error.toString() };
       }
 
       // Remove from local state
@@ -123,6 +136,7 @@ export function useCommunityPosts(options: { following?: boolean; limit?: number
 
       return { data };
     } catch (err) {
+      console.error('Exception in deletePost:', err);
       return { error: 'Failed to delete post' };
     }
   };
@@ -185,6 +199,14 @@ export function useCommunityPosts(options: { following?: boolean; limit?: number
     }
   };
 
+  const updateCommentCount = (postId: string, increment: number = 1) => {
+    setPosts(prev => prev.map(post => 
+      post.id === postId 
+        ? { ...post, comments_count: Math.max(0, (post.comments_count || 0) + increment) }
+        : post
+    ));
+  };
+
   return {
     posts,
     loading,
@@ -196,5 +218,6 @@ export function useCommunityPosts(options: { following?: boolean; limit?: number
     deletePost,
     likePost,
     sharePost,
+    updateCommentCount,
   };
 }

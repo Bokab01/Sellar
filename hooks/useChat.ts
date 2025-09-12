@@ -106,7 +106,7 @@ export function useMessages(conversationId: string) {
       try {
         const { data: completeMessage, error } = await dbHelpers.getMessages(conversationId);
         if (!error && completeMessage) {
-          const messageWithOffers = completeMessage.find(msg => msg.id === newMessage.id);
+          const messageWithOffers = completeMessage.find(msg => (msg as any).id === (newMessage as any).id);
           if (messageWithOffers) {
             newMessage = messageWithOffers;
             console.log('📨 Fetched complete offer message:', newMessage);

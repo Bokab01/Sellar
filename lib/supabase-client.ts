@@ -360,7 +360,6 @@ export const rpc = {
   get_user_reward_summary: (params: any) => supabase.rpc('get_user_reward_summary', params),
   claim_anniversary_bonus: (params: any) => supabase.rpc('claim_anniversary_bonus', params),
   add_user_credits: (params: any) => supabase.rpc('add_user_credits', params),
-  claim_referral_bonus: (params: any) => supabase.rpc('claim_referral_bonus', params),
   create_referral_record: (params: any) => supabase.rpc('create_referral_record', params),
   complete_referral: (params: any) => supabase.rpc('complete_referral', params),
   get_user_referral_stats: (params: any) => supabase.rpc('get_user_referral_stats', params),

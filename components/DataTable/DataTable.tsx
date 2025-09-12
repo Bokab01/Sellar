@@ -159,7 +159,7 @@ export function ItemDetailsTable({
     },
     {
       label: 'Condition',
-      value: listing.condition ? listing.condition.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'N/A',
+      value: listing.condition ? listing.condition.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) : 'N/A',
       icon: <Text style={{ fontSize: 16 }}>🔍</Text>,
     },
     {
@@ -266,7 +266,7 @@ export function SellerInfoTable({
     },
     {
       label: 'Response Time',
-      value: profile?.response_time ? profile.response_time.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Within hours',
+      value: profile?.response_time ? profile.response_time.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) : 'Within hours',
       icon: <Text style={{ fontSize: 16 }}>⏱️</Text>,
     },
     {

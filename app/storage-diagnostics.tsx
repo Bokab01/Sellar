@@ -133,7 +133,7 @@ export default function StorageDiagnosticsScreen() {
                     }}
                   >
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.sm }}>
-                      <Text variant="bodyLarge" style={{ fontWeight: '600' }}>
+                      <Text variant="body" style={{ fontWeight: '600' }}>
                         Storage Connection
                       </Text>
                       <Text
@@ -178,7 +178,7 @@ export default function StorageDiagnosticsScreen() {
                     }}
                   >
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.sm }}>
-                      <Text variant="bodyLarge" style={{ fontWeight: '600' }}>
+                      <Text variant="body" style={{ fontWeight: '600' }}>
                         Image Upload Test
                       </Text>
                       <Text

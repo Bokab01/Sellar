@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { isBusinessUser, getBusinessFeatures } from '@/lib/subscriptionEntitlements';
 
@@ -64,8 +64,8 @@ export function useBusinessFeatures() {
     loadFeatures();
   }, [user?.id]);
 
-  // Simplified helper functions
-  const requiresBusinessPlan = (featureName: string) => {
+  // Memoized helper functions to prevent re-renders
+  const requiresBusinessPlan = useCallback((featureName: string) => {
     if (features.isBusinessUser) return false;
     
     return {
@@ -74,41 +74,41 @@ export function useBusinessFeatures() {
       action: 'Upgrade to Business',
       route: '/subscription-plans',
     };
-  };
+  }, [features.isBusinessUser]);
 
-  const checkAnalyticsAccess = () => {
+  const checkAnalyticsAccess = useCallback(() => {
     return features.hasAnalytics ? null : requiresBusinessPlan('Analytics Dashboard');
-  };
+  }, [features.hasAnalytics, requiresBusinessPlan]);
 
-  const checkAutoBoostAccess = () => {
+  const checkAutoBoostAccess = useCallback(() => {
     return features.hasAutoBoost ? null : requiresBusinessPlan('Auto-boost');
-  };
+  }, [features.hasAutoBoost, requiresBusinessPlan]);
 
-  const checkPrioritySupport = () => {
+  const checkPrioritySupport = useCallback(() => {
     return features.hasPrioritySupport ? null : requiresBusinessPlan('Priority Support');
-  };
+  }, [features.hasPrioritySupport, requiresBusinessPlan]);
 
-  const checkHomepagePlacement = () => {
+  const checkHomepagePlacement = useCallback(() => {
     return features.hasHomepagePlacement ? null : requiresBusinessPlan('Homepage Placement');
-  };
+  }, [features.hasHomepagePlacement, requiresBusinessPlan]);
 
-  const checkPremiumBranding = () => {
+  const checkPremiumBranding = useCallback(() => {
     return features.hasPremiumBranding ? null : requiresBusinessPlan('Premium Branding');
-  };
+  }, [features.hasPremiumBranding, requiresBusinessPlan]);
 
-  const checkSponsoredPosts = () => {
+  const checkSponsoredPosts = useCallback(() => {
     return features.hasSponsoredPosts ? null : requiresBusinessPlan('Sponsored Posts');
-  };
+  }, [features.hasSponsoredPosts, requiresBusinessPlan]);
 
-  const checkBulkOperations = () => {
+  const checkBulkOperations = useCallback(() => {
     return features.hasBulkOperations ? null : requiresBusinessPlan('Bulk Operations');
-  };
+  }, [features.hasBulkOperations, requiresBusinessPlan]);
 
-  const checkUnlimitedListings = () => {
+  const checkUnlimitedListings = useCallback(() => {
     return features.hasUnlimitedListings ? null : requiresBusinessPlan('Unlimited Listings');
-  };
+  }, [features.hasUnlimitedListings, requiresBusinessPlan]);
 
-  return {
+  return useMemo(() => ({
     ...features,
     loading,
     
@@ -122,7 +122,19 @@ export function useBusinessFeatures() {
     checkBulkOperations,
     checkUnlimitedListings,
     requiresBusinessPlan,
-  };
+  }), [
+    features,
+    loading,
+    checkAnalyticsAccess,
+    checkAutoBoostAccess,
+    checkPrioritySupport,
+    checkHomepagePlacement,
+    checkPremiumBranding,
+    checkSponsoredPosts,
+    checkBulkOperations,
+    checkUnlimitedListings,
+    requiresBusinessPlan,
+  ]);
 }
 
 /**

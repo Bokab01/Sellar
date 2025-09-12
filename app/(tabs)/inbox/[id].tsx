@@ -6,6 +6,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { useMessages } from '@/hooks/useChat';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useChatStore } from '@/store/useChatStore';
+import { useAppResume } from '@/hooks/useAppResume';
 import { getOfferLimitFromMessages, type OfferLimitResult } from '@/utils/offerLimits';
 import { formatChatTimestamp, isDifferentDay } from '@/utils/dateUtils';
 import { dbHelpers, supabase } from '@/lib/supabase';
@@ -32,6 +33,8 @@ import {
   ChatImagePicker,
   ChatMenu,
   ChatInlineMenu,
+  TransactionCompletionButton,
+  CallbackMessage,
 } from '@/components';
 import { Phone, Info, Eye, MessageCircle, EllipsisVertical } from 'lucide-react-native';
 
@@ -43,6 +46,17 @@ export default function ChatScreen() {
   const { draftMessages, setDraftMessage, clearDraftMessage, markAsRead } = useChatStore();
   
   const { messages, loading, error, sendMessage, markMessagesAsRead, refresh: refreshMessages } = useMessages(conversationId!);
+  
+  // App resume handling - refresh messages when app comes back from background
+  const { isRefreshing, isReconnecting, error: resumeError } = useAppResume({
+    onResume: async () => {
+      console.log('📱 Chat screen: App resumed, refreshing messages...');
+      await refreshMessages();
+      // Also refresh conversation details to get latest user status
+      await fetchConversationDetails();
+    },
+    debug: true,
+  });
   
   const [messageText, setMessageText] = useState('');
   const [showOfferModal, setShowOfferModal] = useState(false);
@@ -62,6 +76,7 @@ export default function ChatScreen() {
   const [conversation, setConversation] = useState<any>(null);
   const [otherUser, setOtherUser] = useState<any>(null);
   const [typing, setTyping] = useState(false);
+  const [existingTransaction, setExistingTransaction] = useState<any>(null);
 
   useEffect(() => {
     if (conversationId) {
@@ -122,10 +137,41 @@ export default function ChatScreen() {
           ? conv.participant_2_profile 
           : conv.participant_1_profile;
         setOtherUser(otherParticipant);
+        
+        // Check for existing transaction
+        await checkExistingTransaction(conv.listing?.id);
       }
     } catch (err) {
       console.error('Failed to fetch conversation details:', err);
     }
+  };
+
+  const checkExistingTransaction = async (listingId: string) => {
+    if (!listingId || !user) return;
+    
+    try {
+      const { data: transaction, error } = await supabase
+        .from('meetup_transactions')
+        .select('*')
+        .eq('listing_id', listingId)
+        .eq('conversation_id', conversationId)
+        .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (!error && transaction) {
+        setExistingTransaction(transaction);
+      }
+    } catch (err) {
+      console.error('Error checking existing transaction:', err);
+    }
+  };
+
+  const handleTransactionCreated = (transactionId: string) => {
+    console.log('Transaction created:', transactionId);
+    // Refresh to get the new transaction
+    checkExistingTransaction(conversation?.listing?.id);
   };
 
   const handleSendMessage = async () => {
@@ -903,6 +949,21 @@ export default function ChatScreen() {
                 }
               }
 
+              // Callback request message
+              if (message.message_type === 'callback_request') {
+                elements.push(
+                  <CallbackMessage
+                    key={message.id}
+                    message={message}
+                    isOwn={isOwn}
+                    senderName={!isOwn ? `${message.sender?.first_name || 'User'} ${message.sender?.last_name || ''}`.trim() : undefined}
+                    senderPhone={message.sender?.phone}
+                    timestamp={timestamp}
+                  />
+                );
+                return elements;
+              }
+
               if (message.message_type === 'system') {
                 elements.push(
                   <View key={message.id} style={{ alignItems: 'center', marginVertical: theme.spacing.md }}>
@@ -990,6 +1051,44 @@ export default function ChatScreen() {
             </View>
           )}
         </ScrollView>
+
+        {/* Transaction Completion Button */}
+        {conversation?.listing && otherUser && !existingTransaction && (
+          <View style={{
+            paddingHorizontal: theme.spacing.lg,
+            paddingVertical: theme.spacing.md,
+            backgroundColor: theme.colors.surface,
+            borderTopWidth: 1,
+            borderTopColor: theme.colors.border,
+          }}>
+            <TransactionCompletionButton
+              conversationId={conversationId!}
+              otherUser={otherUser}
+              listing={conversation.listing}
+              existingTransaction={existingTransaction}
+              onTransactionCreated={handleTransactionCreated}
+            />
+          </View>
+        )}
+
+        {/* Transaction Status Display */}
+        {existingTransaction && (
+          <View style={{
+            paddingHorizontal: theme.spacing.lg,
+            paddingVertical: theme.spacing.md,
+            backgroundColor: theme.colors.surface,
+            borderTopWidth: 1,
+            borderTopColor: theme.colors.border,
+          }}>
+            <TransactionCompletionButton
+              conversationId={conversationId!}
+              otherUser={otherUser}
+              listing={conversation?.listing}
+              existingTransaction={existingTransaction}
+              onTransactionCreated={handleTransactionCreated}
+            />
+          </View>
+        )}
 
         {/* Message Input */}
         <View

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, TouchableOpacity } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -6,7 +6,6 @@ import { router } from 'expo-router';
 import { Text } from '@/components/Typography/Text';
 import { Avatar } from '@/components/Avatar/Avatar';
 import { Button } from '@/components/Button/Button';
-import { Input } from '@/components/Input/Input';
 import { Heart, MessageCircle, MoveHorizontal as MoreHorizontal } from 'lucide-react-native';
 
 interface CommentCardProps {
@@ -26,7 +25,7 @@ interface CommentCardProps {
     depth?: number;
   };
   onLike: () => void;
-  onReply: (content: string) => void;
+  onReply: (commentId: string, authorName: string) => void; // Pass comment ID and author name
   onReport?: () => void;
   maxDepth?: number;
   style?: any;
@@ -42,28 +41,10 @@ export function CommentCard({
 }: CommentCardProps) {
   const { theme } = useTheme();
   const { user } = useAuthStore();
-  const [showReplyInput, setShowReplyInput] = useState(false);
-  const [replyText, setReplyText] = useState('');
-  const [submittingReply, setSubmittingReply] = useState(false);
 
   const depth = comment.depth || 0;
   const canReply = depth < maxDepth;
   const isOwnComment = user?.id === comment.author.id;
-
-  const handleSubmitReply = async () => {
-    if (!replyText.trim()) return;
-
-    setSubmittingReply(true);
-    try {
-      await onReply(replyText.trim());
-      setReplyText('');
-      setShowReplyInput(false);
-    } catch (error) {
-      // Error handling is done in parent component
-    } finally {
-      setSubmittingReply(false);
-    }
-  };
 
   const leftMargin = depth * theme.spacing.xl;
 
@@ -173,7 +154,7 @@ export function CommentCard({
 
           {canReply && (
             <TouchableOpacity
-              onPress={() => setShowReplyInput(!showReplyInput)}
+              onPress={() => onReply(comment.id, comment.author.name)}
               activeOpacity={0.7}
             >
               <Text variant="caption" style={{ color: theme.colors.primary, fontWeight: '600' }}>
@@ -183,36 +164,6 @@ export function CommentCard({
           )}
         </View>
 
-        {/* Reply Input */}
-        {showReplyInput && (
-          <View
-            style={{
-              marginTop: theme.spacing.md,
-              marginLeft: 32, // Align with avatar
-            }}
-          >
-            <View style={{ flexDirection: 'row', gap: theme.spacing.sm, alignItems: 'flex-end' }}>
-              <View style={{ flex: 1 }}>
-                <Input
-                  placeholder={`Reply to ${comment.author.name}...`}
-                  value={replyText}
-                  onChangeText={setReplyText}
-                  variant="multiline"
-                  style={{ minHeight: 60 }}
-                />
-              </View>
-              <Button
-                variant="primary"
-                onPress={handleSubmitReply}
-                loading={submittingReply}
-                disabled={!replyText.trim() || submittingReply}
-                size="sm"
-              >
-                Reply
-              </Button>
-            </View>
-          </View>
-        )}
       </View>
 
       {/* Nested Replies */}
@@ -223,7 +174,7 @@ export function CommentCard({
               key={reply.id}
               comment={{ ...reply, depth: depth + 1 }}
               onLike={() => {}}
-              onReply={(content) => onReply(content)}
+              onReply={(commentId, authorName) => onReply(commentId, authorName)}
               onReport={onReport}
               maxDepth={maxDepth}
             />

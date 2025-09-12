@@ -90,8 +90,9 @@ export function UserDisplayName({
       
       {showBadge && displayInfo.showBusinessBadge && (
         <BusinessBadge 
+          type="business"
           size="small"
-          variant={profile.verification_level === 'business' ? 'verified' : 'standard'}
+          variant={profile.verification_level === 'business' ? 'default' : 'default'}
         />
       )}
     </View>
