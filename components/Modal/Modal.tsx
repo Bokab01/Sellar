@@ -82,7 +82,7 @@ export function AppModal({
       case 'lg':
         return {
           width: Math.min(600, maxWidth),
-          maxHeight: screenHeight * 0.8,
+          maxHeight: screenHeight * 0.9,
         };
       case 'full':
         return {

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { View, ScrollView, RefreshControl, FlatList } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { router } from 'expo-router';
@@ -12,7 +12,6 @@ import {
   Button,
 } from '@/components';
 import { TransactionCard } from '@/components/TransactionCard/TransactionCard';
-import { TransactionFiltersState, TransactionFilters as FilterComponent } from '@/components/TransactionFilters/TransactionFilters';
 import { 
   useFinancialTransactions, 
   useTransactionSummary,
@@ -21,17 +20,12 @@ import {
 import { 
   formatAmount, 
   formatCredits,
-  groupTransactionsByDate,
-  searchTransactions,
-  filterTransactionsByType,
-  filterTransactionsByStatus,
-  filterTransactionsByDateRange
+  groupTransactionsByDate
 } from '@/lib/transactionService';
 import { 
   TrendingUp, 
   TrendingDown, 
   CreditCard, 
-  BarChart3,
   Plus,
   ArrowUpRight,
   ArrowDownLeft
@@ -39,80 +33,30 @@ import {
 
 export default function TransactionsScreen() {
   const { theme } = useTheme();
-  const [filters, setFilters] = useState<TransactionFiltersState>({});
   const [refreshing, setRefreshing] = useState(false);
 
   const { transactions, loading, error, refresh } = useFinancialTransactions();
   const { summary, loading: summaryLoading } = useTransactionSummary();
 
-  // Filter and search transactions
-  const filteredTransactions = useMemo(() => {
-    let filtered = [...transactions];
-
-    // Apply search
-    if (filters.searchQuery) {
-      filtered = searchTransactions(filtered, filters.searchQuery);
-    }
-
-    // Apply type filter
-    if (filters.type) {
-      filtered = filterTransactionsByType(filtered, [filters.type]);
-    }
-
-    // Apply status filter
-    if (filters.status) {
-      filtered = filterTransactionsByStatus(filtered, [filters.status]);
-    }
-
-    // Apply date range filter
-    if (filters.startDate && filters.endDate) {
-      filtered = filterTransactionsByDateRange(
-        filtered,
-        new Date(filters.startDate),
-        new Date(filters.endDate)
-      );
-    }
-
-    // Apply amount range filter
-    if (filters.amountMin !== undefined || filters.amountMax !== undefined) {
-      filtered = filtered.filter(t => {
-        const amount = Math.abs(t.amount);
-        const minCheck = filters.amountMin === undefined || amount >= filters.amountMin;
-        const maxCheck = filters.amountMax === undefined || amount <= filters.amountMax;
-        return minCheck && maxCheck;
-      });
-    }
-
-    // Apply category filter
-    if (filters.category) {
-      filtered = filtered.filter(t => t.category === filters.category);
-    }
-
-    return filtered;
-  }, [transactions, filters]);
-
   // Group transactions by date
   const groupedTransactions = useMemo(() => {
-    return groupTransactionsByDate(filteredTransactions);
-  }, [filteredTransactions]);
+    return groupTransactionsByDate(transactions);
+  }, [transactions]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await refresh();
     setRefreshing(false);
-  };
+  }, [refresh]);
 
-  const handleTransactionPress = (transaction: Transaction) => {
+  const handleTransactionPress = useCallback((transaction: Transaction) => {
     // For now, just show an alert with transaction details
     // TODO: Implement transaction details modal or screen
     console.log('Transaction pressed:', transaction.id);
-  };
+  }, []);
 
-  const clearFilters = () => {
-    setFilters({});
-  };
 
-  const renderSummaryCard = () => {
+  const renderSummaryCard = useCallback(() => {
     if (summaryLoading || !summary) return null;
 
     return (
@@ -145,10 +89,10 @@ export default function TransactionsScreen() {
               justifyContent: 'center',
               marginBottom: theme.spacing.sm,
             }}>
-              <BarChart3 size={24} color={theme.colors.primary} />
+              <CreditCard size={24} color={theme.colors.primary} />
             </View>
             <Text variant="h2" style={{ marginBottom: theme.spacing.xs }}>
-              {summary.totalTransactions}
+              {summary.total_transactions}
             </Text>
             <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
               Total Transactions
@@ -169,7 +113,7 @@ export default function TransactionsScreen() {
               <ArrowDownLeft size={24} color={theme.colors.success} />
             </View>
             <Text variant="h2" style={{ marginBottom: theme.spacing.xs }}>
-              {(summary.totalCredits || 0).toLocaleString()}
+              {(summary.total_credits || 0).toLocaleString()}
             </Text>
             <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
               Credits Purchased
@@ -190,7 +134,7 @@ export default function TransactionsScreen() {
               <ArrowUpRight size={24} color={theme.colors.error} />
             </View>
             <Text variant="h2" style={{ marginBottom: theme.spacing.xs }}>
-              {(summary.totalAmount || 0).toLocaleString()}
+              {(summary.total_amount || 0).toLocaleString()}
             </Text>
             <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
               Credits Used
@@ -212,21 +156,12 @@ export default function TransactionsScreen() {
           >
             Buy Credits
           </Button>
-          <Button
-            variant="tertiary"
-            size="md"
-            onPress={() => router.push('/transaction-analytics')}
-            icon={<BarChart3 size={20} color={theme.colors.primary} />}
-            style={{ flex: 1 }}
-          >
-            Analytics
-          </Button>
         </View>
       </View>
     );
-  };
+  }, [summaryLoading, summary, theme]);
 
-  const renderTransactionGroup = ({ item }: { item: [string, Transaction[]] }) => {
+  const renderTransactionGroup = useCallback(({ item }: { item: [string, Transaction[]] }) => {
     const [date, groupTransactions] = item;
     
     return (
@@ -253,7 +188,7 @@ export default function TransactionsScreen() {
         ))}
       </View>
     );
-  };
+  }, [theme, handleTransactionPress]);
 
   if (loading && transactions.length === 0) {
     return (
@@ -295,13 +230,6 @@ export default function TransactionsScreen() {
           {/* Summary Card */}
           {renderSummaryCard()}
 
-          {/* Filters */}
-          <FilterComponent
-            filters={filters}
-            onFiltersChange={setFilters}
-            onClearFilters={clearFilters}
-          />
-
           {/* Error State */}
           {error && (
             <View style={{
@@ -317,23 +245,14 @@ export default function TransactionsScreen() {
           )}
 
           {/* Transactions List */}
-          {filteredTransactions.length === 0 ? (
+          {transactions.length === 0 ? (
             <EmptyState
               title="No Transactions Found"
-              description={
-                Object.keys(filters).length > 0
-                  ? "No transactions match your current filters. Try adjusting your search criteria."
-                  : "You haven't made any transactions yet. Start by purchasing credits or making your first listing."
-              }
-              action={
-                Object.keys(filters).length > 0 ? {
-                  text: "Clear Filters",
-                  onPress: clearFilters
-                } : {
-                  text: "Buy Credits",
-                  onPress: () => router.push('/buy-credits')
-                }
-              }
+              description="You haven't made any transactions yet. Start by purchasing credits or making your first listing."
+              action={{
+                text: "Buy Credits",
+                onPress: () => router.push('/buy-credits')
+              }}
             />
           ) : (
             <View style={{ marginBottom: theme.spacing.xl }}>
@@ -346,7 +265,7 @@ export default function TransactionsScreen() {
                   paddingHorizontal: theme.spacing.sm,
                 }}
               >
-                {filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''} found
+                {transactions.length} transaction{transactions.length !== 1 ? 's' : ''} found
               </Text>
 
               {/* Grouped Transactions */}

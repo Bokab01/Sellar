@@ -28,7 +28,7 @@ const baseTypography = {
     letterSpacing: 0,
   },
   body: {
-    fontSize: 16,
+    fontSize: 14,
     lineHeight: 24,
     fontFamily: getFontFamily('body', 'regular'),
     letterSpacing: 0,
@@ -46,7 +46,7 @@ const baseTypography = {
     letterSpacing: 0.5,
   },
   button: {
-    fontSize: 14,
+    fontSize: 12,
     lineHeight: 20,
     fontFamily: getFontFamily('body', 'semiBold'),
     letterSpacing: 0.25,

@@ -76,7 +76,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  signUp: async (email: string, password: string, userData: { firstName: string; lastName: string; phone?: string; location?: string }) => {
+  signUp: async (email: string, password: string, userData: { firstName: string; lastName: string; phone?: string; location?: string; acceptedTerms?: boolean }) => {
     try {
       console.log('Attempting signup with:', { email, userData });
       
@@ -92,6 +92,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               phone: userData.phone || null,
               location: userData.location || 'Accra, Greater Accra',
               is_business: false,
+              accepted_terms: userData.acceptedTerms || false,
             },
           },
         }),

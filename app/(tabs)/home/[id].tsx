@@ -1622,6 +1622,7 @@ export default function ListingDetailScreen() {
         visible={showCallbackModal}
         onClose={() => setShowCallbackModal(false)}
         title="Request Callback"
+        size="lg"
         primaryAction={{
           text: 'Request Callback',
           onPress: handleRequestCallback,

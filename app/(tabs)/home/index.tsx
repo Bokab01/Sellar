@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl, Alert, Animated } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl, Alert, Animated, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -26,6 +26,8 @@ import {
   ProfessionalBadge,
   BoostBadge,
   VerifiedBadge,
+  MarketplaceSidebar,
+  EnhancedSearchHeader,
   // Temporarily disabled performance components
   // ProductVirtualizedList,
   // LazyComponent,
@@ -103,6 +105,9 @@ export default function HomeScreen() {
   // Real user credit from database
   const [userCredit, setUserCredit] = useState<number>(0);
   const [creditLoading, setCreditLoading] = useState(true);
+  
+  // Sidebar state
+  const [sidebarVisible, setSidebarVisible] = useState(false);
 
   // Category scroll indicator
   const categoryScrollRef = useRef<ScrollView>(null);
@@ -477,8 +482,19 @@ export default function HomeScreen() {
       flex: 1, 
       backgroundColor: theme.colors.background,
     }}>
+      {/* Enhanced Search Header */}
+      <View style={{ paddingTop: insets.top, }}>
+        <EnhancedSearchHeader
+          searchQuery={searchQuery}
+          onSearchPress={() => router.push('/smart-search')}
+          onFilterPress={() => setShowFilters(true)}
+          onAvatarPress={() => setSidebarVisible(true)}
+          placeholder= 'Search here...'
+        />
+      </View>
+
       {/* Sticky Search Bar - Appears when scrolling down */}
-      <Animated.View
+   {/*    <Animated.View
         style={{
           position: 'absolute',
           top: insets.top,
@@ -486,9 +502,9 @@ export default function HomeScreen() {
           right: 0,
           zIndex: 1000,
           backgroundColor: 'transparent',
-          paddingHorizontal: 0, // No horizontal padding for full-width
+          paddingHorizontal: 0,
           paddingTop: theme.spacing.sm,
-          paddingBottom: theme.spacing.md, // Add bottom padding for spacing
+          paddingBottom: theme.spacing.md,
           borderWidth: 1,
           borderColor: 'transparent',
           opacity: searchBarOpacity,
@@ -506,7 +522,7 @@ export default function HomeScreen() {
             borderColor: theme.colors.border,
             paddingHorizontal: theme.spacing.lg,
             paddingVertical: theme.spacing.md,
-            marginHorizontal: theme.spacing.md, // Minimal margin for visual breathing room
+            marginHorizontal: theme.spacing.md,
           }}
           activeOpacity={0.7}
         >
@@ -530,146 +546,14 @@ export default function HomeScreen() {
             <ListFilterPlus size={20} color={theme.colors.text.primary} />
           </TouchableOpacity>
         </TouchableOpacity>
-      </Animated.View>
+      </Animated.View> */}
 
       {/* Main Content Container */}
       <View style={{ 
         flex: 1,
-        paddingTop: insets.top,
         paddingLeft: insets.left,
         paddingRight: insets.right,
       }}>
-        {/* Animated Header */}
-        <Animated.View
-          style={{
-            backgroundColor: theme.colors.surface,
-            paddingHorizontal: theme.spacing.lg,
-            paddingVertical: theme.spacing.xs,
-            borderBottomLeftRadius: theme.borderRadius.xl,
-            borderBottomRightRadius: theme.borderRadius.xl,
-            borderBottomWidth: 1,
-            borderBottomColor: theme.colors.border,
-            ...theme.shadows.sm,
-            transform: [{ translateY: headerTranslateY }],
-          }}
-        >
-          {/* Top Row - Profile & Actions */}
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: theme.spacing.md,
-            }}
-          >
-            {/* Compact Profile Section */}
-            <TouchableOpacity
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                flex: 0.85,
-                borderWidth: 1,
-                borderColor: theme.colors.border,
-                borderRadius: theme.borderRadius.xl,
-                padding: theme.spacing.xs,
-                backgroundColor: theme.colors.primary + '10',
-              }}
-              onPress={() => {
-                router.push('/(tabs)/more');
-              }}
-              activeOpacity={0.7}
-            >
-              <Avatar
-                source={avatarUrl}
-                name={`${firstName} ${lastName}`}
-                size="sm"
-                style={{ marginRight: theme.spacing.sm }}
-              />
-              <View style={{ flex: 1 }}>
-                <Text variant="body" style={{ fontWeight: '600', marginBottom: 2 }}>
-                  Hey, <Text variant='body' style={{ fontWeight: '600' }}>{firstName}</Text>
-                </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-                  <Text variant="caption" color="muted" style={{ fontSize: 12 }}>
-                    Welcome back
-                  </Text>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: theme.colors.primary + '10',
-                      borderRadius: theme.borderRadius.md,
-                      paddingHorizontal: theme.spacing.sm,
-                      paddingVertical: 1,
-                    }}
-                  >
-                    <Zap size={10} color={theme.colors.primary} style={{ marginRight: 2 }} />
-                    <Text style={{ 
-                      color: theme.colors.primary, 
-                      fontSize: 10, 
-                      fontWeight: '700' 
-                    }}>
-                      {creditLoading ? '...' : `${Math.floor(userCredit)}`}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-              <ChevronDown size={16} color={theme.colors.text.muted} />
-            </TouchableOpacity>
-
-            {/* Compact Action Buttons */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-              {/* Notifications */}
-              <TouchableOpacity
-                style={{
-                  position: 'relative',
-                  padding: theme.spacing.xs,
-                }}
-                onPress={() => router.push('/notifications')}
-                activeOpacity={0.7}
-              >
-                <Bell size={20} color={theme.colors.text.primary} />
-                {unreadCount > 0 && (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      right: 0,
-                      backgroundColor: theme.colors.error,
-                      borderRadius: 6,
-                      minWidth: 12,
-                      height: 12,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: '#FFF',
-                        fontSize: 8,
-                        fontWeight: '600',
-                      }}
-                    >
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              {/* Favorites */}
-              <TouchableOpacity
-                style={{ padding: theme.spacing.xs }}
-                onPress={() => router.push('/favorites')}
-                activeOpacity={0.7}
-              >
-                <Heart size={20} color={theme.colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Compact Location Display */}
-          
-        </Animated.View>
 
         {/* Main Content Area - Scrollable */}
         <View style={{ flex: 1 }}>
@@ -761,7 +645,7 @@ export default function HomeScreen() {
             <ChevronDown size={12} color={theme.colors.text.secondary} style={{ marginLeft: theme.spacing.xs }} />
                 </TouchableOpacity>
               {/* Search Bar Trigger */}
-              <TouchableOpacity
+            {/*   <TouchableOpacity
                 onPress={() => router.push('/smart-search')}
                 style={{
                   flexDirection: 'row',
@@ -797,7 +681,7 @@ export default function HomeScreen() {
                 >
                   <ListFilterPlus size={20} color={theme.colors.text.primary} />
                 </TouchableOpacity>
-              </TouchableOpacity>
+              </TouchableOpacity> */}
 
               {/* Enhanced Categories with Icons and Scroll Indicator */}
               <View style={{ paddingVertical: theme.spacing.md, position: 'relative' }}>
@@ -1026,6 +910,29 @@ export default function HomeScreen() {
         </View>
 
       </View>
+
+      {/* Sidebar Overlay */}
+      {sidebarVisible && (
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 999,
+          }}
+          onPress={() => setSidebarVisible(false)}
+          activeOpacity={1}
+        />
+      )}
+
+      {/* Marketplace Sidebar */}
+      <MarketplaceSidebar
+        isVisible={sidebarVisible}
+        onClose={() => setSidebarVisible(false)}
+      />
 
       {/* Filter Sheet */}
       <FilterSheet

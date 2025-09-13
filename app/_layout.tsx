@@ -13,6 +13,7 @@ import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 import { RewardsProvider } from '@/components/RewardsProvider/RewardsProvider';
 import { SplashScreenManager, useSplashScreen } from '@/components/SplashScreen';
 import { AuthErrorBoundary } from '@/components/AuthErrorBoundary/AuthErrorBoundary';
+import { FollowProvider } from '@/hooks/useFollowState';
 import { useEffect } from 'react';
 import { securityService } from '@/lib/securityService';
 import { offlineStorage } from '@/lib/offlineStorage';
@@ -105,7 +106,8 @@ function AppContent() {
 
   return (
     <AuthErrorBoundary>
-      <RewardsProvider>
+      <FollowProvider>
+        <RewardsProvider>
         <Stack 
           screenOptions={{ 
             headerShown: false,
@@ -155,7 +157,8 @@ function AppContent() {
           onAnimationComplete={handleAnimationComplete}
         />
       )}
-      </RewardsProvider>
+        </RewardsProvider>
+      </FollowProvider>
     </AuthErrorBoundary>
   );
 }

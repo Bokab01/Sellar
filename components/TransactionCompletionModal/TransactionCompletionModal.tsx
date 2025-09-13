@@ -2,15 +2,16 @@ import React, { useState } from 'react';
 import { View, Alert, ScrollView } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
-import { 
-  Text, 
-  AppModal, 
-  Button, 
-  Input, 
+import {
+  Text,
+  AppModal,
+  Button,
+  Input,
   Badge,
   Avatar,
   UserDisplayName
 } from '@/components';
+import { TransactionBasedReviewForm } from '@/components/TransactionBasedReviewForm/TransactionBasedReviewForm';
 import { 
   CheckCircle, 
   MapPin, 
@@ -29,6 +30,7 @@ interface TransactionCompletionModalProps {
   conversationId: string;
   otherUser: any;
   listing: any;
+  existingTransaction?: any;
   onTransactionCreated?: (transactionId: string) => void;
 }
 
@@ -38,21 +40,27 @@ export function TransactionCompletionModal({
   conversationId,
   otherUser,
   listing,
+  existingTransaction,
   onTransactionCreated,
 }: TransactionCompletionModalProps) {
   const { theme } = useTheme();
   const { user } = useAuthStore();
   
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState<'details' | 'confirmation' | 'success'>('details');
+  const [step, setStep] = useState<'details' | 'confirmation' | 'success'>(
+    existingTransaction ? 'confirmation' : 'details'
+  );
   const [transactionData, setTransactionData] = useState({
-    agreedPrice: listing?.price?.toString() || '',
-    meetupLocation: '',
-    meetupTime: '',
-    buyerNotes: '',
-    sellerNotes: '',
+    agreedPrice: existingTransaction?.agreed_price?.toString() || listing?.price?.toString() || '',
+    meetupLocation: existingTransaction?.meetup_location || '',
+    meetupTime: existingTransaction?.meetup_time || '',
+    buyerNotes: existingTransaction?.buyer_notes || '',
+    sellerNotes: existingTransaction?.seller_notes || '',
   });
-  const [createdTransactionId, setCreatedTransactionId] = useState<string | null>(null);
+  const [createdTransactionId, setCreatedTransactionId] = useState<string | null>(
+    existingTransaction?.id || null
+  );
+  const [showReviewForm, setShowReviewForm] = useState(false);
 
   const isBuyer = user?.id !== listing?.user_id;
   const role = isBuyer ? 'buyer' : 'seller';
@@ -71,9 +79,10 @@ export function TransactionCompletionModal({
 
     setLoading(true);
     try {
-      // Create transaction record
+      // Create transaction record with the creator automatically confirmed
+      const confirmationField = isBuyer ? 'buyer_confirmed_at' : 'seller_confirmed_at';
       const { data: transaction, error } = await supabase
-        .from('transactions')
+        .from('meetup_transactions')
         .insert({
           buyer_id: isBuyer ? user!.id : otherUser.id,
           seller_id: isBuyer ? otherUser.id : user!.id,
@@ -85,6 +94,7 @@ export function TransactionCompletionModal({
           buyer_notes: isBuyer ? transactionData.buyerNotes : transactionData.sellerNotes,
           seller_notes: isBuyer ? transactionData.sellerNotes : transactionData.buyerNotes,
           status: 'pending',
+          [confirmationField]: new Date().toISOString(), // Auto-confirm the creator
         })
         .select()
         .single();
@@ -92,7 +102,7 @@ export function TransactionCompletionModal({
       if (error) throw error;
 
       setCreatedTransactionId(transaction.id);
-      setStep('confirmation');
+      setStep('success'); // Creator goes straight to success since they're auto-confirmed
       onTransactionCreated?.(transaction.id);
 
     } catch (error) {
@@ -111,7 +121,7 @@ export function TransactionCompletionModal({
       const confirmationField = isBuyer ? 'buyer_confirmed_at' : 'seller_confirmed_at';
       
       const { error } = await supabase
-        .from('transactions')
+        .from('meetup_transactions')
         .update({
           [confirmationField]: new Date().toISOString(),
         })
@@ -129,7 +139,7 @@ export function TransactionCompletionModal({
   };
 
   const renderDetailsStep = () => (
-    <ScrollView style={{ maxHeight: 400 }}>
+    <ScrollView showsVerticalScrollIndicator={false}>
       <View style={{ gap: theme.spacing.lg }}>
         {/* Header */}
         <View style={{ alignItems: 'center', marginBottom: theme.spacing.md }}>
@@ -357,9 +367,18 @@ export function TransactionCompletionModal({
         <Text variant="body" style={{ textAlign: 'center', marginBottom: theme.spacing.md }}>
           🎉 Transaction successfully recorded!
         </Text>
-        <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
+        <Text variant="caption" color="secondary" style={{ textAlign: 'center', marginBottom: theme.spacing.lg }}>
           This creates a verified transaction that enables authentic reviews and builds trust in the community.
         </Text>
+        
+        {/* Leave Review Button */}
+        <Button
+          variant="primary"
+          onPress={() => setShowReviewForm(true)}
+          style={{ marginTop: theme.spacing.sm }}
+        >
+          Leave Review
+        </Button>
       </View>
     </View>
   );
@@ -409,18 +428,37 @@ export function TransactionCompletionModal({
   };
 
   return (
-    <AppModal
-      visible={visible}
-      onClose={onClose}
-      title={getModalTitle()}
-      size="lg"
-      primaryAction={getPrimaryAction()}
-      secondaryAction={getSecondaryAction()}
-      dismissOnBackdrop={step !== 'confirmation'}
-    >
-      {step === 'details' && renderDetailsStep()}
-      {step === 'confirmation' && renderConfirmationStep()}
-      {step === 'success' && renderSuccessStep()}
-    </AppModal>
+    <>
+      <AppModal
+        visible={visible}
+        onClose={onClose}
+        title={getModalTitle()}
+        size="lg"
+        primaryAction={getPrimaryAction()}
+        secondaryAction={getSecondaryAction()}
+        dismissOnBackdrop={step !== 'confirmation'}
+      >
+        {step === 'details' && renderDetailsStep()}
+        {step === 'confirmation' && renderConfirmationStep()}
+        {step === 'success' && renderSuccessStep()}
+      </AppModal>
+
+      {/* Review Form Modal */}
+      {showReviewForm && createdTransactionId && otherUser && (
+        <TransactionBasedReviewForm
+          visible={showReviewForm}
+          onClose={() => setShowReviewForm(false)}
+          transactionId={createdTransactionId}
+          reviewedUserId={otherUser.id}
+          reviewedUserName={otherUser.full_name || otherUser.username}
+          onSuccess={(review) => {
+            console.log('Review submitted:', review);
+            setShowReviewForm(false);
+            // Optionally close the transaction modal too
+            onClose();
+          }}
+        />
+      )}
+    </>
   );
 }

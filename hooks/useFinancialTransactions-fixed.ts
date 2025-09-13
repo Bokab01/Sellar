@@ -87,6 +87,7 @@ export function useFinancialTransactions(options: {
   const stableOffset = useMemo(() => offset, [offset]);
 
   const fetchTransactions = useCallback(async () => {
+    console.log('🔄 fetchTransactions called', { userId: stableUserId, filtersCount: Object.keys(stableFilters).length });
     if (!stableUserId) return;
 
     try {
@@ -149,6 +150,7 @@ export function useFinancialTransactions(options: {
   }, [hasMore, loading]);
 
   useEffect(() => {
+    console.log('🔄 useFinancialTransactions useEffect triggered');
     fetchTransactions();
   }, [fetchTransactions]);
 
@@ -172,6 +174,7 @@ export function useTransactionSummary(userId?: string) {
   const targetUserId = useMemo(() => userId || user?.id, [userId, user?.id]);
 
   const fetchSummary = useCallback(async () => {
+    console.log('📊 fetchSummary called', { targetUserId });
     if (!targetUserId) return;
 
     try {
@@ -195,6 +198,7 @@ export function useTransactionSummary(userId?: string) {
   }, [targetUserId]);
 
   useEffect(() => {
+    console.log('📊 useTransactionSummary useEffect triggered');
     fetchSummary();
   }, [fetchSummary]);
 

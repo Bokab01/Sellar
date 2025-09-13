@@ -4,6 +4,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
+import { useFollowState } from '@/hooks/useFollowState';
 import {
   Text,
   SafeAreaWrapper,
@@ -35,6 +36,7 @@ export default function FollowingScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { unfollowUser } = useFollowState();
 
   const fetchFollowing = useCallback(async () => {
     if (!user?.id) return;
@@ -120,41 +122,12 @@ export default function FollowingScreen() {
   }, [user, fetchFollowing]);
 
   const handleUnfollow = async (userId: string) => {
-    try {
-      // Try RPC function first
-      try {
-        const { data } = await supabase.rpc('unfollow_user', { target_user_id: userId });
-        
-        if (data?.success) {
-          // Remove from local state
-          setFollowing(prev => prev.filter(user => user.id !== userId));
-          return;
-        }
-      } catch (rpcError: any) {
-        if (!rpcError.message.includes('Could not find the function')) {
-          throw rpcError;
-        }
-        console.log('RPC function not available, using direct delete');
-      }
-
-      // Fallback to direct delete if RPC doesn't exist
-      const { error } = await supabase
-        .from('follows')
-        .delete()
-        .eq('follower_id', user?.id)
-        .eq('following_id', userId);
-
-      if (error) {
-        throw error;
-      }
-
-      // Remove from local state
+    const success = await unfollowUser(userId);
+    if (success) {
+      // Remove from local state only if the global unfollow was successful
       setFollowing(prev => prev.filter(user => user.id !== userId));
-    } catch (error: any) {
-      console.error('Error unfollowing user:', error);
-      if (error.message.includes('relation "follows" does not exist')) {
-        alert('Social features not yet enabled. Please apply the database migration.');
-      }
+    } else {
+      alert('Failed to unfollow user. Please try again.');
     }
   };
 

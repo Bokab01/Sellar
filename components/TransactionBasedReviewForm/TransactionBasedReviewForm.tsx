@@ -83,12 +83,12 @@ export function TransactionBasedReviewForm({
   const fetchTransaction = async () => {
     try {
       const { data, error } = await supabase
-        .from('transactions')
+        .from('meetup_transactions')
         .select(`
           *,
           listing:listings(id, title),
-          buyer:profiles!transactions_buyer_id_fkey(id, full_name, avatar_url),
-          seller:profiles!transactions_seller_id_fkey(id, full_name, avatar_url)
+          buyer:profiles!meetup_transactions_buyer_id_fkey(id, full_name, avatar_url),
+          seller:profiles!meetup_transactions_seller_id_fkey(id, full_name, avatar_url)
         `)
         .eq('id', transactionId)
         .single();
@@ -262,7 +262,7 @@ export function TransactionBasedReviewForm({
         onPress: handleClose,
       }}
     >
-      <ScrollView style={{ maxHeight: 500 }}>
+      <ScrollView showsVerticalScrollIndicator={false}>
         <View style={{ gap: theme.spacing.lg }}>
           {/* Transaction Verification Status */}
           <View style={{

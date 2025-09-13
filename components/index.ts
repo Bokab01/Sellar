@@ -47,6 +47,8 @@ export { ReviewModerationModal, QuickReportButton } from './ReviewModerationModa
 // Callback Request System Components
 export { SimpleCallbackRequestButton } from './SimpleCallbackRequestButton/SimpleCallbackRequestButton';
 export { CallbackMessage } from './CallbackMessage/CallbackMessage';
+export { MarketplaceSidebar } from './MarketplaceSidebar/MarketplaceSidebar';
+export { EnhancedSearchHeader } from './EnhancedSearchHeader/EnhancedSearchHeader';
 
 // Support System Components
 export { SupportTicketCard } from './SupportTicketCard/SupportTicketCard';

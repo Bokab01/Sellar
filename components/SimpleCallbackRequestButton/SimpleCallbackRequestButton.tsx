@@ -206,7 +206,7 @@ export function SimpleCallbackRequestButton({
         visible={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}
         title="Request Callback"
-        size="md"
+        size="lg"
         primaryAction={{
           text: 'Yes, Request Callback',
           onPress: handleRequestCallback,

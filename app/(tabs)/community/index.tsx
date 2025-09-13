@@ -6,6 +6,8 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useProfile } from '@/hooks/useProfile';
 import { useAppResume } from '@/hooks/useAppResume';
 import { router, useFocusEffect } from 'expo-router';
+import { supabase } from '@/lib/supabase';
+import { useFollowState } from '@/hooks/useFollowState';
 import {
   Text,
   SafeAreaWrapper,
@@ -27,7 +29,7 @@ export default function CommunityScreen() {
   const { profile } = useProfile();
   const { posts, loading, error, refreshing, refresh, updatePost, deletePost } = useCommunityPosts();
   const [sidebarVisible, setSidebarVisible] = useState(false);
-  const [followingStates, setFollowingStates] = useState<Record<string, boolean>>({});
+  const { followingStates, followUser, unfollowUser, isFollowing, refreshAllFollowStates } = useFollowState();
 
   // App resume handling - refresh posts when app comes back from background
   const { isRefreshing, isReconnecting } = useAppResume({
@@ -42,27 +44,22 @@ export default function CommunityScreen() {
   useFocusEffect(
     React.useCallback(() => {
       refresh();
-    }, [refresh])
+      refreshAllFollowStates(); // Refresh follow states when screen comes into focus
+    }, [refresh, refreshAllFollowStates])
   );
 
   // Handle follow/unfollow functionality
   const handleFollow = async (userId: string) => {
-    try {
-      // TODO: Implement actual follow API call
-      setFollowingStates(prev => ({ ...prev, [userId]: true }));
-      console.log('Following user:', userId);
-    } catch (error) {
-      console.error('Error following user:', error);
+    const success = await followUser(userId);
+    if (!success) {
+      Alert.alert('Error', 'Failed to follow user. Please try again.');
     }
   };
 
   const handleUnfollow = async (userId: string) => {
-    try {
-      // TODO: Implement actual unfollow API call
-      setFollowingStates(prev => ({ ...prev, [userId]: false }));
-      console.log('Unfollowed user:', userId);
-    } catch (error) {
-      console.error('Error unfollowing user:', error);
+    const success = await unfollowUser(userId);
+    if (!success) {
+      Alert.alert('Error', 'Failed to unfollow user. Please try again.');
     }
   };
 
@@ -271,7 +268,7 @@ export default function CommunityScreen() {
                 <PostCard 
                   key={post.id} 
                   post={post}
-                  isFollowing={followingStates[post.author.id] || false}
+                  isFollowing={isFollowing(post.author.id)}
                   onLike={() => {
                     console.log('Liked post:', post.id);
                     // TODO: Implement like functionality

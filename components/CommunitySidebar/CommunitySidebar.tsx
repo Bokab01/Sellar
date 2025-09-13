@@ -19,11 +19,9 @@ import {
   TrendingUp, 
   Star, 
   MessageCircle,
-  Heart,
   Share,
   Award,
   Crown,
-  Zap,
   Calendar,
   FileText,
   UserCheck,
@@ -33,6 +31,7 @@ import {
   Settings,
   Bell
 } from 'lucide-react-native';
+
 
 interface UserStats {
   followers_count: number;
@@ -102,7 +101,7 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
     try {
       setLoading(true);
       
-      // Fetch current user stats
+      // Fetch current user stats for counts
       if (user?.id) {
         const { data: profile } = await supabase
           .from('profiles')
@@ -126,9 +125,9 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
             listings_count: 0,
           });
         }
-
-        // Credits are now handled by the monetization store
       }
+
+      // Credits are now handled by the monetization store
 
       // Fetch trending users (most followers in last 30 days)
       const { data: trending } = await supabase
@@ -156,17 +155,6 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
     }
   };
 
-  const handleFollowUser = async (userId: string) => {
-    try {
-      const { data } = await supabase.rpc('follow_user', { target_user_id: userId });
-      if (data?.success) {
-        // Refresh trending users to update follow status
-        fetchSidebarData();
-      }
-    } catch (error) {
-      console.error('Error following user:', error);
-    }
-  };
 
   const navigationItems = [
     {
@@ -349,39 +337,6 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
                   </Text>
                 </View>
 
-                {/* Stats Grid */}
-                {userStats && (
-                  <View style={{ gap: theme.spacing.sm }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <View style={{ alignItems: 'center', flex: 1 }}>
-                        <Text variant="h4" color="primary" style={{ fontWeight: '700' }}>
-                          {userStats.followers_count}
-                        </Text>
-                        <Text variant="caption" color="muted">Followers</Text>
-                      </View>
-                      <View style={{ alignItems: 'center', flex: 1 }}>
-                        <Text variant="h4" color="primary" style={{ fontWeight: '700' }}>
-                          {userStats.following_count}
-                        </Text>
-                        <Text variant="caption" color="muted">Following</Text>
-                      </View>
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <View style={{ alignItems: 'center', flex: 1 }}>
-                        <Text variant="body" style={{ fontWeight: '600' }}>
-                          {userStats.posts_count}
-                        </Text>
-                        <Text variant="caption" color="muted">Posts</Text>
-                      </View>
-                      <View style={{ alignItems: 'center', flex: 1 }}>
-                        <Text variant="body" style={{ fontWeight: '600' }}>
-                          {userStats.listings_count}
-                        </Text>
-                        <Text variant="caption" color="muted">Listings</Text>
-                      </View>
-                    </View>
-                  </View>
-                )}
               </View>
             )}
           </View>
@@ -418,14 +373,14 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
                   activeOpacity={0.7}
                 >
                   <IconComponent size={20} color={theme.colors.primary} />
-                  <Text variant="body" style={{ marginLeft: theme.spacing.md, flex: 1 }}>
+                  <Text variant="bodySmall" style={{ marginLeft: theme.spacing.md, flex: 1 }}>
                     {item.label}
                   </Text>
                   {item.count !== undefined && (
                     <Badge
                       text={item.count.toString()}
                       variant="info"
-                      style={{ marginRight: theme.spacing.sm }}
+                      style={{ marginRight: theme.spacing.sm, borderRadius: theme.borderRadius.full, paddingHorizontal: theme.spacing.sm, paddingVertical: theme.spacing.xs }}
                     />
                   )}
                   <ChevronRight size={16} color={theme.colors.text.muted} />
@@ -529,68 +484,12 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
                     </View>
                   </View>
                   
-                  <Button
-                    variant="tertiary"
-                    size="sm"
-                    onPress={() => handleFollowUser(trendingUser.id)}
-                  >
-                    Follow
-                  </Button>
                 </View>
               ))}
             </View>
           )}
         </View>
 
-        {/* Community Stats */}
-        <View
-          style={{
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.borderRadius.lg,
-            padding: theme.spacing.lg,
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
-            <Zap size={20} color={theme.colors.primary} />
-            <Text variant="body" style={{ marginLeft: theme.spacing.sm, fontWeight: '600' }}>
-              Community Stats
-            </Text>
-          </View>
-          
-          <View style={{ gap: theme.spacing.sm }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Heart size={16} color={theme.colors.error} />
-                <Text variant="caption" style={{ marginLeft: theme.spacing.xs }}>
-                  Total Likes Today
-                </Text>
-              </View>
-              <Text variant="caption" style={{ fontWeight: '600' }}>1,234</Text>
-            </View>
-            
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <MessageCircle size={16} color={theme.colors.primary} />
-                <Text variant="caption" style={{ marginLeft: theme.spacing.xs }}>
-                  New Posts Today
-                </Text>
-              </View>
-              <Text variant="caption" style={{ fontWeight: '600' }}>89</Text>
-            </View>
-            
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Users size={16} color={theme.colors.success} />
-                <Text variant="caption" style={{ marginLeft: theme.spacing.xs }}>
-                  Active Users
-                </Text>
-              </View>
-              <Text variant="caption" style={{ fontWeight: '600' }}>456</Text>
-            </View>
-          </View>
-        </View>
       </ScrollView>
     </Animated.View>
   );

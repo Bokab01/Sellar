@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Alert, Platform } from 'react-native';
+import { View, Alert, Platform, TouchableOpacity } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useSecureAuth } from '@/hooks/useSecureAuth';
 import { validateSignUpForm } from '@/utils/validation';
@@ -19,7 +19,7 @@ import {
   HybridKeyboardAvoidingView,
 } from '@/components';
 import { router } from 'expo-router';
-import { Mail, Lock, User, Phone, ArrowLeft } from 'lucide-react-native';
+import { Mail, Lock, User, Phone, ArrowLeft, Check } from 'lucide-react-native';
 
 export default function SignUpScreen() {
   const { theme } = useTheme();
@@ -32,8 +32,37 @@ export default function SignUpScreen() {
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Check if form is valid and complete
+  const isFormValid = () => {
+    // Email validation - basic but more thorough
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailValid = email.trim().length > 0 && emailRegex.test(email.trim());
+    
+    // Password validation
+    const passwordValid = password.length >= 6;
+    const confirmPasswordValid = confirmPassword === password && confirmPassword.length > 0;
+    
+    // Name validation
+    const firstNameValid = firstName.trim().length >= 2;
+    const lastNameValid = lastName.trim().length >= 2;
+    
+    // Phone validation - optional, but if provided must be at least 10 digits
+    const phoneValid = phone.trim().length === 0 || phone.trim().length >= 10;
+    
+    // Location validation - optional
+    const locationValid = true; // Location is optional
+    
+    // Terms acceptance
+    const termsAccepted = acceptedTerms;
+
+    return emailValid && passwordValid && confirmPasswordValid && 
+           firstNameValid && lastNameValid && phoneValid && 
+           locationValid && termsAccepted;
+  };
 
   const handleResendConfirmation = async (email: string) => {
     try {
@@ -140,6 +169,14 @@ export default function SignUpScreen() {
         return;
       }
 
+      // Step 2.5: Check terms acceptance
+      if (!acceptedTerms) {
+        setErrors({ terms: 'You must accept the Terms and Conditions and Privacy Policy to continue.' });
+        Alert.alert('Terms Required', 'Please accept the Terms and Conditions and Privacy Policy to create your account.');
+        setLoading(false);
+        return;
+      }
+
       // Step 3: Enhanced pre-signup validation with smart user status detection
       console.log('Checking user status before signup...');
       
@@ -201,6 +238,7 @@ export default function SignUpScreen() {
         lastName: sanitizedData.lastName,
         phone: sanitizedData.phone || undefined,
         location: location || undefined, // Location is not sanitized as it's from picker
+        acceptedTerms: acceptedTerms,
       });
       
       console.log('Signup result:', result);
@@ -374,16 +412,128 @@ export default function SignUpScreen() {
                 style={{ marginBottom: theme.spacing.xl }}
               />
 
+              {/* Terms and Conditions Checkbox */}
+              <View style={{ 
+                marginBottom: theme.spacing.xl,
+                marginTop: theme.spacing.lg 
+              }}>
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'flex-start',
+                  paddingHorizontal: theme.spacing.xs,
+                }}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setAcceptedTerms(!acceptedTerms);
+                      if (errors.terms) {
+                        setErrors(prev => ({ ...prev, terms: '' }));
+                      }
+                    }}
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 11,
+                      borderWidth: 2,
+                      borderColor: acceptedTerms ? theme.colors.primary : theme.colors.text.muted,
+                      backgroundColor: acceptedTerms ? theme.colors.primary : 'transparent',
+                      marginRight: theme.spacing.sm,
+                      marginTop: 1,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    {acceptedTerms && (
+                      <Check 
+                        size={14} 
+                        color="white" 
+                        strokeWidth={3}
+                      />
+                    )}
+                  </TouchableOpacity>
+                  
+                  <View style={{ flex: 1 }}>
+                    <Text variant="bodySmall" style={{ 
+                      lineHeight: 20,
+                      color: theme.colors.text.secondary 
+                    }}>
+                      I agree to the{' '}
+                      <Text 
+                        style={{ 
+                          color: theme.colors.primary,
+                          textDecorationLine: 'underline' 
+                        }}
+                        onPress={() => {
+                          router.push('/(auth)/terms-and-conditions');
+                        }}
+                      >
+                        Terms and Conditions
+                      </Text>
+                      {' '}and{' '}
+                      <Text 
+                        style={{ 
+                          color: theme.colors.primary,
+                          textDecorationLine: 'underline' 
+                        }}
+                        onPress={() => {
+                          router.push('/(auth)/privacy-policy');
+                        }}
+                      >
+                        Privacy Policy
+                      </Text>
+                    </Text>
+                    
+                    {errors.terms && (
+                      <Text variant="bodySmall" style={{ 
+                        color: theme.colors.error,
+                        marginTop: theme.spacing.xs 
+                      }}>
+                        {errors.terms}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </View>
+
               <Button
                 variant="primary"
                 onPress={handleSignUp}
                 loading={loading}
-                disabled={loading}
+                disabled={loading || !isFormValid()}
                 fullWidth
                 size="lg"
               >
                 Create Account
               </Button>
+
+              {/* Form validation helper text */}
+              {!isFormValid() && !loading && (
+                <Text variant="bodySmall" style={{
+                  textAlign: 'center',
+                  color: theme.colors.text.muted,
+                  marginTop: theme.spacing.sm,
+                  lineHeight: 18,
+                }}>
+                  {(() => {
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    const missing = [];
+                    
+                    if (!email.trim() || !emailRegex.test(email.trim())) missing.push('valid email');
+                    if (password.length < 6) missing.push('password (6+ chars)');
+                    if (confirmPassword !== password || !confirmPassword) missing.push('password confirmation');
+                    if (firstName.trim().length < 2) missing.push('first name');
+                    if (lastName.trim().length < 2) missing.push('last name');
+                    // Phone is optional, but if provided must be valid
+                    if (phone.trim().length > 0 && phone.trim().length < 10) missing.push('valid phone number (10+ digits)');
+                    if (!acceptedTerms) missing.push('terms acceptance');
+                    
+                    if (missing.length === 0) return 'All required fields completed!';
+                    if (missing.length === 1) return `Please provide ${missing[0]}`;
+                    if (missing.length === 2) return `Please provide ${missing[0]} and ${missing[1]}`;
+                    return `Please provide ${missing.slice(0, -1).join(', ')} and ${missing[missing.length - 1]}`;
+                  })()}
+                </Text>
+              )}
             </View>
 
             {/* Footer Links */}

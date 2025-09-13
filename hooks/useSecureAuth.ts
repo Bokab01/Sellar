@@ -34,6 +34,7 @@ interface SignUpOptions {
   lastName: string;
   phone?: string;
   location?: string;
+  acceptedTerms?: boolean;
 }
 
 export function useSecureAuth() {
@@ -268,6 +269,7 @@ export function useSecureAuth() {
           lastName: options.lastName,
           phone: options.phone,
           location: options.location,
+          acceptedTerms: options.acceptedTerms,
         }
       );
 
