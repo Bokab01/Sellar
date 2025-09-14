@@ -517,8 +517,8 @@ export function usePushNotifications() {
 
     try {
       const { data: notifications } = await dbHelpers.getNotifications(user.id, 100);
-      // Fix the type issue by using proper property name
-      const unreadCount = notifications?.filter((n: any) => !n.read_at).length || 0;
+      // Use consistent property name for read status
+      const unreadCount = notifications?.filter((n: any) => !n.is_read).length || 0;
       
       await pushNotificationService.setBadgeCount(unreadCount);
       console.log(`Badge count updated: ${unreadCount}`);

@@ -3,7 +3,7 @@ import { View, TouchableOpacity } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 
-type BadgeVariant = 'new' | 'sold' | 'featured' | 'discount' | 'success' | 'warning' | 'error' | 'info' | 'neutral' | 'primary' | 'secondary' | 'default' | 'premium';
+type BadgeVariant = 'new' | 'sold' | 'featured' | 'discount' | 'success' | 'warning' | 'error' | 'info' | 'neutral' | 'primary' | 'secondary' | 'default' | 'premium' | 'urgent' | 'spotlight';
 type BadgeSize = 'sm' | 'md' | 'lg' | 'small' | 'large';
 
 interface BadgeProps {
@@ -83,6 +83,16 @@ export function Badge({
         return {
           backgroundColor: theme.colors.warning,
           textColor: theme.colors.warningForeground,
+        };
+      case 'urgent':
+        return {
+          backgroundColor: '#FF4444', // Bright red for urgency
+          textColor: '#FFFFFF',
+        };
+      case 'spotlight':
+        return {
+          backgroundColor: '#9C27B0', // Purple for spotlight
+          textColor: '#FFFFFF',
         };
       case 'default':
       case 'neutral':

@@ -4,8 +4,8 @@ export const CREDIT_PACKAGES = [
     id: 'starter',
     name: 'Starter',
     credits: 50,
-    priceGHS: 10,
-    pricePerCredit: 0.200,
+    priceGHS: 15,
+    pricePerCredit: 0.300,
     popular: false,
     description: 'Perfect for getting started',
   },
@@ -13,8 +13,8 @@ export const CREDIT_PACKAGES = [
     id: 'seller',
     name: 'Seller',
     credits: 120,
-    priceGHS: 20,
-    pricePerCredit: 0.167,
+    priceGHS: 25,
+    pricePerCredit: 0.208,
     popular: true,
     description: 'Great value for regular sellers',
   },
@@ -28,100 +28,62 @@ export const CREDIT_PACKAGES = [
     description: 'For serious sellers',
   },
   {
-    id: 'business',
-    name: 'Business',
-    credits: 650,
+    id: 'max',
+    name: 'Max',
+    credits: 700,
     priceGHS: 100,
-    pricePerCredit: 0.154,
+    pricePerCredit: 0.143,
     popular: false,
-    description: 'Maximum value for businesses',
+    description: 'Maximum value for power users',
   },
 ] as const;
 
-// Feature catalog with credit costs
+// Streamlined feature catalog with credit costs
 export const FEATURE_CATALOG = {
-  // Visibility features
-  visibility: {
-    pulse_boost_24h: {
-      name: 'Pulse Boost',
-      description: '24-hour visibility boost',
-      credits: 15,
-      duration: '24 hours',
-      icon: '⚡',
-      category: 'visibility',
-    },
-    mega_pulse_7d: {
-      name: 'Mega Pulse',
-      description: '7-day mega visibility boost',
-      credits: 50,
-      duration: '7 days',
-      icon: '🚀',
-      category: 'visibility',
-    },
-    category_spotlight_3d: {
-      name: 'Category Spotlight',
-      description: '3-day category spotlight',
-      credits: 35,
-      duration: '3 days',
-      icon: '🎯',
-      category: 'visibility',
-    },
+  // Core visibility features
+  pulse_boost_24h: {
+    name: 'Pulse Boost',
+    description: '24-hour visibility boost',
+    credits: 15,
+    duration: '24 hours',
+    icon: '⚡',
+  },
+  mega_pulse_7d: {
+    name: 'Mega Pulse',
+    description: '7-day mega visibility boost',
+    credits: 50,
+    duration: '7 days',
+    icon: '🚀',
+  },
+  category_spotlight_3d: {
+    name: 'Category Spotlight',
+    description: '3-day category spotlight',
+    credits: 35,
+    duration: '3 days',
+    icon: '🎯',
+  },
+  ad_refresh: {
+    name: 'Ad Refresh',
+    description: 'Refresh listing to top',
+    credits: 5,
+    duration: 'instant',
+    icon: '🔄',
   },
   
-  // Management features
-  management: {
-    ad_refresh: {
-      name: 'Ad Refresh',
-      description: 'Refresh listing to top',
-      credits: 5,
-      duration: 'instant',
-      icon: '🔄',
-      category: 'management',
-    },
-    auto_refresh_30d: {
-      name: 'Auto-Refresh',
-      description: '30-day auto-refresh',
-      credits: 60,
-      duration: '30 days',
-      icon: '⚙️',
-      category: 'management',
-    },
-    direct_whatsapp: {
-      name: 'Direct to WhatsApp',
-      description: 'WhatsApp contact button',
-      credits: 20,
-      duration: 'permanent',
-      icon: '💬',
-      category: 'management',
-    },
+  // Value-added features
+  listing_highlight: {
+    name: 'Listing Highlight',
+    description: 'Highlight listing with colored border',
+    credits: 10,
+    duration: '7 days',
+    icon: '✨',
   },
-  
-  // Business features
-  business: {
-    business_profile: {
-      name: 'Business Profile',
-      description: 'Unlock business features',
-      credits: 50,
-      duration: 'permanent',
-      icon: '🏢',
-      category: 'business',
-    },
-    analytics_report: {
-      name: 'Analytics Report',
-      description: 'Detailed performance analytics',
-      credits: 40,
-      duration: '30 days',
-      icon: '📊',
-      category: 'business',
-    },
-    priority_support: {
-      name: 'Priority Support',
-      description: 'Fast-track customer support',
-      credits: 30,
-      duration: '30 days',
-      icon: '🎧',
-      category: 'business',
-    },
+  urgent_badge: {
+    name: 'Urgent Badge',
+    description: 'Add "Urgent Sale" badge to listing',
+    credits: 8,
+    duration: '3 days',
+    icon: '🔥',
   },
 } as const;
 
@@ -171,12 +133,7 @@ export function calculateCreditValue(credits: number): number {
 }
 
 export function getFeatureByKey(key: string) {
-  for (const category of Object.values(FEATURE_CATALOG)) {
-    if (category[key as keyof typeof category]) {
-      return category[key as keyof typeof category];
-    }
-  }
-  return null;
+  return FEATURE_CATALOG[key as keyof typeof FEATURE_CATALOG] || null;
 }
 
 export function getCreditPackageById(id: string) {
@@ -187,27 +144,16 @@ export function getBusinessPlanById(id: string) {
   return BUSINESS_PLANS.find(plan => plan.id === id);
 }
 
-// Feature categories for UI organization
+// All available features in a single list (no categories)
+export const ALL_FEATURES = Object.keys(FEATURE_CATALOG);
+
+// Feature categories for UI organization (simplified)
 export const FEATURE_CATEGORIES = [
   {
-    id: 'visibility',
-    name: 'Visibility Boosts',
-    description: 'Get more eyes on your listings',
-    icon: '👁️',
-    features: Object.keys(FEATURE_CATALOG.visibility),
-  },
-  {
-    id: 'management',
-    name: 'Listing Management',
-    description: 'Automate and optimize your listings',
-    icon: '⚙️',
-    features: Object.keys(FEATURE_CATALOG.management),
-  },
-  {
-    id: 'business',
-    name: 'Business Tools',
-    description: 'Professional selling features',
-    icon: '🏢',
-    features: Object.keys(FEATURE_CATALOG.business),
+    id: 'all',
+    name: 'All Features',
+    description: 'Boost your listings and sales',
+    icon: '⚡',
+    features: ALL_FEATURES,
   },
 ] as const;

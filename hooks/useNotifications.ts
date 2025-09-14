@@ -38,16 +38,23 @@ export function useNotifications() {
 
   const markAsRead = async (notificationId: string) => {
     try {
-      await dbHelpers.markNotificationAsRead(notificationId);
+      const { data, error } = await dbHelpers.markNotificationAsRead(notificationId);
       
-      // Update local state
+      if (error) {
+        console.error('Failed to mark notification as read:', error);
+        return;
+      }
+      
+      // Update local state with the returned data to ensure consistency
       setNotifications(prev => 
         prev.map(n => 
-          n.id === notificationId ? { ...n, is_read: true } : n
+          n.id === notificationId ? { ...n, is_read: true, read_at: new Date().toISOString() } : n
         )
       );
       
       setUnreadCount(prev => Math.max(0, prev - 1));
+      
+      // Badge count will be updated automatically by the unreadCount state change
     } catch (error) {
       console.error('Failed to mark notification as read:', error);
     }

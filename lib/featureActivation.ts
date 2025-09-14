@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { FEATURE_CATALOG } from '@/constants/monetization';
+import { FEATURE_CATALOG, getFeatureByKey } from '@/constants/monetization';
 
 export interface ActiveFeature {
   id: string;
@@ -430,14 +430,60 @@ export async function activateListingFeature(
   listingId: string,
   userId: string
 ): Promise<{ success: boolean; error?: string }> {
-  return await featureActivationService.activateFeature(userId, featureKey, listingId);
+  try {
+    const feature = getFeatureByKey(featureKey);
+    if (!feature) {
+      return { success: false, error: 'Feature not found' };
+    }
+
+    // Use the database function to purchase and activate the feature
+    const { data, error } = await supabase.rpc('purchase_feature', {
+      p_user_id: userId,
+      p_feature_key: featureKey,
+      p_credits: feature.credits,
+      p_metadata: { listing_id: listingId },
+    });
+
+    if (error) {
+      console.error('Feature activation error:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: data.success, error: data.error };
+  } catch (error: any) {
+    console.error('Feature activation error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 export async function activateUserFeature(
   featureKey: string,
   userId: string
 ): Promise<{ success: boolean; error?: string }> {
-  return await featureActivationService.activateFeature(userId, featureKey);
+  try {
+    const feature = getFeatureByKey(featureKey);
+    if (!feature) {
+      return { success: false, error: 'Feature not found' };
+    }
+
+    // Use the database function to purchase and activate the feature
+    const { data, error } = await supabase.rpc('purchase_feature', {
+      p_user_id: userId,
+      p_feature_key: featureKey,
+      p_credits: feature.credits,
+      p_metadata: {},
+    });
+
+    if (error) {
+      console.error('Feature activation error:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: data.success, error: data.error };
+  } catch (error: any) {
+    console.error('Feature activation error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 export async function getListingFeatures(listingId: string, userId: string): Promise<ActiveFeature[]> {

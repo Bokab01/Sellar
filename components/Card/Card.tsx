@@ -43,6 +43,8 @@ interface ProductCardProps {
   viewCount?: number;
   onFavoritePress?: () => void;
   onViewPress?: () => void;
+  // Premium feature props
+  isHighlighted?: boolean;
 }
 
 export function ProductCard({
@@ -67,6 +69,8 @@ export function ProductCard({
   viewCount = 0,
   onFavoritePress,
   onViewPress,
+  // Premium feature props
+  isHighlighted = false,
 }: ProductCardProps) {
   const { theme } = useTheme();
   const { shouldLoadHeavyComponent } = useMemoryManager();
@@ -113,6 +117,16 @@ export function ProductCard({
           overflow: 'hidden',
           marginBottom: isGridLayout ? 0 : theme.spacing.md,
           height: isGridLayout ? totalCardHeight : undefined,
+          // Add highlight border if highlighted
+          ...(isHighlighted && {
+            borderWidth: 3,
+            borderColor: theme.colors.warning,
+            shadowColor: theme.colors.warning,
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 8,
+          }),
         }}
         activeOpacity={0.95}
       >

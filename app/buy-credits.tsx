@@ -50,7 +50,7 @@ export default function BuyCreditsScreen() {
       case 'starter': return <Zap size={32} color={theme.colors.primary} />;
       case 'seller': return <Star size={32} color={theme.colors.warning} />;
       case 'pro': return <Crown size={32} color={theme.colors.primary} />;
-      case 'business': return <Building size={32} color={theme.colors.success} />;
+      case 'max': return <Building size={32} color={theme.colors.success} />;
       default: return <CreditCard size={32} color={theme.colors.text.muted} />;
     }
   };

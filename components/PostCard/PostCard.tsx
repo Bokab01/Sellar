@@ -299,11 +299,11 @@ export function PostCard({
       style={[
         {
           backgroundColor: theme.colors.surface,
-          marginBottom: theme.spacing.lg,
-          borderRadius: theme.borderRadius.xl,
+          marginBottom: theme.spacing.md,
+          borderRadius: theme.borderRadius.lg,
           borderWidth: 1,
           borderColor: theme.colors.border,
-          ...theme.shadows.md,
+          ...theme.shadows.sm,
           overflow: 'hidden',
         },
         style,
@@ -312,8 +312,8 @@ export function PostCard({
       {/* Post Header */}
       <View
         style={{
-          padding: theme.spacing.lg,
-          paddingBottom: theme.spacing.md,
+          padding: theme.spacing.md,
+          paddingBottom: theme.spacing.sm,
         }}
       >
         {/* Post Type Badge and Menu */}
@@ -321,7 +321,7 @@ export function PostCard({
           flexDirection: 'row', 
           justifyContent: 'space-between', 
           alignItems: 'center',
-          marginBottom: theme.spacing.md
+          marginBottom: theme.spacing.sm
         }}>
           {post.type ? (
             <View
@@ -384,8 +384,8 @@ export function PostCard({
               <Avatar
                 source={post.author.avatar}
                 name={post.author.name}
-                size="lg"
-                style={{ marginRight: theme.spacing.md }}
+                size="md"
+                style={{ marginRight: theme.spacing.sm }}
               />
             </TouchableOpacity>
             
@@ -399,16 +399,16 @@ export function PostCard({
                   variant="full"
                   showBadge={true}
                   textVariant="body"
-                  style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}
+                  style={{ fontWeight: '600', marginBottom: theme.spacing.xxs }}
                 />
               </TouchableOpacity>
               
               {/* Rating Section */}
               {post.author.rating && post.author.rating > 0 && (
-                <View style={{ marginBottom: theme.spacing.xs }}>
+                <View style={{ marginBottom: theme.spacing.xxs }}>
                   <Rating 
                     rating={post.author.rating} 
-                    size="sm" 
+                    size="xs" 
                     showValue={true}
                     showCount={post.author.reviewCount ? true : false}
                     reviewCount={post.author.reviewCount}
@@ -437,8 +437,8 @@ export function PostCard({
       </View>
 
       {/* Post Content */}
-      <View style={{ paddingHorizontal: theme.spacing.lg, paddingBottom: theme.spacing.md }}>
-        <Text variant="body" style={{ lineHeight: 22 }}>
+      <View style={{ paddingHorizontal: theme.spacing.md, paddingBottom: theme.spacing.sm }}>
+        <Text variant="body" style={{ lineHeight: 20 }}>
           {post.content}
         </Text>
       </View>
@@ -448,27 +448,27 @@ export function PostCard({
         <TouchableOpacity
           onPress={() => router.push(`/(tabs)/home/${post.listing!.id}`)}
           style={{
-            marginHorizontal: theme.spacing.lg,
-            marginBottom: theme.spacing.md,
+            marginHorizontal: theme.spacing.md,
+            marginBottom: theme.spacing.sm,
             backgroundColor: theme.colors.surfaceVariant,
-            borderRadius: theme.borderRadius.md,
-            padding: theme.spacing.md,
+            borderRadius: theme.borderRadius.sm,
+            padding: theme.spacing.sm,
             borderWidth: 1,
             borderColor: theme.colors.border,
           }}
           activeOpacity={0.7}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
             {post.listing.image && (
               <ThumbnailImage
                 source={{ uri: post.listing.image }}
-                size={60}
+                size={50}
                 borderRadius={theme.borderRadius.sm}
                 backgroundColor={theme.colors.border}
               />
             )}
             <View style={{ flex: 1 }}>
-              <Text variant="bodySmall" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
+              <Text variant="bodySmall" style={{ fontWeight: '600', marginBottom: theme.spacing.xxs }}>
                 🏷️ {post.listing.title}
               </Text>
               <Text variant="caption" color="primary" style={{ fontWeight: '600' }}>
@@ -482,7 +482,7 @@ export function PostCard({
 
       {/* Post Images with ImageViewer */}
       {post.images && post.images.length > 0 && (
-        <View style={{ marginBottom: theme.spacing.md }}>
+        <View style={{ marginBottom: theme.spacing.sm }}>
           {post.images.length === 1 ? (
             <TouchableOpacity 
               activeOpacity={0.9}
@@ -559,21 +559,21 @@ export function PostCard({
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          paddingHorizontal: theme.spacing.lg,
-          paddingVertical: theme.spacing.lg,
+          paddingHorizontal: theme.spacing.md,
+          paddingVertical: theme.spacing.sm,
           borderTopWidth: 1,
           borderTopColor: theme.colors.border,
           backgroundColor: theme.colors.surfaceVariant + '30',
         }}
       >
-        <View style={{ flexDirection: 'row', gap: theme.spacing.xl }}>
+        <View style={{ flexDirection: 'row', gap: theme.spacing.lg }}>
           <TouchableOpacity
             style={{ 
               flexDirection: 'row', 
               alignItems: 'center', 
-              gap: theme.spacing.sm,
-              paddingVertical: theme.spacing.sm,
-              paddingHorizontal: theme.spacing.md,
+              gap: theme.spacing.xs,
+              paddingVertical: theme.spacing.xs,
+              paddingHorizontal: theme.spacing.sm,
               borderRadius: theme.borderRadius.full,
               backgroundColor: isLiked ? theme.colors.error + '15' : 'transparent',
               opacity: isLiking ? 0.7 : 1,
@@ -583,7 +583,7 @@ export function PostCard({
             disabled={isLiking}
           >
             <Heart
-              size={20}
+              size={18}
               color={isLiked ? theme.colors.error : theme.colors.text.muted}
               fill={isLiked ? theme.colors.error : 'none'}
             />
@@ -602,15 +602,15 @@ export function PostCard({
             style={{ 
               flexDirection: 'row', 
               alignItems: 'center', 
-              gap: theme.spacing.sm,
-              paddingVertical: theme.spacing.sm,
-              paddingHorizontal: theme.spacing.md,
+              gap: theme.spacing.xs,
+              paddingVertical: theme.spacing.xs,
+              paddingHorizontal: theme.spacing.sm,
               borderRadius: theme.borderRadius.full,
             }}
             onPress={onComment}
             activeOpacity={0.7}
           >
-            <MessageCircle size={20} color={theme.colors.text.muted} />
+            <MessageCircle size={18} color={theme.colors.text.muted} />
             <Text variant="bodySmall" color="muted" style={{ fontWeight: '500' }}>
               {(post.comments || 0).toLocaleString()}
             </Text>
@@ -620,15 +620,15 @@ export function PostCard({
             style={{ 
               flexDirection: 'row', 
               alignItems: 'center', 
-              gap: theme.spacing.sm,
-              paddingVertical: theme.spacing.sm,
-              paddingHorizontal: theme.spacing.md,
+              gap: theme.spacing.xs,
+              paddingVertical: theme.spacing.xs,
+              paddingHorizontal: theme.spacing.sm,
               borderRadius: theme.borderRadius.full,
             }}
             onPress={handleShare}
             activeOpacity={0.7}
           >
-            <Share size={20} color={theme.colors.text.muted} />
+            <Share size={18} color={theme.colors.text.muted} />
             <Text variant="bodySmall" color="muted" style={{ fontWeight: '500' }}>
               {(post.shares || 0).toLocaleString()}
             </Text>

@@ -3,7 +3,7 @@ import { View, TouchableOpacity } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useProfile } from '@/hooks/useProfile';
-import { useNotifications } from '@/hooks/useNotifications';
+import { useNotificationStore } from '@/store/useNotificationStore';
 import { router } from 'expo-router';
 import { Text, Avatar } from '@/components';
 import { Filter, Bell, Heart } from 'lucide-react-native';
@@ -26,7 +26,7 @@ export function EnhancedSearchHeader({
   const { theme } = useTheme();
   const { user } = useAuthStore();
   const { profile } = useProfile();
-  const { unreadCount } = useNotifications();
+  const { unreadCount } = useNotificationStore();
 
   const firstName = profile?.first_name || user?.user_metadata?.first_name || 'User';
   const lastName = profile?.last_name || user?.user_metadata?.last_name || '';

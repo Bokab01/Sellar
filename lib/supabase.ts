@@ -392,12 +392,18 @@ export const dbHelpers = {
   },
 
   async markNotificationAsRead(notificationId: string) {
-    const { data, error } = await db.notifications.update({ is_read: true }, notificationId).select().single();
+    const { data, error } = await db.notifications.update({ 
+      is_read: true, 
+      read_at: new Date().toISOString() 
+    }, notificationId).select().single();
     return { data, error };
   },
 
   async markAllNotificationsAsRead(userId: string) {
-    const { error } = await db.notifications.update({ is_read: true }).eq('user_id', userId);
+    const { error } = await db.notifications.update({ 
+      is_read: true, 
+      read_at: new Date().toISOString() 
+    }).eq('user_id', userId);
     return { error };
   },
 

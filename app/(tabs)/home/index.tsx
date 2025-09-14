@@ -5,7 +5,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useAppStore } from '@/store/useAppStore';
 import { useListings } from '@/hooks/useListings';
-import { useNotifications } from '@/hooks/useNotifications';
+import { useNotificationStore } from '@/store/useNotificationStore';
 import { useProfile } from '@/hooks/useProfile';
 import { useMultipleListingStats } from '@/hooks/useListingStats';
 import { useAppResume } from '@/hooks/useAppResume';
@@ -80,15 +80,16 @@ export default function HomeScreen() {
   // const { shouldLoadHeavyComponent, memoryUsage } = useMemoryManager();
 
   // Get notifications for badge
-  const { unreadCount } = useNotifications();
+  const { unreadCount, fetchNotifications } = useNotificationStore();
 
   // App resume handling - refresh listings when app comes back from background
   const { isRefreshing, isReconnecting } = useAppResume({
     onResume: async () => {
       console.log('📱 Home screen: App resumed, refreshing listings...');
       await refresh();
-      // Also refresh user credit
+      // Also refresh user credit and notifications
       await fetchUserCredit();
+      await fetchNotifications();
     },
     debug: true,
   });
@@ -228,10 +229,11 @@ export default function HomeScreen() {
     }
   };
 
-  // Fetch user credit balance on mount
+  // Fetch user credit balance and notifications on mount
   useEffect(() => {
     fetchUserCredit();
-  }, [user?.id]);
+    fetchNotifications();
+  }, [user?.id, fetchNotifications]);
 
   // Fetch category counts from database
   useEffect(() => {
@@ -412,6 +414,16 @@ export default function HomeScreen() {
       badges.push({ text: 'Boosted', variant: 'featured' as const });
     }
     
+    // Add urgent badge if listing has urgent sale
+    if (listing.urgent_until && new Date(listing.urgent_until) > new Date()) {
+      badges.push({ text: 'Urgent Sale', variant: 'urgent' as const });
+    }
+    
+    // Add spotlight badge if listing is spotlighted
+    if (listing.spotlight_until && new Date(listing.spotlight_until) > new Date()) {
+      badges.push({ text: 'Spotlight', variant: 'spotlight' as const });
+    }
+    
     // Add business badges if seller has them
     if (seller?.account_type === 'business') {
       badges.push({ text: 'Business', variant: 'info' as const });
@@ -421,8 +433,12 @@ export default function HomeScreen() {
       badges.push({ text: 'Verified', variant: 'success' as const });
     }
 
+    // Check if listing is highlighted
+    const isHighlighted = listing.highlight_until && new Date(listing.highlight_until) > new Date();
+    
     return {
       id: listing.id,
+      isHighlighted, // Add highlight flag
       image: listing.images || ['https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg'],
       title: listing.title,
       price: listing.price,
@@ -865,6 +881,7 @@ export default function HomeScreen() {
                       listingId={product.id}
                       isFavorited={favorites[product.id] || false}
                       viewCount={viewCounts[product.id] || 0}
+                      isHighlighted={product.isHighlighted}
                       onPress={() => router.push(`/(tabs)/home/${product.id}`)}
                       onFavoritePress={user?.id !== product.seller.id ? () => {
                         // Handle favorite toggle - only show for other users' listings

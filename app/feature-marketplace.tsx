@@ -58,13 +58,18 @@ export default function FeatureMarketplaceScreen() {
   };
 
   const getFeatureIcon = (featureKey: string) => {
+    // Use the icon from the feature definition, or fallback to key-based logic
+    const feature = getFeatureByKey(featureKey);
+    if (feature && 'icon' in feature) {
+      return feature.icon;
+    }
+    
+    // Fallback logic for any missing icons
     if (featureKey.includes('boost')) return '⚡';
     if (featureKey.includes('spotlight')) return '🎯';
     if (featureKey.includes('refresh')) return '🔄';
-    if (featureKey.includes('whatsapp')) return '💬';
-    if (featureKey.includes('business')) return '🏢';
-    if (featureKey.includes('analytics')) return '📊';
-    if (featureKey.includes('support')) return '🎧';
+    if (featureKey.includes('highlight')) return '✨';
+    if (featureKey.includes('urgent')) return '🔥';
     return '✨';
   };
 
@@ -75,7 +80,7 @@ export default function FeatureMarketplaceScreen() {
     setSelectedFeature({ key: featureKey, ...(feature as any) });
     
     // For listing-specific features, check if user has listings
-    if (['pulse_boost_24h', 'mega_pulse_7d', 'category_spotlight_3d', 'ad_refresh', 'auto_refresh_30d', 'direct_whatsapp'].includes(featureKey)) {
+    if (['pulse_boost_24h', 'mega_pulse_7d', 'category_spotlight_3d', 'ad_refresh', 'listing_highlight', 'urgent_badge'].includes(featureKey)) {
       if (userListings.length === 0) {
         Alert.alert('No Listings', 'You need to create a listing first to use this feature.');
         return;

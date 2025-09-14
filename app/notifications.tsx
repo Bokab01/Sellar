@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { useNotifications } from '@/hooks/useNotifications';
+import { useNotificationStore } from '@/store/useNotificationStore';
 import { router } from 'expo-router';
 import {
   Text,
@@ -27,12 +27,19 @@ export default function NotificationsScreen() {
     unreadCount,
     markAsRead,
     markAllAsRead,
-    refresh 
-  } = useNotifications();
+    refresh,
+    fetchNotifications
+  } = useNotificationStore();
   
   const [refreshing, setRefreshing] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+
+  // Fetch notifications when component mounts
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -78,43 +85,139 @@ export default function NotificationsScreen() {
     // Navigate based on notification type and data
     const data = notification.data || {};
     
-    switch (notification.type) {
-      case 'message':
-        if (data.conversation_id) {
-          router.push(`/(tabs)/inbox/${data.conversation_id}`);
-        }
-        break;
-      case 'offer':
-        if (data.listing_id) {
-          router.push(`/(tabs)/home/${data.listing_id}`);
-        } else if (data.conversation_id) {
-          router.push(`/(tabs)/inbox/${data.conversation_id}`);
-        }
-        break;
-      case 'like':
-      case 'comment':
-        if (data.post_id) {
-          router.push(`/(tabs)/community/${data.post_id}`);
-        }
-        break;
-      case 'follow':
-        if (data.user_id) {
-          router.push(`/profile/${data.user_id}`);
-        }
-        break;
-      case 'review':
-        if (data.user_id) {
-          router.push(`/profile/${data.user_id}`);
-        }
-        break;
-      case 'listing':
-        if (data.listing_id) {
-          router.push(`/(tabs)/home/${data.listing_id}`);
-        }
-        break;
-      default:
-        // No specific navigation
-        break;
+    try {
+      switch (notification.type) {
+        case 'message':
+          // Navigate to specific conversation
+          if (data.conversation_id) {
+            router.push(`/(tabs)/inbox/${data.conversation_id}`);
+          } else {
+            // Fallback to inbox if no specific conversation
+            router.push('/(tabs)/inbox');
+          }
+          break;
+
+        case 'offer':
+          // Offers are usually discussed in conversations
+          if (data.conversation_id) {
+            router.push(`/(tabs)/inbox/${data.conversation_id}`);
+          } else if (data.listing_id) {
+            // Fallback to listing detail
+            router.push(`/listing/${data.listing_id}`);
+          } else {
+            router.push('/(tabs)/inbox');
+          }
+          break;
+
+        case 'like':
+        case 'comment':
+          // Navigate to the specific post that was liked/commented
+          if (data.post_id) {
+            router.push(`/post/${data.post_id}`);
+          } else {
+            router.push('/(tabs)/community');
+          }
+          break;
+
+        case 'follow':
+          // Navigate to the profile of the user who followed you
+          if (data.user_id || data.follower_id) {
+            const userId = data.user_id || data.follower_id;
+            router.push(`/profile/${userId}`);
+          } else {
+            router.push('/(tabs)/community');
+          }
+          break;
+
+        case 'review':
+          // Navigate to the listing that was reviewed or user profile
+          if (data.listing_id) {
+            router.push(`/listing/${data.listing_id}`);
+          } else if (data.transaction_id) {
+            router.push('/transactions');
+          } else if (data.user_id) {
+            router.push(`/profile/${data.user_id}`);
+          } else {
+            router.push('/(tabs)/home');
+          }
+          break;
+
+        case 'listing':
+        case 'listing_update':
+          // Navigate to the specific listing
+          if (data.listing_id) {
+            router.push(`/listing/${data.listing_id}`);
+          } else {
+            router.push('/(tabs)/home');
+          }
+          break;
+
+        case 'verification':
+          // Navigate to verification screen or profile
+          if (data.verification_id) {
+            router.push(`/verification-status`);
+          } else {
+            router.push('/profile');
+          }
+          break;
+
+        case 'payment':
+          // Navigate to transactions or credits
+          if (data.transaction_id) {
+            router.push('/transactions');
+          } else if (data.credit_transaction_id) {
+            router.push('/transactions');
+          } else {
+            router.push('/buy-credits');
+          }
+          break;
+
+        case 'promotion':
+          // Navigate to the promoted listing
+          if (data.listing_id) {
+            router.push(`/listing/${data.listing_id}`);
+          } else {
+            router.push('/(tabs)/home');
+          }
+          break;
+
+        case 'system':
+          // Handle system notifications
+          if (data.action === 'update_app') {
+            router.push('/(tabs)/more/settings');
+          } else if (data.listing_id) {
+            router.push(`/listing/${data.listing_id}`);
+          } else if (data.user_id) {
+            router.push(`/profile/${data.user_id}`);
+          } else {
+            // Show toast for general system messages
+            setToastMessage('System notification viewed');
+            setShowToast(true);
+          }
+          break;
+
+        case 'reminder':
+          // Navigate based on what the reminder is about
+          if (data.listing_id) {
+            router.push(`/listing/${data.listing_id}`);
+          } else if (data.conversation_id) {
+            router.push(`/(tabs)/inbox/${data.conversation_id}`);
+          } else {
+            router.push('/(tabs)/home');
+          }
+          break;
+
+        default:
+          // For unknown notification types, show helpful message
+          console.log('Unknown notification type:', notification.type, 'Data:', data);
+          setToastMessage(`Notification type: ${notification.type}`);
+          setShowToast(true);
+          break;
+      }
+    } catch (error) {
+      console.error('Navigation error:', error);
+      setToastMessage('Unable to navigate to content');
+      setShowToast(true);
     }
   };
 
@@ -218,23 +321,37 @@ export default function NotificationsScreen() {
                 ...theme.shadows.sm,
               }}
             >
-              {notifications.map((notification, index) => (
-                <ListItem
-                  key={notification.id}
-                  title={notification.title}
-                  description={notification.body}
-                  timestamp={new Date(notification.created_at).toLocaleString()}
-                  rightIcon={getNotificationIcon(notification.type)}
-                  onPress={() => handleNotificationPress(notification)}
-                  style={{
-                    borderBottomWidth: index < notifications.length - 1 ? 1 : 0,
-                    backgroundColor: notification.is_read 
-                      ? 'transparent' 
-                      : theme.colors.primary + '05',
-                    paddingVertical: theme.spacing.lg,
-                  }}
-                />
-              ))}
+              {notifications.map((notification, index) => {
+                const data = notification.data || {};
+                const hasActionableContent = data.conversation_id || data.listing_id || data.post_id || data.user_id;
+                
+                return (
+                  <ListItem
+                    key={notification.id}
+                    title={notification.title}
+                    description={notification.body}
+                    timestamp={new Date(notification.created_at).toLocaleString()}
+                    rightIcon={getNotificationIcon(notification.type)}
+                    onPress={() => handleNotificationPress(notification)}
+                    style={{
+                      borderBottomWidth: index < notifications.length - 1 ? 1 : 0,
+                      backgroundColor: notification.is_read 
+                        ? 'transparent' 
+                        : theme.colors.primary + '05',
+                      paddingVertical: theme.spacing.lg,
+                      // Add subtle visual cue for clickable notifications
+                      ...(hasActionableContent && {
+                        borderLeftWidth: 3,
+                        borderLeftColor: notification.is_read 
+                          ? theme.colors.text.muted 
+                          : theme.colors.primary,
+                      }),
+                    }}
+                    // Add chevron for actionable notifications
+                    showChevron={hasActionableContent}
+                  />
+                );
+              })}
             </View>
           </ScrollView>
         ) : (
