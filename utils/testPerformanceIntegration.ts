@@ -74,7 +74,7 @@ export async function testPerformanceIntegration(): Promise<IntegrationTestResul
     results.push({
       component: 'Cache System',
       status: 'pass',
-      message: `Cache items: ${cacheStats.totalItems}, Size: ${(cacheStats.totalSize / 1024).toFixed(1)}KB`,
+      message: `Cache items: ${cacheStats.listings + cacheStats.messages}, Size: ${cacheStats.totalSizeKB}KB`,
       details: cacheStats
     });
   } catch (error) {

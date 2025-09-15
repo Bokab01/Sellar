@@ -36,6 +36,7 @@ import {
   AppModal,
   Badge,
 } from '@/components';
+import { ListingFeatureSelector } from '@/components/ListingFeatureSelector/ListingFeatureSelector';
 import { SelectedImage } from '@/components/ImagePicker';
 import { 
   Camera, 
@@ -73,6 +74,14 @@ interface ListingFormData {
   
   // Location (Step 5)
   location: string;
+}
+
+interface SelectedFeature {
+  key: string;
+  name: string;
+  credits: number;
+  duration: string;
+  description: string;
 }
 
 const STEPS = [
@@ -124,7 +133,7 @@ const CONDITIONS = [
 export default function CreateListingScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
-  const { balance, getMaxListings, spendCredits, hasUnlimitedListings } = useMonetizationStore();
+  const { balance, getMaxListings, spendCredits, hasUnlimitedListings, refreshCredits } = useMonetizationStore();
   
   // Form state
   const [currentStep, setCurrentStep] = useState(0);
@@ -149,6 +158,10 @@ export default function CreateListingScreen() {
   const [userListingsCount, setUserListingsCount] = useState(0);
   const [showPhotoTips, setShowPhotoTips] = useState(false);
   
+  // Feature selector state
+  const [showFeatureSelector, setShowFeatureSelector] = useState(false);
+  const [selectedFeatures, setSelectedFeatures] = useState<SelectedFeature[]>([]);
+  
   // Validation state
   const [validationResults, setValidationResults] = useState<Record<number, ValidationResult>>({});
   const [isValidating, setIsValidating] = useState(false);
@@ -162,6 +175,12 @@ export default function CreateListingScreen() {
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const AUTOSAVE_KEY = useMemo(() => `listing_draft_${user?.id || 'anonymous'}`, [user?.id]);
+
+  // Feature selection handler
+  const handleFeaturesSelected = useCallback((features: SelectedFeature[]) => {
+    setSelectedFeatures(features);
+    setHasUnsavedChanges(true);
+  }, []);
 
   // Load saved draft on component mount
   const loadDraft = useCallback(async () => {
@@ -542,6 +561,35 @@ export default function CreateListingScreen() {
       const { data: listing, error: listingError } = await dbHelpers.createListing(listingData);
 
       if (listingError) throw listingError;
+
+      // Apply selected features to the newly created listing
+      if (selectedFeatures.length > 0 && listing) {
+        console.log(`Applying ${selectedFeatures.length} features to listing ${listing.id}`);
+        
+        try {
+          for (const feature of selectedFeatures) {
+            const { data, error: featureError } = await supabase.rpc('purchase_feature', {
+              p_user_id: user!.id,
+              p_feature_key: feature.key,
+              p_credits: feature.credits,
+              p_metadata: { listing_id: listing.id },
+            });
+
+            if (featureError) {
+              console.error(`Failed to apply feature ${feature.key}:`, featureError);
+              // Continue with other features even if one fails
+            } else if (data?.success) {
+              console.log(`Successfully applied feature ${feature.key} to listing`);
+            }
+          }
+          
+          // Refresh credits after feature application
+          await refreshCredits();
+        } catch (featureError) {
+          console.error('Error applying features:', featureError);
+          // Don't fail the entire listing creation if features fail
+        }
+      }
       
       // Clear draft after successful creation
       await clearDraft();
@@ -568,6 +616,7 @@ export default function CreateListingScreen() {
               acceptOffers: true,
               location: '',
             });
+            setSelectedFeatures([]);
             setCurrentStep(0);
           }
         } catch (navError) {
@@ -1143,6 +1192,90 @@ export default function CreateListingScreen() {
         </View>
       </View>
 
+      {/* Feature Boost Section */}
+      <View style={{
+        backgroundColor: theme.colors.primary + '10',
+        borderRadius: theme.borderRadius.lg,
+        padding: theme.spacing.lg,
+        borderWidth: 1,
+        borderColor: theme.colors.primary + '30',
+      }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
+          <View style={{
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: theme.colors.primary,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: theme.spacing.md,
+          }}>
+            <Text style={{ fontSize: 20 }}>🚀</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text variant="h4" style={{ marginBottom: theme.spacing.xs }}>
+              Boost Your Listing
+            </Text>
+            <Text variant="body" color="secondary">
+              Get more views and sell faster with premium features
+            </Text>
+          </View>
+        </View>
+
+        {selectedFeatures.length > 0 ? (
+          <View>
+            <Text variant="body" style={{ marginBottom: theme.spacing.sm, color: theme.colors.success }}>
+              ✅ {selectedFeatures.length} feature{selectedFeatures.length > 1 ? 's' : ''} selected
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs, marginBottom: theme.spacing.md }}>
+              {selectedFeatures.map((feature) => (
+                <Badge 
+                  key={feature.key}
+                  text={`${feature.name} (${feature.credits} credits)`}
+                  variant="primary"
+                  size="sm"
+                />
+              ))}
+            </View>
+            <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onPress={() => setShowFeatureSelector(true)}
+                style={{ flex: 1 }}
+              >
+                Modify Features
+              </Button>
+              <Button
+                variant="tertiary"
+                size="sm"
+                onPress={() => setSelectedFeatures([])}
+                style={{ flex: 1 }}
+              >
+                Remove All
+              </Button>
+            </View>
+          </View>
+        ) : (
+          <View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
+              <Text variant="body" color="secondary" style={{ flex: 1 }}>
+                Available Credits: 
+              </Text>
+              <Text variant="h4" color="primary">
+                {balance.toLocaleString()}
+              </Text>
+            </View>
+            <Button
+              variant="primary"
+              onPress={() => setShowFeatureSelector(true)}
+              leftIcon={<Text style={{ fontSize: 16 }}>⚡</Text>}
+            >
+              Add Features to Boost Visibility
+            </Button>
+          </View>
+        )}
+      </View>
 
       {/* Listing Limit Warning */}
       {!hasUnlimitedListings() && userListingsCount >= getMaxListings() && (
@@ -1497,6 +1630,13 @@ export default function CreateListingScreen() {
         }}
       />
 
+      {/* Feature Selector Modal */}
+      <ListingFeatureSelector
+        visible={showFeatureSelector}
+        onClose={() => setShowFeatureSelector(false)}
+        onFeaturesSelected={handleFeaturesSelected}
+        listingTitle={formData.title || 'your listing'}
+      />
 
     </SafeAreaWrapper>
   );

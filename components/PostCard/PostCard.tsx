@@ -399,16 +399,16 @@ export function PostCard({
                   variant="full"
                   showBadge={true}
                   textVariant="body"
-                  style={{ fontWeight: '600', marginBottom: theme.spacing.xxs }}
+                  style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}
                 />
               </TouchableOpacity>
               
               {/* Rating Section */}
               {post.author.rating && post.author.rating > 0 && (
-                <View style={{ marginBottom: theme.spacing.xxs }}>
+                <View style={{ marginBottom: theme.spacing.xs }}>
                   <Rating 
                     rating={post.author.rating} 
-                    size="xs" 
+                    size="sm" 
                     showValue={true}
                     showCount={post.author.reviewCount ? true : false}
                     reviewCount={post.author.reviewCount}
@@ -468,7 +468,7 @@ export function PostCard({
               />
             )}
             <View style={{ flex: 1 }}>
-              <Text variant="bodySmall" style={{ fontWeight: '600', marginBottom: theme.spacing.xxs }}>
+              <Text variant="bodySmall" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
                 🏷️ {post.listing.title}
               </Text>
               <Text variant="caption" color="primary" style={{ fontWeight: '600' }}>

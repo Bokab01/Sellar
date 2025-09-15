@@ -1,4 +1,4 @@
-import { TransactionType, TransactionStatus, PaymentMethod } from '@/hooks/useTransactions';
+import { TransactionType, TransactionStatus } from '@/hooks/useTransactions';
 
 // Transaction formatting utilities
 export const formatTransactionType = (type: TransactionType): string => {
@@ -34,8 +34,8 @@ export const formatTransactionStatus = (status: TransactionStatus): string => {
   return statusMap[status] || status;
 };
 
-export const formatPaymentMethod = (method: PaymentMethod): string => {
-  const methodMap: Record<PaymentMethod, string> = {
+export const formatPaymentMethod = (method: string): string => {
+  const methodMap: Record<string, string> = {
     credits: 'Credits',
     mobile_money: 'Mobile Money',
     bank_transfer: 'Bank Transfer',

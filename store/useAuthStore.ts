@@ -13,7 +13,7 @@ interface AuthState {
   setLoading: (loading: boolean) => void;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signInWithMagicLink: (email: string) => Promise<{ error?: string }>;
-  signUp: (email: string, password: string, userData: { firstName: string; lastName: string; phone?: string; location?: string }) => Promise<{ error?: string }>;
+  signUp: (email: string, password: string, userData: { firstName: string; lastName: string; phone?: string; location?: string; acceptedTerms?: boolean; referralCode?: string }) => Promise<{ error?: string }>;
   forgotPassword: (email: string) => Promise<{ error?: string }>;
   resetPassword: (password: string) => Promise<{ error?: string }>;
   resendVerification: (email: string) => Promise<{ error?: string }>;
@@ -76,7 +76,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  signUp: async (email: string, password: string, userData: { firstName: string; lastName: string; phone?: string; location?: string; acceptedTerms?: boolean }) => {
+  signUp: async (email: string, password: string, userData: { firstName: string; lastName: string; phone?: string; location?: string; acceptedTerms?: boolean; referralCode?: string }) => {
     try {
       console.log('Attempting signup with:', { email, userData });
       
@@ -93,6 +93,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               location: userData.location || 'Accra, Greater Accra',
               is_business: false,
               accepted_terms: userData.acceptedTerms || false,
+              referral_code: userData.referralCode || null,
             },
           },
         }),

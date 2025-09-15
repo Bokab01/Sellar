@@ -103,7 +103,7 @@ export default function NotificationsScreen() {
             router.push(`/(tabs)/inbox/${data.conversation_id}`);
           } else if (data.listing_id) {
             // Fallback to listing detail
-            router.push(`/listing/${data.listing_id}`);
+            router.push(`/(tabs)/home/${data.listing_id}` as any);
           } else {
             router.push('/(tabs)/inbox');
           }
@@ -113,7 +113,7 @@ export default function NotificationsScreen() {
         case 'comment':
           // Navigate to the specific post that was liked/commented
           if (data.post_id) {
-            router.push(`/post/${data.post_id}`);
+            router.push(`/post/${data.post_id}` as any);
           } else {
             router.push('/(tabs)/community');
           }
@@ -132,7 +132,7 @@ export default function NotificationsScreen() {
         case 'review':
           // Navigate to the listing that was reviewed or user profile
           if (data.listing_id) {
-            router.push(`/listing/${data.listing_id}`);
+            router.push(`/(tabs)/home/${data.listing_id}` as any);
           } else if (data.transaction_id) {
             router.push('/transactions');
           } else if (data.user_id) {
@@ -146,7 +146,7 @@ export default function NotificationsScreen() {
         case 'listing_update':
           // Navigate to the specific listing
           if (data.listing_id) {
-            router.push(`/listing/${data.listing_id}`);
+            router.push(`/(tabs)/home/${data.listing_id}` as any);
           } else {
             router.push('/(tabs)/home');
           }
@@ -155,9 +155,9 @@ export default function NotificationsScreen() {
         case 'verification':
           // Navigate to verification screen or profile
           if (data.verification_id) {
-            router.push(`/verification-status`);
+            router.push(`/verification-status` as any);
           } else {
-            router.push('/profile');
+            router.push('/profile' as any);
           }
           break;
 
@@ -175,7 +175,7 @@ export default function NotificationsScreen() {
         case 'promotion':
           // Navigate to the promoted listing
           if (data.listing_id) {
-            router.push(`/listing/${data.listing_id}`);
+            router.push(`/(tabs)/home/${data.listing_id}` as any);
           } else {
             router.push('/(tabs)/home');
           }
@@ -186,7 +186,7 @@ export default function NotificationsScreen() {
           if (data.action === 'update_app') {
             router.push('/(tabs)/more/settings');
           } else if (data.listing_id) {
-            router.push(`/listing/${data.listing_id}`);
+            router.push(`/(tabs)/home/${data.listing_id}` as any);
           } else if (data.user_id) {
             router.push(`/profile/${data.user_id}`);
           } else {
@@ -199,7 +199,7 @@ export default function NotificationsScreen() {
         case 'reminder':
           // Navigate based on what the reminder is about
           if (data.listing_id) {
-            router.push(`/listing/${data.listing_id}`);
+            router.push(`/(tabs)/home/${data.listing_id}` as any);
           } else if (data.conversation_id) {
             router.push(`/(tabs)/inbox/${data.conversation_id}`);
           } else {

@@ -35,9 +35,9 @@ INSERT INTO categories (id, name, slug, parent_id, icon, is_active, sort_order) 
 
 -- Fashion subcategories
 INSERT INTO categories (id, name, slug, parent_id, icon, is_active, sort_order) VALUES
-('20000000-0000-4000-8000-000000000001', 'Men\'s Fashion', 'mens-fashion', '00000000-0000-4000-8000-000000000002', 'user', true, 1),
-('20000000-0000-4000-8000-000000000002', 'Women\'s Fashion', 'womens-fashion', '00000000-0000-4000-8000-000000000002', 'user', true, 2),
-('20000000-0000-4000-8000-000000000003', 'Kids\' Fashion', 'kids-fashion', '00000000-0000-4000-8000-000000000002', 'baby', true, 3);
+('20000000-0000-4000-8000-000000000001', 'Men''s Fashion', 'mens-fashion', '00000000-0000-4000-8000-000000000002', 'user', true, 1),
+('20000000-0000-4000-8000-000000000002', 'Women''s Fashion', 'womens-fashion', '00000000-0000-4000-8000-000000000002', 'user', true, 2),
+('20000000-0000-4000-8000-000000000003', 'Kids'' Fashion', 'kids-fashion', '00000000-0000-4000-8000-000000000002', 'baby', true, 3);
 
 -- Vehicles subcategories
 INSERT INTO categories (id, name, slug, parent_id, icon, is_active, sort_order) VALUES
@@ -66,7 +66,7 @@ INSERT INTO credit_packages (id, name, credits, price_ghs, description, is_activ
 -- =============================================
 
 INSERT INTO subscription_plans (id, name, description, price_ghs, billing_cycle, features, is_active) VALUES
-('s0000000-0000-4000-8000-000000000001', 'Sellar Business', 'Complete business solution for serious sellers', 400.00, 'monthly', 
+('a0000000-0000-4000-8000-000000000001', 'Sellar Business', 'Complete business solution for serious sellers', 400.00, 'monthly', 
 '[
   "unlimited_listings",
   "120_boost_credits_monthly",

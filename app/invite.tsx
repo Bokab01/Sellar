@@ -54,7 +54,7 @@ export default function InviteScreen() {
     
     try {
       setLoading(true);
-      const { data, error } = await supabase.rpc('get_user_referral_stats', {
+      const { data, error } = await supabase.rpc('get_referral_stats', {
         p_user_id: user.id
       });
 
@@ -65,10 +65,10 @@ export default function InviteScreen() {
 
       if (data) {
         setInviteStats({
-          totalInvites: data.total_invites || 0,
-          successfulInvites: data.successful_invites || 0,
-          pendingInvites: data.pending_invites || 0,
-          totalEarned: data.total_earned || 0,
+          totalInvites: data.totalReferrals || 0,
+          successfulInvites: data.successfulReferrals || 0,
+          pendingInvites: data.pendingReferrals || 0,
+          totalEarned: data.totalEarned || 0,
         });
       }
     } catch (error) {

@@ -35,6 +35,7 @@ interface SignUpOptions {
   phone?: string;
   location?: string;
   acceptedTerms?: boolean;
+  referralCode?: string;
 }
 
 export function useSecureAuth() {
@@ -270,6 +271,7 @@ export function useSecureAuth() {
           phone: options.phone,
           location: options.location,
           acceptedTerms: options.acceptedTerms,
+          referralCode: options.referralCode,
         }
       );
 

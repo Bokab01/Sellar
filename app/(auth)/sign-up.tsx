@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Alert, Platform, TouchableOpacity } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useSecureAuth } from '@/hooks/useSecureAuth';
@@ -35,6 +35,27 @@ export default function SignUpScreen() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [referralCode, setReferralCode] = useState('');
+
+  // Process referral code from URL parameters
+  useEffect(() => {
+    const processReferralCode = async () => {
+      try {
+        // Check for referral code in URL parameters
+        const params = new URLSearchParams(window?.location?.search || '');
+        const refCode = params.get('ref');
+        
+        if (refCode) {
+          setReferralCode(refCode.toUpperCase());
+        }
+      } catch (error) {
+        // Ignore URL processing errors in mobile environment
+        console.log('URL processing not available in mobile environment');
+      }
+    };
+
+    processReferralCode();
+  }, []);
 
   // Check if form is valid and complete
   const isFormValid = () => {
@@ -239,6 +260,7 @@ export default function SignUpScreen() {
         phone: sanitizedData.phone || undefined,
         location: location || undefined, // Location is not sanitized as it's from picker
         acceptedTerms: acceptedTerms,
+        referralCode: referralCode.trim() || undefined,
       });
       
       console.log('Signup result:', result);
@@ -409,6 +431,22 @@ export default function SignUpScreen() {
                 }}
                 leftIcon={<Lock size={20} color={theme.colors.text.muted} />}
                 error={errors.confirmPassword}
+                style={{ marginBottom: theme.spacing.lg }}
+              />
+
+              <Input
+                label="Referral Code (Optional)"
+                placeholder="Enter referral code if you have one"
+                value={referralCode}
+                onChangeText={(text) => {
+                  setReferralCode(text.toUpperCase());
+                  if (errors.referralCode) {
+                    setErrors(prev => ({ ...prev, referralCode: '' }));
+                  }
+                }}
+                autoCapitalize="characters"
+                maxLength={8}
+                error={errors.referralCode}
                 style={{ marginBottom: theme.spacing.xl }}
               />
 

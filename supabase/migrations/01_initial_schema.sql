@@ -72,6 +72,10 @@ CREATE TABLE profiles (
     account_type VARCHAR(50) DEFAULT 'individual',
     verification_status VARCHAR(50) DEFAULT 'unverified',
     
+    -- Referral tracking
+    referral_code VARCHAR(50), -- Code used when signing up (if any)
+    referred_by UUID REFERENCES profiles(id), -- Who referred this user
+    
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -682,7 +686,6 @@ CREATE TRIGGER update_notification_preferences_updated_at BEFORE UPDATE ON notif
 CREATE TRIGGER update_device_tokens_updated_at BEFORE UPDATE ON device_tokens FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_push_notification_queue_updated_at BEFORE UPDATE ON push_notification_queue FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_app_settings_updated_at BEFORE UPDATE ON app_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_meetup_transactions_updated_at BEFORE UPDATE ON meetup_transactions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- =============================================
 -- MISSING TABLES FROM FRONTEND USAGE
@@ -709,6 +712,9 @@ CREATE TABLE meetup_transactions (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add trigger for meetup_transactions
+CREATE TRIGGER update_meetup_transactions_updated_at BEFORE UPDATE ON meetup_transactions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Transaction categories table (referenced in supabase-client.ts)
 CREATE TABLE transaction_categories (

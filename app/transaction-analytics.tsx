@@ -91,8 +91,8 @@ export default function TransactionAnalyticsScreen() {
   const renderOverviewCards = () => {
     if (!analytics || !summary) return null;
 
-    const totalSpent = analytics.totals?.credits_spent || 0;
-    const totalEarned = analytics.totals?.credits_earned || 0;
+    const totalSpent = summary?.total_amount || 0;
+    const totalEarned = summary?.total_credits || 0;
     const netChange = totalEarned - totalSpent;
 
     return (
@@ -128,7 +128,7 @@ export default function TransactionAnalyticsScreen() {
               <BarChart3 size={24} color={theme.colors.primary} />
             </View>
             <Text variant="h2" style={{ marginBottom: theme.spacing.xs }}>
-              {analytics.totals.transaction_count}
+              {summary?.total_transactions || 0}
             </Text>
             <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
               Transactions
@@ -204,8 +204,8 @@ export default function TransactionAnalyticsScreen() {
   const renderTransactionBreakdown = () => {
     if (!analytics) return null;
 
-    const typeEntries = Object.entries(analytics.by_type || {});
-    const totalTransactions = analytics.totals.transaction_count;
+    const typeEntries = analytics ? [analytics] : [];
+    const totalTransactions = summary?.total_transactions || 0;
 
     return (
       <View style={{
@@ -227,21 +227,20 @@ export default function TransactionAnalyticsScreen() {
             Transaction Breakdown
           </Text>
         </View>
-
-        {typeEntries.length > 0 ? (
+                {typeEntries.length > 0 ? (
           <View style={{ gap: theme.spacing.md }}>
-            {typeEntries.map(([type, data]) => {
-              const percentage = totalTransactions > 0 ? (data.count / totalTransactions) * 100 : 0;
+            {typeEntries.map((data, index) => {
+              const percentage = totalTransactions > 0 ? (data.total_count / totalTransactions) * 100 : 0;
               
               return (
-                <View key={type} style={{
+                <View key={index} style={{
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                 }}>
                   <View style={{ flex: 1 }}>
                     <Text variant="body" style={{ marginBottom: theme.spacing.xs }}>
-                      {type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      {data.transaction_type.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                     </Text>
                     <View style={{
                       height: 8,
@@ -259,7 +258,7 @@ export default function TransactionAnalyticsScreen() {
                   
                   <View style={{ alignItems: 'flex-end', marginLeft: theme.spacing.md }}>
                     <Text variant="body" style={{ fontWeight: '600' }}>
-                      {data.count}
+                      {data.total_count}
                     </Text>
                     <Text variant="caption" color="secondary">
                       {percentage.toFixed(1)}%

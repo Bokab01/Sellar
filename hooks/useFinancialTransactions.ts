@@ -41,6 +41,7 @@ export interface FinancialTransaction {
 }
 
 export interface TransactionFilters {
+  id?: string;
   type?: TransactionType;
   status?: TransactionStatus;
   category?: string;

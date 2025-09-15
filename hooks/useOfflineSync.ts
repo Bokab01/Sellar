@@ -49,12 +49,12 @@ export function useOfflineSync() {
 
   const updateSyncStatus = useCallback(async () => {
     const isOnline = offlineStorage.getNetworkStatus();
-    const syncStatus = offlineStorage.getSyncQueueStatus();
+    const syncStatus = await offlineStorage.getSyncQueueStatus();
     
     setState(prev => ({
       ...prev,
       isOnline,
-      pendingChanges: syncStatus.pendingItems,
+      pendingChanges: syncStatus.length,
     }));
   }, []);
 

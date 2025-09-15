@@ -602,6 +602,86 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- REFERRAL AND REWARDS FUNCTIONS
 -- =============================================
 
+-- Function to lookup user by referral code
+CREATE OR REPLACE FUNCTION get_user_by_referral_code(p_referral_code VARCHAR(50))
+RETURNS UUID AS $$
+DECLARE
+    referrer_id UUID;
+BEGIN
+    -- Find user whose ID ends with the referral code (case insensitive)
+    SELECT id INTO referrer_id
+    FROM profiles
+    WHERE UPPER(RIGHT(id::text, 8)) = UPPER(p_referral_code)
+    LIMIT 1;
+    
+    RETURN referrer_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to process referral during signup
+CREATE OR REPLACE FUNCTION process_signup_referral(
+    p_new_user_id UUID,
+    p_referral_code VARCHAR(50)
+)
+RETURNS TABLE (success BOOLEAN, message TEXT, credits_awarded INTEGER) AS $$
+DECLARE
+    referrer_id UUID;
+    bonus_amount INTEGER := 50;
+    result_success BOOLEAN := false;
+    result_message TEXT := '';
+    credits_given INTEGER := 0;
+BEGIN
+    -- Skip if no referral code provided
+    IF p_referral_code IS NULL OR LENGTH(TRIM(p_referral_code)) = 0 THEN
+        RETURN QUERY SELECT false, 'No referral code provided', 0;
+        RETURN;
+    END IF;
+    
+    -- Find the referrer
+    SELECT get_user_by_referral_code(p_referral_code) INTO referrer_id;
+    
+    IF referrer_id IS NULL THEN
+        RETURN QUERY SELECT false, 'Invalid referral code', 0;
+        RETURN;
+    END IF;
+    
+    -- Cannot refer yourself
+    IF referrer_id = p_new_user_id THEN
+        RETURN QUERY SELECT false, 'Cannot refer yourself', 0;
+        RETURN;
+    END IF;
+    
+    -- Check if this user was already referred
+    IF EXISTS (
+        SELECT 1 FROM profiles 
+        WHERE id = p_new_user_id 
+        AND referred_by IS NOT NULL
+    ) THEN
+        RETURN QUERY SELECT false, 'User already has a referrer', 0;
+        RETURN;
+    END IF;
+    
+    -- Update the new user's profile with referral info
+    UPDATE profiles 
+    SET 
+        referral_code = p_referral_code,
+        referred_by = referrer_id,
+        updated_at = NOW()
+    WHERE id = p_new_user_id;
+    
+    -- Auto-claim the referral bonus
+    SELECT * INTO result_success, result_message 
+    FROM claim_referral_bonus(referrer_id, p_new_user_id, p_referral_code);
+    
+    IF result_success THEN
+        credits_given := bonus_amount * 2; -- Both users get credits
+        result_message := 'Referral bonus awarded successfully';
+    END IF;
+    
+    RETURN QUERY SELECT result_success, result_message, credits_given;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Function to claim referral bonus
 CREATE OR REPLACE FUNCTION claim_referral_bonus(
     p_referrer_id UUID,
@@ -688,6 +768,92 @@ BEGIN
     RETURN QUERY SELECT true, 'Referral bonus awarded successfully';
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger function to auto-process referrals after profile creation
+CREATE OR REPLACE FUNCTION trigger_process_referral()
+RETURNS TRIGGER AS $$
+DECLARE
+    referral_result RECORD;
+BEGIN
+    -- Only process if there's a referral code and no existing referrer
+    IF NEW.referral_code IS NOT NULL AND NEW.referred_by IS NULL THEN
+        -- Process the referral
+        SELECT * INTO referral_result
+        FROM process_signup_referral(NEW.id, NEW.referral_code);
+        
+        -- Log the result (optional)
+        IF referral_result.success THEN
+            RAISE NOTICE 'Referral processed successfully for user %: % credits awarded', 
+                NEW.id, referral_result.credits_awarded;
+        ELSE
+            RAISE NOTICE 'Referral processing failed for user %: %', 
+                NEW.id, referral_result.message;
+        END IF;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to get referral statistics
+CREATE OR REPLACE FUNCTION get_referral_stats(p_user_id UUID)
+RETURNS JSONB AS $$
+DECLARE
+    total_referrals INTEGER := 0;
+    successful_referrals INTEGER := 0;
+    total_earned INTEGER := 0;
+    recent_referrals JSONB;
+BEGIN
+    -- Count total people referred by this user
+    SELECT COUNT(*) INTO total_referrals
+    FROM profiles
+    WHERE referred_by = p_user_id;
+    
+    -- Count successful referrals (those who got the bonus)
+    SELECT COUNT(*) INTO successful_referrals
+    FROM credit_transactions ct
+    JOIN profiles p ON ct.reference_id = p.id
+    WHERE ct.user_id = p_user_id
+    AND ct.reference_type = 'referral_bonus'
+    AND ct.type = 'earned';
+    
+    -- Calculate total credits earned from referrals
+    SELECT COALESCE(SUM(amount), 0) INTO total_earned
+    FROM credit_transactions
+    WHERE user_id = p_user_id
+    AND reference_type = 'referral_bonus'
+    AND type = 'earned';
+    
+    -- Get recent referrals (last 5)
+    SELECT COALESCE(
+        json_agg(
+            json_build_object(
+                'name', p.first_name || ' ' || p.last_name,
+                'date', p.created_at,
+                'credits_earned', 50
+            ) ORDER BY p.created_at DESC
+        ), '[]'::json
+    ) INTO recent_referrals
+    FROM profiles p
+    WHERE p.referred_by = p_user_id
+    LIMIT 5;
+    
+    RETURN jsonb_build_object(
+        'totalReferrals', total_referrals,
+        'successfulReferrals', successful_referrals,
+        'pendingReferrals', total_referrals - successful_referrals,
+        'totalEarned', total_earned,
+        'recentReferrals', recent_referrals
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create the trigger
+DROP TRIGGER IF EXISTS auto_process_referral ON profiles;
+CREATE TRIGGER auto_process_referral
+    AFTER INSERT ON profiles
+    FOR EACH ROW
+    EXECUTE FUNCTION trigger_process_referral();
 
 -- Function to get user reward summary
 CREATE OR REPLACE FUNCTION get_user_reward_summary(p_user_id UUID)

@@ -265,3 +265,7 @@ export {
   QuantityBadge 
 } from './ProfessionalBadge';
 export type { ProfessionalBadgeProps } from './ProfessionalBadge';
+
+// Network Optimization Components
+export { AdaptiveImage, AdaptiveListingImage, AdaptiveProfileImage, AdaptiveThumbnailImage } from './AdaptiveImage/AdaptiveImage';
+export { OfflineIndicator, CompactOfflineIndicator } from './OfflineIndicator/OfflineIndicator';

@@ -37,6 +37,9 @@ class FeatureActivationService {
       if (!feature) {
         return { success: false, error: 'Feature not found' };
       }
+      
+      // Type assertion to ensure feature has the expected properties
+      const featureConfig = feature as any;
 
       // Calculate expiry date
       const expiresAt = this.calculateExpiryDate(featureKey);
@@ -48,14 +51,14 @@ class FeatureActivationService {
           user_id: userId,
           listing_id: listingId,
           feature_key: featureKey,
-          feature_name: feature.name,
-          credits_spent: feature.credits,
+          feature_name: featureConfig.name || featureKey,
+          credits_spent: featureConfig.credits || 0,
           status: 'active',
           expires_at: expiresAt,
           metadata: {
             ...metadata,
-            duration: feature.duration,
-            category: feature.category,
+            duration: featureConfig.duration || '24 hours',
+            category: 'feature',
           },
         })
         .select()
