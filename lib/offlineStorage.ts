@@ -425,7 +425,7 @@ class OfflineStorageService {
             await this.removeFromSyncQueue(item.id);
             synced++;
           } else {
-            // Increment retry count
+        // Increment retry count
             await this.updateSyncQueueItem(item.id, {
               retry_count: item.retry_count + 1,
               last_attempt: new Date().toISOString(),
@@ -465,7 +465,7 @@ class OfflineStorageService {
 
   private async syncItem(item: SyncQueueItem): Promise<boolean> {
     try {
-      switch (item.type) {
+    switch (item.type) {
         case 'create_listing':
           return await this.syncCreateListing(item.data);
         case 'update_listing':
@@ -602,7 +602,7 @@ class OfflineStorageService {
          JSON.stringify(messages).length + 
          JSON.stringify(queue).length) / 1024
       );
-
+      
       return {
         listings: listings.length,
         messages: messages.length,

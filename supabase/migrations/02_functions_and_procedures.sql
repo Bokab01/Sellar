@@ -2,6 +2,263 @@
 -- Functions used by the frontend application
 
 -- =============================================
+-- USER MANAGEMENT FUNCTIONS
+-- =============================================
+
+-- Function to check if email exists
+CREATE OR REPLACE FUNCTION check_email_exists(email_to_check TEXT)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM profiles WHERE email = email_to_check
+        UNION
+        SELECT 1 FROM auth.users WHERE email = email_to_check
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to check if username exists
+CREATE OR REPLACE FUNCTION check_username_exists(username_to_check TEXT)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM profiles WHERE username = username_to_check
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to check if phone exists
+CREATE OR REPLACE FUNCTION check_phone_exists(phone_to_check TEXT)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM profiles WHERE phone = phone_to_check
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to ensure user profile exists (create if missing)
+CREATE OR REPLACE FUNCTION ensure_user_profile(user_id UUID)
+RETURNS JSONB AS $$
+DECLARE
+    profile_data JSONB;
+    auth_user_data RECORD;
+    user_first_name TEXT;
+    user_last_name TEXT;
+    user_email TEXT;
+    user_phone TEXT;
+    user_location TEXT;
+    referral_code_value TEXT;
+    verification_status_value TEXT;
+BEGIN
+    -- Check if profile already exists
+    SELECT to_jsonb(p.*) INTO profile_data
+    FROM profiles p
+    WHERE p.id = user_id;
+    
+    -- If profile exists, return it
+    IF profile_data IS NOT NULL THEN
+        RETURN profile_data;
+    END IF;
+    
+    -- Get user data from auth.users
+    SELECT * INTO auth_user_data
+    FROM auth.users
+    WHERE id = user_id;
+    
+    -- If auth user doesn't exist, return error
+    IF auth_user_data IS NULL THEN
+        RETURN jsonb_build_object(
+            'error', true,
+            'message', 'User not found in auth system'
+        );
+    END IF;
+    
+    -- Extract and validate user data
+    user_first_name := COALESCE(
+        NULLIF(TRIM((auth_user_data.raw_user_meta_data->>'firstName')::TEXT), ''),
+        NULLIF(TRIM((auth_user_data.raw_user_meta_data->>'first_name')::TEXT), ''),
+        'User'
+    );
+    
+    user_last_name := COALESCE(
+        NULLIF(TRIM((auth_user_data.raw_user_meta_data->>'lastName')::TEXT), ''),
+        NULLIF(TRIM((auth_user_data.raw_user_meta_data->>'last_name')::TEXT), ''),
+        ''
+    );
+    
+    user_email := COALESCE(
+        NULLIF(TRIM(auth_user_data.email), ''),
+        NULLIF(TRIM((auth_user_data.raw_user_meta_data->>'email')::TEXT), '')
+    );
+    
+    user_phone := NULLIF(TRIM((auth_user_data.raw_user_meta_data->>'phone')::TEXT), '');
+    
+    user_location := COALESCE(
+        NULLIF(TRIM((auth_user_data.raw_user_meta_data->>'location')::TEXT), ''),
+        'Accra, Greater Accra'
+    );
+    
+    -- Generate unique referral code
+    referral_code_value := UPPER(SUBSTRING(MD5(user_id::TEXT || EXTRACT(EPOCH FROM NOW())::TEXT), 1, 8));
+    
+    -- Ensure referral code is unique
+    WHILE EXISTS (SELECT 1 FROM profiles WHERE referral_code = referral_code_value) LOOP
+        referral_code_value := UPPER(SUBSTRING(MD5(user_id::TEXT || EXTRACT(EPOCH FROM NOW())::TEXT || random()::TEXT), 1, 8));
+    END LOOP;
+    
+    -- Determine verification status based on email confirmation
+    verification_status_value := CASE 
+        WHEN auth_user_data.email_confirmed_at IS NOT NULL THEN 'verified'
+        ELSE 'unverified'
+    END;
+    
+    -- Create profile from auth user data
+    BEGIN
+        INSERT INTO profiles (
+            id,
+            first_name,
+            last_name,
+            email,
+            phone,
+            avatar_url,
+            location,
+            is_business,
+            account_type,
+            verification_status,
+            referral_code,
+            referred_by,
+            onboarding_completed,
+            onboarding_completed_at,
+            created_at,
+            updated_at
+        ) VALUES (
+            user_id,
+            user_first_name,
+            user_last_name,
+            user_email,
+            user_phone,
+            (auth_user_data.raw_user_meta_data->>'avatar_url')::TEXT,
+            user_location,
+            COALESCE((auth_user_data.raw_user_meta_data->>'is_business')::BOOLEAN, false),
+            COALESCE((auth_user_data.raw_user_meta_data->>'account_type')::TEXT, 'individual'),
+            verification_status_value,
+            referral_code_value,
+            (auth_user_data.raw_user_meta_data->>'referralCode')::TEXT,
+            false,
+            NULL,
+            COALESCE(auth_user_data.created_at, NOW()),
+            NOW()
+        );
+        
+        -- Process referral if applicable
+        IF (auth_user_data.raw_user_meta_data->>'referralCode')::TEXT IS NOT NULL THEN
+            BEGIN
+                PERFORM process_signup_referral(user_id, (auth_user_data.raw_user_meta_data->>'referralCode')::TEXT);
+            EXCEPTION
+                WHEN OTHERS THEN
+                    -- Log referral processing error but don't fail profile creation
+                    RAISE WARNING 'Failed to process referral for user %: %', user_id, SQLERRM;
+            END;
+        END IF;
+        
+    EXCEPTION
+        WHEN unique_violation THEN
+            -- Profile already exists, update it with current auth data
+            UPDATE profiles SET
+                first_name = user_first_name,
+                last_name = user_last_name,
+                email = user_email,
+                phone = user_phone,
+                verification_status = verification_status_value,
+                updated_at = NOW()
+            WHERE id = user_id;
+    END;
+    
+    -- Initialize user credits (ignore if already exists)
+    BEGIN
+        INSERT INTO user_credits (user_id, balance, lifetime_earned, lifetime_spent)
+        VALUES (user_id, 0, 0, 0);
+    EXCEPTION
+        WHEN unique_violation THEN
+            -- Credits already exist, ignore
+            NULL;
+    END;
+    
+    -- Create default notification preferences (ignore if already exists)
+    BEGIN
+        INSERT INTO notification_preferences (user_id)
+        VALUES (user_id);
+    EXCEPTION
+        WHEN unique_violation THEN
+            -- Preferences already exist, ignore
+            NULL;
+    END;
+    
+    -- Create default user settings (ignore if already exists)
+    BEGIN
+        INSERT INTO user_settings (user_id)
+        VALUES (user_id);
+    EXCEPTION
+        WHEN unique_violation THEN
+            -- Settings already exist, ignore
+            NULL;
+    END;
+    
+    -- Get the created/updated profile
+    SELECT to_jsonb(p.*) INTO profile_data
+    FROM profiles p
+    WHERE p.id = user_id;
+    
+    RETURN profile_data;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get user profile with fallback creation
+CREATE OR REPLACE FUNCTION get_user_profile(user_id UUID)
+RETURNS JSONB AS $$
+DECLARE
+    profile_data JSONB;
+BEGIN
+    -- Try to get existing profile
+    SELECT to_jsonb(p.*) INTO profile_data
+    FROM profiles p
+    WHERE p.id = user_id;
+    
+    -- If profile exists, return it
+    IF profile_data IS NOT NULL THEN
+        RETURN profile_data;
+    END IF;
+    
+    -- If profile doesn't exist, create it
+    RETURN ensure_user_profile(user_id);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger function to automatically create profile when user signs up
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Create profile for new user with error handling
+    BEGIN
+        PERFORM ensure_user_profile(NEW.id);
+    EXCEPTION
+        WHEN OTHERS THEN
+            -- Log the error but don't fail the user creation
+            RAISE WARNING 'Failed to create profile for user %: %', NEW.id, SQLERRM;
+    END;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create trigger on auth.users
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+-- =============================================
 -- NOTIFICATION FUNCTIONS
 -- =============================================
 
@@ -1032,3 +1289,821 @@ CREATE TRIGGER update_post_comments_count
 CREATE TRIGGER update_post_shares_count
     AFTER INSERT OR DELETE ON shares
     FOR EACH ROW EXECUTE FUNCTION update_post_counts();
+
+-- =============================================
+-- MIGRATION UTILITY FUNCTIONS
+-- =============================================
+
+-- Function to get listings with category (resolves ambiguous relationship)
+CREATE OR REPLACE FUNCTION get_listings_with_category(
+    p_limit INTEGER DEFAULT 20,
+    p_offset INTEGER DEFAULT 0,
+    p_category_id UUID DEFAULT NULL,
+    p_user_id UUID DEFAULT NULL,
+    p_status TEXT DEFAULT 'active'
+)
+RETURNS TABLE (
+    id UUID,
+    user_id UUID,
+    title VARCHAR(255),
+    description TEXT,
+    price DECIMAL(12,2),
+    currency VARCHAR(3),
+    category_id UUID,
+    condition VARCHAR(20),
+    quantity INTEGER,
+    location VARCHAR(255),
+    images JSONB,
+    accept_offers BOOLEAN,
+    status VARCHAR(20),
+    views_count INTEGER,
+    favorites_count INTEGER,
+    boost_until TIMESTAMP WITH TIME ZONE,
+    boost_score INTEGER,
+    highlight_until TIMESTAMP WITH TIME ZONE,
+    urgent_until TIMESTAMP WITH TIME ZONE,
+    spotlight_until TIMESTAMP WITH TIME ZONE,
+    spotlight_category_id UUID,
+    seo_title VARCHAR(300),
+    keywords TEXT[],
+    attributes JSONB,
+    created_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    category JSONB,
+    profile JSONB
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        l.id,
+        l.user_id,
+        l.title,
+        l.description,
+        l.price,
+        l.currency,
+        l.category_id,
+        l.condition,
+        l.quantity,
+        l.location,
+        l.images,
+        l.accept_offers,
+        l.status,
+        l.views_count,
+        l.favorites_count,
+        l.boost_until,
+        l.boost_score,
+        l.highlight_until,
+        l.urgent_until,
+        l.spotlight_until,
+        l.spotlight_category_id,
+        l.seo_title,
+        l.keywords,
+        l.attributes,
+        l.created_at,
+        l.updated_at,
+        jsonb_build_object(
+            'id', c.id,
+            'name', c.name,
+            'slug', c.slug,
+            'icon', c.icon,
+            'parent_id', c.parent_id,
+            'is_active', c.is_active,
+            'sort_order', c.sort_order
+        ) as category,
+        jsonb_build_object(
+            'id', p.id,
+            'first_name', p.first_name,
+            'last_name', p.last_name,
+            'full_name', p.full_name,
+            'username', p.username,
+            'avatar_url', p.avatar_url,
+            'location', p.location,
+            'rating', p.rating,
+            'total_sales', p.total_sales,
+            'is_verified', p.is_verified,
+            'is_online', p.is_online,
+            'last_seen', p.last_seen,
+            'response_time', p.response_time
+        ) as profile
+    FROM listings l
+    LEFT JOIN categories c ON l.category_id = c.id
+    LEFT JOIN profiles p ON l.user_id = p.id
+    WHERE 
+        (p_category_id IS NULL OR l.category_id = p_category_id)
+        AND (p_user_id IS NULL OR l.user_id = p_user_id)
+        AND l.status = p_status
+    ORDER BY l.created_at DESC
+    LIMIT p_limit
+    OFFSET p_offset;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get user transaction summary
+CREATE OR REPLACE FUNCTION get_user_transaction_summary(p_user_id UUID)
+RETURNS JSONB AS $$
+DECLARE
+    summary JSONB;
+    credit_stats RECORD;
+    transaction_stats RECORD;
+    recent_transactions JSONB;
+BEGIN
+    -- Get credit statistics
+    SELECT 
+        COALESCE(balance, 0) as current_balance,
+        COALESCE(lifetime_earned, 0) as total_earned,
+        COALESCE(lifetime_spent, 0) as total_spent
+    INTO credit_stats
+    FROM user_credits
+    WHERE user_id = p_user_id;
+    
+    -- Get transaction statistics
+    SELECT 
+        COUNT(*) as total_transactions,
+        COUNT(CASE WHEN type = 'earned' THEN 1 END) as earned_count,
+        COUNT(CASE WHEN type = 'spent' THEN 1 END) as spent_count,
+        COALESCE(SUM(CASE WHEN type = 'earned' THEN amount ELSE 0 END), 0) as total_earned_amount,
+        COALESCE(SUM(CASE WHEN type = 'spent' THEN amount ELSE 0 END), 0) as total_spent_amount
+    INTO transaction_stats
+    FROM credit_transactions
+    WHERE user_id = p_user_id;
+    
+    -- Get recent transactions (last 10)
+    SELECT jsonb_agg(
+        jsonb_build_object(
+            'id', id,
+            'type', type,
+            'amount', amount,
+            'balance_before', balance_before,
+            'balance_after', balance_after,
+            'reference_type', reference_type,
+            'reference_id', reference_id,
+            'metadata', metadata,
+            'created_at', created_at
+        ) ORDER BY created_at DESC
+    )
+    INTO recent_transactions
+    FROM (
+        SELECT *
+        FROM credit_transactions
+        WHERE user_id = p_user_id
+        ORDER BY created_at DESC
+        LIMIT 10
+    ) recent;
+    
+    -- Build summary
+    summary := jsonb_build_object(
+        'credits', jsonb_build_object(
+            'current_balance', COALESCE(credit_stats.current_balance, 0),
+            'lifetime_earned', COALESCE(credit_stats.total_earned, 0),
+            'lifetime_spent', COALESCE(credit_stats.total_spent, 0)
+        ),
+        'transactions', jsonb_build_object(
+            'total_count', COALESCE(transaction_stats.total_transactions, 0),
+            'earned_count', COALESCE(transaction_stats.earned_count, 0),
+            'spent_count', COALESCE(transaction_stats.spent_count, 0),
+            'total_earned_amount', COALESCE(transaction_stats.total_earned_amount, 0),
+            'total_spent_amount', COALESCE(transaction_stats.total_spent_amount, 0)
+        ),
+        'recent_transactions', COALESCE(recent_transactions, '[]'::jsonb)
+    );
+    
+    RETURN summary;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get user trust metrics
+CREATE OR REPLACE FUNCTION get_user_trust_metrics(p_user_id UUID)
+RETURNS JSONB AS $$
+DECLARE
+    trust_metrics JSONB;
+    profile_data RECORD;
+    verification_score INTEGER := 0;
+    activity_score INTEGER := 0;
+    reputation_score INTEGER := 0;
+    total_score INTEGER := 0;
+BEGIN
+    -- Get user profile data
+    SELECT 
+        is_verified,
+        verification_status,
+        rating,
+        total_sales,
+        total_reviews,
+        created_at
+    INTO profile_data
+    FROM profiles
+    WHERE id = p_user_id;
+    
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object(
+            'error', true,
+            'message', 'User not found'
+        );
+    END IF;
+    
+    -- Calculate verification score (0-30 points)
+    IF profile_data.is_verified THEN
+        verification_score := verification_score + 20;
+    END IF;
+    
+    IF profile_data.verification_status = 'verified' THEN
+        verification_score := verification_score + 10;
+    END IF;
+    
+    -- Calculate activity score (0-40 points)
+    activity_score := LEAST(40, profile_data.total_sales * 2);
+    
+    -- Calculate reputation score (0-30 points)
+    IF profile_data.rating > 0 THEN
+        reputation_score := LEAST(30, ROUND(profile_data.rating * 6)::INTEGER);
+    END IF;
+    
+    -- Calculate total trust score
+    total_score := verification_score + activity_score + reputation_score;
+    
+    -- Build trust metrics response
+    trust_metrics := jsonb_build_object(
+        'total_score', total_score,
+        'verification_score', verification_score,
+        'activity_score', activity_score,
+        'reputation_score', reputation_score,
+        'trust_level', CASE 
+            WHEN total_score >= 80 THEN 'excellent'
+            WHEN total_score >= 60 THEN 'good'
+            WHEN total_score >= 40 THEN 'fair'
+            WHEN total_score >= 20 THEN 'poor'
+            ELSE 'new'
+        END,
+        'metrics', jsonb_build_object(
+            'is_verified', profile_data.is_verified,
+            'verification_status', profile_data.verification_status,
+            'rating', profile_data.rating,
+            'total_sales', profile_data.total_sales,
+            'total_reviews', profile_data.total_reviews,
+            'account_age_days', EXTRACT(DAYS FROM (NOW() - profile_data.created_at))
+        )
+    );
+    
+    RETURN trust_metrics;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to initialize payment (fallback for Edge Function)
+CREATE OR REPLACE FUNCTION initialize_payment(
+    p_user_id UUID,
+    p_amount DECIMAL(10,2),
+    p_reference_type VARCHAR(50),
+    p_currency VARCHAR(3) DEFAULT 'GHS',
+    p_payment_method VARCHAR(50) DEFAULT 'mobile_money',
+    p_reference_id UUID DEFAULT NULL,
+    p_metadata JSONB DEFAULT '{}'::jsonb
+)
+RETURNS JSONB AS $$
+DECLARE
+    payment_id UUID;
+    payment_reference VARCHAR(100);
+    result JSONB;
+BEGIN
+    -- Generate payment ID and reference
+    payment_id := uuid_generate_v4();
+    payment_reference := 'PAY_' || UPPER(SUBSTRING(MD5(payment_id::TEXT || EXTRACT(EPOCH FROM NOW())::TEXT), 1, 12));
+    
+    -- Validate user exists
+    IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_user_id) THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error', 'User not found'
+        );
+    END IF;
+    
+    -- Validate amount
+    IF p_amount <= 0 THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error', 'Invalid amount'
+        );
+    END IF;
+    
+    -- Create payment record
+    BEGIN
+        INSERT INTO payments (
+            id,
+            user_id,
+            amount,
+            currency,
+            payment_method,
+            reference,
+            status,
+            reference_type,
+            reference_id,
+            metadata,
+            created_at,
+            updated_at
+        ) VALUES (
+            payment_id,
+            p_user_id,
+            p_amount,
+            p_currency,
+            p_payment_method,
+            payment_reference,
+            'pending',
+            p_reference_type,
+            p_reference_id,
+            p_metadata,
+            NOW(),
+            NOW()
+        );
+        
+        -- Build success response
+        result := jsonb_build_object(
+            'success', true,
+            'payment_id', payment_id,
+            'reference', payment_reference,
+            'amount', p_amount,
+            'currency', p_currency,
+            'payment_method', p_payment_method,
+            'status', 'pending',
+            'message', 'Payment initialized successfully'
+        );
+        
+        -- Add payment method specific instructions
+        CASE p_payment_method
+            WHEN 'mobile_money' THEN
+                result := result || jsonb_build_object(
+                    'instructions', 'Please complete payment using your mobile money service',
+                    'next_step', 'mobile_money_prompt',
+                    'provider_details', jsonb_build_object(
+                        'mtn', jsonb_build_object('code', '*170#', 'name', 'MTN Mobile Money'),
+                        'vodafone', jsonb_build_object('code', '*110#', 'name', 'Vodafone Cash'),
+                        'airteltigo', jsonb_build_object('code', '*185#', 'name', 'AirtelTigo Money')
+                    )
+                );
+            WHEN 'bank_transfer' THEN
+                result := result || jsonb_build_object(
+                    'instructions', 'Please transfer the amount to the provided bank details',
+                    'next_step', 'bank_details',
+                    'bank_details', jsonb_build_object(
+                        'account_name', 'Sellar Ghana Ltd',
+                        'account_number', '1234567890',
+                        'bank', 'GCB Bank',
+                        'branch', 'Accra Main'
+                    )
+                );
+            WHEN 'card' THEN
+                result := result || jsonb_build_object(
+                    'instructions', 'Please complete card payment',
+                    'next_step', 'card_form',
+                    'supported_cards', jsonb_build_array('visa', 'mastercard', 'verve')
+                );
+            ELSE
+                result := result || jsonb_build_object(
+                    'instructions', 'Please complete payment using the selected method',
+                    'next_step', 'payment_confirmation'
+                );
+        END CASE;
+        
+        RETURN result;
+        
+    EXCEPTION
+        WHEN OTHERS THEN
+            RETURN jsonb_build_object(
+                'success', false,
+                'error', 'Failed to initialize payment: ' || SQLERRM
+            );
+    END;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to process payment completion
+CREATE OR REPLACE FUNCTION complete_payment(
+    p_payment_id UUID,
+    p_transaction_reference VARCHAR(255),
+    p_status VARCHAR(50) DEFAULT 'completed',
+    p_gateway_response JSONB DEFAULT '{}'::jsonb
+)
+RETURNS JSONB AS $$
+DECLARE
+    payment_record RECORD;
+    result JSONB;
+BEGIN
+    -- Get payment record
+    SELECT * INTO payment_record
+    FROM payments
+    WHERE id = p_payment_id;
+    
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error', 'Payment not found'
+        );
+    END IF;
+    
+    -- Check if payment is already processed
+    IF payment_record.status != 'pending' THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error', 'Payment already processed',
+            'current_status', payment_record.status
+        );
+    END IF;
+    
+    -- Update payment status
+    UPDATE payments
+    SET 
+        status = p_status,
+        transaction_reference = p_transaction_reference,
+        gateway_response = p_gateway_response,
+        completed_at = CASE WHEN p_status = 'completed' THEN NOW() ELSE NULL END,
+        updated_at = NOW()
+    WHERE id = p_payment_id;
+    
+    -- Process successful payment
+    IF p_status = 'completed' THEN
+        -- Handle different reference types
+        CASE payment_record.reference_type
+            WHEN 'credit_purchase' THEN
+                -- Award credits to user
+                PERFORM award_credits_from_payment(payment_record.user_id, payment_record.amount, p_payment_id);
+            WHEN 'subscription' THEN
+                -- Log subscription payment (subscription activation handled elsewhere)
+                RAISE NOTICE 'Subscription payment completed for user %', payment_record.user_id;
+            WHEN 'feature_purchase' THEN
+                -- Log feature payment (feature activation handled elsewhere)
+                RAISE NOTICE 'Feature payment completed for user %', payment_record.user_id;
+            ELSE
+                -- Log unknown reference type
+                RAISE NOTICE 'Unknown payment reference type: %', payment_record.reference_type;
+        END CASE;
+    END IF;
+    
+    RETURN jsonb_build_object(
+        'success', true,
+        'payment_id', p_payment_id,
+        'status', p_status,
+        'message', 'Payment processed successfully'
+    );
+    
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error', 'Failed to process payment: ' || SQLERRM
+        );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Helper function to award credits from payment
+CREATE OR REPLACE FUNCTION award_credits_from_payment(
+    p_user_id UUID,
+    p_amount DECIMAL(10,2),
+    p_payment_id UUID
+)
+RETURNS VOID AS $$
+DECLARE
+    credits_to_award INTEGER;
+    current_balance INTEGER;
+BEGIN
+    -- Calculate credits based on amount (1 GHS = 10 credits)
+    credits_to_award := (p_amount * 10)::INTEGER;
+    
+    -- Get current balance
+    SELECT COALESCE(balance, 0) INTO current_balance
+    FROM user_credits WHERE user_id = p_user_id;
+    
+    -- Create credits record if it doesn't exist
+    INSERT INTO user_credits (user_id, balance, lifetime_earned, lifetime_spent)
+    VALUES (p_user_id, 0, 0, 0)
+    ON CONFLICT (user_id) DO NOTHING;
+    
+    -- Award credits
+    UPDATE user_credits
+    SET 
+        balance = balance + credits_to_award,
+        lifetime_earned = lifetime_earned + credits_to_award,
+        updated_at = NOW()
+    WHERE user_id = p_user_id;
+    
+    -- Log transaction
+    INSERT INTO credit_transactions (
+        user_id, type, amount, balance_before, balance_after,
+        reference_id, reference_type, metadata
+    )
+    VALUES (
+        p_user_id, 'earned', credits_to_award, current_balance, current_balance + credits_to_award,
+        p_payment_id, 'payment_purchase',
+        jsonb_build_object('payment_amount', p_amount, 'conversion_rate', 10)
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to generate unique ticket number
+CREATE OR REPLACE FUNCTION generate_ticket_number()
+RETURNS VARCHAR(20) AS $$
+DECLARE
+    new_ticket_number VARCHAR(20);
+    counter INTEGER;
+    date_prefix VARCHAR(8);
+BEGIN
+    -- Generate date prefix (YYYYMMDD)
+    date_prefix := TO_CHAR(NOW(), 'YYYYMMDD');
+    
+    -- Get count of tickets created today
+    SELECT COUNT(*) + 1 INTO counter
+    FROM support_tickets
+    WHERE DATE(created_at) = CURRENT_DATE;
+    
+    -- Generate ticket number: TKT-YYYYMMDD-XXXX
+    new_ticket_number := 'TKT-' || date_prefix || '-' || LPAD(counter::TEXT, 4, '0');
+    
+    -- Ensure uniqueness (in case of race conditions)
+    WHILE EXISTS (SELECT 1 FROM support_tickets WHERE support_tickets.ticket_number = new_ticket_number) LOOP
+        counter := counter + 1;
+        new_ticket_number := 'TKT-' || date_prefix || '-' || LPAD(counter::TEXT, 4, '0');
+    END LOOP;
+    
+    RETURN new_ticket_number;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to create support ticket
+CREATE OR REPLACE FUNCTION create_support_ticket(
+    p_user_id UUID,
+    p_subject VARCHAR(255),
+    p_description TEXT,
+    p_category VARCHAR(50),
+    p_priority VARCHAR(20) DEFAULT 'medium',
+    p_attachments JSONB DEFAULT '[]'::jsonb,
+    p_metadata JSONB DEFAULT '{}'::jsonb,
+    p_app_version VARCHAR(20) DEFAULT NULL,
+    p_device_info JSONB DEFAULT '{}'::jsonb
+)
+RETURNS JSONB AS $$
+DECLARE
+    ticket_id UUID;
+    generated_ticket_number VARCHAR(20);
+    result JSONB;
+BEGIN
+    -- Validate user exists
+    IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_user_id) THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error', 'User not found'
+        );
+    END IF;
+    
+    -- Validate category
+    IF p_category NOT IN ('technical', 'billing', 'account', 'feature_request', 'bug_report', 'general') THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error', 'Invalid category'
+        );
+    END IF;
+    
+    -- Validate priority
+    IF p_priority NOT IN ('low', 'medium', 'high', 'urgent') THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error', 'Invalid priority'
+        );
+    END IF;
+    
+    -- Generate ticket number
+    generated_ticket_number := generate_ticket_number();
+    
+    -- Create ticket
+    BEGIN
+        INSERT INTO support_tickets (
+            user_id,
+            subject,
+            description,
+            category,
+            priority,
+            status,
+            attachments,
+            metadata,
+            app_version,
+            device_info,
+            ticket_number,
+            created_at,
+            updated_at
+        ) VALUES (
+            p_user_id,
+            p_subject,
+            p_description,
+            p_category,
+            p_priority,
+            'open',
+            p_attachments,
+            p_metadata,
+            p_app_version,
+            p_device_info,
+            generated_ticket_number,
+            NOW(),
+            NOW()
+        ) RETURNING id INTO ticket_id;
+        
+        -- Create initial message
+        INSERT INTO support_ticket_messages (
+            ticket_id,
+            user_id,
+            message,
+            is_staff_response,
+            attachments,
+            created_at
+        ) VALUES (
+            ticket_id,
+            p_user_id,
+            p_description,
+            false,
+            p_attachments,
+            NOW()
+        );
+        
+        -- Build success response
+        result := jsonb_build_object(
+            'success', true,
+            'ticket_id', ticket_id,
+            'ticket_number', generated_ticket_number,
+            'status', 'open',
+            'message', 'Support ticket created successfully'
+        );
+        
+        RETURN result;
+        
+    EXCEPTION
+        WHEN OTHERS THEN
+            RETURN jsonb_build_object(
+                'success', false,
+                'error', 'Failed to create support ticket: ' || SQLERRM
+            );
+    END;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get user support tickets
+CREATE OR REPLACE FUNCTION get_user_support_tickets(
+    p_user_id UUID,
+    p_status VARCHAR(20) DEFAULT NULL,
+    p_limit INTEGER DEFAULT 20,
+    p_offset INTEGER DEFAULT 0
+)
+RETURNS TABLE (
+    id UUID,
+    subject VARCHAR(255),
+    description TEXT,
+    category VARCHAR(50),
+    priority VARCHAR(20),
+    status VARCHAR(20),
+    ticket_number VARCHAR(20),
+    assigned_to_name TEXT,
+    message_count INTEGER,
+    last_message_at TIMESTAMP WITH TIME ZONE,
+    app_version VARCHAR(20),
+    created_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    resolved_at TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        st.id,
+        st.subject,
+        st.description,
+        st.category,
+        st.priority,
+        st.status,
+        st.ticket_number,
+        COALESCE(p.first_name || ' ' || p.last_name, 'Unassigned') as assigned_to_name,
+        (
+            SELECT COUNT(*)::INTEGER 
+            FROM support_ticket_messages stm 
+            WHERE stm.ticket_id = st.id
+        ) as message_count,
+        (
+            SELECT MAX(stm.created_at) 
+            FROM support_ticket_messages stm 
+            WHERE stm.ticket_id = st.id
+        ) as last_message_at,
+        st.app_version,
+        st.created_at,
+        st.updated_at,
+        st.resolved_at
+    FROM support_tickets st
+    LEFT JOIN profiles p ON st.assigned_to = p.id
+    WHERE st.user_id = p_user_id
+    AND (p_status IS NULL OR st.status = p_status)
+    ORDER BY st.created_at DESC
+    LIMIT p_limit OFFSET p_offset;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to add message to support ticket
+CREATE OR REPLACE FUNCTION add_support_ticket_message(
+    p_ticket_id UUID,
+    p_user_id UUID,
+    p_message TEXT,
+    p_is_staff_response BOOLEAN DEFAULT false,
+    p_attachments JSONB DEFAULT '[]'::jsonb
+)
+RETURNS JSONB AS $$
+DECLARE
+    message_id UUID;
+    ticket_exists BOOLEAN;
+BEGIN
+    -- Check if ticket exists and user has access
+    SELECT EXISTS(
+        SELECT 1 FROM support_tickets 
+        WHERE id = p_ticket_id 
+        AND (user_id = p_user_id OR p_is_staff_response = true)
+    ) INTO ticket_exists;
+    
+    IF NOT ticket_exists THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error', 'Ticket not found or access denied'
+        );
+    END IF;
+    
+    -- Add message
+    BEGIN
+        INSERT INTO support_ticket_messages (
+            ticket_id,
+            user_id,
+            message,
+            is_staff_response,
+            attachments,
+            created_at
+        ) VALUES (
+            p_ticket_id,
+            p_user_id,
+            p_message,
+            p_is_staff_response,
+            p_attachments,
+            NOW()
+        ) RETURNING id INTO message_id;
+        
+        -- Update ticket timestamp
+        UPDATE support_tickets 
+        SET updated_at = NOW()
+        WHERE id = p_ticket_id;
+        
+        RETURN jsonb_build_object(
+            'success', true,
+            'message_id', message_id,
+            'message', 'Message added successfully'
+        );
+        
+    EXCEPTION
+        WHEN OTHERS THEN
+            RETURN jsonb_build_object(
+                'success', false,
+                'error', 'Failed to add message: ' || SQLERRM
+            );
+    END;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to fix existing users who don't have profiles
+CREATE OR REPLACE FUNCTION fix_missing_user_profiles()
+RETURNS TABLE (
+    user_id UUID,
+    email TEXT,
+    status TEXT,
+    message TEXT
+) AS $$
+DECLARE
+    auth_user RECORD;
+    result_status TEXT;
+    result_message TEXT;
+BEGIN
+    -- Loop through all authenticated users who don't have profiles
+    FOR auth_user IN 
+        SELECT au.* 
+        FROM auth.users au 
+        LEFT JOIN profiles p ON au.id = p.id 
+        WHERE p.id IS NULL
+    LOOP
+        BEGIN
+            -- Use the ensure_user_profile function to create the profile
+            PERFORM ensure_user_profile(auth_user.id);
+            
+            result_status := 'SUCCESS';
+            result_message := 'Profile created successfully';
+            
+        EXCEPTION
+            WHEN OTHERS THEN
+                result_status := 'ERROR';
+                result_message := SQLERRM;
+        END;
+        
+        -- Return the result for this user
+        RETURN QUERY SELECT 
+            auth_user.id,
+            auth_user.email,
+            result_status,
+            result_message;
+    END LOOP;
+    
+    RETURN;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

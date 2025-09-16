@@ -132,7 +132,7 @@ export default function TermsOfServiceScreen() {
             • Starter: 50 credits for GHS 10{'\n'}
             • Seller: 120 credits for GHS 20{'\n'}
             • Pro: 300 credits for GHS 50{'\n'}
-            • Business: 650 credits for GHS 100{'\n'}
+            • Max: 700 credits for GHS 100{'\n'}
             • Credits are non-refundable once purchased
           </Text>
 
@@ -219,10 +219,11 @@ export default function TermsOfServiceScreen() {
           </Text>
           <Text variant="body" style={{ marginBottom: theme.spacing.xl, lineHeight: 22 }}>
             For questions about these Terms:{'\n\n'}
-            Email: legal@sellar.gh{'\n'}
-            Address: Sellar Technologies Ltd., Accra, Ghana{'\n'}
-            Phone: +233 (0) 123 456 789{'\n'}
-            Customer Support: support@sellar.gh
+            Email: legal@sellarghana.com{'\n'}
+            Address: Sellar Group Ltd., Kumasi, Ghana{'\n'}
+            Phone: +233 (0) 243 887 777{'\n'}
+            WhatsApp: +233 (0) 244 857 777{'\n'}
+            Customer Support: support@sellarghana.com
           </Text>
 
           {/* Acknowledgment */}

@@ -189,10 +189,11 @@ export default function PrivacyPolicyScreen() {
             For privacy-related questions or to exercise your rights:
           </Text>
           <Text variant="body" style={{ marginBottom: theme.spacing.xl, lineHeight: 22 }}>
-            Email: privacy@sellar.gh{'\n'}
-            Address: Sellar Technologies Ltd., Accra, Ghana{'\n'}
-            Phone: +233 (0) 123 456 789{'\n'}
-            Data Protection Officer: dpo@sellar.gh
+            Email: privacy@sellarghana.com{'\n'}
+            Address: Sellar Group Ltd., Kumasi, Ghana{'\n'}
+            Phone: +233 (0) 243 887 777{'\n'}
+            WhatsApp: +233 (0) 244 857 777{'\n'}
+            Data Protection Officer: dpo@sellarghana.com
           </Text>
 
           {/* Ghana Compliance */}

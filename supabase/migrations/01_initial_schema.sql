@@ -76,6 +76,10 @@ CREATE TABLE profiles (
     referral_code VARCHAR(50), -- Code used when signing up (if any)
     referred_by UUID REFERENCES profiles(id), -- Who referred this user
     
+    -- Onboarding tracking
+    onboarding_completed BOOLEAN DEFAULT false,
+    onboarding_completed_at TIMESTAMP WITH TIME ZONE,
+    
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -92,7 +96,7 @@ CREATE TABLE listings (
     description TEXT NOT NULL,
     price DECIMAL(12,2) NOT NULL CHECK (price >= 0),
     currency VARCHAR(3) DEFAULT 'GHS',
-    category_id UUID NOT NULL REFERENCES categories(id),
+    category_id UUID NOT NULL,
     condition VARCHAR(20) NOT NULL CHECK (condition IN ('new', 'like_new', 'good', 'fair', 'poor')),
     quantity INTEGER DEFAULT 1 CHECK (quantity > 0),
     location VARCHAR(255) NOT NULL,
@@ -106,7 +110,7 @@ CREATE TABLE listings (
     highlight_until TIMESTAMP WITH TIME ZONE,
     urgent_until TIMESTAMP WITH TIME ZONE,
     spotlight_until TIMESTAMP WITH TIME ZONE,
-    spotlight_category_id UUID REFERENCES categories(id),
+    spotlight_category_id UUID,
     
     -- SEO and search optimization
     seo_title VARCHAR(300),
@@ -114,7 +118,8 @@ CREATE TABLE listings (
     attributes JSONB DEFAULT '{}',
     
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT listings_category_id_fkey FOREIGN KEY (category_id) REFERENCES categories(id)
 );
 
 -- Listing views tracking
@@ -269,8 +274,8 @@ CREATE TABLE follows (
 -- Reviews system
 CREATE TABLE reviews (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    reviewer_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-    reviewed_user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    reviewer_id UUID NOT NULL,
+    reviewed_user_id UUID NOT NULL,
     listing_id UUID REFERENCES listings(id) ON DELETE SET NULL,
     transaction_id UUID, -- Will reference transactions table
     rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
@@ -279,7 +284,9 @@ CREATE TABLE reviews (
     helpful_count INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(reviewer_id, reviewed_user_id, listing_id)
+    UNIQUE(reviewer_id, reviewed_user_id, listing_id),
+    CONSTRAINT reviews_reviewer_fkey FOREIGN KEY (reviewer_id) REFERENCES profiles(id) ON DELETE CASCADE,
+    CONSTRAINT reviews_reviewed_user_fkey FOREIGN KEY (reviewed_user_id) REFERENCES profiles(id) ON DELETE CASCADE
 );
 
 -- =============================================
@@ -407,6 +414,7 @@ CREATE TABLE community_rewards (
     points INTEGER NOT NULL,
     description TEXT NOT NULL,
     metadata JSONB DEFAULT '{}',
+    is_validated BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -578,6 +586,61 @@ CREATE TABLE app_settings (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Support tickets system
+CREATE TABLE support_tickets (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    subject VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    category VARCHAR(50) NOT NULL CHECK (category IN ('technical', 'billing', 'account', 'feature_request', 'bug_report', 'general')),
+    priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
+    status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'waiting_response', 'resolved', 'closed')),
+    assigned_to UUID REFERENCES profiles(id) ON DELETE SET NULL,
+    attachments JSONB DEFAULT '[]',
+    metadata JSONB DEFAULT '{}',
+    app_version VARCHAR(20),
+    device_info JSONB DEFAULT '{}',
+    ticket_number VARCHAR(20) UNIQUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    resolved_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Support ticket responses/messages
+CREATE TABLE support_ticket_messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ticket_id UUID NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    message TEXT NOT NULL,
+    is_staff_response BOOLEAN DEFAULT false,
+    attachments JSONB DEFAULT '[]',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- =============================================
+-- VIEWS FOR SIMPLIFIED QUERIES
+-- =============================================
+
+-- View for listings with main category (resolves ambiguous relationship)
+CREATE VIEW listings_with_category AS
+SELECT 
+    l.*,
+    c.name as category_name,
+    c.slug as category_slug,
+    c.icon as category_icon
+FROM listings l
+LEFT JOIN categories c ON l.category_id = c.id;
+
+-- View for listings with spotlight category
+CREATE VIEW listings_with_spotlight_category AS
+SELECT 
+    l.*,
+    c.name as spotlight_category_name,
+    c.slug as spotlight_category_slug,
+    c.icon as spotlight_category_icon
+FROM listings l
+LEFT JOIN categories c ON l.spotlight_category_id = c.id;
 
 -- =============================================
 -- INDEXES FOR PERFORMANCE
@@ -821,6 +884,18 @@ CREATE INDEX idx_subscription_change_log_user_id ON subscription_change_log(user
 CREATE INDEX idx_subscription_change_log_subscription_id ON subscription_change_log(subscription_id);
 CREATE INDEX idx_subscription_change_log_change_type ON subscription_change_log(change_type);
 CREATE INDEX idx_subscription_change_log_created_at ON subscription_change_log(created_at);
+
+-- Support tickets indexes
+CREATE INDEX idx_support_tickets_user_id ON support_tickets(user_id);
+CREATE INDEX idx_support_tickets_status ON support_tickets(status);
+CREATE INDEX idx_support_tickets_category ON support_tickets(category);
+CREATE INDEX idx_support_tickets_priority ON support_tickets(priority);
+CREATE INDEX idx_support_tickets_assigned_to ON support_tickets(assigned_to);
+CREATE INDEX idx_support_tickets_created_at ON support_tickets(created_at);
+CREATE INDEX idx_support_tickets_app_version ON support_tickets(app_version);
+CREATE INDEX idx_support_tickets_ticket_number ON support_tickets(ticket_number);
+CREATE INDEX idx_support_ticket_messages_ticket_id ON support_ticket_messages(ticket_id);
+CREATE INDEX idx_support_ticket_messages_user_id ON support_ticket_messages(user_id);
 
 -- =============================================
 -- STORAGE BUCKETS SETUP

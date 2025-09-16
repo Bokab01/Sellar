@@ -455,10 +455,10 @@ class NetworkUtilsService {
     try {
       const result = await this.adaptiveRequest(
         async () => {
-          const { data: urlData } = supabase.storage
-            .from('listing-images')
-            .getPublicUrl('test-connection.jpg');
-          
+      const { data: urlData } = supabase.storage
+        .from('listing-images')
+        .getPublicUrl('test-connection.jpg');
+      
           return !!urlData.publicUrl;
         },
         { priority: 'low', timeout: 5000, retries: 2 }
@@ -476,10 +476,10 @@ class NetworkUtilsService {
     try {
       const result = await this.adaptiveRequest(
         async () => {
-          const { data: urlData } = supabase.storage
-            .from(bucketName)
-            .getPublicUrl('test-access.jpg');
-          
+      const { data: urlData } = supabase.storage
+        .from(bucketName)
+        .getPublicUrl('test-access.jpg');
+      
           return !!urlData.publicUrl;
         },
         { priority: 'low', timeout: 5000, retries: 2 }
