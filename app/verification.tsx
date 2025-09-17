@@ -183,14 +183,14 @@ export default function VerificationScreen() {
                 marginBottom: theme.spacing.md,
               }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Award size={24} color={getTrustScoreColor(status.trust_score)} />
+                  <Award size={24} color={getTrustScoreColor(status.trust_score || 0)} />
                   <Text variant="h3" style={{ marginLeft: theme.spacing.sm }}>
                     Trust Score
                   </Text>
                 </View>
                 <Badge 
-                  text={getTrustScoreLabel(status.trust_score)} 
-                  variant={status.trust_score >= 70 ? 'success' : status.trust_score >= 50 ? 'warning' : 'error'}
+                  text={getTrustScoreLabel(status.trust_score || 0)} 
+                  variant={(status.trust_score || 0) >= 70 ? 'success' : (status.trust_score || 0) >= 50 ? 'warning' : 'error'}
                 />
               </View>
 
@@ -200,10 +200,10 @@ export default function VerificationScreen() {
                 marginBottom: theme.spacing.sm,
               }}>
                 <Text variant="h1" style={{ 
-                  color: getTrustScoreColor(status.trust_score),
+                  color: getTrustScoreColor(status.trust_score || 0),
                   marginRight: theme.spacing.sm,
                 }}>
-                  {status.trust_score}
+                  {status.trust_score || 0}
                 </Text>
                 <Text variant="body" color="secondary">
                   / 100
@@ -215,14 +215,14 @@ export default function VerificationScreen() {
               </Text>
 
               {/* Verification Badges */}
-              {status.verification_badges.length > 0 && (
+              {status.verification_badges && status.verification_badges.length > 0 && (
                 <View style={{
                   flexDirection: 'row',
                   flexWrap: 'wrap',
                   gap: theme.spacing.sm,
                   marginTop: theme.spacing.md,
                 }}>
-                  {status.verification_badges.map((badge) => (
+                  {status.verification_badges?.map((badge) => (
                     <Badge
                       key={badge}
                       text={badge.replace('_', ' ').toUpperCase()}

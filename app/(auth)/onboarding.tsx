@@ -321,24 +321,24 @@ export default function OnboardingScreen() {
         onClose={() => setShowSignUpModal(false)}
         title="Join Sellar"
         position="bottom"
-        size="lg"
+        size="md"
         showCloseButton={true}
         dismissOnBackdrop={true}
       >
-        <View style={{ padding: theme.spacing.lg }}>
+        <View style={{ padding: theme.spacing.md }}>
 
           {/* Auth Options */}
-          <View style={{ gap: theme.spacing.md }}>
+          <View style={{ gap: theme.spacing.sm }}>
             {/* Google Auth */}
             <Button
               variant="tertiary"
               onPress={handleGoogleAuth}
               fullWidth
-              size="lg"
+              size="md"
               style={{
                 borderColor: theme.colors.border,
                 borderWidth: 1,
-                paddingVertical: theme.spacing.lg,
+                paddingVertical: theme.spacing.md,
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -378,11 +378,11 @@ export default function OnboardingScreen() {
               variant="tertiary"
               onPress={handleFacebookAuth}
               fullWidth
-              size="lg"
+              size="md"
               style={{
                 borderColor: theme.colors.border,
                 borderWidth: 1,
-                paddingVertical: theme.spacing.lg,
+                paddingVertical: theme.spacing.md,
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -421,7 +421,7 @@ export default function OnboardingScreen() {
             <View style={{
               flexDirection: 'row',
               alignItems: 'center',
-              marginVertical: theme.spacing.lg,
+              marginVertical: theme.spacing.md,
             }}>
               <View style={{
                 flex: 1,
@@ -450,9 +450,9 @@ export default function OnboardingScreen() {
               variant="ghost"
               onPress={handleEmailSignUp}
               fullWidth
-              size="lg"
+              size="md"
               style={{
-                paddingVertical: theme.spacing.lg,
+                paddingVertical: theme.spacing.md,
               }}
             >
               <Text 
@@ -469,7 +469,7 @@ export default function OnboardingScreen() {
           </View>
 
           {/* Bottom Spacer */}
-          <View style={{ height: theme.spacing.lg }} />
+          <View style={{ height: theme.spacing.sm }} />
         </View>
       </AppModal>
 
@@ -479,24 +479,24 @@ export default function OnboardingScreen() {
         onClose={() => setShowSignInModal(false)}
         title="Log in to Sellar"
         position="bottom"
-        size="lg"
+        size="md"
         showCloseButton={true}
         dismissOnBackdrop={true}
       >
-        <View style={{ padding: theme.spacing.lg }}>
+        <View style={{ padding: theme.spacing.md }}>
 
           {/* Auth Options */}
-          <View style={{ gap: theme.spacing.md }}>
+          <View style={{ gap: theme.spacing.sm }}>
             {/* Google Auth */}
             <Button
               variant="tertiary"
               onPress={handleGoogleAuth}
               fullWidth
-              size="lg"
+              size="md"
               style={{
                 borderColor: theme.colors.border,
                 borderWidth: 1,
-                paddingVertical: theme.spacing.lg,
+                paddingVertical: theme.spacing.md,
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -538,11 +538,11 @@ export default function OnboardingScreen() {
               variant="tertiary"
               onPress={handleFacebookAuth}
               fullWidth
-              size="lg"
+              size="md"
               style={{
                 borderColor: theme.colors.border,
                 borderWidth: 1,
-                paddingVertical: theme.spacing.lg,
+                paddingVertical: theme.spacing.md,
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -581,7 +581,7 @@ export default function OnboardingScreen() {
             <View style={{
               flexDirection: 'row',
               alignItems: 'center',
-              marginVertical: theme.spacing.lg,
+              marginVertical: theme.spacing.sm,
             }}>
               <View style={{
                 flex: 1,
@@ -592,7 +592,7 @@ export default function OnboardingScreen() {
                 variant="bodySmall" 
                 color="muted"
                 style={{ 
-                  marginHorizontal: theme.spacing.md,
+                  marginHorizontal: theme.spacing.sm,
                   fontSize: 14
                 }}
               >
@@ -610,17 +610,16 @@ export default function OnboardingScreen() {
               variant="ghost"
               onPress={handleEmailSignIn}
               fullWidth
-              size="lg"
+              size="md"
               style={{
-                paddingVertical: theme.spacing.lg,
+                paddingVertical: theme.spacing.md,
               }}
             >
               <Text 
-                variant="body" 
+                variant="bodySmall" 
                 style={{ 
                   color: theme.colors.primary,
                   fontWeight: '600',
-                  fontSize: 16
                 }}
               >
                 Continue with email
@@ -629,7 +628,7 @@ export default function OnboardingScreen() {
           </View>
 
           {/* Bottom Spacer */}
-          <View style={{ height: theme.spacing.lg }} />
+          <View style={{ height: theme.spacing.sm }} />
         </View>
       </AppModal>
     </SafeAreaWrapper>

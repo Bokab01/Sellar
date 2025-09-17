@@ -150,7 +150,7 @@ class AnalyticsService {
         conversations (count),
         offers (count)
       `)
-      .eq('seller_id', userId);
+      .eq('user_id', userId);
 
     if (error) throw error;
 
@@ -177,7 +177,7 @@ class AnalyticsService {
     const { data: userListings, error: listingsError } = await supabase
       .from('listings')
       .select('id')
-      .eq('seller_id', userId);
+      .eq('user_id', userId);
 
     if (listingsError) throw listingsError;
 
@@ -199,7 +199,7 @@ class AnalyticsService {
       .from('listing_views')
       .select('id', { count: 'exact' })
       .in('listing_id', listingIds)
-      .gte('viewed_at', oneWeekAgo.toISOString());
+      .gte('created_at', oneWeekAgo.toISOString());
 
     if (weekError) throw weekError;
 
@@ -211,8 +211,8 @@ class AnalyticsService {
       .from('listing_views')
       .select('id', { count: 'exact' })
       .in('listing_id', listingIds)
-      .gte('viewed_at', twoWeeksAgo.toISOString())
-      .lt('viewed_at', oneWeekAgo.toISOString());
+      .gte('created_at', twoWeeksAgo.toISOString())
+      .lt('created_at', oneWeekAgo.toISOString());
 
     if (lastWeekError) throw lastWeekError;
 
@@ -232,10 +232,10 @@ class AnalyticsService {
         created_at,
         sender_id,
         conversation:conversations!inner(
-          listing:listings!inner(seller_id)
+          listing:listings!inner(user_id)
         )
       `)
-      .eq('conversation.listing.seller_id', userId);
+      .eq('conversation.listing.user_id', userId);
 
     if (error) throw error;
 
@@ -268,7 +268,7 @@ class AnalyticsService {
     const { data: userListings, error: listingsError } = await supabase
       .from('listings')
       .select('id')
-      .eq('seller_id', userId);
+      .eq('user_id', userId);
 
     if (listingsError) throw listingsError;
 
@@ -305,7 +305,7 @@ class AnalyticsService {
     const { data: userListings, error: listingsError } = await supabase
       .from('listings')
       .select('id')
-      .eq('seller_id', userId);
+      .eq('user_id', userId);
 
     if (listingsError) throw listingsError;
 
@@ -322,8 +322,8 @@ class AnalyticsService {
         .from('listing_views')
         .select('id', { count: 'exact' })
         .in('listing_id', listingIds)
-        .gte('viewed_at', `${dateStr}T00:00:00.000Z`)
-        .lt('viewed_at', `${dateStr}T23:59:59.999Z`);
+        .gte('created_at', `${dateStr}T00:00:00.000Z`)
+        .lt('created_at', `${dateStr}T23:59:59.999Z`);
 
       // Get conversation IDs for user's listings
       const { data: conversations, error: conversationsError } = await supabase
@@ -360,7 +360,7 @@ class AnalyticsService {
         listing_views(count),
         conversations(count)
       `)
-      .eq('seller_id', userId);
+      .eq('user_id', userId);
 
     if (error) throw error;
 

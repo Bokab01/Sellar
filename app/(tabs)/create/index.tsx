@@ -285,25 +285,30 @@ export default function CreateListingScreen() {
       return newData;
     });
     
-    // Trigger validation and autosave separately to avoid re-render issues
-    setHasUnsavedChanges(true);
-    
-    // Clear existing timeout
-    if (autosaveTimeoutRef.current) {
-      clearTimeout(autosaveTimeoutRef.current);
-    }
-    
-    // Set new timeout for autosave
-    autosaveTimeoutRef.current = setTimeout(() => {
-      const currentData = formDataRef.current;
-      saveDraft(currentData);
-    }, 2000) as any;
-    
-    // Debounced validation
-    setIsValidating(true);
-    debouncedValidator.current(currentStep, formDataRef.current, (result) => {
-      setValidationResults(prev => ({ ...prev, [currentStep]: result }));
-      setIsValidating(false);
+    // Use React's automatic batching for state updates
+    React.startTransition(() => {
+      setHasUnsavedChanges(true);
+      
+      // Clear existing timeout
+      if (autosaveTimeoutRef.current) {
+        clearTimeout(autosaveTimeoutRef.current);
+      }
+      
+      // Set new timeout for autosave
+      autosaveTimeoutRef.current = setTimeout(() => {
+        const currentData = formDataRef.current;
+        saveDraft(currentData);
+      }, 2000) as any;
+      
+      // Debounced validation with proper async handling
+      setIsValidating(true);
+      debouncedValidator.current(currentStep, formDataRef.current, (result) => {
+        // Use startTransition to avoid scheduling updates during render
+        React.startTransition(() => {
+          setValidationResults(prev => ({ ...prev, [currentStep]: result }));
+          setIsValidating(false);
+        });
+      });
     });
   }, [currentStep, saveDraft]);
 
@@ -451,6 +456,14 @@ export default function CreateListingScreen() {
         'decor': '00000000-0000-4000-8000-000000000004',
         'garden': '00000000-0000-4000-8000-000000000004',
         'tools': '00000000-0000-4000-8000-000000000004',
+        
+        // Furniture subcategories (missing ones that were causing the error)
+        'living-room': '00000000-0000-4000-8000-000000000004',
+        'bedroom': '00000000-0000-4000-8000-000000000004',
+        'dining-room': '00000000-0000-4000-8000-000000000004',
+        'office-furniture': '00000000-0000-4000-8000-000000000004',
+        'kitchen-furniture': '00000000-0000-4000-8000-000000000004',
+        'outdoor-furniture': '00000000-0000-4000-8000-000000000004',
         
         // Health & Sports subcategories
         'fitness': '00000000-0000-4000-8000-000000000005',

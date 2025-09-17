@@ -1,64 +1,47 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { router } from 'expo-router';
 import { Text } from '@/components/Typography/Text';
-import { SafeAreaWrapper, Container } from '@/components/Layout';
+import { SafeAreaWrapper } from '@/components/Layout';
 import { AppHeader } from '@/components/AppHeader/AppHeader';
-import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
-import { EmptyState } from '@/components/EmptyState/EmptyState';
-import { Badge } from '@/components/Badge/Badge';
-import { Button } from '@/components/Button/Button';
 import { 
   BarChart3, 
   Zap, 
   HeadphonesIcon,
-  Crown,
-  TrendingUp,
-  Settings,
-  Users,
-  MessageSquare,
-  Star,
-  ArrowUpRight,
-  Lock,
-  ArrowUpRight as Upgrade,
-  PhoneCall
+  TrendingUp
 } from 'lucide-react-native';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { useAuth } from '@/hooks/useAuth';
-import { useBusinessFeatures } from '@/hooks/useBusinessFeatures';
 import { useAnalytics, type QuickStats, type AnalyticsData } from '@/lib/analyticsService';
 
-// Import dashboard components with direct imports to avoid circular dependencies
-import { AnalyticsDashboard } from '@/components/AnalyticsDashboard/AnalyticsDashboard';
-import { AutoBoostDashboard } from '@/components/AutoBoostDashboard/AutoBoostDashboard';
-import { PrioritySupportDashboard } from '@/components/PrioritySupportDashboard/PrioritySupportDashboard';
-import { PremiumFeaturesDashboard } from '@/components/PremiumFeaturesDashboard/PremiumFeaturesDashboard';
+// Import dashboard components
+import { 
+  BusinessOverview, 
+  BusinessBoostManager, 
+  BusinessAnalytics, 
+  BusinessSupport, 
+  FreeUserDashboard 
+} from '@/components/Dashboard';
 
-type DashboardTab = 'overview' | 'analytics' | 'autoboost' | 'support' | 'premium';
+type DashboardTab = 'overview' | 'boost' | 'analytics' | 'support';
 
 interface TabConfig {
   id: DashboardTab;
   label: string;
   icon: (color: string) => React.ReactNode;
-  requiredTier: 'business' | 'free';
-  badge?: string;
 }
 
 export default function BusinessDashboardScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
-  // Use selective subscriptions to prevent unnecessary re-renders
   const currentSubscription = useMonetizationStore(state => state.currentSubscription);
-  const refreshSubscription = useMonetizationStore(state => state.refreshSubscription);
-  
-  // Use simplified business features hook
-  const businessFeatures = useBusinessFeatures();
+  const hasBusinessPlan = useMonetizationStore(state => state.hasBusinessPlan);
   const { getQuickStats, getBusinessAnalytics } = useAnalytics();
 
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
   const [quickStats, setQuickStats] = useState<QuickStats>({
     profileViews: 0,
     totalMessages: 0,
@@ -67,765 +50,232 @@ export default function BusinessDashboardScreen() {
   });
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
 
-  // Extract and memoize boolean to prevent dependency issues
-  const isBusinessUser = useMemo(() => businessFeatures.isBusinessUser, [businessFeatures.isBusinessUser]);
-
-  // Simplified tier calculation for unified plan
+  // Determine if user has business plan
+  const isBusinessUser = useMemo(() => {
+    return hasBusinessPlan();
+  }, [hasBusinessPlan, currentSubscription]);
+  
   const currentTier = useMemo((): 'free' | 'business' => {
     return isBusinessUser ? 'business' : 'free';
   }, [isBusinessUser]);
 
-  // Memoize available tabs to prevent unnecessary re-renders
+  // Available tabs for business users only
   const availableTabs = useMemo((): TabConfig[] => {
-    const tabs: TabConfig[] = [
+    if (currentTier !== 'business') {
+      return [];
+    }
+
+    return [
       {
         id: 'overview',
         label: 'Overview',
         icon: (color: string) => <BarChart3 size={18} color={color} />,
-        requiredTier: 'free',
+      },
+      {
+        id: 'boost',
+        label: 'Boost',
+        icon: (color: string) => <Zap size={18} color={color} />,
       },
       {
         id: 'analytics',
         label: 'Analytics',
         icon: (color: string) => <TrendingUp size={18} color={color} />,
-        requiredTier: 'free',
-        badge: currentTier === 'free' ? 'Basic' : 'Comprehensive',
+      },
+      {
+        id: 'support',
+        label: 'Support',
+        icon: (color: string) => <HeadphonesIcon size={18} color={color} />,
       },
     ];
+  }, [currentTier]);
 
-    // Add business-only features for business users
-    if (currentTier === 'business') {
-      tabs.push({
-        id: 'autoboost',
-        label: 'Auto-boost',
-        icon: (color: string) => <Zap size={18} color={color} />,
-        requiredTier: 'business',
-      });
-
-      tabs.push({
-        id: 'support',
-        label: 'Priority Support',
-        icon: (color: string) => <HeadphonesIcon size={18} color={color} />,
-        requiredTier: 'business',
-      });
-
-      tabs.push({
-        id: 'premium',
-        label: 'Business Features',
-        icon: (color: string) => <Crown size={18} color={color} />,
-        requiredTier: 'business',
-      });
-    }
-
-    return tabs;
-  }, [currentTier, theme]);
-
-  // Load dashboard data - remove problematic function dependencies
-  const loadDashboardData = useCallback(async () => {
-    if (!user?.id) return;
+  // Load dashboard data
+  useEffect(() => {
+    const initializeDashboard = async () => {
+      try {
+        setSubscriptionLoading(true);
+        // First, refresh subscription data to ensure we have the latest info
+        await useMonetizationStore.getState().refreshSubscription();
+        setSubscriptionLoading(false);
+        
+        // Then load dashboard data
+        await loadDashboardData();
+      } catch (error) {
+        console.error('Error initializing dashboard:', error);
+        setSubscriptionLoading(false);
+      }
+    };
     
+    initializeDashboard();
+  }, []);
+
+  const loadDashboardData = async () => {
     try {
       setLoading(true);
-      
-      // Load subscription data
-      try {
-        await refreshSubscription();
-      } catch (error) {
-        console.warn('Failed to refresh subscription:', error);
-      }
-      
-      // Load basic analytics for all users, comprehensive for business users
       const [stats, analytics] = await Promise.all([
         getQuickStats(),
-        isBusinessUser ? getBusinessAnalytics() : null
+        getBusinessAnalytics(),
       ]);
       
       setQuickStats(stats);
-      if (analytics) {
-        setAnalyticsData(analytics);
-      }
+      setAnalyticsData(analytics);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
       setLoading(false);
     }
-  }, [user?.id, isBusinessUser]);
-
-  useEffect(() => {
-    loadDashboardData();
-  }, [loadDashboardData]);
+  };
 
   const handleRefresh = useCallback(async () => {
-    if (!user?.id) return;
-    
     setRefreshing(true);
     try {
-      // Load subscription data
-      try {
-        await refreshSubscription();
-      } catch (error) {
-        console.warn('Failed to refresh subscription:', error);
-      }
-      
-      // Load basic analytics for all users, comprehensive for business users
-      const [stats, analytics] = await Promise.all([
-        getQuickStats(),
-        isBusinessUser ? getBusinessAnalytics() : null
-      ]);
-      
-      setQuickStats(stats);
-      if (analytics) {
-        setAnalyticsData(analytics);
-      }
+      // Force refresh subscription data
+      await useMonetizationStore.getState().refreshSubscription();
+      await loadDashboardData();
     } catch (error) {
-      console.error('Failed to refresh dashboard:', error);
+      console.error('Error refreshing dashboard:', error);
     } finally {
       setRefreshing(false);
     }
-  }, [user?.id, isBusinessUser]);
+  }, []);
 
-  // Memoize tab bar styles
-  const tabBarStyles = useMemo(() => ({
-    scrollView: {
-      backgroundColor: theme.colors.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
-    },
-    contentContainer: { 
-      paddingHorizontal: theme.spacing.lg 
-    },
-  }), [theme]);
+  const handleTabChange = useCallback((tab: DashboardTab) => {
+    setActiveTab(tab);
+  }, []);
 
-  // Render tab bar with pill-shaped tabs
+  // Render tab bar for business users
   const renderTabBar = useMemo(() => (
     <View style={{
       backgroundColor: theme.colors.surface,
       borderBottomWidth: 1,
       borderBottomColor: theme.colors.border,
-      paddingHorizontal: theme.spacing.lg,
       paddingVertical: theme.spacing.md,
     }}>
-      {/* Pill-shaped tab container */}
-      <View style={{
-        backgroundColor: theme.colors.surfaceVariant,
-        borderRadius: 50, // Full pill shape
-        padding: theme.spacing.xs,
-        flexDirection: 'row',
-        alignSelf: 'flex-start', // Only take needed width
-      }}>
-        {availableTabs.map((tab, index) => {
-          const isActive = activeTab === tab.id;
-          
-          return (
-            <TouchableOpacity
-              key={tab.id}
-              onPress={() => setActiveTab(tab.id)}
-              style={{
-                paddingVertical: theme.spacing.sm,
-                paddingHorizontal: theme.spacing.lg,
-                backgroundColor: isActive ? theme.colors.primary : 'transparent',
-                borderRadius: 50, // Full pill shape
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: theme.spacing.xs,
-                marginRight: index < availableTabs.length - 1 ? theme.spacing.xs : 0,
-              }}
-            >
-              {tab.icon(isActive ? theme.colors.text.inverse : theme.colors.text.primary)}
-              <Text
-                variant="bodySmall"
-                style={{
-                  color: isActive ? theme.colors.text.inverse : theme.colors.text.primary,
-                  fontWeight: isActive ? '600' : '500',
-                }}
-              >
-                {tab.label}
-              </Text>
-              {tab.badge && (
-                <Badge
-                  text={tab.badge}
-                  variant={isActive ? "secondary" : "info"}
-                  style={{
-                    backgroundColor: isActive ? theme.colors.text.inverse + '20' : undefined,
-                  }}
-                />
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-    </View>
-  ), [availableTabs, activeTab, theme]);
-
-  // Memoize overview tab
-  const renderOverviewTab = useMemo(() => {
-    if (currentTier === 'free') {
-      return (
-        <Container style={{ paddingTop: theme.spacing.lg }}>
-          {/* Compact Business Features Card */}
-          <View style={{
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.borderRadius.lg,
-            padding: theme.spacing.lg,
-            marginBottom: theme.spacing.lg,
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-          }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
-              <Crown size={24} color={theme.colors.primary} />
-              <View style={{ marginLeft: theme.spacing.md, flex: 1 }}>
-                <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
-                  Unlock Business Features
-                </Text>
-                <Text variant="bodySmall" color="secondary">
-                  Analytics, auto-boost & priority support
-                </Text>
-              </View>
-            </View>
-
-            <Button
-              variant="primary"
-              onPress={() => router.push('/subscription-plans')}
-              style={{ width: '100%' }}
-              size="sm"
-            >
-              <Upgrade size={16} color={theme.colors.surface} />
-              <Text variant="bodySmall" style={{ 
-                color: theme.colors.surface, 
-                marginLeft: theme.spacing.sm,
-                fontWeight: '600',
-              }}>
-                View Business Plans
-              </Text>
-            </Button>
-          </View>
-
-          {/* Quick Stats Grid */}
-          <View style={{
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            gap: theme.spacing.sm,
-            marginBottom: theme.spacing.lg,
-          }}>
-            <View style={{
-              flex: 1,
-              minWidth: '48%',
-              backgroundColor: theme.colors.surface,
-              borderRadius: theme.borderRadius.md,
-              padding: theme.spacing.md,
-              alignItems: 'center',
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-            }}>
-              <Users size={20} color={theme.colors.primary} />
-              <Text variant="body" style={{ fontWeight: '600', marginTop: theme.spacing.xs }}>
-                {loading ? '...' : quickStats.profileViews}
-              </Text>
-              <Text variant="caption" color="muted">Profile Views</Text>
-            </View>
-
-            <View style={{
-              flex: 1,
-              minWidth: '48%',
-              backgroundColor: theme.colors.surface,
-              borderRadius: theme.borderRadius.md,
-              padding: theme.spacing.md,
-              alignItems: 'center',
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-            }}>
-              <MessageSquare size={20} color={theme.colors.success} />
-              <Text variant="body" style={{ fontWeight: '600', marginTop: theme.spacing.xs }}>
-                {loading ? '...' : quickStats.totalMessages}
-              </Text>
-              <Text variant="caption" color="muted">Messages</Text>
-            </View>
-
-            <View style={{
-              flex: 1,
-              minWidth: '48%',
-              backgroundColor: theme.colors.surface,
-              borderRadius: theme.borderRadius.md,
-              padding: theme.spacing.md,
-              alignItems: 'center',
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-            }}>
-              <Star size={20} color={theme.colors.warning} />
-              <Text variant="body" style={{ fontWeight: '600', marginTop: theme.spacing.xs }}>
-                {loading ? '...' : quickStats.totalReviews}
-              </Text>
-              <Text variant="caption" color="muted">Reviews</Text>
-            </View>
-
-            <View style={{
-              flex: 1,
-              minWidth: '48%',
-              backgroundColor: theme.colors.surface,
-              borderRadius: theme.borderRadius.md,
-              padding: theme.spacing.md,
-              alignItems: 'center',
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-            }}>
-              <Star size={20} color={theme.colors.warning} />
-              <Text variant="body" style={{ fontWeight: '600', marginTop: theme.spacing.xs }}>
-                {loading ? '...' : quickStats.averageRating.toFixed(1)}
-              </Text>
-              <Text variant="caption" color="muted">Avg Rating</Text>
-            </View>
-          </View>
-
-
-          {/* Analytics Tab Prompt */}
-          <TouchableOpacity
-            onPress={() => setActiveTab('analytics')}
-            style={{
-              backgroundColor: theme.colors.surface,
-              borderRadius: theme.borderRadius.lg,
-              padding: theme.spacing.md,
-              marginBottom: theme.spacing.lg,
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-            }}
-          >
-            <View style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <TrendingUp size={20} color={theme.colors.primary} />
-                <Text variant="body" style={{ fontWeight: '600', marginLeft: theme.spacing.sm }}>
-                  View Analytics
-                </Text>
-                <Badge text="Basic" variant="info" style={{ marginLeft: theme.spacing.sm }} />
-              </View>
-              <ArrowUpRight size={16} color={theme.colors.text.muted} />
-            </View>
-          </TouchableOpacity>
-        </Container>
-      );
-    }
-
-    // Business plan overview
-    const planName = currentSubscription?.subscription_plans?.name || 'Business Plan';
-    
-    return (
-      <Container style={{ paddingTop: theme.spacing.lg }}>
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {/* Plan Status Card */}
-          <View style={{
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.borderRadius.lg,
-            padding: theme.spacing.lg,
-            marginBottom: theme.spacing.lg,
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-          }}>
-            <View style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: theme.spacing.md,
-            }}>
-              <Text variant="h4">{planName}</Text>
-              <Badge 
-                text="Active" 
-                variant="success" 
-              />
-            </View>
-
-            <View style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              marginBottom: theme.spacing.lg,
-            }}>
-              <View>
-                <Text variant="bodySmall" color="muted">Monthly Credits</Text>
-                <Text variant="h4" style={{ fontWeight: '600' }}>
-                  120
-                </Text>
-              </View>
-              
-              <View>
-                <Text variant="bodySmall" color="muted">Max Listings</Text>
-                <Text variant="h4" style={{ fontWeight: '600' }}>
-                  ∞
-                </Text>
-              </View>
-              
-              <View>
-                <Text variant="bodySmall" color="muted">Analytics</Text>
-                <Text variant="h4" style={{ fontWeight: '600' }}>
-                  Comprehensive
-                </Text>
-              </View>
-            </View>
-
-            <Button
-              variant="secondary"
-              onPress={() => router.push('/subscription-plans')}
-              style={{ width: '100%' }}
-            >
-              <Settings size={18} color={theme.colors.primary} />
-              <Text variant="body" style={{ 
-                color: theme.colors.primary, 
-                marginLeft: theme.spacing.sm,
-              }}>
-                Manage Subscription
-              </Text>
-            </Button>
-          </View>
-
-          {/* Quick Stats */}
-          <View style={{
-            flexDirection: 'row',
-            gap: theme.spacing.md,
-            marginBottom: theme.spacing.lg,
-          }}>
-            <View style={{
-              flex: 1,
-              backgroundColor: theme.colors.surface,
-              borderRadius: theme.borderRadius.lg,
-              padding: theme.spacing.lg,
-              alignItems: 'center',
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-            }}>
-              <Users size={24} color={theme.colors.primary} />
-              <Text variant="h4" style={{ fontWeight: '600', marginTop: theme.spacing.sm }}>
-                {loading ? '...' : quickStats.profileViews}
-              </Text>
-              <Text variant="bodySmall" color="muted">
-                Profile Views
-              </Text>
-            </View>
-
-            <View style={{
-              flex: 1,
-              backgroundColor: theme.colors.surface,
-              borderRadius: theme.borderRadius.lg,
-              padding: theme.spacing.lg,
-              alignItems: 'center',
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-            }}>
-              <MessageSquare size={24} color={theme.colors.success} />
-              <Text variant="h4" style={{ fontWeight: '600', marginTop: theme.spacing.sm }}>
-                {loading ? '...' : quickStats.totalMessages}
-              </Text>
-              <Text variant="bodySmall" color="muted">
-                Messages
-              </Text>
-            </View>
-
-            <View style={{
-              flex: 1,
-              backgroundColor: theme.colors.surface,
-              borderRadius: theme.borderRadius.lg,
-              padding: theme.spacing.lg,
-              alignItems: 'center',
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-            }}>
-              <Star size={24} color={theme.colors.warning} />
-              <Text variant="h4" style={{ fontWeight: '600', marginTop: theme.spacing.sm }}>
-                {loading ? '...' : quickStats.totalReviews}
-              </Text>
-              <Text variant="bodySmall" color="muted">
-                Reviews ({quickStats.averageRating.toFixed(1)}★)
-              </Text>
-            </View>
-          </View>
-
-          {/* Analytics Overview */}
-          {analyticsData && (
-            <View style={{
-              backgroundColor: theme.colors.surface,
-              borderRadius: theme.borderRadius.lg,
-              padding: theme.spacing.lg,
-              marginBottom: theme.spacing.lg,
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-            }}>
-              <Text variant="h4" style={{ marginBottom: theme.spacing.lg }}>
-                Analytics Overview
-              </Text>
-              
-              {/* Key Metrics Row */}
-              <View style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                marginBottom: theme.spacing.lg,
-              }}>
-                <View style={{ alignItems: 'center' }}>
-                  <Text variant="h3" style={{ fontWeight: '600', color: theme.colors.primary }}>
-                    {analyticsData.totalViews}
-                  </Text>
-                  <Text variant="bodySmall" color="muted">Total Views</Text>
-                  <Text variant="caption" color={analyticsData.viewsThisWeek > analyticsData.viewsLastWeek ? 'success' : 'muted'}>
-                    {analyticsData.viewsThisWeek > analyticsData.viewsLastWeek ? '+' : ''}
-                    {((analyticsData.viewsThisWeek - analyticsData.viewsLastWeek) / Math.max(analyticsData.viewsLastWeek, 1) * 100).toFixed(0)}% this week
-                  </Text>
-                </View>
-                
-                <View style={{ alignItems: 'center' }}>
-                  <Text variant="h3" style={{ fontWeight: '600', color: theme.colors.success }}>
-                    {analyticsData.conversionRate.toFixed(1)}%
-                  </Text>
-                  <Text variant="bodySmall" color="muted">Conversion</Text>
-                  <Text variant="caption" color="muted">Views to Messages</Text>
-                </View>
-                
-                <View style={{ alignItems: 'center' }}>
-                  <Text variant="h3" style={{ fontWeight: '600', color: theme.colors.warning }}>
-                    {analyticsData.totalOffers}
-                  </Text>
-                  <Text variant="bodySmall" color="muted">Total Offers</Text>
-                  <Text variant="caption" color="muted">{analyticsData.activeListings} active listings</Text>
-                </View>
-              </View>
-
-              {/* Top Performing Listing */}
-              {analyticsData.topPerformingListings.length > 0 && (
-                <View>
-                  <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.md }}>
-                    Top Performing Listing
-                  </Text>
-                  <View style={{
-                    backgroundColor: theme.colors.surfaceVariant,
-                    borderRadius: theme.borderRadius.md,
-                    padding: theme.spacing.md,
-                  }}>
-                    <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.sm }}>
-                      {analyticsData.topPerformingListings[0].title}
-                    </Text>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text variant="bodySmall" color="muted">
-                        {analyticsData.topPerformingListings[0].views} views
-                      </Text>
-                      <Text variant="bodySmall" color="muted">
-                        {analyticsData.topPerformingListings[0].messages} messages
-                      </Text>
-                      <Text variant="bodySmall" color="muted">
-                        {analyticsData.topPerformingListings[0].offers} offers
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* Feature Access Cards */}
-          <View style={{ gap: theme.spacing.md }}>
-            {availableTabs.slice(1).map((tab) => (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: theme.spacing.lg,
+        }}
+        style={{ flexGrow: 0 }}
+      >
+        <View style={{
+          backgroundColor: theme.colors.surfaceVariant,
+          borderRadius: 50,
+          padding: theme.spacing.xs,
+          flexDirection: 'row',
+        }}>
+          {availableTabs.map((tab, index) => {
+            const isActive = activeTab === tab.id;
+            return (
               <TouchableOpacity
                 key={tab.id}
                 onPress={() => setActiveTab(tab.id)}
                 style={{
-                  backgroundColor: theme.colors.surface,
-                  borderRadius: theme.borderRadius.lg,
-                  padding: theme.spacing.lg,
-                  borderWidth: 1,
-                  borderColor: theme.colors.border,
+                  paddingVertical: theme.spacing.sm,
+                  paddingHorizontal: theme.spacing.lg,
+                  backgroundColor: isActive ? theme.colors.primary : 'transparent',
+                  borderRadius: 50,
                   flexDirection: 'row',
                   alignItems: 'center',
+                  gap: theme.spacing.xs,
+                  marginRight: index < availableTabs.length - 1 ? theme.spacing.xs : 0,
                 }}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                  {tab.icon(theme.colors.text.primary)}
-                  <View style={{ marginLeft: theme.spacing.md, flex: 1 }}>
-                    <Text variant="body" style={{ fontWeight: '600' }}>
-                      {tab.label}
-                    </Text>
-                    <Text variant="bodySmall" color="muted">
-                      {tab.id === 'analytics' && 'View detailed business insights'}
-                      {tab.id === 'autoboost' && 'Automatically promote your listings'}
-                      {tab.id === 'support' && 'Get priority customer support'}
-                      {tab.id === 'premium' && 'Access exclusive premium features'}
-                    </Text>
-                    {tab.badge && (
-                      <Badge
-                        text={tab.badge}
-                        variant="info"
-                        style={{ marginTop: theme.spacing.xs }}
-                      />
-                    )}
-                  </View>
-                </View>
-                <ArrowUpRight size={20} color={theme.colors.text.muted} />
+                {tab.icon(isActive ? theme.colors.text.inverse : theme.colors.text.primary)}
+                <Text
+                  variant="bodySmall"
+                  style={{
+                    color: isActive ? theme.colors.text.inverse : theme.colors.text.primary,
+                    fontWeight: isActive ? '600' : '500',
+                  }}
+                >
+                  {tab.label}
+                </Text>
               </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
-      </Container>
-    );
-  }, [currentTier, theme, currentSubscription, isBusinessUser, loading, quickStats, analyticsData]);
-
-  // Render basic analytics for free users
-  const renderBasicAnalytics = useMemo(() => (
-    <Container style={{ paddingTop: theme.spacing.lg }}>
-      {/* Compact Stats Grid */}
-        <View style={{
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          gap: theme.spacing.sm,
-          marginBottom: theme.spacing.lg,
-        }}>
-          <View style={{
-            flex: 1,
-            minWidth: '48%',
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.borderRadius.md,
-            padding: theme.spacing.md,
-            alignItems: 'center',
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-          }}>
-            <Users size={20} color={theme.colors.primary} />
-            <Text variant="body" style={{ fontWeight: '600', marginTop: theme.spacing.xs }}>
-              {loading ? '...' : quickStats.profileViews}
-            </Text>
-            <Text variant="caption" color="muted">
-              Profile Views
-            </Text>
-          </View>
-
-          <View style={{
-            flex: 1,
-            minWidth: '48%',
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.borderRadius.md,
-            padding: theme.spacing.md,
-            alignItems: 'center',
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-          }}>
-            <MessageSquare size={20} color={theme.colors.success} />
-            <Text variant="body" style={{ fontWeight: '600', marginTop: theme.spacing.xs }}>
-              {loading ? '...' : quickStats.totalMessages}
-            </Text>
-            <Text variant="caption" color="muted">
-              Messages
-            </Text>
-          </View>
-
-          <View style={{
-            flex: 1,
-            minWidth: '48%',
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.borderRadius.md,
-            padding: theme.spacing.md,
-            alignItems: 'center',
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-          }}>
-            <Star size={20} color={theme.colors.warning} />
-            <Text variant="body" style={{ fontWeight: '600', marginTop: theme.spacing.xs }}>
-              {loading ? '...' : quickStats.totalReviews}
-            </Text>
-            <Text variant="caption" color="muted">
-              Reviews
-            </Text>
-          </View>
-
-          <View style={{
-            flex: 1,
-            minWidth: '48%',
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.borderRadius.md,
-            padding: theme.spacing.md,
-            alignItems: 'center',
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-          }}>
-            <Star size={20} color={theme.colors.warning} />
-            <Text variant="body" style={{ fontWeight: '600', marginTop: theme.spacing.xs }}>
-              {loading ? '...' : quickStats.averageRating.toFixed(1)}
-            </Text>
-            <Text variant="caption" color="muted">
-              Avg Rating
-            </Text>
-          </View>
+            );
+          })}
         </View>
+      </ScrollView>
+    </View>
+  ), [availableTabs, activeTab, theme]);
 
-        {/* Compact Upgrade Prompt */}
-        <View style={{
-          backgroundColor: theme.colors.surface,
-          borderRadius: theme.borderRadius.lg,
-          padding: theme.spacing.lg,
-          marginBottom: theme.spacing.lg,
-          borderWidth: 1,
-          borderColor: theme.colors.border,
-        }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
-            <Lock size={24} color={theme.colors.text.muted} />
-            <View style={{ marginLeft: theme.spacing.md, flex: 1 }}>
-              <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
-                Get Advanced Analytics
-              </Text>
-              <Text variant="bodySmall" color="secondary">
-                Detailed insights, trends & conversion tracking
-              </Text>
-            </View>
-          </View>
-
-          <Button
-            variant="primary"
-            onPress={() => router.push('/subscription-plans')}
-            style={{ width: '100%' }}
-            size="sm"
-          >
-            <ArrowUpRight size={16} color={theme.colors.text.inverse} />
-            <Text variant="bodySmall" style={{ 
-              color: theme.colors.text.inverse, 
-              marginLeft: theme.spacing.sm,
-              fontWeight: '600',
-            }}>
-              Upgrade to Business
-            </Text>
-          </Button>
-        </View>
-    </Container>
-  ), [theme, loading, quickStats]);
-
-  // Memoize tab content
+  // Render tab content for business users
   const renderTabContent = useMemo(() => {
-    if (loading) {
-      return (
-        <View style={{ padding: theme.spacing.lg, gap: theme.spacing.lg }}>
-          <LoadingSkeleton height={120} />
-          <LoadingSkeleton height={120} />
-          <LoadingSkeleton height={120} />
-        </View>
-      );
-    }
-
     switch (activeTab) {
       case 'overview':
-        return renderOverviewTab;
+        return (
+          <BusinessOverview
+            loading={loading}
+            quickStats={quickStats}
+            analyticsData={analyticsData}
+            onTabChange={handleTabChange}
+          />
+        );
+      case 'boost':
+        return (
+          <BusinessBoostManager
+            onTabChange={handleTabChange}
+          />
+        );
       case 'analytics':
-        return currentTier === 'free' 
-          ? renderBasicAnalytics 
-          : <AnalyticsDashboard tier={currentTier === 'business' ? 'pro' : currentTier} />;
-      case 'autoboost':
-        return <AutoBoostDashboard />;
+        return (
+          <BusinessAnalytics
+            onTabChange={handleTabChange}
+          />
+        );
       case 'support':
-        return <PrioritySupportDashboard />;
-      case 'premium':
-        return <PremiumFeaturesDashboard />;
+        return (
+          <BusinessSupport
+            onTabChange={handleTabChange}
+          />
+        );
       default:
-        return renderOverviewTab;
+        return (
+          <BusinessOverview
+            loading={loading}
+            quickStats={quickStats}
+            analyticsData={analyticsData}
+            onTabChange={handleTabChange}
+          />
+        );
     }
-  }, [loading, activeTab, currentTier]);
+  }, [activeTab, loading, quickStats, analyticsData, handleTabChange]);
 
+  // Show loading while subscription data is being fetched
+  if (subscriptionLoading) {
+    return (
+      <SafeAreaWrapper>
+        <View style={{ flex: 1, marginTop: theme.spacing.md }}>
+          <AppHeader title="Dashboard" />
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <Text variant="body" color="secondary">Loading subscription data...</Text>
+          </View>
+        </View>
+      </SafeAreaWrapper>
+    );
+  }
+
+  // Free user dashboard (single screen, no tabs)
+  if (currentTier === 'free') {
+    return (
+      <SafeAreaWrapper>
+        <View style={{ flex: 1, marginTop: theme.spacing.md }}>
+          <AppHeader title="Dashboard" />
+          <FreeUserDashboard
+            loading={loading}
+            quickStats={quickStats}
+          />
+        </View>
+      </SafeAreaWrapper>
+    );
+  }
+
+  // Business user dashboard (with tabs)
   return (
     <SafeAreaWrapper>
       <View style={{ flex: 1, marginTop: theme.spacing.md }}>
         {renderTabBar}
-        
         <ScrollView
           style={{ flex: 1 }}
           refreshControl={
@@ -838,4 +288,3 @@ export default function BusinessDashboardScreen() {
     </SafeAreaWrapper>
   );
 }
-

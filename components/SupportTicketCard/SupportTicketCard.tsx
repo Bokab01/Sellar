@@ -92,17 +92,30 @@ export function SupportTicketCard({ ticket, onPress }: SupportTicketCardProps) {
     );
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'No date';
+    
+    try {
+      const date = new Date(dateString);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return 'Invalid date';
+      }
+      
+      const now = new Date();
+      const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
 
-    if (diffInHours < 24) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } else if (diffInHours < 168) { // 7 days
-      return date.toLocaleDateString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
-    } else {
-      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      if (diffInHours < 24) {
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } else if (diffInHours < 168) { // 7 days
+        return date.toLocaleDateString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+      } else {
+        return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      }
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid date';
     }
   };
 
@@ -182,7 +195,7 @@ export function SupportTicketCard({ ticket, onPress }: SupportTicketCardProps) {
         </View>
 
         <Text variant="bodySmall" color="muted">
-          {formatDate(ticket.last_activity_at)}
+          {formatDate(ticket.last_message_at || ticket.created_at)}
         </Text>
       </View>
 

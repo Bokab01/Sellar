@@ -109,9 +109,9 @@ export function Badge({
       case 'sm':
       case 'small':
         return {
-          paddingHorizontal: theme.spacing.sm,
-          paddingVertical: theme.spacing.xs,
-          borderRadius: theme.borderRadius.sm,
+          paddingHorizontal: theme.spacing.xs + 2,
+          paddingVertical: theme.spacing.xs - 3,
+          borderRadius: theme.borderRadius.lg,
         };
       case 'lg':
       case 'large':
@@ -144,8 +144,8 @@ export function Badge({
         variant="caption"
         style={{
           color: colors.textColor,
-          fontSize: (size === 'sm' || size === 'small') ? 10 : (size === 'lg' || size === 'large') ? 14 : 12,
-          fontWeight: '600',
+          fontSize: (size === 'sm' || size === 'small') ? 8 : (size === 'lg' || size === 'large') ? 14 : 12,
+          fontWeight: '700',
           textTransform: 'uppercase',
         }}
       >

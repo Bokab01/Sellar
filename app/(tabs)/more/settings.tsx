@@ -41,7 +41,7 @@ import {
 
 export default function SettingsScreen() {
   const { theme, isDarkMode, toggleTheme, setThemeMode, themeMode } = useTheme();
-  const { user } = useAuthStore();
+  const { user, signOut } = useAuthStore();
   
   const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -135,22 +135,48 @@ export default function SettingsScreen() {
       return;
     }
 
+    if (!user?.id) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
     setProcessing(true);
     try {
-      // TODO: Implement account deletion logic
-      // This should include:
-      // 1. Anonymize user data
-      // 2. Delete personal information
-      // 3. Keep transaction records for legal compliance
-      // 4. Notify related users about account deletion
-      
-      Alert.alert(
-        'Account Deletion',
-        'Account deletion request submitted. You will receive an email with further instructions.',
-        [{ text: 'OK', onPress: () => setShowDeleteAccount(false) }]
-      );
+      // Request account deletion using database function
+      const { data, error } = await supabase
+        .rpc('request_account_deletion', {
+          p_user_id: user.id,
+          p_reason: 'User requested deletion from settings'
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      const result = data?.[0];
+      if (result?.success) {
+        const scheduledDate = new Date(result.scheduled_for).toLocaleDateString();
+        Alert.alert(
+          'Account Deletion Scheduled',
+          `Your account has been scheduled for deletion on ${scheduledDate}. You will receive an email confirmation and can cancel this request anytime before then by contacting support.`,
+          [
+            { 
+              text: 'OK', 
+              onPress: () => {
+                setShowDeleteAccount(false);
+                setDeleteConfirmText('');
+                // Sign out the user
+                signOut();
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Error', result?.message || 'Failed to process account deletion request');
+      }
     } catch (error) {
-      Alert.alert('Error', 'Failed to process account deletion request');
+      console.error('Account deletion error:', error);
+      Alert.alert('Error', 'Failed to process account deletion request. Please try again.');
     } finally {
       setProcessing(false);
     }
@@ -559,6 +585,7 @@ export default function SettingsScreen() {
         visible={showDeleteAccount}
         onClose={() => setShowDeleteAccount(false)}
         title="Delete Account"
+        size="lg"
         primaryAction={{
           text: 'Delete Account',
           onPress: handleDeleteAccount,

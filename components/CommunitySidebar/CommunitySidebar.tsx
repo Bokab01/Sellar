@@ -103,28 +103,48 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
       
       // Fetch current user stats for counts
       if (user?.id) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('followers_count, following_count, posts_count, listings_count')
-          .eq('id', user.id)
-          .single();
-        
-        if (profile) {
-          setUserStats({
-            followers_count: profile.followers_count || 0,
-            following_count: profile.following_count || 0,
-            posts_count: profile.posts_count || 0,
-            listings_count: profile.listings_count || 0,
-          });
-        } else {
-          // Set default stats if profile doesn't have social columns yet
-          setUserStats({
-            followers_count: 0,
-            following_count: 0,
-            posts_count: 0,
-            listings_count: 0,
-          });
-        }
+        // Calculate counts dynamically from related tables
+        const [followersResult, followingResult, postsResult, listingsResult] = await Promise.allSettled([
+          // Count followers
+          supabase
+            .from('follows')
+            .select('id', { count: 'exact', head: true })
+            .eq('following_id', user.id),
+          
+          // Count following
+          supabase
+            .from('follows')
+            .select('id', { count: 'exact', head: true })
+            .eq('follower_id', user.id),
+          
+          // Count posts
+          supabase
+            .from('posts')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id),
+          
+          // Count listings
+          supabase
+            .from('listings')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+        ]);
+
+        const stats = {
+          followers_count: followersResult.status === 'fulfilled' ? (followersResult.value.count || 0) : 0,
+          following_count: followingResult.status === 'fulfilled' ? (followingResult.value.count || 0) : 0,
+          posts_count: postsResult.status === 'fulfilled' ? (postsResult.value.count || 0) : 0,
+          listings_count: listingsResult.status === 'fulfilled' ? (listingsResult.value.count || 0) : 0,
+        };
+
+        // Log any errors
+        if (followersResult.status === 'rejected') console.error('Followers count error:', followersResult.reason);
+        if (followingResult.status === 'rejected') console.error('Following count error:', followingResult.reason);
+        if (postsResult.status === 'rejected') console.error('Posts count error:', postsResult.reason);
+        if (listingsResult.status === 'rejected') console.error('Listings count error:', listingsResult.reason);
+
+        console.log('Community sidebar stats:', stats);
+        setUserStats(stats);
       }
 
       // Credits are now handled by the monetization store

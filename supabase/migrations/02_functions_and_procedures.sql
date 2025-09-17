@@ -653,8 +653,48 @@ BEGIN
         'feature_purchase'
     );
     
-    -- If credit deduction successful, apply the feature effect
+    -- If credit deduction successful, create feature purchase record and apply effects
     IF result_success THEN
+        -- Create feature purchase record
+        INSERT INTO feature_purchases (
+            user_id,
+            listing_id,
+            feature_key,
+            feature_name,
+            credits_spent,
+            status,
+            activated_at,
+            expires_at,
+            metadata
+        ) VALUES (
+            p_user_id,
+            p_listing_id,
+            p_feature_key,
+            CASE 
+                WHEN p_feature_key = 'pulse_boost_24h' THEN 'Pulse Boost'
+                WHEN p_feature_key = 'mega_pulse_7d' THEN 'Mega Pulse'
+                WHEN p_feature_key = 'category_spotlight_3d' THEN 'Category Spotlight'
+                WHEN p_feature_key = 'listing_highlight' THEN 'Listing Highlight'
+                WHEN p_feature_key = 'urgent_badge' THEN 'Urgent Badge'
+                WHEN p_feature_key = 'ad_refresh' THEN 'Ad Refresh'
+                ELSE p_feature_key -- Fallback to key if not mapped
+            END,
+            p_credits,
+            'active',
+            NOW(),
+            CASE 
+                WHEN p_feature_key = 'pulse_boost_24h' THEN NOW() + INTERVAL '24 hours'
+                WHEN p_feature_key = 'mega_pulse_7d' THEN NOW() + INTERVAL '7 days'
+                WHEN p_feature_key = 'category_spotlight_3d' THEN NOW() + INTERVAL '3 days'
+                WHEN p_feature_key = 'listing_highlight' THEN NOW() + INTERVAL '7 days'
+                WHEN p_feature_key = 'urgent_badge' THEN NOW() + INTERVAL '3 days'
+                WHEN p_feature_key = 'ad_refresh' THEN NULL -- Instant effect
+                ELSE NOW() + INTERVAL '30 days' -- Default duration
+            END,
+            p_metadata
+        );
+        
+        -- Apply the feature effect
         PERFORM apply_feature_effect(p_user_id, p_feature_key, p_listing_id, p_metadata);
     END IF;
     
@@ -732,42 +772,8 @@ BEGIN
             RAISE NOTICE 'Unknown feature key: %', p_feature_key;
     END CASE;
     
-    -- Log feature activation
-    INSERT INTO feature_purchases (
-        user_id,
-        listing_id,
-        feature_key,
-        feature_name,
-        credits_spent,
-        status,
-        expires_at,
-        metadata
-    ) VALUES (
-        p_user_id,
-        p_listing_id,
-        p_feature_key,
-        CASE p_feature_key
-            WHEN 'pulse_boost_24h' THEN 'Pulse Boost'
-            WHEN 'mega_pulse_7d' THEN 'Mega Pulse'
-            WHEN 'category_spotlight_3d' THEN 'Category Spotlight'
-            WHEN 'ad_refresh' THEN 'Ad Refresh'
-            WHEN 'listing_highlight' THEN 'Listing Highlight'
-            WHEN 'urgent_badge' THEN 'Urgent Badge'
-            ELSE p_feature_key
-        END,
-        p_credits,
-        'active',
-        CASE p_feature_key
-            WHEN 'pulse_boost_24h' THEN NOW() + INTERVAL '24 hours'
-            WHEN 'mega_pulse_7d' THEN NOW() + INTERVAL '7 days'
-            WHEN 'category_spotlight_3d' THEN NOW() + INTERVAL '3 days'
-            WHEN 'ad_refresh' THEN NOW() -- Instant effect
-            WHEN 'listing_highlight' THEN NOW() + INTERVAL '7 days'
-            WHEN 'urgent_badge' THEN NOW() + INTERVAL '3 days'
-            ELSE NOW()
-        END,
-        p_metadata
-    );
+    -- Feature effects are applied to listings table above
+    -- The feature_purchases record is created by the purchase_feature function
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -825,14 +831,14 @@ DECLARE
     user_subscription RECORD;
     entitlements JSONB;
 BEGIN
-    -- Get active subscription
+    -- Get active OR cancelled subscription (cancelled but still within period)
     SELECT us.*, sp.features
     INTO user_subscription
     FROM user_subscriptions us
     JOIN subscription_plans sp ON us.plan_id = sp.id
     WHERE us.user_id = p_user_id
-    AND us.status = 'active'
-    AND us.current_period_end > NOW()
+    AND us.status IN ('active', 'cancelled')  -- Include cancelled subscriptions
+    AND us.current_period_end > NOW()  -- Still within the current period
     ORDER BY us.created_at DESC
     LIMIT 1;
     
@@ -844,11 +850,35 @@ BEGIN
             'analytics_level', 'none',
             'priority_support', false,
             'business_badge', false,
-            'auto_boost', false
+            'auto_boost', false,
+            'business_features', false
         );
     ELSE
-        -- Return subscription entitlements
-        entitlements := user_subscription.features;
+        -- Map subscription features to entitlements format
+        -- Check if features is an array (new format) or object (legacy format)
+        IF jsonb_typeof(user_subscription.features) = 'array' THEN
+            -- New array format - map to entitlements object
+            entitlements := jsonb_build_object(
+                'max_listings', CASE WHEN user_subscription.features ? 'unlimited_listings' THEN 999999 ELSE 5 END,
+                'boost_credits', CASE WHEN user_subscription.features ? '120_boost_credits_monthly' THEN 120 ELSE 0 END,
+                'analytics_level', CASE 
+                    WHEN user_subscription.features ? 'comprehensive_analytics' THEN 'full'
+                    WHEN user_subscription.features ? 'basic_analytics' THEN 'basic'
+                    ELSE 'none' 
+                END,
+                'priority_support', user_subscription.features ? 'priority_support',
+                'business_badge', true, -- All business plans get business badge
+                'auto_boost', user_subscription.features ? 'auto_boost_listings',
+                'business_features', true,
+                'homepage_placement', user_subscription.features ? 'homepage_placement',
+                'premium_branding', user_subscription.features ? 'premium_branding',
+                'sponsored_posts', user_subscription.features ? 'sponsored_posts',
+                'bulk_operations', user_subscription.features ? 'bulk_operations'
+            );
+        ELSE
+            -- Legacy object format - use as is
+            entitlements := user_subscription.features;
+        END IF;
     END IF;
     
     RETURN entitlements;
@@ -1228,6 +1258,154 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- =============================================
+-- COMMUNITY REWARDS SYSTEM
+-- =============================================
+
+-- Function to award community reward
+CREATE OR REPLACE FUNCTION award_community_reward(
+    p_user_id UUID,
+    p_type VARCHAR(50),
+    p_points INTEGER,
+    p_description TEXT,
+    p_metadata JSONB DEFAULT '{}'
+)
+RETURNS BOOLEAN AS $$
+DECLARE
+    current_balance INTEGER;
+BEGIN
+    -- Insert community reward
+    INSERT INTO community_rewards (
+        user_id, type, points, description, metadata, is_validated
+    )
+    VALUES (
+        p_user_id, p_type, p_points, p_description, p_metadata, true
+    );
+    
+    -- Get current balance
+    SELECT COALESCE(balance, 0) INTO current_balance
+    FROM user_credits WHERE user_id = p_user_id;
+    
+    -- Create credits record if it doesn't exist
+    INSERT INTO user_credits (user_id, balance, lifetime_earned, lifetime_spent)
+    VALUES (p_user_id, 0, 0, 0)
+    ON CONFLICT (user_id) DO NOTHING;
+    
+    -- Award credits
+    UPDATE user_credits
+    SET 
+        balance = balance + p_points,
+        lifetime_earned = lifetime_earned + p_points,
+        updated_at = NOW()
+    WHERE user_id = p_user_id;
+    
+    -- Log transaction
+    INSERT INTO credit_transactions (
+        user_id, type, amount, balance_before, balance_after,
+        reference_type, metadata
+    )
+    VALUES (
+        p_user_id, 'earned', p_points, current_balance, current_balance + p_points,
+        'community_reward', 
+        jsonb_build_object('reward_type', p_type, 'description', p_description)
+    );
+    
+    RETURN true;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to handle first post bonus
+CREATE OR REPLACE FUNCTION handle_first_post_bonus()
+RETURNS TRIGGER AS $$
+DECLARE
+    post_count INTEGER;
+    reward_already_given BOOLEAN;
+BEGIN
+    -- Check if user has already received the first post bonus
+    SELECT EXISTS(
+        SELECT 1 FROM community_rewards 
+        WHERE user_id = NEW.user_id 
+        AND type = 'first_post_bonus'
+    ) INTO reward_already_given;
+    
+    -- If reward already given, don't award again
+    IF reward_already_given THEN
+        RETURN NEW;
+    END IF;
+    
+    -- Check if this is the user's first post
+    SELECT COUNT(*) INTO post_count
+    FROM posts
+    WHERE user_id = NEW.user_id;
+    
+    -- If this is the first post, award bonus
+    IF post_count = 1 THEN
+        PERFORM award_community_reward(
+            NEW.user_id,
+            'first_post_bonus',
+            5,
+            'Congratulations on your first community post!',
+            jsonb_build_object('post_id', NEW.id, 'post_type', NEW.type)
+        );
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- Function to handle positive review rewards
+CREATE OR REPLACE FUNCTION handle_positive_review_reward()
+RETURNS TRIGGER AS $$
+DECLARE
+    reward_already_given BOOLEAN;
+BEGIN
+    -- Handle INSERT or UPDATE operations
+    IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
+        -- Award reward for 4-5 star reviews
+        IF NEW.rating >= 4 THEN
+            -- Check if reward already given for this specific review
+            SELECT EXISTS(
+                SELECT 1 FROM community_rewards 
+                WHERE user_id = NEW.reviewed_user_id 
+                AND type = 'positive_review'
+                AND metadata->>'review_id' = NEW.id::text
+            ) INTO reward_already_given;
+            
+            -- Only award if not already given for this review
+            IF NOT reward_already_given THEN
+                -- For UPDATE: only award if the OLD rating was < 4 (newly became positive)
+                IF TG_OP = 'INSERT' OR (TG_OP = 'UPDATE' AND OLD.rating < 4) THEN
+                    PERFORM award_community_reward(
+                        NEW.reviewed_user_id,
+                        'positive_review',
+                        3,
+                        'You received a positive review!',
+                        jsonb_build_object('review_id', NEW.id, 'rating', NEW.rating, 'reviewer_id', NEW.reviewer_id)
+                    );
+                END IF;
+            END IF;
+        END IF;
+    END IF;
+    
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create triggers for reward system
+DROP TRIGGER IF EXISTS trigger_first_post_bonus ON posts;
+CREATE TRIGGER trigger_first_post_bonus
+    AFTER INSERT ON posts
+    FOR EACH ROW
+    EXECUTE FUNCTION handle_first_post_bonus();
+
+
+DROP TRIGGER IF EXISTS trigger_positive_review_reward ON reviews;
+CREATE TRIGGER trigger_positive_review_reward
+    AFTER INSERT OR UPDATE ON reviews
+    FOR EACH ROW
+    EXECUTE FUNCTION handle_positive_review_reward();
+
+-- =============================================
 -- UTILITY FUNCTIONS
 -- =============================================
 
@@ -1251,12 +1429,64 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Function to update post engagement counts
+-- SECURITY DEFINER allows the function to bypass RLS policies
+-- This is crucial so that when User B comments on User A's post,
+-- the trigger can still update User A's post counts
 CREATE OR REPLACE FUNCTION update_post_counts()
 RETURNS TRIGGER AS $$
+DECLARE
+    post_user_id UUID;
+    current_likes INTEGER;
+    reward_given BOOLEAN;
 BEGIN
     IF TG_OP = 'INSERT' THEN
         IF TG_TABLE_NAME = 'likes' AND NEW.post_id IS NOT NULL THEN
             UPDATE posts SET likes_count = likes_count + 1 WHERE id = NEW.post_id;
+            
+            -- Check for viral post rewards after updating likes count
+            SELECT user_id, likes_count INTO post_user_id, current_likes
+            FROM posts WHERE id = NEW.post_id;
+            
+            -- Check for 50+ likes (viral post)
+            IF current_likes >= 50 THEN
+                SELECT EXISTS(
+                    SELECT 1 FROM community_rewards 
+                    WHERE user_id = post_user_id 
+                    AND type = 'viral_post' 
+                    AND metadata->>'post_id' = NEW.post_id::text
+                ) INTO reward_given;
+                
+                IF NOT reward_given THEN
+                    PERFORM award_community_reward(
+                        post_user_id,
+                        'viral_post',
+                        10,
+                        'Your post went viral with 50+ likes!',
+                        jsonb_build_object('post_id', NEW.post_id, 'likes_count', current_likes)
+                    );
+                END IF;
+            END IF;
+            
+            -- Check for 100+ likes (super viral post)
+            IF current_likes >= 100 THEN
+                SELECT EXISTS(
+                    SELECT 1 FROM community_rewards 
+                    WHERE user_id = post_user_id 
+                    AND type = 'super_viral_post' 
+                    AND metadata->>'post_id' = NEW.post_id::text
+                ) INTO reward_given;
+                
+                IF NOT reward_given THEN
+                    PERFORM award_community_reward(
+                        post_user_id,
+                        'super_viral_post',
+                        15,
+                        'Your post is super viral with 100+ likes!',
+                        jsonb_build_object('post_id', NEW.post_id, 'likes_count', current_likes)
+                    );
+                END IF;
+            END IF;
+            
         ELSIF TG_TABLE_NAME = 'comments' THEN
             UPDATE posts SET comments_count = comments_count + 1 WHERE id = NEW.post_id;
         ELSIF TG_TABLE_NAME = 'shares' THEN
@@ -1275,7 +1505,7 @@ BEGIN
     END IF;
     RETURN NULL;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Create triggers for post engagement counts
 CREATE TRIGGER update_post_likes_count
@@ -1835,7 +2065,8 @@ CREATE OR REPLACE FUNCTION create_support_ticket(
     p_attachments JSONB DEFAULT '[]'::jsonb,
     p_metadata JSONB DEFAULT '{}'::jsonb,
     p_app_version VARCHAR(20) DEFAULT NULL,
-    p_device_info JSONB DEFAULT '{}'::jsonb
+    p_device_info JSONB DEFAULT '{}'::jsonb,
+    p_user_agent TEXT DEFAULT NULL
 )
 RETURNS JSONB AS $$
 DECLARE
@@ -1884,6 +2115,7 @@ BEGIN
             app_version,
             device_info,
             ticket_number,
+            user_agent,
             created_at,
             updated_at
         ) VALUES (
@@ -1898,6 +2130,7 @@ BEGIN
             p_app_version,
             p_device_info,
             generated_ticket_number,
+            p_user_agent,
             NOW(),
             NOW()
         ) RETURNING id INTO ticket_id;
@@ -1979,10 +2212,11 @@ BEGIN
             FROM support_ticket_messages stm 
             WHERE stm.ticket_id = st.id
         ) as message_count,
-        (
-            SELECT MAX(stm.created_at) 
-            FROM support_ticket_messages stm 
-            WHERE stm.ticket_id = st.id
+        COALESCE(
+            (SELECT MAX(stm.created_at) 
+             FROM support_ticket_messages stm 
+             WHERE stm.ticket_id = st.id),
+            st.created_at
         ) as last_message_at,
         st.app_version,
         st.created_at,
@@ -2107,3 +2341,656 @@ BEGIN
     RETURN;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =============================================
+-- KNOWLEDGE BASE FUNCTIONS
+-- =============================================
+
+-- Function to get published knowledge base articles
+CREATE OR REPLACE FUNCTION get_kb_articles(
+    p_category VARCHAR DEFAULT NULL,
+    p_search_term TEXT DEFAULT NULL,
+    p_limit INTEGER DEFAULT 20,
+    p_offset INTEGER DEFAULT 0
+)
+RETURNS TABLE (
+    id UUID,
+    title VARCHAR,
+    slug VARCHAR,
+    content TEXT,
+    excerpt TEXT,
+    category VARCHAR,
+    tags TEXT[],
+    author_id UUID,
+    view_count INTEGER,
+    helpful_count INTEGER,
+    not_helpful_count INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    published_at TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        kb.id,
+        kb.title,
+        kb.slug,
+        kb.content,
+        kb.excerpt,
+        kb.category,
+        kb.tags,
+        kb.author_id,
+        kb.view_count,
+        kb.helpful_count,
+        kb.not_helpful_count,
+        kb.created_at,
+        kb.updated_at,
+        kb.published_at
+    FROM kb_articles kb
+    WHERE 
+        kb.is_published = true
+        AND (p_category IS NULL OR kb.category = p_category)
+        AND (p_search_term IS NULL OR 
+             kb.search_vector @@ plainto_tsquery('english', p_search_term) OR
+             kb.title ILIKE '%' || p_search_term || '%' OR
+             kb.content ILIKE '%' || p_search_term || '%')
+    ORDER BY 
+        CASE WHEN p_search_term IS NOT NULL THEN
+            ts_rank(kb.search_vector, plainto_tsquery('english', p_search_term))
+        ELSE 0 END DESC,
+        kb.created_at DESC
+    LIMIT p_limit
+    OFFSET p_offset;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get FAQ items
+CREATE OR REPLACE FUNCTION get_faq_items(
+    p_category VARCHAR DEFAULT NULL,
+    p_featured_only BOOLEAN DEFAULT FALSE
+)
+RETURNS TABLE (
+    id UUID,
+    question TEXT,
+    answer TEXT,
+    category VARCHAR,
+    order_index INTEGER,
+    is_featured BOOLEAN,
+    view_count INTEGER,
+    helpful_count INTEGER,
+    not_helpful_count INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        faq.id,
+        faq.question,
+        faq.answer,
+        faq.category,
+        faq.order_index,
+        faq.is_featured,
+        faq.view_count,
+        faq.helpful_count,
+        faq.not_helpful_count,
+        faq.created_at,
+        faq.updated_at
+    FROM faq_items faq
+    WHERE 
+        (p_category IS NULL OR faq.category = p_category)
+        AND (p_featured_only = FALSE OR faq.is_featured = TRUE)
+    ORDER BY 
+        faq.order_index ASC,
+        faq.created_at DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to increment article view count
+CREATE OR REPLACE FUNCTION increment_article_views(p_article_id UUID)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE kb_articles 
+    SET view_count = view_count + 1,
+        updated_at = now()
+    WHERE id = p_article_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to increment FAQ view count
+CREATE OR REPLACE FUNCTION increment_faq_views(p_faq_id UUID)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE faq_items 
+    SET view_count = view_count + 1,
+        updated_at = now()
+    WHERE id = p_faq_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to update search vector for articles
+CREATE OR REPLACE FUNCTION update_kb_article_search_vector()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.search_vector := 
+        setweight(to_tsvector('english', COALESCE(NEW.title, '')), 'A') ||
+        setweight(to_tsvector('english', COALESCE(NEW.excerpt, '')), 'B') ||
+        setweight(to_tsvector('english', COALESCE(NEW.content, '')), 'C');
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to automatically update search vector
+CREATE TRIGGER update_kb_article_search_vector_trigger
+    BEFORE INSERT OR UPDATE ON kb_articles
+    FOR EACH ROW
+    EXECUTE FUNCTION update_kb_article_search_vector();
+
+-- =============================================
+-- ACCOUNT DELETION FUNCTIONS
+-- =============================================
+
+-- Function to request account deletion
+CREATE OR REPLACE FUNCTION request_account_deletion(
+    p_user_id UUID,
+    p_reason TEXT DEFAULT NULL
+)
+RETURNS TABLE (
+    success BOOLEAN,
+    message TEXT,
+    scheduled_for TIMESTAMP WITH TIME ZONE
+) AS $$
+DECLARE
+    deletion_date TIMESTAMP WITH TIME ZONE;
+BEGIN
+    -- Check if user exists
+    IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_user_id) THEN
+        RETURN QUERY SELECT false, 'User not found', NULL::TIMESTAMP WITH TIME ZONE;
+        RETURN;
+    END IF;
+    
+    -- Check if there's already a pending deletion request
+    IF EXISTS (
+        SELECT 1 FROM data_deletion_requests 
+        WHERE user_id = p_user_id AND status IN ('pending', 'processing')
+    ) THEN
+        RETURN QUERY SELECT false, 'Account deletion already requested', NULL::TIMESTAMP WITH TIME ZONE;
+        RETURN;
+    END IF;
+    
+    -- Set deletion date (30 days from now)
+    deletion_date := NOW() + INTERVAL '30 days';
+    
+    -- Create deletion request
+    INSERT INTO data_deletion_requests (
+        user_id,
+        reason,
+        scheduled_for
+    ) VALUES (
+        p_user_id,
+        p_reason,
+        deletion_date
+    );
+    
+    -- Mark account as pending deletion to prevent login
+    UPDATE profiles 
+    SET 
+        account_status = 'pending_deletion',
+        updated_at = NOW()
+    WHERE id = p_user_id;
+    
+    RETURN QUERY SELECT true, 'Account deletion scheduled successfully', deletion_date;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to cancel account deletion
+CREATE OR REPLACE FUNCTION cancel_account_deletion(p_user_id UUID)
+RETURNS TABLE (
+    success BOOLEAN,
+    message TEXT
+) AS $$
+BEGIN
+    -- Update the deletion request status to cancelled
+    UPDATE data_deletion_requests 
+    SET 
+        status = 'cancelled',
+        updated_at = NOW()
+    WHERE 
+        user_id = p_user_id 
+        AND status IN ('pending', 'processing');
+    
+    IF FOUND THEN
+        -- Restore account status to active
+        UPDATE profiles 
+        SET 
+            account_status = 'active',
+            updated_at = NOW()
+        WHERE id = p_user_id;
+        
+        RETURN QUERY SELECT true, 'Account deletion cancelled successfully';
+    ELSE
+        RETURN QUERY SELECT false, 'No pending deletion request found';
+    END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get user deletion requests
+CREATE OR REPLACE FUNCTION get_user_deletion_requests(p_user_id UUID)
+RETURNS TABLE (
+    id UUID,
+    reason TEXT,
+    status VARCHAR,
+    requested_at TIMESTAMP WITH TIME ZONE,
+    scheduled_for TIMESTAMP WITH TIME ZONE,
+    processed_at TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        dr.id,
+        dr.reason,
+        dr.status,
+        dr.requested_at,
+        dr.scheduled_for,
+        dr.processed_at
+    FROM data_deletion_requests dr
+    WHERE dr.user_id = p_user_id
+    ORDER BY dr.created_at DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to anonymize user data (for GDPR compliance)
+CREATE OR REPLACE FUNCTION anonymize_user_data(p_user_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    -- Update profile with anonymized data
+    UPDATE profiles SET
+        first_name = 'Deleted',
+        last_name = 'User',
+        phone = NULL,
+        avatar_url = NULL,
+        bio = NULL,
+        location = NULL,
+        date_of_birth = NULL,
+        updated_at = NOW()
+    WHERE id = p_user_id;
+    
+    -- Anonymize messages (keep for conversation context but remove personal info)
+    UPDATE messages SET
+        content = '[Message deleted by user]',
+        updated_at = NOW()
+    WHERE sender_id = p_user_id;
+    
+    -- Anonymize reviews (keep for business integrity but remove personal info)
+    UPDATE reviews SET
+        comment = '[Review deleted by user]',
+        updated_at = NOW()
+    WHERE reviewer_id = p_user_id;
+    
+    -- Delete personal notifications
+    DELETE FROM notifications WHERE user_id = p_user_id;
+    
+    -- Delete user settings
+    DELETE FROM user_settings WHERE user_id = p_user_id;
+    
+    -- Delete favorites
+    DELETE FROM favorites WHERE user_id = p_user_id;
+    
+    -- Delete follows
+    DELETE FROM follows WHERE follower_id = p_user_id OR following_id = p_user_id;
+    
+    -- Delete likes
+    DELETE FROM likes WHERE user_id = p_user_id;
+    
+    -- Delete shares
+    DELETE FROM shares WHERE user_id = p_user_id;
+    
+    -- Delete listing views
+    DELETE FROM listing_views WHERE user_id = p_user_id;
+    
+    -- Delete search analytics
+    DELETE FROM search_analytics WHERE user_id = p_user_id;
+    
+    RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to process account deletion (called by admin or scheduled job)
+CREATE OR REPLACE FUNCTION process_account_deletion(p_user_id UUID)
+RETURNS TABLE (
+    success BOOLEAN,
+    message TEXT
+) AS $$
+DECLARE
+    deletion_request_id UUID;
+BEGIN
+    -- Check if there's a pending deletion request
+    SELECT id INTO deletion_request_id
+    FROM data_deletion_requests 
+    WHERE user_id = p_user_id AND status = 'pending'
+    AND scheduled_for <= NOW();
+    
+    IF deletion_request_id IS NULL THEN
+        RETURN QUERY SELECT false, 'No eligible deletion request found';
+        RETURN;
+    END IF;
+    
+    -- Update status to processing
+    UPDATE data_deletion_requests 
+    SET status = 'processing', updated_at = NOW()
+    WHERE id = deletion_request_id;
+    
+    BEGIN
+        -- Anonymize user data
+        PERFORM anonymize_user_data(p_user_id);
+        
+        -- Mark deletion as completed
+        UPDATE data_deletion_requests 
+        SET 
+            status = 'completed',
+            processed_at = NOW(),
+            updated_at = NOW()
+        WHERE id = deletion_request_id;
+        
+        RETURN QUERY SELECT true, 'Account deletion processed successfully';
+        
+    EXCEPTION WHEN OTHERS THEN
+        -- Mark deletion as failed
+        UPDATE data_deletion_requests 
+        SET 
+            status = 'failed',
+            updated_at = NOW()
+        WHERE id = deletion_request_id;
+        
+        RETURN QUERY SELECT false, 'Account deletion failed: ' || SQLERRM;
+    END;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to check if user can login (not pending deletion)
+CREATE OR REPLACE FUNCTION check_user_login_status(p_user_id UUID)
+RETURNS TABLE (
+    can_login BOOLEAN,
+    account_status VARCHAR,
+    message TEXT,
+    deletion_scheduled_for TIMESTAMP WITH TIME ZONE
+) AS $$
+DECLARE
+    user_status VARCHAR;
+    deletion_date TIMESTAMP WITH TIME ZONE;
+BEGIN
+    -- Get user account status with qualified column name
+    SELECT profiles.account_status INTO user_status
+    FROM profiles 
+    WHERE profiles.id = p_user_id;
+    
+    -- If user not found
+    IF user_status IS NULL THEN
+        RETURN QUERY SELECT false, 'not_found'::VARCHAR, 'User account not found', NULL::TIMESTAMP WITH TIME ZONE;
+        RETURN;
+    END IF;
+    
+    -- Check if account is pending deletion
+    IF user_status = 'pending_deletion' THEN
+        -- Get deletion scheduled date
+        SELECT scheduled_for INTO deletion_date
+        FROM data_deletion_requests 
+        WHERE user_id = p_user_id AND status = 'pending'
+        ORDER BY created_at DESC
+        LIMIT 1;
+        
+        RETURN QUERY SELECT 
+            false, 
+            user_status, 
+            'Account is scheduled for deletion. Contact support to cancel deletion request.',
+            deletion_date;
+        RETURN;
+    END IF;
+    
+    -- Check if account is suspended
+    IF user_status = 'suspended' THEN
+        RETURN QUERY SELECT 
+            false, 
+            user_status, 
+            'Account is suspended. Contact support for assistance.',
+            NULL::TIMESTAMP WITH TIME ZONE;
+        RETURN;
+    END IF;
+    
+    -- Check if account is deleted
+    IF user_status = 'deleted' THEN
+        RETURN QUERY SELECT 
+            false, 
+            user_status, 
+            'Account has been deleted.',
+            NULL::TIMESTAMP WITH TIME ZONE;
+        RETURN;
+    END IF;
+    
+    -- Account is active
+    RETURN QUERY SELECT 
+        true, 
+        user_status, 
+        'Account is active',
+        NULL::TIMESTAMP WITH TIME ZONE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to check if email can be used for signup (not pending deletion)
+CREATE OR REPLACE FUNCTION check_email_signup_eligibility(p_email TEXT)
+RETURNS TABLE (
+    can_signup BOOLEAN,
+    message TEXT,
+    existing_user_id UUID,
+    account_status VARCHAR,
+    deletion_scheduled_for TIMESTAMP WITH TIME ZONE
+) AS $$
+DECLARE
+    existing_user_record RECORD;
+    deletion_date TIMESTAMP WITH TIME ZONE;
+BEGIN
+    -- Check if there's an existing user with this email
+    SELECT au.id, au.email, profiles.account_status
+    INTO existing_user_record
+    FROM auth.users au
+    LEFT JOIN profiles ON au.id = profiles.id
+    WHERE au.email = p_email;
+    
+    -- If no existing user, signup is allowed
+    IF existing_user_record IS NULL THEN
+        RETURN QUERY SELECT 
+            true, 
+            'Email available for signup',
+            NULL::UUID,
+            NULL::VARCHAR,
+            NULL::TIMESTAMP WITH TIME ZONE;
+        RETURN;
+    END IF;
+    
+    -- If user exists but account is pending deletion
+    IF existing_user_record.account_status = 'pending_deletion' THEN
+        -- Get deletion scheduled date
+        SELECT scheduled_for INTO deletion_date
+        FROM data_deletion_requests 
+        WHERE user_id = existing_user_record.id AND status = 'pending'
+        ORDER BY created_at DESC
+        LIMIT 1;
+        
+        RETURN QUERY SELECT 
+            false,
+            'An account with this email is scheduled for deletion. Please wait for the deletion to complete or contact support to cancel the deletion request.',
+            existing_user_record.id,
+            existing_user_record.account_status,
+            deletion_date;
+        RETURN;
+    END IF;
+    
+    -- If user exists and account is deleted, allow signup (reuse email)
+    IF existing_user_record.account_status = 'deleted' THEN
+        RETURN QUERY SELECT 
+            true,
+            'Previous account was deleted, email available for signup',
+            existing_user_record.id,
+            existing_user_record.account_status,
+            NULL::TIMESTAMP WITH TIME ZONE;
+        RETURN;
+    END IF;
+    
+    -- If user exists and account is active or suspended
+    RETURN QUERY SELECT 
+        false,
+        'An account with this email already exists. Please sign in instead.',
+        existing_user_record.id,
+        existing_user_record.account_status,
+        NULL::TIMESTAMP WITH TIME ZONE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =============================================
+-- FIXES FOR AMBIGUOUS COLUMNS AND MISSING PROFILES
+-- =============================================
+
+-- Create the missing function to fix users without profiles
+CREATE OR REPLACE FUNCTION fix_missing_user_profiles()
+RETURNS TABLE(
+    user_id UUID,
+    email TEXT,
+    profile_created BOOLEAN,
+    message TEXT
+) AS $$
+DECLARE
+    user_record RECORD;
+    profile_created_count INTEGER := 0;
+BEGIN
+    -- Find auth users without profiles
+    FOR user_record IN 
+        SELECT au.id, au.email::TEXT as email, au.raw_user_meta_data
+        FROM auth.users au
+        LEFT JOIN profiles p ON au.id = p.id
+        WHERE p.id IS NULL
+        AND au.email_confirmed_at IS NOT NULL
+    LOOP
+        BEGIN
+            -- Create profile for this user
+            PERFORM ensure_user_profile(user_record.id);
+            
+            profile_created_count := profile_created_count + 1;
+            
+            RETURN QUERY SELECT 
+                user_record.id,
+                user_record.email,
+                true,
+                'Profile created successfully'::TEXT;
+                
+        EXCEPTION WHEN OTHERS THEN
+            RETURN QUERY SELECT 
+                user_record.id,
+                user_record.email,
+                false,
+                ('Error creating profile: ' || SQLERRM)::TEXT;
+        END;
+    END LOOP;
+    
+    -- If no users found, return a summary message
+    IF profile_created_count = 0 THEN
+        RETURN QUERY SELECT 
+            NULL::UUID,
+            'No missing profiles found'::TEXT,
+            true,
+            'All verified users already have profiles'::TEXT;
+    END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =============================================
+-- FEATURE PURCHASES UTILITY FUNCTIONS
+-- =============================================
+
+-- Function to get user's active features
+CREATE OR REPLACE FUNCTION get_user_active_features(
+    p_user_id UUID,
+    p_listing_id UUID DEFAULT NULL
+)
+RETURNS TABLE (
+    feature_key VARCHAR(100),
+    feature_name VARCHAR(200),
+    activated_at TIMESTAMP WITH TIME ZONE,
+    expires_at TIMESTAMP WITH TIME ZONE,
+    credits_spent INTEGER
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        fp.feature_key,
+        fp.feature_name,
+        fp.activated_at,
+        fp.expires_at,
+        fp.credits_spent
+    FROM feature_purchases fp
+    WHERE fp.user_id = p_user_id
+    AND fp.status = 'active'
+    AND (p_listing_id IS NULL OR fp.listing_id = p_listing_id OR fp.listing_id IS NULL)
+    AND (fp.expires_at IS NULL OR fp.expires_at > NOW())
+    ORDER BY fp.activated_at DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =============================================
+-- SUBSCRIPTION CANCELLATION FUNCTION
+-- =============================================
+
+-- Function to cancel user subscription (bypasses RLS)
+CREATE OR REPLACE FUNCTION cancel_user_subscription(
+    p_user_id UUID,
+    p_subscription_id UUID
+)
+RETURNS JSONB AS $$
+DECLARE
+    subscription_record RECORD;
+    result JSONB;
+BEGIN
+    -- Verify the subscription exists and belongs to the user
+    SELECT * INTO subscription_record
+    FROM user_subscriptions
+    WHERE id = p_subscription_id
+    AND user_id = p_user_id
+    AND status = 'active';
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error', 'Active subscription not found for user'
+        );
+    END IF;
+
+    -- Update the subscription status
+    UPDATE user_subscriptions
+    SET 
+        status = 'cancelled',
+        auto_renew = false,
+        updated_at = NOW()
+    WHERE id = p_subscription_id
+    AND user_id = p_user_id
+    AND status = 'active';
+
+    -- Check if the update was successful
+    IF FOUND THEN
+        result := jsonb_build_object(
+            'success', true,
+            'message', 'Subscription cancelled successfully',
+            'subscription_id', p_subscription_id,
+            'cancelled_at', NOW()
+        );
+    ELSE
+        result := jsonb_build_object(
+            'success', false,
+            'error', 'Failed to update subscription'
+        );
+    END IF;
+
+    RETURN result;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION cancel_user_subscription(UUID, UUID) TO authenticated;

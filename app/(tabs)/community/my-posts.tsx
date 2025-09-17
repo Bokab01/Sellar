@@ -142,9 +142,9 @@ export default function MyPostsScreen() {
     timestamp: new Date(post.created_at || new Date()).toLocaleString(),
     content: post.content,
     images: post.images || [],
-    likes: post.likes_count || 0,
-    comments: post.comments_count || 0,
-    shares: post.shares_count || 0,
+    likes_count: post.likes_count || 0,
+    comments_count: post.comments_count || 0,
+    shares_count: post.shares_count || 0,
     isLiked: false,
     location: post.location,
     listing: post.listing ? {

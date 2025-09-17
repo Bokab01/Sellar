@@ -321,6 +321,12 @@ export const dbHelpers = {
         following_id: followingId,
       }).select().single();
 
+      // Handle duplicate key error gracefully
+      if (error && error.code === '23505') {
+        // Already following, return success
+        return { data: { action: 'followed' }, error: null };
+      }
+
       return { data: { action: 'followed', ...data }, error };
     }
   },
@@ -698,7 +704,8 @@ export const dbHelpers = {
         unreadCounts[msg.conversation_id] = (unreadCounts[msg.conversation_id] || 0) + 1;
       });
 
-      console.log('📊 Unread counts calculated:', unreadCounts);
+      console.log('📊 Unread counts calculated from database:', unreadCounts);
+      console.log('📊 Total unread messages found:', data?.length || 0);
       return { data: unreadCounts, error: null };
     } catch (err) {
       console.error('❌ Error in getUnreadMessageCounts:', err);

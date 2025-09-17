@@ -33,6 +33,10 @@ import {
   // LazyComponent,
 } from '@/components';
 import { FeaturedListings } from '@/components/FeaturedListings/FeaturedListings';
+import { SimpleFeaturedListings } from '@/components/FeaturedListings/SimpleFeaturedListings';
+import { FixedFeaturedListings } from '@/components/FeaturedListings/FixedFeaturedListings';
+import { PremiumProductCard } from '@/components/PremiumProductCard/PremiumProductCard';
+import { MinimalPremiumProductCard } from '@/components/PremiumProductCard/MinimalPremiumProductCard';
 // Removed SmartSearchModal import - now using dedicated screen
 import { 
   Bell, 
@@ -82,17 +86,7 @@ export default function HomeScreen() {
   // Get notifications for badge
   const { unreadCount, fetchNotifications } = useNotificationStore();
 
-  // App resume handling - refresh listings when app comes back from background
-  const { isRefreshing, isReconnecting } = useAppResume({
-    onResume: async () => {
-      console.log('📱 Home screen: App resumed, refreshing listings...');
-      await refresh();
-      // Also refresh user credit and notifications
-      await fetchUserCredit();
-      await fetchNotifications();
-    },
-    debug: true,
-  });
+  // App resume handling - will be defined after useListings hook
 
   // Temporarily disabled offline listings
   // const { 
@@ -233,7 +227,7 @@ export default function HomeScreen() {
   useEffect(() => {
     fetchUserCredit();
     fetchNotifications();
-  }, [user?.id, fetchNotifications]);
+  }, [user?.id]); // Removed fetchNotifications from dependencies as Zustand functions are stable
 
   // Fetch category counts from database
   useEffect(() => {
@@ -385,19 +379,36 @@ export default function HomeScreen() {
     ? categoryIdMap[selectedCategories[0]] // Use category ID instead of slug
     : undefined;
 
-  const { 
-    listings: products, 
-    loading, 
-    error, 
-    refreshing, 
-    refresh 
-  } = useListings({
+  // Memoize useListings options to prevent infinite re-renders
+  const listingsOptions = useMemo(() => ({
     search: searchQuery,
     category: selectedCategoryId,
     location: filters.location, // Only apply location filter if explicitly set by user
     priceMin: filters.priceRange.min,
     priceMax: filters.priceRange.max,
     condition: filters.condition,
+  }), [searchQuery, selectedCategoryId, filters.location, filters.priceRange.min, filters.priceRange.max, filters.condition]);
+
+  const { 
+    listings: products, 
+    loading, 
+    error, 
+    refreshing, 
+    refresh 
+  } = useListings(listingsOptions);
+
+  // App resume handling - refresh listings when app comes back from background
+  const onResumeCallback = React.useCallback(async () => {
+    console.log('📱 Home screen: App resumed, refreshing listings...');
+    await refresh();
+    // Also refresh user credit and notifications
+    await fetchUserCredit();
+    await fetchNotifications();
+  }, [refresh]); // Removed fetchUserCredit and fetchNotifications as they are stable functions
+
+  const { isRefreshing, isReconnecting } = useAppResume({
+    onResume: onResumeCallback,
+    debug: true,
   });
 
   // Real-time updates should handle new listings automatically
@@ -407,30 +418,21 @@ export default function HomeScreen() {
   const transformedProducts = useMemo(() => products.map((listing: any) => {
     // Handle both joined and simple listing data
     const seller = listing.profiles || null;
-    const badges = [];
     
-    // Add boost badge if listing is boosted
-    if (listing.boost_until && new Date(listing.boost_until) > new Date()) {
-      badges.push({ text: 'Boosted', variant: 'featured' as const });
-    }
+    // Determine the highest priority badge (only show ONE badge per listing)
+    let primaryBadge = null;
     
-    // Add urgent badge if listing has urgent sale
+    // Priority order: Urgent > Spotlight > Boosted > Business > Verified
     if (listing.urgent_until && new Date(listing.urgent_until) > new Date()) {
-      badges.push({ text: 'Urgent Sale', variant: 'urgent' as const });
-    }
-    
-    // Add spotlight badge if listing is spotlighted
-    if (listing.spotlight_until && new Date(listing.spotlight_until) > new Date()) {
-      badges.push({ text: 'Spotlight', variant: 'spotlight' as const });
-    }
-    
-    // Add business badges if seller has them
-    if (seller?.account_type === 'business') {
-      badges.push({ text: 'Business', variant: 'info' as const });
-    }
-    
-    if (seller?.verification_status === 'verified') {
-      badges.push({ text: 'Verified', variant: 'success' as const });
+      primaryBadge = { text: 'Urgent Sale', variant: 'urgent' as const };
+    } else if (listing.spotlight_until && new Date(listing.spotlight_until) > new Date()) {
+      primaryBadge = { text: 'Spotlight', variant: 'spotlight' as const };
+    } else if (listing.boost_until && new Date(listing.boost_until) > new Date()) {
+      primaryBadge = { text: 'Boosted', variant: 'featured' as const };
+    } else if (seller?.account_type === 'business') {
+      primaryBadge = { text: 'Business', variant: 'info' as const };
+    } else if (seller?.verification_status === 'verified') {
+      primaryBadge = { text: 'Verified', variant: 'success' as const };
     }
 
     // Check if listing is highlighted
@@ -449,7 +451,7 @@ export default function HomeScreen() {
         rating: seller?.rating || 0,
         badges: seller?.account_type === 'business' ? ['business'] : [],
       },
-      badge: badges[0], // Show first badge
+      badge: primaryBadge || undefined, // Convert null to undefined
       location: listing.location,
       views: listing.views_count || 0,
       favorites: listing.favorites_count || 0,
@@ -854,14 +856,12 @@ export default function HomeScreen() {
                 </ScrollView>
               </View>
 
-              {/* Featured Business Listings */}
-              <FeaturedListings
+              {/* Featured Business Listings - USING WORKING MINIMAL VERSION */}
+              <FixedFeaturedListings
                 maxItems={6}
                 layout="horizontal"
                 onViewAll={() => {
-                  setSelectedCategories([]);
-                  setSearchQuery('');
-                  // Could add a business filter here in the future
+                  router.push('/(tabs)/home/business-listings');
                 }}
               />
 
@@ -898,27 +898,6 @@ export default function HomeScreen() {
                         router.push(`/(tabs)/home/${product.id}`);
                       }}
                     />
-                    
-                    {/* Professional Badges Overlay */}
-                    <View style={{
-                      position: 'absolute',
-                      top: theme.spacing.sm,
-                      left: theme.spacing.sm,
-                      right: theme.spacing.sm,
-                      flexDirection: 'row',
-                      flexWrap: 'wrap',
-                      gap: theme.spacing.xs,
-                    }}>
-                      {/* Boost Badge */}
-                      {product.isBoosted && (
-                        <BoostBadge size="sm" />
-                      )}
-                      
-                      {/* Verified Seller Badge */}
-                      {product.isVerified && (
-                        <VerifiedBadge size="sm" />
-                      )}
-                    </View>
                   </View>
                 ))}
               </Grid>

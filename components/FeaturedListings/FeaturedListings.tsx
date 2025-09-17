@@ -49,11 +49,7 @@ export function FeaturedListings({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchFeaturedListings();
-  }, []);
-
-  const fetchFeaturedListings = async () => {
+  const fetchFeaturedListings = React.useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -92,7 +88,7 @@ export function FeaturedListings({
           currency,
           images,
           location,
-          view_count,
+          views_count,
           created_at,
           user_id
         `)
@@ -123,10 +119,10 @@ export function FeaturedListings({
             rating: (profile as any)?.rating,
             isBusinessUser: true, // All these listings are from business users
           },
-          isBoosted: Math.random() > 0.5, // Simulate boost status
-          isSponsored: Math.random() > 0.7, // Simulate sponsored status
+          isBoosted: listing.id.length % 2 === 0, // Stable pseudo-random based on ID
+          isSponsored: listing.id.length % 3 === 0, // Stable pseudo-random based on ID
           isPriority: true, // All featured listings are priority
-          viewCount: listing.view_count || 0,
+          viewCount: listing.views_count || 0,
           createdAt: listing.created_at,
         };
       }) || [];
@@ -138,7 +134,11 @@ export function FeaturedListings({
     } finally {
       setLoading(false);
     }
-  };
+  }, [maxItems]); // Add maxItems as dependency since it affects the query
+
+  useEffect(() => {
+    fetchFeaturedListings();
+  }, [fetchFeaturedListings]);
 
   const handleListingPress = (listingId: string) => {
     router.push(`/(tabs)/home/${listingId}`);

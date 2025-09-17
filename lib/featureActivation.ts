@@ -181,7 +181,7 @@ class FeatureActivationService {
       .from('listings')
       .update({
         spotlight_category: listing.category_id,
-        spotlight_expires_at: expiresAt.toISOString(),
+        spotlight_until: expiresAt.toISOString(),
         spotlighted_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -351,9 +351,9 @@ class FeatureActivationService {
       .from('listings')
       .update({
         spotlight_category: null,
-        spotlight_expires_at: null,
+        spotlight_until: null,
       })
-      .lt('spotlight_expires_at', now);
+      .lt('spotlight_until', now);
   }
 
   /**

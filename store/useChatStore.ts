@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface ChatState {
   // Active conversation
@@ -19,13 +21,19 @@ interface ChatState {
   markAsUnread: (conversationId: string) => void;
   clearManuallyMarkedAsUnread: (conversationId: string) => void;
   
+  // Track when conversations were last marked as read (for app reload persistence)
+  lastReadTimestamps: Record<string, number>; // conversationId -> timestamp
+  setLastReadTimestamp: (conversationId: string, timestamp: number) => void;
+  
   // Draft messages
   draftMessages: Record<string, string>; // conversationId -> draft text
   setDraftMessage: (conversationId: string, text: string) => void;
   clearDraftMessage: (conversationId: string) => void;
 }
 
-export const useChatStore = create<ChatState>((set, get) => ({
+export const useChatStore = create<ChatState>()(
+  persist(
+    (set, get) => ({
   // Active conversation
   activeConversationId: null,
   setActiveConversationId: (id) => set({ activeConversationId: id }),
@@ -73,30 +81,35 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return;
     }
     
+    console.log('📖 ChatStore markAsRead called for conversation:', conversationId);
+    
+    // Update local state immediately
     const newCounts = { ...unreadCounts };
     delete newCounts[conversationId];
-    set({ unreadCounts: newCounts });
     
-    // Also mark messages as read in the database
-    try {
-      const { supabase } = await import('@/lib/supabase');
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (user) {
-        await supabase
-          .from('messages')
-          .update({ read_at: new Date().toISOString() })
-          .eq('conversation_id', conversationId)
-          .neq('sender_id', user.id)
-          .is('read_at', null);
-      }
-    } catch (error) {
-      console.error('Failed to mark messages as read in database:', error);
-    }
+    // Track when this conversation was last marked as read
+    const { lastReadTimestamps } = get();
+    const timestamp = Date.now();
+    
+    set({ 
+      unreadCounts: newCounts,
+      lastReadTimestamps: {
+        ...lastReadTimestamps,
+        [conversationId]: timestamp,
+      },
+    });
+    console.log('📊 ChatStore updated local unread count to 0 for conversation:', conversationId);
+    console.log('⏰ ChatStore recorded read timestamp:', timestamp, 'for conversation:', conversationId);
+    
+    // Note: Database update is handled by markMessagesAsRead in useMessages hook
+    // to avoid duplicate database calls and race conditions
   },
   
   // Manually marked as unread
   manuallyMarkedAsUnread: new Set(),
+  
+  // Track when conversations were last marked as read
+  lastReadTimestamps: {},
   markAsUnread: (conversationId) => {
     const { manuallyMarkedAsUnread } = get();
     const newSet = new Set(manuallyMarkedAsUnread);
@@ -108,6 +121,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const newSet = new Set(manuallyMarkedAsUnread);
     newSet.delete(conversationId);
     set({ manuallyMarkedAsUnread: newSet });
+  },
+  
+  setLastReadTimestamp: (conversationId, timestamp) => {
+    const { lastReadTimestamps } = get();
+    set({
+      lastReadTimestamps: {
+        ...lastReadTimestamps,
+        [conversationId]: timestamp,
+      },
+    });
   },
   
   // Draft messages
@@ -127,4 +150,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
     delete newDrafts[conversationId];
     set({ draftMessages: newDrafts });
   },
-}));
+    }),
+    {
+      name: 'chat-store',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        unreadCounts: state.unreadCounts,
+        lastReadTimestamps: state.lastReadTimestamps,
+        manuallyMarkedAsUnread: Array.from(state.manuallyMarkedAsUnread),
+        draftMessages: state.draftMessages,
+      }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          // Convert array back to Set for manuallyMarkedAsUnread
+          state.manuallyMarkedAsUnread = new Set(state.manuallyMarkedAsUnread as any);
+        }
+      },
+    }
+  )
+);

@@ -227,7 +227,8 @@ export function useListingsRealtime(onListingUpdate: (listing: any) => void) {
 }
 
 export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
-  return useRealtime({
+  // Set up posts subscription
+  const postsSubscription = useRealtime({
     table: 'posts',
     onInsert: async (payload) => {
       console.log('🔗 Real-time post insert:', payload);
@@ -285,7 +286,127 @@ export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
         onPostUpdate(payload);
       }
     },
+    onDelete: (payload) => {
+      console.log('🔗 Real-time post delete:', payload);
+      // For deletes, we just need to remove the post from the UI
+      // The payload.old contains the deleted post data
+      onPostUpdate({ ...payload, _deleted: true });
+    }
   });
+
+  // Set up comments subscription to catch comment count changes
+  const commentsSubscription = useRealtime({
+    table: 'comments',
+    onInsert: async (payload) => {
+      console.log('🔗 Real-time comment insert for community feed:', payload);
+      // When a comment is added, refresh the affected post to get updated counts
+      if (payload.post_id) {
+        try {
+          console.log('🔗 Fetching updated post data for post_id:', payload.post_id);
+          const { data, error } = await supabase
+            .from('posts')
+            .select(`
+              *,
+              profiles(*),
+              listings(*)
+            `)
+            .eq('id', payload.post_id)
+            .single();
+          
+          if (!error && data) {
+            console.log('🔗 Fetched post with updated comment count:', {
+              postId: data.id,
+              newCount: data.comments_count
+            });
+            onPostUpdate(data);
+          } else {
+            console.error('🔗 Error fetching post after comment:', error);
+          }
+        } catch (err) {
+          console.error('🔗 Exception fetching post after comment:', err);
+        }
+      }
+    },
+    onDelete: async (payload) => {
+      console.log('🔗 Real-time comment delete:', payload);
+      // When a comment is deleted, refresh the affected post to get updated counts
+      if (payload.post_id) {
+        try {
+          const { data, error } = await supabase
+            .from('posts')
+            .select(`
+              *,
+              profiles(*),
+              listings(*)
+            `)
+            .eq('id', payload.post_id)
+            .single();
+          
+          if (!error && data) {
+            console.log('🔗 Fetched post with updated comment count after deletion:', data);
+            onPostUpdate(data);
+          }
+        } catch (err) {
+          console.error('🔗 Error fetching post after comment deletion:', err);
+        }
+      }
+    }
+  });
+
+  // Set up likes subscription to catch like count changes
+  const likesSubscription = useRealtime({
+    table: 'likes',
+    onInsert: async (payload) => {
+      console.log('🔗 Real-time like insert:', payload);
+      // When a like is added, refresh the affected post to get updated counts
+      if (payload.post_id) {
+        try {
+          const { data, error } = await supabase
+            .from('posts')
+            .select(`
+              *,
+              profiles(*),
+              listings(*)
+            `)
+            .eq('id', payload.post_id)
+            .single();
+          
+          if (!error && data) {
+            console.log('🔗 Fetched post with updated like count:', data);
+            onPostUpdate(data);
+          }
+        } catch (err) {
+          console.error('🔗 Error fetching post after like:', err);
+        }
+      }
+    },
+    onDelete: async (payload) => {
+      console.log('🔗 Real-time like delete:', payload);
+      // When a like is removed, refresh the affected post to get updated counts
+      if (payload.post_id) {
+        try {
+          const { data, error } = await supabase
+            .from('posts')
+            .select(`
+              *,
+              profiles(*),
+              listings(*)
+            `)
+            .eq('id', payload.post_id)
+            .single();
+          
+          if (!error && data) {
+            console.log('🔗 Fetched post with updated like count after unlike:', data);
+            onPostUpdate(data);
+          }
+        } catch (err) {
+          console.error('🔗 Error fetching post after unlike:', err);
+        }
+      }
+    }
+  });
+
+  return { postsSubscription, commentsSubscription, likesSubscription };
 }
 
 export function useOffersRealtime(conversationId: string, onOfferUpdate: (offer: any) => void) {

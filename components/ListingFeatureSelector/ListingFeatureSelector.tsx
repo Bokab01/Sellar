@@ -7,7 +7,7 @@ import { Button } from '@/components/Button/Button';
 import { Badge } from '@/components/Badge/Badge';
 import { AppModal } from '@/components/Modal/Modal';
 import { PriceDisplay } from '@/components/PriceDisplay/PriceDisplay';
-import { FEATURE_CATALOG, getFeatureByKey, BUSINESS_PLANS } from '@/constants/monetization';
+import { FEATURE_CATALOG, getFeatureByKey, getFeatureCost, getBusinessDiscount, BUSINESS_PLANS } from '@/constants/monetization';
 import { 
   Zap, 
   Rocket, 
@@ -70,23 +70,31 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
   };
 
   const getBenefits = (key: string) => {
-    switch (key) {
-      case 'pulse_boost_24h':
-        return ['2x visibility for 24 hours', 'Higher search ranking', 'More views & inquiries'];
-      case 'mega_pulse_7d':
-        return ['5x visibility for 7 days', 'Top search results', 'Maximum exposure'];
-      case 'category_spotlight_3d':
-        return ['Featured in category', '3 days of prominence', 'Category page highlight'];
-      case 'ad_refresh':
-        return ['Move to top instantly', 'Fresh timestamp', 'Renewed visibility'];
-      case 'listing_highlight':
-        return ['Golden border highlight', '7 days of distinction', 'Stands out visually'];
-      case 'urgent_badge':
-        return ['Red "Urgent Sale" badge', '3 days of urgency', 'Attracts quick buyers'];
-      default:
-        return ['Enhanced visibility', 'Better performance', 'More engagement'];
+    const baseBenefits = {
+      'pulse_boost_24h': ['2x visibility for 24 hours', 'Higher search ranking', 'More views & inquiries'],
+      'mega_pulse_7d': ['5x visibility for 7 days', 'Top search results', 'Maximum exposure'],
+      'category_spotlight_3d': ['Featured in category', '3 days of prominence', 'Category page highlight'],
+      'ad_refresh': ['Move to top instantly', 'Fresh timestamp', 'Renewed visibility'],
+      'listing_highlight': ['Golden border highlight', '7 days of distinction', 'Stands out visually'],
+      'urgent_badge': ['Red "Urgent Sale" badge', '3 days of urgency', 'Attracts quick buyers'],
+    };
+    
+    const benefits = baseBenefits[key as keyof typeof baseBenefits] || ['Enhanced visibility', 'Better performance', 'More engagement'];
+    
+    // Add business-specific benefits
+    if (isBusinessPlan) {
+      if (key === 'ad_refresh') {
+        return [...benefits, 'FREE auto-refresh every 2 hours!'];
+      }
+      return [...benefits, `${getBusinessDiscount(key)}% discount for business users!`];
     }
+    
+    return benefits;
   };
+
+  const credits = getFeatureCost(featureKey, isBusinessPlan);
+  const regularCredits = (feature as any).regularCredits || 0;
+  const discount = getBusinessDiscount(featureKey);
 
   return (
     <TouchableOpacity
@@ -123,19 +131,50 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
             {feature.description}
           </Text>
           
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.sm }}>
-            <Badge 
-              text={`${feature.credits} credits`} 
-              variant="primary" 
-              size="sm"
-              style={{ marginRight: theme.spacing.sm }}
-            />
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.sm, flexWrap: 'wrap', gap: theme.spacing.sm }}>
+            {/* Pricing with business discount */}
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              {isBusinessPlan && regularCredits > credits && (
+                <Badge 
+                  text={`${regularCredits} credits`} 
+                  variant="neutral" 
+                  size="sm"
+                  style={{ 
+                    marginRight: theme.spacing.xs,
+                    textDecorationLine: 'line-through',
+                    opacity: 0.6
+                  }}
+                />
+              )}
+              <Badge 
+                text={credits === 0 ? 'FREE' : `${credits} credits`} 
+                variant={credits === 0 ? "success" : "primary"} 
+                size="sm"
+              />
+              {isBusinessPlan && discount > 0 && (
+                <Badge 
+                  text={`${discount}% OFF`} 
+                  variant="success" 
+                  size="sm"
+                  style={{ marginLeft: theme.spacing.xs }}
+                />
+              )}
+            </View>
+            
             <Badge 
               text={feature.duration} 
               variant="neutral" 
               size="sm"
               leftIcon={<Clock size={12} color={theme.colors.text.secondary} />}
             />
+            
+            {isBusinessPlan && featureKey === 'ad_refresh' && (
+              <Badge 
+                text="Auto-refresh 2h" 
+                variant="success" 
+                size="sm"
+              />
+            )}
           </View>
         </View>
       </View>
@@ -166,7 +205,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
           borderRadius: theme.borderRadius.sm,
         }}>
           <Text variant="caption" color="error">
-            Insufficient credits. Need {feature.credits} credits.
+            Insufficient credits. Need {getFeatureCost(featureKey, isBusinessPlan)} credits.
           </Text>
         </View>
       )}
@@ -209,9 +248,9 @@ export function ListingFeatureSelector({
   };
 
   const getTotalCost = () => {
+    const isBusinessUser = hasBusinessPlan();
     return selectedFeatures.reduce((total, key) => {
-      const feature = getFeatureByKey(key);
-      return total + (feature?.credits || 0);
+      return total + getFeatureCost(key, isBusinessUser);
     }, 0);
   };
 
@@ -244,10 +283,11 @@ export function ListingFeatureSelector({
 
     const features: SelectedFeature[] = selectedFeatures.map(key => {
       const feature = getFeatureByKey(key);
+      const isBusinessUser = hasBusinessPlan();
       return {
         key,
         name: feature?.name || key,
-        credits: feature?.credits || 0,
+        credits: getFeatureCost(key, isBusinessUser),
         duration: feature?.duration || '24 hours',
         description: feature?.description || ''
       };
@@ -303,10 +343,16 @@ export function ListingFeatureSelector({
       visible={visible}
       onClose={onClose}
       title="Boost Your Listing"
-      size="lg"
+      position='bottom'
+      size='lg'
     >
-      <ScrollView style={{ maxHeight: 600 }}>
-        <View style={{ padding: theme.spacing.lg }}>
+      <View style={{ height: 500 }}>
+        <ScrollView 
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: theme.spacing.lg }}
+          showsVerticalScrollIndicator={true}
+          bounces={true}
+        >
           {/* Header */}
           <View style={{ marginBottom: theme.spacing.lg }}>
             <Text variant="h3" style={{ marginBottom: theme.spacing.sm }}>
@@ -354,7 +400,7 @@ export function ListingFeatureSelector({
                 feature={feature}
                 isSelected={selectedFeatures.includes(key)}
                 onToggle={() => handleFeatureToggle(key)}
-                canAfford={canAffordFeature(feature.credits)}
+                canAfford={canAffordFeature(getFeatureCost(key, hasBusinessPlan()))}
                 isBusinessPlan={hasBusinessPlan()}
               />
             ))}
@@ -385,7 +431,7 @@ export function ListingFeatureSelector({
                   }}>
                     <Text variant="body">{feature?.name}</Text>
                     <Text variant="body" color="primary">
-                      {feature?.credits} credits
+                      {getFeatureCost(key, hasBusinessPlan())} credits
                     </Text>
                   </View>
                 );
@@ -442,8 +488,8 @@ export function ListingFeatureSelector({
               Features will be applied immediately after your listing is published. You can always add more features later from your listing management page.
             </Text>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </View>
     </AppModal>
   );
 }

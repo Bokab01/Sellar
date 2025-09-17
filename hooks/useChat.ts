@@ -19,6 +19,9 @@ export function useConversations() {
       }
       setError(null);
 
+      // Delay to ensure database updates have propagated
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       // Fetch conversations and unread counts in parallel
       const [conversationsResult, unreadCountsResult] = await Promise.all([
         dbHelpers.getConversations(user.id),
@@ -31,20 +34,59 @@ export function useConversations() {
         setConversations(conversationsResult.data || []);
         
         // Update unread counts in the chat store
-        const { setUnreadCount, unreadCounts } = useChatStore.getState();
+        const { setUnreadCount, unreadCounts, manuallyMarkedAsUnread, lastReadTimestamps } = useChatStore.getState();
         
         if (unreadCountsResult.data) {
-          // Update counts for conversations with unread messages
+          // Smart merge: only update counts for conversations that:
+          // 1. Have unread messages in the database, OR
+          // 2. Are not in the local state (new conversations)
+          // 3. Are not manually marked as unread (preserve user's manual marking)
           Object.entries(unreadCountsResult.data).forEach(([conversationId, count]) => {
-            setUnreadCount(conversationId, count as number);
+            const currentLocalCount = unreadCounts[conversationId] || 0;
+            const isManuallyMarked = manuallyMarkedAsUnread.has(conversationId);
+            
+            // Smart logic to handle race conditions, app reloads, and preserve local state
+            const lastReadTime = lastReadTimestamps[conversationId];
+            const timeSinceLastRead = lastReadTime ? Date.now() - lastReadTime : null;
+            const isRecentRead = timeSinceLastRead !== null && timeSinceLastRead < 300000; // 5 minutes
+            
+            if (isManuallyMarked) {
+              console.log('🚫 Preserving manually marked unread conversation:', conversationId);
+              // Don't update manually marked conversations
+            } else if (!(conversationId in unreadCounts)) {
+              // New conversation not in local state - use database count
+              console.log('📊 New conversation, using database count:', conversationId, 'count:', count);
+              setUnreadCount(conversationId, count as number);
+            } else if (count > 0 && currentLocalCount === 0) {
+              // Database shows unread but local shows 0 - check if this is a recent read
+              if (isRecentRead) {
+                console.log('⚠️ Recent read detected - database shows unread but local shows 0 for:', conversationId);
+                console.log('⏰ Last read:', timeSinceLastRead, 'ms ago - preserving local state (0)');
+                // Don't update - preserve the local state of 0
+              } else {
+                console.log('📊 App reload detected - using database count for:', conversationId, 'count:', count);
+                setUnreadCount(conversationId, count as number);
+              }
+            } else if (count > 0 && currentLocalCount > 0) {
+              // If both database and local have unread messages, use the higher count
+              const maxCount = Math.max(count as number, currentLocalCount);
+              if (maxCount !== currentLocalCount) {
+                console.log('📊 Using higher unread count:', conversationId, 'count:', maxCount);
+                setUnreadCount(conversationId, maxCount);
+              }
+            } else if (count === 0 && currentLocalCount > 0) {
+              // Database shows 0 but local shows unread - use database (messages were read)
+              console.log('📊 Database shows 0, updating local count to 0 for:', conversationId);
+              setUnreadCount(conversationId, 0);
+            }
           });
         }
         
-        // Clear counts for conversations that no longer have unread messages
-        // This ensures that conversations marked as read are properly cleared
+        // Clear counts for conversations that no longer have unread messages in database
+        // But only if they're not manually marked as unread
         const currentUnreadCounts = unreadCountsResult.data || {};
         Object.keys(unreadCounts).forEach(conversationId => {
-          if (!(conversationId in currentUnreadCounts)) {
+          if (!(conversationId in currentUnreadCounts) && !manuallyMarkedAsUnread.has(conversationId)) {
             console.log('🧹 Clearing unread count for conversation:', conversationId);
             setUnreadCount(conversationId, 0);
           }
@@ -234,18 +276,33 @@ export function useMessages(conversationId: string) {
 
       if (error) {
         console.error('❌ Failed to mark messages as read:', error);
+        // Even if database update fails, update local state to prevent UI issues
+        const { setUnreadCount, clearManuallyMarkedAsUnread } = useChatStore.getState();
+        setUnreadCount(conversationId, 0);
+        clearManuallyMarkedAsUnread(conversationId);
+        console.log('📊 Updated local unread count to 0 despite database error');
       } else {
         console.log('✅ Marked messages as read:', data?.length || 0, 'messages in conversation:', conversationId);
-        
-        // Update local unread count to 0 since messages are now read
         if (data && data.length > 0) {
-          const { setUnreadCount } = useChatStore.getState();
-          setUnreadCount(conversationId, 0);
-          console.log('📊 Updated local unread count to 0 for conversation:', conversationId);
+          console.log('📝 Messages marked as read:', data.map(msg => ({ id: msg.id, read_at: msg.read_at })));
         }
+        
+        // Always update local unread count to 0 since we're marking messages as read
+        const { setUnreadCount, clearManuallyMarkedAsUnread } = useChatStore.getState();
+        setUnreadCount(conversationId, 0);
+        clearManuallyMarkedAsUnread(conversationId); // Clear manual marking since we're reading
+        console.log('📊 Updated local unread count to 0 for conversation:', conversationId);
+        
+        // Wait a bit to ensure database update is committed
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
     } catch (error) {
       console.error('❌ Exception in markMessagesAsRead:', error);
+      // Even if there's an exception, update local state
+      const { setUnreadCount, clearManuallyMarkedAsUnread } = useChatStore.getState();
+      setUnreadCount(conversationId, 0);
+      clearManuallyMarkedAsUnread(conversationId);
+      console.log('📊 Updated local unread count to 0 despite exception');
     }
   };
 

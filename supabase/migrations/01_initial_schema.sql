@@ -80,6 +80,9 @@ CREATE TABLE profiles (
     onboarding_completed BOOLEAN DEFAULT false,
     onboarding_completed_at TIMESTAMP WITH TIME ZONE,
     
+    -- Account status for deletion management
+    account_status VARCHAR(20) DEFAULT 'active' CHECK (account_status IN ('active', 'suspended', 'pending_deletion', 'deleted')),
+    
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -219,7 +222,7 @@ CREATE TABLE posts (
     comments_count INTEGER DEFAULT 0,
     shares_count INTEGER DEFAULT 0,
     is_pinned BOOLEAN DEFAULT false,
-    type VARCHAR(20) DEFAULT 'general' CHECK (type IN ('general', 'listing', 'review', 'announcement')),
+    type VARCHAR(20) DEFAULT 'general' CHECK (type IN ('general', 'listing', 'review', 'announcement', 'showcase', 'question', 'tips', 'event', 'collaboration')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -418,6 +421,22 @@ CREATE TABLE community_rewards (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Feature purchases system
+CREATE TABLE feature_purchases (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    listing_id UUID REFERENCES listings(id) ON DELETE CASCADE,
+    feature_key VARCHAR(100) NOT NULL,
+    feature_name VARCHAR(200), -- Human-readable feature name
+    credits_spent INTEGER NOT NULL,
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'expired', 'cancelled')),
+    activated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- User achievements
 CREATE TABLE user_achievements (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -602,6 +621,7 @@ CREATE TABLE support_tickets (
     app_version VARCHAR(20),
     device_info JSONB DEFAULT '{}',
     ticket_number VARCHAR(20) UNIQUE,
+    user_agent TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     resolved_at TIMESTAMP WITH TIME ZONE
@@ -616,6 +636,56 @@ CREATE TABLE support_ticket_messages (
     is_staff_response BOOLEAN DEFAULT false,
     attachments JSONB DEFAULT '[]',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Knowledge base articles
+CREATE TABLE kb_articles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) UNIQUE NOT NULL,
+    content TEXT NOT NULL,
+    excerpt TEXT,
+    category VARCHAR(100) NOT NULL,
+    tags TEXT[] DEFAULT '{}',
+    author_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+    is_published BOOLEAN DEFAULT false,
+    view_count INTEGER DEFAULT 0,
+    helpful_count INTEGER DEFAULT 0,
+    not_helpful_count INTEGER DEFAULT 0,
+    search_vector tsvector,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    published_at TIMESTAMP WITH TIME ZONE
+);
+
+-- FAQ items
+CREATE TABLE faq_items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    question TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    category VARCHAR(100) NOT NULL,
+    order_index INTEGER DEFAULT 0,
+    is_featured BOOLEAN DEFAULT false,
+    view_count INTEGER DEFAULT 0,
+    helpful_count INTEGER DEFAULT 0,
+    not_helpful_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Data deletion requests (GDPR compliance)
+CREATE TABLE data_deletion_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    reason TEXT,
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'cancelled')),
+    requested_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    scheduled_for TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '30 days'),
+    processed_at TIMESTAMP WITH TIME ZONE,
+    processed_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- =============================================
@@ -708,6 +778,14 @@ CREATE INDEX idx_credit_transactions_user_id ON credit_transactions(user_id);
 CREATE INDEX idx_credit_transactions_type ON credit_transactions(type);
 CREATE INDEX idx_credit_transactions_created_at ON credit_transactions(created_at DESC);
 
+-- Feature purchases indexes
+CREATE INDEX idx_feature_purchases_user_id ON feature_purchases(user_id);
+CREATE INDEX idx_feature_purchases_listing_id ON feature_purchases(listing_id);
+CREATE INDEX idx_feature_purchases_feature_key ON feature_purchases(feature_key);
+CREATE INDEX idx_feature_purchases_status ON feature_purchases(status);
+CREATE INDEX idx_feature_purchases_expires_at ON feature_purchases(expires_at);
+CREATE INDEX idx_feature_purchases_activated_at ON feature_purchases(activated_at);
+
 -- Reviews indexes
 CREATE INDEX idx_reviews_reviewer_id ON reviews(reviewer_id);
 CREATE INDEX idx_reviews_reviewed_user_id ON reviews(reviewed_user_id);
@@ -743,6 +821,7 @@ CREATE TRIGGER update_reviews_updated_at BEFORE UPDATE ON reviews FOR EACH ROW E
 CREATE TRIGGER update_transactions_updated_at BEFORE UPDATE ON transactions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_user_credits_updated_at BEFORE UPDATE ON user_credits FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_user_subscriptions_updated_at BEFORE UPDATE ON user_subscriptions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_feature_purchases_updated_at BEFORE UPDATE ON feature_purchases FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_user_verification_updated_at BEFORE UPDATE ON user_verification FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_user_settings_updated_at BEFORE UPDATE ON user_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_notification_preferences_updated_at BEFORE UPDATE ON notification_preferences FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -896,6 +975,24 @@ CREATE INDEX idx_support_tickets_app_version ON support_tickets(app_version);
 CREATE INDEX idx_support_tickets_ticket_number ON support_tickets(ticket_number);
 CREATE INDEX idx_support_ticket_messages_ticket_id ON support_ticket_messages(ticket_id);
 CREATE INDEX idx_support_ticket_messages_user_id ON support_ticket_messages(user_id);
+
+-- Knowledge base indexes
+CREATE INDEX idx_kb_articles_category ON kb_articles(category);
+CREATE INDEX idx_kb_articles_is_published ON kb_articles(is_published);
+CREATE INDEX idx_kb_articles_slug ON kb_articles(slug);
+CREATE INDEX idx_kb_articles_search_vector ON kb_articles USING gin(search_vector);
+CREATE INDEX idx_kb_articles_created_at ON kb_articles(created_at);
+CREATE INDEX idx_kb_articles_author_id ON kb_articles(author_id);
+
+-- FAQ indexes
+CREATE INDEX idx_faq_items_category ON faq_items(category);
+CREATE INDEX idx_faq_items_is_featured ON faq_items(is_featured);
+CREATE INDEX idx_faq_items_order_index ON faq_items(order_index);
+
+-- Data deletion requests indexes
+CREATE INDEX idx_data_deletion_requests_user_id ON data_deletion_requests(user_id);
+CREATE INDEX idx_data_deletion_requests_status ON data_deletion_requests(status);
+CREATE INDEX idx_data_deletion_requests_scheduled_for ON data_deletion_requests(scheduled_for);
 
 -- =============================================
 -- STORAGE BUCKETS SETUP

@@ -103,9 +103,9 @@ export function Toast({
       case 'info':
       default:
         return {
-          backgroundColor: theme.colors.text.primary,
-          textColor: theme.colors.text.inverse,
-          icon: <Info size={20} color={theme.colors.text.inverse} />,
+          backgroundColor: theme.colors.primary,
+          textColor: theme.colors.primaryForeground,
+          icon: <Info size={20} color={theme.colors.primaryForeground} />,
         };
     }
   };

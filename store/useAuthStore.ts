@@ -42,6 +42,35 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return { error: errorInfo.message };
       }
 
+      // Check account status after successful authentication
+      if (data.user) {
+        const { data: statusData, error: statusError } = await supabase
+          .rpc('check_user_login_status', { p_user_id: data.user.id });
+
+        if (statusError) {
+          console.error('Error checking account status:', statusError);
+          // Continue with login if status check fails (fail open)
+        } else if (statusData?.[0]) {
+          const status = statusData[0];
+          if (!status.can_login) {
+            // Sign out the user immediately
+            await supabase.auth.signOut();
+            
+            // Return specific error message based on account status
+            if (status.account_status === 'pending_deletion') {
+              const deletionDate = status.deletion_scheduled_for 
+                ? new Date(status.deletion_scheduled_for).toLocaleDateString()
+                : 'soon';
+              return { 
+                error: `Your account is scheduled for deletion on ${deletionDate}. Contact support to cancel this request.` 
+              };
+            } else {
+              return { error: status.message };
+            }
+          }
+        }
+      }
+
       return {};
     } catch (error) {
       const errorInfo = analyzeAuthError(error);
@@ -80,6 +109,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       console.log('Attempting signup with:', { email, userData });
       
+      // Check if email is eligible for signup (not pending deletion)
+      const { data: eligibilityData, error: eligibilityError } = await supabase
+        .rpc('check_email_signup_eligibility', { p_email: email });
+
+      if (eligibilityError) {
+        console.error('Error checking email eligibility:', eligibilityError);
+        // Continue with signup if check fails (fail open)
+      } else if (eligibilityData?.[0]) {
+        const eligibility = eligibilityData[0];
+        if (!eligibility.can_signup) {
+          // Return specific error message based on account status
+          if (eligibility.account_status === 'pending_deletion') {
+            const deletionDate = eligibility.deletion_scheduled_for 
+              ? new Date(eligibility.deletion_scheduled_for).toLocaleDateString()
+              : 'soon';
+            return { 
+              error: `An account with this email is scheduled for deletion on ${deletionDate}. Please wait for the deletion to complete or contact support to cancel the deletion request.` 
+            };
+          } else {
+            return { error: eligibility.message };
+          }
+        }
+      }
+      
       const { data, error } = await networkUtils.supabaseWithRetry(
         () => supabase.auth.signUp({
           email,
@@ -93,7 +146,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               location: userData.location || 'Accra, Greater Accra',
               is_business: false,
               accepted_terms: userData.acceptedTerms || false,
-              referral_code: userData.referralCode || null,
+              referralCode: userData.referralCode || null,
             },
           },
         }),

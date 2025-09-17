@@ -458,6 +458,14 @@ export default function EditListingScreen() {
           'garden': '00000000-0000-4000-8000-000000000004',
           'tools': '00000000-0000-4000-8000-000000000004',
           
+          // Furniture subcategories (missing ones that were causing the error)
+          'living-room': '00000000-0000-4000-8000-000000000004',
+          'bedroom': '00000000-0000-4000-8000-000000000004',
+          'dining-room': '00000000-0000-4000-8000-000000000004',
+          'office-furniture': '00000000-0000-4000-8000-000000000004',
+          'kitchen-furniture': '00000000-0000-4000-8000-000000000004',
+          'outdoor-furniture': '00000000-0000-4000-8000-000000000004',
+          
           // Health & Sports subcategories
           'fitness': '00000000-0000-4000-8000-000000000005',
           'sports': '00000000-0000-4000-8000-000000000005',

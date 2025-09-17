@@ -27,10 +27,14 @@ export default function SubscriptionPlansScreen() {
   const { 
     currentPlan, 
     entitlements,
+    balance,
     loading, 
     refreshSubscription, 
     subscribeToPlan,
+    upgradeToBusinessWithCredits,
+    getBusinessPlanCreditCost,
     cancelSubscription,
+    refreshCredits,
   } = useMonetizationStore();
   
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
@@ -43,6 +47,7 @@ export default function SubscriptionPlansScreen() {
 
   useEffect(() => {
     refreshSubscription();
+    refreshCredits();
   }, []);
 
   const getPlanIcon = (planId: string) => {
@@ -96,12 +101,24 @@ export default function SubscriptionPlansScreen() {
           text: 'Cancel',
           style: 'destructive',
           onPress: async () => {
+            console.log('🔄 User confirmed cancellation');
+            console.log('📋 Current subscription before cancellation:', currentPlan);
+            
             const result = await cancelSubscription();
+            console.log('📋 Cancellation result:', result);
+            
             if (result.success) {
+              console.log('✅ Cancellation successful, showing success toast');
               setToastMessage('Subscription cancelled successfully');
               setToastVariant('success');
               setShowToast(true);
+              
+              // Force refresh the subscription data
+              console.log('🔄 Forcing subscription refresh...');
+              await refreshSubscription();
+              console.log('📋 Subscription after refresh:', currentPlan);
             } else {
+              console.log('❌ Cancellation failed:', result.error);
               setToastMessage('Failed to cancel subscription');
               setToastVariant('error');
               setShowToast(true);
@@ -132,6 +149,47 @@ export default function SubscriptionPlansScreen() {
   const handlePaymentClose = () => {
     setShowPaymentModal(false);
     setPaymentRequest(null);
+  };
+
+  const handleCreditUpgrade = async () => {
+    const creditsRequired = getBusinessPlanCreditCost();
+    
+    Alert.alert(
+      'Upgrade with Credits',
+      `Upgrade to Sellar Business for ${creditsRequired.toLocaleString()} credits?\n\nYou currently have ${balance.toLocaleString()} credits.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Upgrade',
+          style: 'default',
+          onPress: async () => {
+            setSubscribing(true);
+            setSelectedPlan('sellar_business');
+            
+            try {
+              const result = await upgradeToBusinessWithCredits();
+              
+              if (result.success) {
+                setToastMessage('Successfully upgraded to Sellar Business! Welcome to premium features.');
+                setToastVariant('success');
+                setShowToast(true);
+              } else {
+                setToastMessage(result.error || 'Failed to upgrade with credits');
+                setToastVariant('error');
+                setShowToast(true);
+              }
+            } catch (error) {
+              setToastMessage('An unexpected error occurred');
+              setToastVariant('error');
+              setShowToast(true);
+            } finally {
+              setSubscribing(false);
+              setSelectedPlan(null);
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (loading) {
@@ -167,6 +225,7 @@ export default function SubscriptionPlansScreen() {
         <Container>
           {/* Current Plan Status */}
           {currentPlan && (
+            console.log('📋 Rendering current plan:', currentPlan),
             <View
               style={{
                 backgroundColor: theme.colors.success + '10',
@@ -189,17 +248,38 @@ export default function SubscriptionPlansScreen() {
               </Text>
               
               <Text variant="bodySmall" color="secondary">
-                Renews on {new Date(currentPlan.current_period_end).toLocaleDateString()}
+                {currentPlan.status === 'cancelled' 
+                  ? `Expires on ${new Date(currentPlan.current_period_end).toLocaleDateString()}`
+                  : `Renews on ${new Date(currentPlan.current_period_end).toLocaleDateString()}`
+                }
               </Text>
 
-              <Button
-                variant="tertiary"
-                onPress={handleCancelSubscription}
-                size="sm"
-                style={{ marginTop: theme.spacing.md, alignSelf: 'flex-start' }}
-              >
-                Cancel Subscription
-              </Button>
+              {currentPlan.status === 'cancelled' ? (
+                <View style={{ 
+                  backgroundColor: theme.colors.warning + '20',
+                  borderColor: theme.colors.warning,
+                  borderWidth: 1,
+                  borderRadius: theme.borderRadius.md,
+                  padding: theme.spacing.md,
+                  marginTop: theme.spacing.md,
+                }}>
+                  <Text variant="bodySmall" style={{ color: theme.colors.warning, fontWeight: '600' }}>
+                    Subscription Cancelled
+                  </Text>
+                  <Text variant="caption" color="secondary" style={{ marginTop: theme.spacing.xs }}>
+                    Your subscription will remain active until the end of your current billing period.
+                  </Text>
+                </View>
+              ) : (
+                <Button
+                  variant="tertiary"
+                  onPress={handleCancelSubscription}
+                  size="sm"
+                  style={{ marginTop: theme.spacing.md, alignSelf: 'flex-start' }}
+                >
+                  Cancel Subscription
+                </Button>
+              )}
             </View>
           )}
 
@@ -316,22 +396,67 @@ export default function SubscriptionPlansScreen() {
                     ))}
                   </View>
 
-                  {/* Action Button */}
-                  <Button
-                    variant={isCurrentPlan(plan.id) ? "tertiary" : "primary"}
-                    onPress={isCurrentPlan(plan.id) ? undefined : () => handleSubscribe(plan.id)}
-                    loading={subscribing && selectedPlan === plan.id}
-                    disabled={subscribing || isCurrentPlan(plan.id)}
-                    fullWidth
-                    size="lg"
-                  >
-                    {isCurrentPlan(plan.id) 
-                      ? 'Current Plan' 
-                      : subscribing && selectedPlan === plan.id 
-                      ? 'Processing...' 
-                      : `Subscribe for GHS ${plan.priceGHS}/month`
-                    }
-                  </Button>
+                  {/* Action Buttons */}
+                  <View style={{ gap: theme.spacing.md }}>
+                    <Button
+                      variant={isCurrentPlan(plan.id) ? "tertiary" : "primary"}
+                      onPress={isCurrentPlan(plan.id) ? undefined : () => handleSubscribe(plan.id)}
+                      loading={subscribing && selectedPlan === plan.id}
+                      disabled={subscribing || isCurrentPlan(plan.id)}
+                      fullWidth
+                      size="lg"
+                    >
+                      {isCurrentPlan(plan.id) 
+                        ? 'Current Plan' 
+                        : subscribing && selectedPlan === plan.id 
+                        ? 'Processing...' 
+                        : `Subscribe for GHS ${plan.priceGHS}/month`
+                      }
+                    </Button>
+
+                    {/* Credit Upgrade Option */}
+                    {!isCurrentPlan(plan.id) && (
+                      <View
+                        style={{
+                          backgroundColor: theme.colors.surfaceVariant,
+                          borderRadius: theme.borderRadius.md,
+                          padding: theme.spacing.lg,
+                          borderWidth: 1,
+                          borderColor: theme.colors.border,
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: theme.spacing.sm }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+                            <Zap size={16} color={theme.colors.warning} />
+                            <Text variant="bodySmall" style={{ fontWeight: '600' }}>
+                              Pay with Credits
+                            </Text>
+                          </View>
+                          <Text variant="caption" color="muted">
+                            {getBusinessPlanCreditCost().toLocaleString()} credits
+                          </Text>
+                        </View>
+                        
+                        <Text variant="caption" color="secondary" style={{ marginBottom: theme.spacing.md }}>
+                          Use your earned credits instead of cash. You have {balance.toLocaleString()} credits available.
+                        </Text>
+                        
+                        <Button
+                          variant="secondary"
+                          onPress={handleCreditUpgrade}
+                          loading={subscribing && selectedPlan === plan.id}
+                          disabled={subscribing || balance < getBusinessPlanCreditCost()}
+                          fullWidth
+                          size="md"
+                        >
+                          {balance < getBusinessPlanCreditCost() 
+                            ? `Need ${(getBusinessPlanCreditCost() - balance).toLocaleString()} more credits`
+                            : `Upgrade with ${getBusinessPlanCreditCost().toLocaleString()} Credits`
+                          }
+                        </Button>
+                      </View>
+                    )}
+                  </View>
                 </View>
               </View>
             ))}

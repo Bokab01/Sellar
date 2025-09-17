@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, ScrollView, RefreshControl, Alert, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import { View, RefreshControl, Alert, Platform, TouchableOpacity } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase } from '@/lib/supabase';
+import { useRealtime } from '@/hooks/useRealtime';
 import { UserProfile } from '@/hooks/useProfile';
 import {
   Text,
@@ -156,6 +158,79 @@ export default function PostDetailScreen() {
     setRefreshing(false);
   };
 
+  // Real-time subscription for post updates (likes, comments count, etc.)
+  const handlePostUpdate = useCallback((updatedPost: any) => {
+    console.log('🔗 Post updated via real-time:', updatedPost);
+    if (updatedPost.id === postId) {
+      setPost((prev: any) => prev ? { ...prev, ...updatedPost } : updatedPost);
+    }
+  }, [postId]);
+
+  // Real-time subscription for new comments
+  const handleCommentUpdate = useCallback((newComment: any) => {
+    console.log('🔗 Comment updated via real-time:', newComment);
+    if (newComment.post_id === postId) {
+      // Fetch the complete comment data with profile info
+      const fetchCompleteComment = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('comments')
+            .select(`
+              *,
+              profiles!comments_user_id_fkey (
+                id,
+                first_name,
+                last_name,
+                avatar_url,
+                is_verified
+              )
+            `)
+            .eq('id', newComment.id)
+            .single();
+
+          if (!error && data) {
+            setComments(prev => {
+              const exists = prev.find(comment => comment.id === data.id);
+              if (exists) {
+                return prev.map(comment => comment.id === data.id ? data : comment);
+              } else {
+                return [...prev, data].sort((a, b) => 
+                  new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                );
+              }
+            });
+          }
+        } catch (err) {
+          console.error('Error fetching complete comment data:', err);
+        }
+      };
+
+      fetchCompleteComment();
+    }
+  }, [postId]);
+
+  // Set up real-time subscriptions
+  useRealtime({
+    table: 'posts',
+    filter: `id=eq.${postId}`,
+    onUpdate: handlePostUpdate,
+  });
+
+  useRealtime({
+    table: 'comments',
+    filter: `post_id=eq.${postId}`,
+    onInsert: handleCommentUpdate,
+    onUpdate: handleCommentUpdate,
+  });
+
+  // Real-time subscription for likes (to update like counts)
+  useRealtime({
+    table: 'likes',
+    filter: `post_id=eq.${postId}`,
+    onInsert: () => fetchPost(), // Refresh post when someone likes
+    onDelete: () => fetchPost(), // Refresh post when someone unlikes
+  });
+
   const handleLikePost = async () => {
     if (!user) return;
 
@@ -282,7 +357,7 @@ export default function PostDetailScreen() {
           showBackButton
           onBackPress={() => router.back()}
         />
-        <ScrollView contentContainerStyle={{ padding: theme.spacing.lg }}>
+        <KeyboardAwareScrollView contentContainerStyle={{ padding: theme.spacing.lg }}>
           <LoadingSkeleton width="100%" height={200} style={{ marginBottom: theme.spacing.lg }} />
           {Array.from({ length: 3 }).map((_, index) => (
             <LoadingSkeleton
@@ -292,7 +367,7 @@ export default function PostDetailScreen() {
               style={{ marginBottom: theme.spacing.md }}
             />
           ))}
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </SafeAreaWrapper>
     );
   }
@@ -365,9 +440,9 @@ export default function PostDetailScreen() {
     timestamp: new Date(post.created_at || new Date()).toLocaleString(),
     content: post.content || '',
     images: Array.isArray(post.images) ? post.images : [],
-    likes: Number(post.likes_count) || 0,
-    comments: totalCommentsCount, // Use total comments including replies
-    shares: Number(post.shares_count) || 0,
+    likes_count: Number(post.likes_count) || 0,
+    comments_count: totalCommentsCount, // Use total comments including replies
+    shares_count: Number(post.shares_count) || 0,
     isLiked: false, // TODO: Check if current user liked this post
     location: post.location || null,
     listing: post.listings ? {
@@ -393,7 +468,7 @@ export default function PostDetailScreen() {
       hour: '2-digit',
       minute: '2-digit',
     }),
-    likes: comment.likes_count || 0,
+    likes_count: comment.likes_count || 0,
     isLiked: false, // TODO: Check if current user liked this comment
     replies: comment.replies?.map((reply: any) => ({
       id: reply.id,
@@ -408,7 +483,7 @@ export default function PostDetailScreen() {
         hour: '2-digit',
         minute: '2-digit',
       }),
-      likes: reply.likes_count || 0,
+      likes_count: reply.likes_count || 0,
       isLiked: false,
       depth: 1,
     })) || [],
@@ -423,26 +498,28 @@ export default function PostDetailScreen() {
         onBackPress={() => router.back()}
       />
 
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      <KeyboardAwareScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: theme.spacing.md }}
+        enableOnAndroid={true}
+        enableAutomaticScroll={true}
+        keyboardOpeningTime={250}
+        extraScrollHeight={Platform.OS === 'ios' ? 20 : 50}
+        extraHeight={Platform.OS === 'android' ? 20 : 0}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={theme.colors.primary}
+          />
+        }
       >
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom: theme.spacing.md }}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor={theme.colors.primary}
-            />
-          }
-        >
           {/* Post */}
           <View style={{ marginBottom: theme.spacing.lg }}>
             <PostCard
-              key={`${transformedPost.id}-${transformedPost.comments}`}
+              key={`${transformedPost.id}-${transformedPost.comments_count}`}
               post={transformedPost}
               onLike={handleLikePost}
               onComment={() => {}}
@@ -477,8 +554,6 @@ export default function PostDetailScreen() {
               />
             )}
           </View>
-        </ScrollView>
-
         {/* Fixed Comment Input at Bottom */}
         <View
           style={{
@@ -565,7 +640,7 @@ export default function PostDetailScreen() {
             </Button>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
 
       {/* Toast */}
       <Toast

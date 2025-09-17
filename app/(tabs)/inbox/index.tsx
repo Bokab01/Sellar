@@ -23,6 +23,7 @@ import {
 import { MessageCircle, Plus, Users, CheckSquare, Square, Trash2, Mail, MailOpen, X } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { formatConversationTimestamp } from '@/utils/dateUtils';
+import { getDisplayName } from '@/hooks/useDisplayName';
 
 export default function InboxScreen() {
   const { theme } = useTheme();
@@ -340,10 +341,9 @@ export default function InboxScreen() {
     const typingUsers = getTypingUsers(conv.id);
     const isOtherUserTyping = typingUsers.includes(otherParticipant?.id);
     
-    // Ensure all text values are properly handled
-    const safeTitle = otherParticipant 
-      ? `${otherParticipant.first_name || 'User'} ${otherParticipant.last_name || ''}`.trim()
-      : 'Anonymous User';
+    // Get proper display name based on business settings
+    const displayNameResult = getDisplayName(otherParticipant, false);
+    const safeTitle = otherParticipant ? displayNameResult.displayName : 'Anonymous User';
     
     const safeSubtitle = conv.listing?.title ? `About ${String(conv.listing.title)}` : 'General conversation';
     

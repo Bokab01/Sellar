@@ -179,7 +179,14 @@ export default function FollowersScreen() {
             following_id: userId
           });
 
-        if (error) throw error;
+        if (error) {
+          if (error.code === '23505') {
+            // Already following, just update state - this is not an error
+            console.log('User already being followed, updating state');
+          } else {
+            throw error;
+          }
+        }
       }
 
       setFollowingStates(prev => ({

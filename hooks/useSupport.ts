@@ -25,7 +25,8 @@ export interface SupportTicket {
   created_at: string;
   updated_at: string;
   first_response_at?: string;
-  last_activity_at: string;
+  last_activity_at?: string;
+  last_message_at?: string;
 }
 
 export interface SupportTicketMessage {
@@ -52,17 +53,15 @@ export interface KnowledgeBaseArticle {
   slug: string;
   content: string;
   excerpt?: string;
-  category: 'getting_started' | 'buying_selling' | 'credits_billing' | 'account_privacy' | 'technical_issues' | 'safety_guidelines' | 'features' | 'policies';
+  category: string;
   tags: string[];
-  status: 'draft' | 'published' | 'archived';
+  is_published: boolean;
   published_at?: string;
-  author_id: string;
-  last_updated_by?: string;
+  author_id?: string;
   view_count: number;
   helpful_count: number;
   not_helpful_count: number;
-  meta_description?: string;
-  search_keywords: string[];
+  search_vector?: any;
   created_at: string;
   updated_at: string;
 }
@@ -108,10 +107,12 @@ export function useSupportTickets() {
 
     try {
       const { data, error: fetchError } = await supabase
-        .from('support_tickets')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .rpc('get_user_support_tickets', {
+          p_user_id: user.id,
+          p_status: null,
+          p_limit: 50,
+          p_offset: 0
+        });
 
       if (fetchError) throw fetchError;
       setTickets(data || []);
@@ -338,21 +339,14 @@ export function useKnowledgeBase() {
     setError(null);
 
     try {
-      let query = supabase
-        .from('kb_articles')
-        .select('*')
-        .eq('status', 'published')
-        .order('view_count', { ascending: false });
-
-      if (category) {
-        query = query.eq('category', category);
-      }
-
-      if (searchQuery) {
-        query = query.textSearch('title,content', searchQuery);
-      }
-
-      const { data, error: fetchError } = await query;
+      // Use the database function for better performance and search
+      const { data, error: fetchError } = await supabase
+        .rpc('get_kb_articles', {
+          p_category: category || null,
+          p_search_term: searchQuery || null,
+          p_limit: 50,
+          p_offset: 0
+        });
 
       if (fetchError) throw fetchError;
       setArticles(data || []);
@@ -370,13 +364,13 @@ export function useKnowledgeBase() {
         .from('kb_articles')
         .select('*')
         .eq('slug', slug)
-        .eq('status', 'published')
+        .eq('is_published', true)
         .single();
 
       if (fetchError) throw fetchError;
 
       // Increment view count
-      await supabase.rpc('increment_article_views', { article_uuid: data.id });
+      await supabase.rpc('increment_article_views', { p_article_id: data.id });
 
       return data as KnowledgeBaseArticle;
     } catch (err) {

@@ -81,7 +81,7 @@ export function VerificationBadge({
     ];
 
     for (const badge of priorityOrder) {
-      if (status.verification_badges.includes(badge)) {
+      if (status.verification_badges && status.verification_badges.includes(badge)) {
         return badge;
       }
     }
@@ -102,7 +102,7 @@ export function VerificationBadge({
     return badgeMap[badge] || badge.replace('_', ' ');
   };
 
-  if (!status.is_verified && status.verification_badges.length === 0) {
+  if (!status.is_verified && (!status.verification_badges || status.verification_badges.length === 0)) {
     return null;
   }
 
@@ -122,32 +122,32 @@ export function VerificationBadge({
       activeOpacity={onPress ? 0.7 : 1}
     >
       {/* Trust Score Badge */}
-      {showTrustScore && status.trust_score > 0 && (
+      {showTrustScore && (status.trust_score || 0) > 0 && (
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            backgroundColor: getTrustScoreColor(status.trust_score) + '15',
+            backgroundColor: getTrustScoreColor(status.trust_score || 0) + '15',
             borderRadius: theme.borderRadius.full,
             paddingHorizontal: size === 'small' ? theme.spacing.xs : theme.spacing.sm,
             paddingVertical: size === 'small' ? 2 : 4,
             borderWidth: 1,
-            borderColor: getTrustScoreColor(status.trust_score) + '30',
+            borderColor: getTrustScoreColor(status.trust_score || 0) + '30',
           }}
         >
           <Award 
             size={getIconSize()} 
-            color={getTrustScoreColor(status.trust_score)} 
+            color={getTrustScoreColor(status.trust_score || 0)} 
           />
           <Text
             variant={size === 'small' ? 'caption' : 'bodySmall'}
             style={{
-              color: getTrustScoreColor(status.trust_score),
+              color: getTrustScoreColor(status.trust_score || 0),
               marginLeft: theme.spacing.xs,
               fontWeight: '600',
             }}
           >
-            {status.trust_score}
+            {status.trust_score || 0}
           </Text>
         </View>
       )}
@@ -155,7 +155,7 @@ export function VerificationBadge({
       {/* Verification Badges */}
       {showAllBadges ? (
         // Show all badges
-        status.verification_badges.map((badge) => (
+        status.verification_badges?.map((badge) => (
           <View
             key={badge}
             style={{
@@ -229,7 +229,7 @@ export function CompactVerificationBadge({
 }: Omit<VerificationBadgeProps, 'showTrustScore' | 'showAllBadges'>) {
   const { theme } = useTheme();
 
-  if (!status.is_verified && status.verification_badges.length === 0) {
+  if (!status.is_verified && (!status.verification_badges || status.verification_badges.length === 0)) {
     return null;
   }
 

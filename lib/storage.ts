@@ -16,6 +16,52 @@ export const STORAGE_BUCKETS = {
   VERIFICATION: 'verification-documents'
 } as const;
 
+// Helper function to check storage bucket accessibility with detailed diagnostics
+const checkBucketAccess = async (bucket: string): Promise<{ accessible: boolean; error?: string; details?: any }> => {
+  try {
+    console.log(`🔍 Checking access to bucket: ${bucket}`);
+    
+    // First check if we have a valid session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) {
+      return { 
+        accessible: false, 
+        error: 'No authenticated session', 
+        details: { sessionError, hasSession: !!session } 
+      };
+    }
+    
+    console.log(`✅ Session valid for user: ${session.user.id}`);
+    
+    // Try to list bucket contents
+    const { data, error } = await supabase.storage.from(bucket).list('', { limit: 1 });
+    
+    if (error) {
+      console.error(`❌ Bucket ${bucket} access failed:`, error);
+      return { 
+        accessible: false, 
+        error: error.message, 
+        details: { 
+          code: error.message,
+          bucket,
+          userId: session.user.id 
+        } 
+      };
+    }
+    
+    console.log(`✅ Bucket ${bucket} is accessible`);
+    return { accessible: true };
+    
+  } catch (error) {
+    console.error(`❌ Bucket ${bucket} access check failed:`, error);
+    return { 
+      accessible: false, 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      details: error 
+    };
+  }
+};
+
 export const storageHelpers = {
   async uploadImage(
     uri: string, 
@@ -25,8 +71,60 @@ export const storageHelpers = {
     retries: number = 3,
     enableOptimization: boolean = true
   ): Promise<UploadResult> {
+    console.log(`🚀 Starting upload to bucket: ${bucket}, folder: ${folder}, user: ${userId}`);
+    
+    // Use the specified bucket directly - no fallbacks to maintain clean bucket structure
+    try {
+      console.log(`🎯 Uploading to specified bucket: ${bucket}`);
+      const result = await this.uploadToSpecificBucket(uri, bucket, folder, userId, retries, enableOptimization);
+      console.log(`✅ Upload successful to bucket: ${bucket}`);
+      return result;
+    } catch (error) {
+      console.error(`❌ Upload failed to bucket ${bucket}:`, error);
+      throw error;
+    }
+  },
+
+  async uploadToSpecificBucket(
+    uri: string, 
+    bucket: string,
+    folder: string = '',
+    userId?: string,
+    retries: number = 3,
+    enableOptimization: boolean = true
+  ): Promise<UploadResult> {
     let lastError: Error | null = null;
     
+    // Check network connectivity before starting
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      await fetch('https://www.google.com/favicon.ico', { 
+        method: 'HEAD', 
+        signal: controller.signal 
+      });
+      clearTimeout(timeoutId);
+    } catch (networkError) {
+      throw new Error('No internet connection. Please check your network and try again.');
+    }
+
+    // Check bucket access with detailed diagnostics
+    const bucketCheck = await checkBucketAccess(bucket);
+    if (!bucketCheck.accessible) {
+      console.error('🚫 Bucket access failed:', bucketCheck);
+      
+      // Provide specific error messages based on the failure type
+      if (bucketCheck.error?.includes('session')) {
+        throw new Error('Authentication expired. Please sign in again.');
+      } else if (bucketCheck.error?.includes('not found') || bucketCheck.error?.includes('does not exist')) {
+        throw new Error(`Storage bucket '${bucket}' does not exist. Please contact support.`);
+      } else if (bucketCheck.error?.includes('permission') || bucketCheck.error?.includes('policy')) {
+        throw new Error(`No permission to access storage bucket '${bucket}'. Please contact support.`);
+      } else {
+        throw new Error(`Storage access failed: ${bucketCheck.error || 'Unknown error'}. Please contact support.`);
+      }
+    }
+
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         console.log(`Upload attempt ${attempt}/${retries} for image: ${uri}`);
@@ -239,13 +337,27 @@ export const storageHelpers = {
           
           // Last resort: try fetch with retry and better error handling
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 45000); // Increased timeout
+          const timeoutId = setTimeout(() => controller.abort(), 60000); // Increased timeout to 60s
           
           try {
+            // Check network connectivity first
+            try {
+              const networkController = new AbortController();
+              const networkTimeoutId = setTimeout(() => networkController.abort(), 5000);
+              await fetch('https://www.google.com/favicon.ico', { 
+                method: 'HEAD',
+                signal: networkController.signal
+              });
+              clearTimeout(networkTimeoutId);
+            } catch (networkError) {
+              throw new Error('No network connection available');
+            }
+            
             const response = await fetch(manipulatedImage.uri, {
               signal: controller.signal,
               headers: {
                 'Accept': 'image/*',
+                'Cache-Control': 'no-cache',
               },
             });
             clearTimeout(timeoutId);
@@ -257,31 +369,87 @@ export const storageHelpers = {
             const blob = await response.blob();
             console.log('Image converted to blob, size:', blob.size);
             
-            const { data: blobData, error: blobError } = await supabase.storage
-              .from(bucket)
-              .upload(filename, blob, {
-                contentType: 'image/jpeg',
-                upsert: true,
-              });
-
-            if (blobError) {
-              throw new Error(`Upload failed: ${blobError.message}`);
+            // Validate blob size
+            if (blob.size === 0) {
+              throw new Error('Image file is empty or corrupted');
             }
             
-            console.log('Blob upload successful:', blobData.path);
+            if (blob.size > 10 * 1024 * 1024) { // 10MB limit
+              throw new Error('Image file is too large (max 10MB)');
+            }
+            
+            // Upload with retry logic
+            let uploadResult;
+            let uploadAttempts = 0;
+            const maxUploadAttempts = 3;
+            
+            while (uploadAttempts < maxUploadAttempts) {
+              try {
+                uploadAttempts++;
+                console.log(`Upload attempt ${uploadAttempts}/${maxUploadAttempts}`);
+                
+                const { data: blobData, error: blobError } = await supabase.storage
+                  .from(bucket)
+                  .upload(filename, blob, {
+                    contentType: 'image/jpeg',
+                    upsert: true,
+                  });
+
+                if (blobError) {
+                  if (uploadAttempts === maxUploadAttempts) {
+                    throw new Error(`Upload failed after ${maxUploadAttempts} attempts: ${blobError.message}`);
+                  }
+                  console.warn(`Upload attempt ${uploadAttempts} failed:`, blobError.message);
+                  await new Promise(resolve => setTimeout(resolve, 2000 * uploadAttempts)); // Exponential backoff
+                  continue;
+                }
+                
+                uploadResult = blobData;
+                break;
+              } catch (uploadError) {
+                if (uploadAttempts === maxUploadAttempts) {
+                  throw uploadError;
+                }
+                console.warn(`Upload attempt ${uploadAttempts} failed:`, uploadError);
+                await new Promise(resolve => setTimeout(resolve, 2000 * uploadAttempts));
+              }
+            }
+            
+            if (!uploadResult) {
+              throw new Error('Upload failed after all attempts');
+            }
+            
+            console.log('Blob upload successful:', uploadResult.path);
             
             // Get public URL
             const { data: urlData } = supabase.storage
               .from(bucket)
-              .getPublicUrl(blobData.path);
+              .getPublicUrl(uploadResult.path);
 
             return {
               url: urlData.publicUrl,
-              path: blobData.path,
+              path: uploadResult.path,
             };
           } catch (fetchError) {
             clearTimeout(timeoutId);
-            throw new Error(`All upload methods failed. Last error: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`);
+            
+            // Provide more specific error messages
+            let errorMessage = 'Upload failed';
+            if (fetchError instanceof Error) {
+              if (fetchError.message.includes('AbortError') || fetchError.message.includes('timeout')) {
+                errorMessage = 'Upload timed out. Please check your connection and try again.';
+              } else if (fetchError.message.includes('NetworkError') || fetchError.message.includes('network')) {
+                errorMessage = 'Network error. Please check your internet connection.';
+              } else if (fetchError.message.includes('too large')) {
+                errorMessage = 'Image file is too large. Please use a smaller image.';
+              } else if (fetchError.message.includes('empty') || fetchError.message.includes('corrupted')) {
+                errorMessage = 'Image file is corrupted. Please try a different image.';
+              } else {
+                errorMessage = fetchError.message;
+              }
+            }
+            
+            throw new Error(`Upload failed: ${errorMessage}`);
           }
         }
       } catch (error) {

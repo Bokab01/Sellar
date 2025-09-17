@@ -19,6 +19,7 @@ import { securityService } from '@/lib/securityService';
 import { offlineStorage } from '@/lib/offlineStorage';
 import { memoryManager } from '@/utils/memoryManager';
 import { recoverFromCorruptedSession } from '@/utils/authErrorHandler';
+import { useMonetizationStore } from '@/store/useMonetizationStore';
 
 // App content component that uses theme context
 function AppContent() {
@@ -79,6 +80,18 @@ function AppContent() {
           console.log('Memory manager initialized');
         } catch (error) {
           console.error('Failed to initialize memory manager:', error);
+        }
+
+        // Initialize monetization data (credits and subscription)
+        try {
+          const { refreshCredits, refreshSubscription } = useMonetizationStore.getState();
+          await Promise.all([
+            refreshCredits(),
+            refreshSubscription(),
+          ]);
+          console.log('Monetization data initialized successfully');
+        } catch (error) {
+          console.error('Failed to initialize monetization data:', error);
         }
 
         console.log('All services initialized successfully');

@@ -137,9 +137,9 @@ export default function CommunityScreen() {
       timestamp: new Date(post.created_at || new Date()).toLocaleString(),
       content: post.content || '',
       images: Array.isArray(post.images) ? post.images : [],
-      likes: Number(post.likes_count) || 0,
-      comments: Number(post.comments_count) || 0,
-      shares: Number(post.shares_count) || 0,
+      likes_count: Number(post.likes_count) || 0,
+      comments_count: Number(post.comments_count) || 0,
+      shares_count: Number(post.shares_count) || 0,
       isLiked: false,
       location: post.location || null,
       listing: post.listings ? {

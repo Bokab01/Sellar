@@ -26,9 +26,9 @@ const examplePost = {
     'https://example.com/phone1.jpg',
     'https://example.com/phone2.jpg'
   ],
-  likes: 24,
-  comments: 8,
-  shares: 3,
+  likes_count: 24,
+  comments_count: 8,
+  shares_count: 3,
   isLiked: false,
   location: 'East Legon, Accra',
   listing: {
@@ -47,7 +47,7 @@ export function PostCardExample() {
     setPost(prev => ({
       ...prev,
       isLiked: !prev.isLiked,
-      likes: prev.isLiked ? prev.likes - 1 : prev.likes + 1
+      likes_count: prev.isLiked ? prev.likes_count - 1 : prev.likes_count + 1
     }));
   };
 

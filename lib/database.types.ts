@@ -191,6 +191,10 @@ export interface Database {
           views_count: number;
           favorites_count: number;
           boost_until: string | null;
+          boost_score: number;
+          highlight_until: string | null;
+          urgent_until: string | null;
+          spotlight_until: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -211,6 +215,10 @@ export interface Database {
           views_count?: number;
           favorites_count?: number;
           boost_until?: string | null;
+          boost_score?: number;
+          highlight_until?: string | null;
+          urgent_until?: string | null;
+          spotlight_until?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -231,6 +239,10 @@ export interface Database {
           views_count?: number;
           favorites_count?: number;
           boost_until?: string | null;
+          boost_score?: number;
+          highlight_until?: string | null;
+          urgent_until?: string | null;
+          spotlight_until?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -364,6 +376,7 @@ export interface Database {
           comments_count: number;
           shares_count: number;
           is_pinned: boolean;
+          type: 'general' | 'listing' | 'review' | 'announcement' | 'showcase' | 'question' | 'tips' | 'event' | 'collaboration';
           created_at: string;
           updated_at: string;
         };
@@ -378,6 +391,7 @@ export interface Database {
           comments_count?: number;
           shares_count?: number;
           is_pinned?: boolean;
+          type?: 'general' | 'listing' | 'review' | 'announcement' | 'showcase' | 'question' | 'tips' | 'event' | 'collaboration';
           created_at?: string;
           updated_at?: string;
         };
@@ -392,6 +406,7 @@ export interface Database {
           comments_count?: number;
           shares_count?: number;
           is_pinned?: boolean;
+          type?: 'general' | 'listing' | 'review' | 'announcement' | 'showcase' | 'question' | 'tips' | 'event' | 'collaboration';
           created_at?: string;
           updated_at?: string;
         };

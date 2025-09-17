@@ -109,11 +109,11 @@ class FeatureExpiryService {
       .from('listings')
       .update({
         spotlight_category: null,
-        spotlight_expires_at: null,
+        spotlight_until: null,
         updated_at: now,
       })
-      .not('spotlight_expires_at', 'is', null)
-      .lt('spotlight_expires_at', now)
+      .not('spotlight_until', 'is', null)
+      .lt('spotlight_until', now)
       .select('id');
 
     if (error) {

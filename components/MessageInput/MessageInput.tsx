@@ -94,8 +94,8 @@ export function MessageInput({
           backgroundColor: theme.colors.surface,
           borderTopWidth: 1,
           borderTopColor: theme.colors.border,
-          paddingHorizontal: theme.spacing.lg,
-          paddingVertical: theme.spacing.md,
+          paddingHorizontal: theme.spacing.sm,
+          paddingVertical: theme.spacing.sm,
         },
         style,
       ]}
@@ -152,10 +152,7 @@ export function MessageInput({
             borderRadius: theme.borderRadius.lg,
             borderWidth: isFocused ? 2 : 1,
             borderColor: isFocused ? theme.colors.primary : theme.colors.border,
-            paddingHorizontal: theme.spacing.md,
-            paddingVertical: theme.spacing.sm,
-            maxHeight: 100,
-            minHeight: 44,
+            padding: theme.spacing.xs,
           }}
         >
           {/* Custom placeholder overlay for single-line display */}
@@ -164,7 +161,7 @@ export function MessageInput({
               style={{
                 position: 'absolute',
                 left: theme.spacing.md,
-                top: theme.spacing.sm + 2, // Adjust vertical alignment
+                top: theme.spacing.sm + 6, // Adjust vertical alignment
                 right: theme.spacing.md,
                 pointerEvents: 'none',
                 zIndex: 1,
@@ -177,8 +174,8 @@ export function MessageInput({
                 numberOfLines={1}
                 ellipsizeMode="tail"
                 style={{
-                  fontSize: 16,
-                  lineHeight: 20,
+                  fontSize: 14,
+                  lineHeight: 24,
                 }}
               >
                 {placeholder}

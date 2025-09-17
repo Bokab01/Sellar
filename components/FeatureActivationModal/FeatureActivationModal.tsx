@@ -48,12 +48,44 @@ export function FeatureActivationModal({
   
   const [activating, setActivating] = useState(false);
   const [feature, setFeature] = useState<any>(null);
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
 
   useEffect(() => {
     if (visible && featureKey) {
+      console.log('FeatureActivationModal: Loading feature:', featureKey);
+      setLoadingTimeout(false);
+      
+      // Set a timeout to prevent infinite loading
+      const timeout = setTimeout(() => {
+        console.warn('FeatureActivationModal: Loading timeout reached');
+        setLoadingTimeout(true);
+      }, 3000);
+      
       const featureConfig = getFeatureByKey(featureKey);
+      console.log('FeatureActivationModal: Feature config:', featureConfig);
+      
+      if (!featureConfig) {
+        console.error('FeatureActivationModal: Feature not found:', featureKey);
+        clearTimeout(timeout);
+        Alert.alert(
+          'Feature Not Available',
+          `The feature "${featureKey}" is not available at this time.`,
+          [{ text: 'OK', onPress: onClose }]
+        );
+        return;
+      }
+      
       setFeature(featureConfig);
       refreshCredits();
+      clearTimeout(timeout);
+      
+      return () => clearTimeout(timeout);
+    } else {
+      // Reset feature when modal is closed
+      if (!visible) {
+        setFeature(null);
+        setLoadingTimeout(false);
+      }
     }
   }, [visible, featureKey]);
 
@@ -63,11 +95,8 @@ export function FeatureActivationModal({
       mega_pulse_7d: Zap,
       category_spotlight_3d: Target,
       ad_refresh: RefreshCw,
-      auto_refresh_30d: RefreshCw,
-      direct_whatsapp: MessageCircle,
-      business_profile: Building,
-      analytics_report: BarChart3,
-      priority_support: Headphones,
+      listing_highlight: CheckCircle,
+      urgent_badge: AlertCircle,
     };
     return iconMap[featureKey] || Zap;
   };
@@ -98,38 +127,25 @@ export function FeatureActivationModal({
         'Immediate visibility boost',
         'One-time activation'
       ],
-      auto_refresh_30d: [
-        'Automatic daily refresh',
-        'Always stay near the top',
-        'Active for 30 days',
-        'Set it and forget it'
+      listing_highlight: [
+        'Highlight with colored border',
+        'Stand out visually',
+        'Active for 7 days',
+        'Increased click-through rates'
       ],
-      direct_whatsapp: [
-        'Add WhatsApp contact button',
-        'Direct messaging capability',
-        'Increase response rates',
-        'Permanent feature'
-      ],
-      business_profile: [
-        'Unlock business features',
-        'Professional profile badge',
-        'Enhanced credibility',
-        'Permanent upgrade'
-      ],
-      analytics_report: [
-        'Detailed performance metrics',
-        'View and engagement data',
-        'Competitor insights',
-        'Active for 30 days'
-      ],
-      priority_support: [
-        'Fast-track support tickets',
-        'Priority response times',
-        'Dedicated support channel',
-        'Active for 30 days'
+      urgent_badge: [
+        'Add "Urgent Sale" badge',
+        'Create sense of urgency',
+        'Active for 3 days',
+        'Faster buyer response'
       ],
     };
-    return benefitsMap[featureKey] || [];
+    return benefitsMap[featureKey] || [
+      'Premium feature activation',
+      'Enhanced listing performance',
+      'Increased visibility',
+      'Better engagement rates'
+    ];
   };
 
   const handleActivate = async () => {
@@ -189,13 +205,31 @@ export function FeatureActivationModal({
       <AppModal
         visible={visible}
         onClose={onClose}
-        title="Loading Feature"
+        title={loadingTimeout ? "Feature Error" : "Loading Feature"}
         size="md"
+        primaryAction={loadingTimeout ? {
+          text: 'Close',
+          onPress: onClose,
+        } : undefined}
       >
         <View style={{ padding: theme.spacing.lg }}>
-          <LoadingSkeleton width="100%" height={60} style={{ marginBottom: theme.spacing.md }} />
-          <LoadingSkeleton width="80%" height={40} style={{ marginBottom: theme.spacing.md }} />
-          <LoadingSkeleton width="60%" height={40} />
+          {loadingTimeout ? (
+            <View style={{ alignItems: 'center', gap: theme.spacing.md }}>
+              <AlertCircle size={48} color={theme.colors.destructive} />
+              <Text variant="body" style={{ textAlign: 'center' }}>
+                Failed to load feature information. Please try again.
+              </Text>
+              <Text variant="bodySmall" color="secondary" style={{ textAlign: 'center' }}>
+                Feature key: {featureKey}
+              </Text>
+            </View>
+          ) : (
+            <>
+              <LoadingSkeleton width="100%" height={60} style={{ marginBottom: theme.spacing.md }} />
+              <LoadingSkeleton width="80%" height={40} style={{ marginBottom: theme.spacing.md }} />
+              <LoadingSkeleton width="60%" height={40} />
+            </>
+          )}
         </View>
       </AppModal>
     );

@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, ScrollView, KeyboardAvoidingView, Platform, Alert, TouchableOpacity, Linking, Image } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Platform, Alert, TouchableOpacity, Linking, Image, Keyboard } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -37,6 +38,7 @@ import {
   CallbackMessage,
 } from '@/components';
 import { Phone, Info, Eye, MessageCircle, EllipsisVertical } from 'lucide-react-native';
+import { getDisplayName } from '@/hooks/useDisplayName';
 
 export default function ChatScreen() {
   const { theme } = useTheme();
@@ -69,8 +71,9 @@ export default function ChatScreen() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
   const [lastSeenText, setLastSeenText] = useState('');
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<KeyboardAwareScrollView>(null);
 
   // Get conversation details
   const [conversation, setConversation] = useState<any>(null);
@@ -94,17 +97,21 @@ export default function ChatScreen() {
   }, [conversationId, draftMessages]);
 
   useEffect(() => {
-    // Save draft message
-    if (conversationId) {
-      setDraftMessage(conversationId, messageText);
+    // Save draft message with debouncing to prevent excessive updates
+    if (conversationId && messageText !== draftMessages[conversationId]) {
+      const timeoutId = setTimeout(() => {
+        setDraftMessage(conversationId, messageText);
+      }, 300); // Debounce for 300ms
+      
+      return () => clearTimeout(timeoutId);
     }
-  }, [messageText, conversationId]);
+  }, [messageText, conversationId, draftMessages, setDraftMessage]);
 
   useEffect(() => {
     // Auto-scroll to bottom when new messages arrive
     if (messages.length > 0) {
       setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
+        scrollViewRef.current?.scrollToEnd(true);
       }, 100);
     }
   }, [messages.length]);
@@ -112,18 +119,63 @@ export default function ChatScreen() {
   // Update last seen text
   useEffect(() => {
     if (otherUser) {
-      setLastSeenText(getLastSeenText());
+      const updateLastSeenText = () => {
+        const newLastSeenText = getLastSeenText();
+        setLastSeenText(prev => {
+          // Only update if the text actually changed to prevent unnecessary re-renders
+          return prev !== newLastSeenText ? newLastSeenText : prev;
+        });
+      };
+      
+      // Initial update
+      updateLastSeenText();
       
       // Update every minute for real-time updates
-      const interval = setInterval(() => {
-        setLastSeenText(getLastSeenText());
-      }, 60000); // Update every minute
+      const interval = setInterval(updateLastSeenText, 60000);
       
       return () => clearInterval(interval);
     }
-  }, [otherUser]);
+  }, [otherUser?.id, otherUser?.last_seen, otherUser?.is_online]); // Only depend on specific properties
 
-  const fetchConversationDetails = async () => {
+  // Keyboard visibility listeners
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
+      setIsKeyboardVisible(true);
+    });
+    
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setIsKeyboardVisible(false);
+    });
+
+    return () => {
+      keyboardDidShowListener?.remove();
+      keyboardDidHideListener?.remove();
+    };
+  }, []);
+
+  const checkExistingTransaction = useCallback(async (listingId: string) => {
+    if (!listingId || !user) return;
+    
+    try {
+      const { data: transaction, error } = await supabase
+        .from('meetup_transactions')
+        .select('*')
+        .eq('listing_id', listingId)
+        .eq('conversation_id', conversationId)
+        .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (!error && transaction) {
+        setExistingTransaction(transaction);
+      }
+    } catch (err) {
+      console.error('Error checking existing transaction:', err);
+    }
+  }, [conversationId, user?.id]);
+
+  const fetchConversationDetails = useCallback(async () => {
     try {
       const { data: conv, error } = await dbHelpers.getConversation(conversationId!, user!.id);
       if (error) {
@@ -144,29 +196,7 @@ export default function ChatScreen() {
     } catch (err) {
       console.error('Failed to fetch conversation details:', err);
     }
-  };
-
-  const checkExistingTransaction = async (listingId: string) => {
-    if (!listingId || !user) return;
-    
-    try {
-      const { data: transaction, error } = await supabase
-        .from('meetup_transactions')
-        .select('*')
-        .eq('listing_id', listingId)
-        .eq('conversation_id', conversationId)
-        .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      
-      if (!error && transaction) {
-        setExistingTransaction(transaction);
-      }
-    } catch (err) {
-      console.error('Error checking existing transaction:', err);
-    }
-  };
+  }, [conversationId, user?.id, checkExistingTransaction]);
 
   const handleTransactionCreated = (transactionId: string) => {
     console.log('Transaction created:', transactionId);
@@ -684,14 +714,14 @@ export default function ChatScreen() {
   return (
     <SafeAreaWrapper>
       <AppHeader
-        title={otherUser ? `${otherUser.first_name || 'User'} ${otherUser.last_name || ''}`.trim() : 'Chat'}
+        title={otherUser ? getDisplayName(otherUser, false).displayName : 'Chat'}
         subtitle={otherUser ? lastSeenText : ''}
         showBackButton
         onBackPress={() => router.back()}
         leftAction={
           otherUser ? (
             <Avatar
-              name={`${otherUser.first_name || 'User'} ${otherUser.last_name || ''}`.trim()}
+              name={getDisplayName(otherUser, false).displayName}
               source={otherUser.avatar_url}
               size="sm"
               style={{ marginLeft: theme.spacing.sm }}
@@ -732,7 +762,7 @@ export default function ChatScreen() {
       />
 
       {/* Listing Context Banner */}
-      {conversation?.listing?.title && conversation?.listing?.id && (
+      {!isKeyboardVisible && conversation?.listing?.title && conversation?.listing?.id && (
         <TouchableOpacity
           onPress={() => router.push(`/(tabs)/home/${conversation.listing.id}`)}
           style={{
@@ -799,7 +829,7 @@ export default function ChatScreen() {
       )}
 
       {/* General Conversation Banner (when no listing) */}
-      {!conversation?.listing?.title && (
+      {!isKeyboardVisible && !conversation?.listing?.title && (
         <View
           style={{
             backgroundColor: theme.colors.surfaceVariant,
@@ -831,18 +861,19 @@ export default function ChatScreen() {
         </View>
       )}
 
-      <KeyboardAvoidingView
+      <KeyboardAwareScrollView
+        ref={scrollViewRef}
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        contentContainerStyle={{ paddingVertical: theme.spacing.md }}
+        enableOnAndroid={true}
+        enableAutomaticScroll={true}
+        keyboardOpeningTime={250}
+        extraScrollHeight={Platform.OS === 'ios' ? 20 : 50}
+        extraHeight={Platform.OS === 'android' ? 20 : 0}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd(true)}
       >
-        {/* Messages */}
-        <ScrollView
-          ref={scrollViewRef}
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingVertical: theme.spacing.md }}
-          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-        >
           {messages.length === 0 ? (
             <EmptyState
               title="Start the conversation"
@@ -892,7 +923,7 @@ export default function ChatScreen() {
                       timestamp={timestamp}
                       type={message.message_type}
                       status={message.status}
-                      senderName={!isOwn ? `${message.sender?.first_name || 'User'} ${message.sender?.last_name || ''}`.trim() : undefined}
+                      senderName={!isOwn ? getDisplayName(message.sender, false).displayName : undefined}
                     />
                   );
                   return elements;
@@ -911,7 +942,7 @@ export default function ChatScreen() {
                           timestamp,
                           expiresAt: offer.expires_at,
                           buyer: {
-                            name: `${message.sender?.first_name || 'User'} ${message.sender?.last_name || ''}`.trim(),
+                            name: getDisplayName(message.sender, false).displayName,
                             avatar: message.sender?.avatar_url,
                             rating: message.sender?.rating,
                           },
@@ -956,7 +987,7 @@ export default function ChatScreen() {
                     key={message.id}
                     message={message}
                     isOwn={isOwn}
-                    senderName={!isOwn ? `${message.sender?.first_name || 'User'} ${message.sender?.last_name || ''}`.trim() : undefined}
+                    senderName={!isOwn ? getDisplayName(message.sender, false).displayName : undefined}
                     senderPhone={message.sender?.phone}
                     timestamp={timestamp}
                   />
@@ -1014,7 +1045,7 @@ export default function ChatScreen() {
                   timestamp={timestamp}
                   type={message.message_type}
                   status={messageStatus}
-                  senderName={!isOwn ? `${message.sender?.first_name || otherUser?.first_name || 'User'} ${message.sender?.last_name || otherUser?.last_name || ''}`.trim() : undefined}
+                  senderName={!isOwn ? getDisplayName(message.sender || otherUser, false).displayName : undefined}
                   images={message.message_type === 'image' && message.images ? 
                     (() => {
                       try {
@@ -1050,8 +1081,6 @@ export default function ChatScreen() {
               </View>
             </View>
           )}
-        </ScrollView>
-
         {/* Transaction Completion Button */}
         {conversation?.listing && otherUser && !existingTransaction && (
           <View style={{
@@ -1101,7 +1130,7 @@ export default function ChatScreen() {
             paddingHorizontal: theme.spacing.lg,
             paddingTop: theme.spacing.md,
             paddingBottom: Platform.OS === 'android' ? Math.max(insets.bottom, theme.spacing.md) : theme.spacing.md,
-            gap: theme.spacing.sm,
+            gap: theme.spacing.xs,
           }}
         >
           {/* Image Picker */}
@@ -1128,7 +1157,7 @@ export default function ChatScreen() {
           />
         </View>
 
-      </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
 
       {/* Make Offer Modal */}
       <AppModal

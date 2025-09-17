@@ -32,6 +32,18 @@ export function useDisplayName(profile: UserProfile | null): DisplayNameResult {
     const canDisplayBusinessName = hasBusinessName && (hasBusinessPlan() || profile.display_business_name);
     const shouldDisplayBusinessName = canDisplayBusinessName && profile.display_business_name;
 
+    console.log('🔍 Display Name Debug:', {
+      profileId: profile.id,
+      isBusiness: profile.is_business,
+      businessName: profile.business_name,
+      displayBusinessName: profile.display_business_name,
+      businessNamePriority: profile.business_name_priority,
+      hasBusinessPlan: hasBusinessPlan(),
+      hasBusinessName,
+      canDisplayBusinessName,
+      shouldDisplayBusinessName,
+    });
+
     // Determine primary display name
     let primaryName = profile.full_name || 'User';
     let isBusinessDisplay = false;

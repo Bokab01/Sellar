@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Modal,
@@ -65,7 +65,24 @@ export function ImageViewer({
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
-  const imageTranslateX = useSharedValue(-currentIndex * screenWidth);
+  const imageTranslateX = useSharedValue(-initialIndex * screenWidth);
+
+  // Reset to initial index when modal opens
+  useEffect(() => {
+    if (visible) {
+      console.log('ImageViewer: Modal opened with initialIndex', initialIndex);
+      setCurrentIndex(initialIndex);
+      imageTranslateX.value = -initialIndex * screenWidth;
+      lastImageTranslateX.value = -initialIndex * screenWidth;
+      // Reset zoom and position
+      scale.value = 1;
+      translateX.value = 0;
+      translateY.value = 0;
+      lastScale.value = 1;
+      lastTranslateX.value = 0;
+      lastTranslateY.value = 0;
+    }
+  }, [visible, initialIndex]);
 
   // Refs for gesture handlers
   const panRef = useRef<any>(null);
@@ -77,7 +94,7 @@ export function ImageViewer({
   const lastScale = useSharedValue(1);
   const lastTranslateX = useSharedValue(0);
   const lastTranslateY = useSharedValue(0);
-  const lastImageTranslateX = useSharedValue(-currentIndex * screenWidth);
+  const lastImageTranslateX = useSharedValue(-initialIndex * screenWidth);
 
   const resetImagePosition = useCallback(() => {
     'worklet';

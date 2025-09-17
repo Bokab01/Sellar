@@ -204,22 +204,47 @@ export default function EditProfileScreen() {
 
       const fullName = `${formData.first_name.trim()} ${formData.last_name.trim()}`.trim();
       
-      const updateData = {
-        ...formData,
-        full_name: fullName,
+      const updateData: any = {
+        // Only include fields that have actually changed or have values
+        email: formData.email.trim() || undefined,
+        phone: formData.phone.trim() || undefined,
+        bio: formData.bio.trim() || undefined,
+        location: formData.location.trim() || undefined,
+        professional_title: formData.professional_title.trim() || undefined,
         years_of_experience: formData.years_of_experience ? parseInt(formData.years_of_experience) : undefined,
         avatar_url: avatar || undefined,
         preferred_contact_method: formData.preferred_contact_method as 'email' | 'phone' | 'app' | 'whatsapp',
         response_time_expectation: formData.response_time_expectation as 'within_hours' | 'within_minutes' | 'within_day' | 'within_week',
         phone_visibility: formData.phone_visibility as 'public' | 'contacts' | 'private',
         email_visibility: formData.email_visibility as 'public' | 'contacts' | 'private',
+        show_online_status: formData.show_online_status,
+        show_last_seen: formData.show_last_seen,
+        // Business fields
+        business_name: formData.business_name.trim() || undefined,
+        business_type: formData.business_type.trim() || undefined,
+        business_description: formData.business_description.trim() || undefined,
+        business_phone: formData.business_phone.trim() || undefined,
+        business_email: formData.business_email.trim() || undefined,
+        business_website: formData.business_website.trim() || undefined,
+        display_business_name: formData.display_business_name,
         business_name_priority: formData.business_name_priority as 'secondary' | 'primary' | 'hidden',
       };
 
-      // Remove first_name and last_name from update data as they're not in the profile schema
-      delete (updateData as any).first_name;
-      delete (updateData as any).last_name;
+      // Auto-set is_business to true if user has business information
+      if (formData.business_name.trim() || formData.business_type.trim() || formData.business_description.trim()) {
+        updateData.is_business = true;
+        console.log('🔍 Auto-setting is_business to true because business fields are present');
+      }
 
+      // Only include username if it has a value and is different from current
+      if (formData.username.trim() && formData.username.trim() !== profile?.username) {
+        updateData.username = formData.username.trim();
+      }
+
+      console.log('🔍 Profile Update Data:', updateData);
+      console.log('🔍 Display Business Name:', updateData.display_business_name);
+      console.log('🔍 Business Name:', updateData.business_name);
+      
       await updateProfile(updateData);
       setToastMessage('Profile updated successfully!');
       setToastVariant('success');
@@ -672,7 +697,7 @@ export default function EditProfileScreen() {
             'Business Profile',
             <Building size={20} color={theme.colors.primary} />,
             <View style={{ gap: theme.spacing.lg }}>
-              {profile?.is_business ? (
+              {hasBusinessPlan() ? (
                 <>
                   <Input
                     label="Business Name"
@@ -767,6 +792,80 @@ export default function EditProfileScreen() {
                           </Text>
                         </TouchableOpacity>
             </View>
+
+            {/* Business Name Priority Selection */}
+            {formData.display_business_name && (
+              <View style={{ marginTop: theme.spacing.lg }}>
+                <Text style={{ 
+                  fontSize: 14, 
+                  fontWeight: '500', 
+                  marginBottom: theme.spacing.sm,
+                  color: theme.colors.text.primary 
+                }}>
+                  Display Priority
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+                  {[
+                    { 
+                      value: 'primary', 
+                      label: 'Business Name Only',
+                      description: `"${formData.business_name}"`
+                    },
+                    { 
+                      value: 'secondary', 
+                      label: 'Both Names',
+                      description: `"${formData.first_name} ${formData.last_name} • ${formData.business_name}"`
+                    },
+                    { 
+                      value: 'hidden', 
+                      label: 'Personal Name Only',
+                      description: `"${formData.first_name} ${formData.last_name}"`
+                    },
+                  ].map((option) => (
+                    <TouchableOpacity
+                      key={option.value}
+                      onPress={() => updateFormField('business_name_priority', option.value)}
+                      style={{ 
+                        backgroundColor: formData.business_name_priority === option.value 
+                          ? theme.colors.primary 
+                          : theme.colors.surfaceVariant,
+                        borderRadius: theme.borderRadius.md,
+                        paddingHorizontal: theme.spacing.md,
+                        paddingVertical: theme.spacing.sm,
+                        borderWidth: 1,
+                        borderColor: formData.business_name_priority === option.value 
+                          ? theme.colors.primary 
+                          : theme.colors.border,
+                        flex: 1,
+                        minWidth: '30%',
+                      }}
+                    >
+                      <Text style={{
+                        color: formData.business_name_priority === option.value 
+                          ? '#FFFFFF' 
+                          : theme.colors.text.primary,
+                        fontSize: 12,
+                        fontWeight: '600',
+                        textAlign: 'center',
+                        marginBottom: 2,
+                      }}>
+                        {option.label}
+                      </Text>
+                      <Text style={{
+                        color: formData.business_name_priority === option.value 
+                          ? '#FFFFFF' 
+                          : theme.colors.text.muted,
+                        fontSize: 10,
+                        textAlign: 'center',
+                        opacity: 0.8,
+                      }}>
+                        {option.description}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
           </View>
                   )}
                 </>

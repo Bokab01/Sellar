@@ -187,10 +187,19 @@ export default function UserProfileScreen() {
             following_id: profileId!,
           });
 
-        if (error) throw error;
-        
-        setIsFollowing(true);
-        setToastMessage('Following successfully');
+        if (error) {
+          if (error.code === '23505') {
+            // Already following, just update state - this is not an error
+            console.log('User already being followed, updating state');
+            setIsFollowing(true);
+            setToastMessage('Following successfully');
+          } else {
+            throw error;
+          }
+        } else {
+          setIsFollowing(true);
+          setToastMessage('Following successfully');
+        }
       }
       
       setShowToast(true);

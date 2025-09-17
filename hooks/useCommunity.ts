@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { dbHelpers, supabase } from '@/lib/supabase';
 import { useCommunityRealtime } from './useRealtime';
 import { useAuthStore } from '@/store/useAuthStore';
+import { addProfileRefreshListener } from './useProfile';
 
 export function useCommunityPosts(options: { following?: boolean; limit?: number; userId?: string } = {}) {
   const { user } = useAuthStore();
@@ -40,21 +41,38 @@ export function useCommunityPosts(options: { following?: boolean; limit?: number
 
   // Real-time updates
   const handleRealtimeUpdate = useCallback((newPost: any) => {
-    setPosts(prev => {
-      const exists = prev.find(item => item.id === newPost.id);
-      if (exists) {
-        return prev.map(item => item.id === newPost.id ? newPost : item);
-      } else {
-        return [newPost, ...prev];
-      }
+    React.startTransition(() => {
+      setPosts(prev => {
+        // Handle deleted posts
+        if (newPost._deleted) {
+          return prev.filter(item => item.id !== newPost.id);
+        }
+        
+        const exists = prev.find(item => item.id === newPost.id);
+        if (exists) {
+          return prev.map(item => item.id === newPost.id ? newPost : item);
+        } else {
+          return [newPost, ...prev];
+        }
+      });
     });
   }, []);
 
-  useCommunityRealtime(handleRealtimeUpdate);
+  const { postsSubscription, commentsSubscription, likesSubscription } = useCommunityRealtime(handleRealtimeUpdate);
 
   useEffect(() => {
     fetchPosts();
   }, [options.following, options.userId]);
+
+  // Listen for profile refresh events to update posts with new profile data
+  useEffect(() => {
+    const removeListener = addProfileRefreshListener(() => {
+      // Refresh posts to get updated profile data
+      fetchPosts(true);
+    });
+
+    return () => removeListener();
+  }, [fetchPosts]);
 
   const createPost = async (content: string, images: string[] = [], listingId?: string, type?: string) => {
     if (!user) return { error: 'Not authenticated' };
@@ -81,6 +99,23 @@ export function useCommunityPosts(options: { following?: boolean; limit?: number
   };
 
   const refresh = useCallback(() => fetchPosts(true), [fetchPosts]);
+
+  const updatePostCounts = useCallback((postId: string, counts: { likes_count?: number; comments_count?: number; shares_count?: number }) => {
+    setPosts(prev => prev.map(post => 
+      post.id === postId 
+        ? { ...post, ...counts }
+        : post
+    ));
+  }, []);
+
+  const incrementCommentCount = useCallback((postId: string) => {
+    console.log('🔗 Manually incrementing comment count for post:', postId);
+    setPosts(prev => prev.map(post => 
+      post.id === postId 
+        ? { ...post, comments_count: (post.comments_count || 0) + 1 }
+        : post
+    ));
+  }, []);
 
   const updatePost = async (postId: string, updates: { content?: string; images?: string[]; type?: string; location?: string }) => {
     console.log('updatePost hook called with:', postId, typeof postId, updates);
@@ -214,6 +249,8 @@ export function useCommunityPosts(options: { following?: boolean; limit?: number
     refreshing,
     refresh,
     createPost,
+    updatePostCounts,
+    incrementCommentCount,
     updatePost,
     deletePost,
     likePost,

@@ -94,10 +94,10 @@ export function ProductCard({
   } = useImageViewer({ images });
   
   const isGridLayout = layout === 'grid';
-  // Increased card height and made image cover 70% of the card
-  const totalCardHeight = isGridLayout ? 320 : 360;
-  const imageHeight = isGridLayout ? totalCardHeight * 0.7 : 200; // 70% for grid, keep default for list
-  const cardPadding = isGridLayout ? theme.spacing.sm : theme.spacing.lg;
+  // Optimized card height for better mobile experience
+  const totalCardHeight = isGridLayout ? 280 : 360; // Reduced from 320 to 280
+  const imageHeight = isGridLayout ? totalCardHeight * 0.65 : 200; // Reduced from 70% to 65% for more content space
+  const cardPadding = isGridLayout ? theme.spacing.md : theme.spacing.lg; // Increased padding for grid
 
   const handleLongPress = () => {
     if (enableImageViewer && images.length > 0) {
@@ -162,13 +162,14 @@ export function ProductCard({
         {badge && (
           <View style={{
             position: 'absolute',
-            top: theme.spacing.sm,
-            left: theme.spacing.sm,
+            top: theme.spacing.xs,
+            left: theme.spacing.xs,
+            zIndex: 2,
           }}>
             <Badge 
               variant={badge.variant} 
               text={badge.text} 
-              size={isGridLayout ? 'sm' : 'md'}
+              size="sm" // Always use small size for better space efficiency
             />
           </View>
         )}
@@ -179,18 +180,19 @@ export function ProductCard({
             onPress={onFavoritePress}
             style={{
               position: 'absolute',
-              top: theme.spacing.sm,
-              right: theme.spacing.sm,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              borderRadius: 20,
-              padding: 8,
+              top: theme.spacing.xs,
+              right: theme.spacing.xs,
+              backgroundColor: 'rgba(0, 0, 0, 0.6)',
+              borderRadius: isGridLayout ? 16 : 20,
+              padding: isGridLayout ? 6 : 8,
               alignItems: 'center',
               justifyContent: 'center',
+              zIndex: 1,
             }}
             activeOpacity={0.7}
           >
             <Heart 
-              size={isGridLayout ? 16 : 18} 
+              size={isGridLayout ? 14 : 16} // Smaller icons for grid
               color={isFavorited ? '#ff4757' : '#ffffff'} 
               fill={isFavorited ? '#ff4757' : 'transparent'}
             />
@@ -203,28 +205,28 @@ export function ProductCard({
             onPress={onViewPress}
             style={{
               position: 'absolute',
-              bottom: theme.spacing.sm,
-              right: theme.spacing.sm,
+              bottom: theme.spacing.xs,
+              right: theme.spacing.xs,
               backgroundColor: 'rgba(0, 0, 0, 0.7)',
-              borderRadius: 12,
-              paddingHorizontal: 8,
-              paddingVertical: 4,
+              borderRadius: isGridLayout ? 8 : 12,
+              paddingHorizontal: isGridLayout ? 6 : 8,
+              paddingVertical: isGridLayout ? 2 : 4,
               flexDirection: 'row',
               alignItems: 'center',
-              gap: 4,
+              gap: isGridLayout ? 2 : 4,
             }}
             activeOpacity={0.7}
           >
-            <Eye size={12} color="#ffffff" />
+            <Eye size={isGridLayout ? 10 : 12} color="#ffffff" />
             <Text 
               variant="caption" 
               style={{ 
                 color: '#ffffff', 
-                fontSize: 11,
+                fontSize: isGridLayout ? 9 : 11,
                 fontWeight: '600'
               }}
             >
-              {viewCount.toLocaleString()}
+              {viewCount > 999 ? `${Math.floor(viewCount / 1000)}k` : viewCount.toString()}
             </Text>
           </TouchableOpacity>
         )}
@@ -243,9 +245,9 @@ export function ProductCard({
             numberOfLines={isGridLayout ? 2 : 2}
             style={{ 
               marginBottom: isGridLayout ? theme.spacing.xs : theme.spacing.sm,
-              fontSize: isGridLayout ? 13 : undefined,
+              fontSize: isGridLayout ? 12 : undefined, // Reduced from 13 to 12
               fontWeight: isGridLayout ? '600' : undefined,
-              lineHeight: isGridLayout ? 16 : undefined,
+              lineHeight: isGridLayout ? 15 : undefined, // Reduced from 16 to 15
             }}
           >
             {title}
@@ -259,13 +261,17 @@ export function ProductCard({
           />
         </View>
 
-        {location && !isGridLayout && (
+        {location && (
           <Text 
-            variant="bodySmall" 
+            variant={isGridLayout ? "caption" : "bodySmall"}
             color="muted"
-            style={{ marginBottom: theme.spacing.md }}
+            numberOfLines={1}
+            style={{ 
+              marginBottom: isGridLayout ? theme.spacing.xs : theme.spacing.md,
+              fontSize: isGridLayout ? 10 : undefined,
+            }}
           >
-            📍 {location}
+             {location}
           </Text>
         )}
 

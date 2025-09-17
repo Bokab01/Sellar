@@ -154,7 +154,9 @@ export function useProfile(userId?: string) {
             .from('profiles')
             .insert({
               id: targetUserId,
-              full_name: fullName,
+              first_name: firstName,
+              last_name: lastName,
+              // full_name is generated from first_name and last_name, don't set it directly
               email: authUser.user.email || '',
               phone: authUser.user.user_metadata?.phone || null,
               location: authUser.user.user_metadata?.location || 'Accra, Greater Accra',
@@ -173,6 +175,13 @@ export function useProfile(userId?: string) {
           throw fetchError;
         }
       } else {
+        console.log('🔍 Profile Fetched:', {
+          id: data.id,
+          isBusiness: data.is_business,
+          businessName: data.business_name,
+          displayBusinessName: data.display_business_name,
+          businessNamePriority: data.business_name_priority,
+        });
         setProfile(data);
       }
     } catch (err) {
@@ -187,12 +196,37 @@ export function useProfile(userId?: string) {
     fetchProfile();
   }, [targetUserId]);
 
+  // Listen for global profile refresh events
+  useEffect(() => {
+    const removeListener = addProfileRefreshListener(() => {
+      if (targetUserId === user?.id) {
+        fetchProfile();
+      }
+    });
+
+    return () => removeListener();
+  }, [targetUserId, user?.id]);
+
   return {
     profile,
     loading,
     error,
     refetch: fetchProfile,
   };
+}
+
+// Global profile refresh mechanism
+const profileRefreshListeners = new Set<() => void>();
+
+export function addProfileRefreshListener(callback: () => void) {
+  profileRefreshListeners.add(callback);
+  return () => {
+    profileRefreshListeners.delete(callback);
+  };
+}
+
+export function triggerProfileRefresh() {
+  profileRefreshListeners.forEach(callback => callback());
 }
 
 // Hook for updating profile
@@ -210,14 +244,25 @@ export function useUpdateProfile() {
     setError(null);
 
     try {
+      // Remove full_name from updates as it's a generated column
+      const { full_name, ...safeUpdates } = updates;
+      
+      // Filter out undefined values to avoid setting fields to null unnecessarily
+      const filteredUpdates = Object.fromEntries(
+        Object.entries(safeUpdates).filter(([_, value]) => value !== undefined)
+      );
+      
       const { data, error: updateError } = await supabase
         .from('profiles')
-        .update(updates)
+        .update(filteredUpdates)
         .eq('id', user.id)
         .select()
         .single();
 
       if (updateError) throw updateError;
+
+      // Trigger global profile refresh to update all components
+      triggerProfileRefresh();
 
       return data as UserProfile;
     } catch (err) {
@@ -249,7 +294,7 @@ export function useBusinessCategories() {
 
     try {
       const { data, error: fetchError } = await supabase
-        .from('business_categories')
+        .from('categories')
         .select('*')
         .eq('is_active', true)
         .order('sort_order');
@@ -514,6 +559,9 @@ export function useBusinessProfileSetup() {
         .single();
 
       if (updateError) throw updateError;
+
+      // Trigger global profile refresh to update all components
+      triggerProfileRefresh();
 
       return data as UserProfile;
     } catch (err) {

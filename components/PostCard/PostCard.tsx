@@ -59,9 +59,9 @@ interface PostCardProps {
     timestamp: string;
     content: string;
     images?: string[];
-    likes: number;
-    comments: number;
-    shares: number;
+    likes_count: number;
+    comments_count: number;
+    shares_count: number;
     isLiked: boolean;
     location?: string;
     listing?: {
@@ -105,11 +105,17 @@ export function PostCard({
   
   // Local state for like functionality
   const [isLiked, setIsLiked] = useState(post.isLiked);
-  const [likeCount, setLikeCount] = useState(post.likes || 0);
+  const [likeCount, setLikeCount] = useState(post.likes_count || 0);
   const [isLiking, setIsLiking] = useState(false);
 
   // Follow feedback hook
   const { showFeedback: showFollowFeedback, feedbackText: followFeedbackText, animation: feedbackAnimation, showFollowFeedback: triggerFollowFeedback } = useFollowFeedback();
+
+  // Sync local state with prop changes (for real-time updates)
+  useEffect(() => {
+    setIsLiked(post.isLiked);
+    setLikeCount(post.likes_count || 0);
+  }, [post.isLiked, post.likes_count, post.comments_count]);
 
   const isOwnPost = user?.id === post.author.id;
 
@@ -612,7 +618,7 @@ export function PostCard({
           >
             <MessageCircle size={18} color={theme.colors.text.muted} />
             <Text variant="bodySmall" color="muted" style={{ fontWeight: '500' }}>
-              {(post.comments || 0).toLocaleString()}
+              {(post.comments_count || 0).toLocaleString()}
             </Text>
           </TouchableOpacity>
 
@@ -630,7 +636,7 @@ export function PostCard({
           >
             <Share size={18} color={theme.colors.text.muted} />
             <Text variant="bodySmall" color="muted" style={{ fontWeight: '500' }}>
-              {(post.shares || 0).toLocaleString()}
+              {(post.shares_count || 0).toLocaleString()}
             </Text>
           </TouchableOpacity>
 

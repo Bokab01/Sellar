@@ -11,7 +11,7 @@ type RewardCategory = 'all' | 'community' | 'marketplace' | 'milestones';
 
 interface RewardTrackerItemProps {
   reward: any;
-  progress?: ProgressInfo;
+  progress: ProgressInfo;
   onPress?: () => void;
 }
 
@@ -19,13 +19,13 @@ function RewardTrackerItem({ reward, progress, onPress }: RewardTrackerItemProps
   const { theme } = useTheme();
 
   const getProgressColor = () => {
-    if (progress?.is_completed) return theme.colors.success;
-    if (progress && progress.percentage > 50) return theme.colors.warning;
+    if (progress.is_completed) return theme.colors.success;
+    if (progress.percentage > 50) return theme.colors.warning;
     return theme.colors.primary;
   };
 
   const getStatusBadge = () => {
-    if (progress?.is_completed) {
+    if (progress.is_completed) {
       return <Badge text="Completed" variant="success" size="sm" />;
     }
     if (reward.automatic) {
@@ -43,7 +43,7 @@ function RewardTrackerItem({ reward, progress, onPress }: RewardTrackerItemProps
         padding: theme.spacing.lg,
         marginBottom: theme.spacing.md,
         borderWidth: 1,
-        borderColor: progress?.is_completed ? theme.colors.success + '30' : theme.colors.border,
+        borderColor: progress.is_completed ? theme.colors.success + '30' : theme.colors.border,
         ...theme.shadows.sm,
       }}
       activeOpacity={0.7}
@@ -95,7 +95,7 @@ function RewardTrackerItem({ reward, progress, onPress }: RewardTrackerItemProps
               </Text>
             </View>
 
-            {progress && !progress.is_completed && (
+            {!progress.is_completed && (
               <Text variant="caption" color="muted">
                 {progress.current}/{progress.required}
               </Text>
@@ -103,7 +103,7 @@ function RewardTrackerItem({ reward, progress, onPress }: RewardTrackerItemProps
           </View>
 
           {/* Progress Bar */}
-          {progress && progress.required > 1 && (
+          {progress.required > 1 && (
             <View style={{ marginTop: theme.spacing.sm }}>
               <View
                 style={{
@@ -125,7 +125,7 @@ function RewardTrackerItem({ reward, progress, onPress }: RewardTrackerItemProps
           )}
 
           {/* Tips */}
-          {!progress?.is_completed && (
+          {!progress.is_completed && (
             <View
               style={{
                 backgroundColor: theme.colors.surfaceVariant,
@@ -167,9 +167,11 @@ export function RewardsTracker({ style }: RewardsTrackerProps) {
   const {
     availableRewards,
     achievements,
+    recentRewards,
     loading,
     fetchAvailableRewards,
     fetchAchievements,
+    fetchRecentRewards,
     getRewardProgress
   } = useRewardsStore();
 
@@ -178,6 +180,7 @@ export function RewardsTracker({ style }: RewardsTrackerProps) {
   useEffect(() => {
     fetchAvailableRewards();
     fetchAchievements();
+    fetchRecentRewards(); // Also fetch recent rewards for progress tracking
   }, []);
 
   const categories = [
@@ -217,6 +220,7 @@ export function RewardsTracker({ style }: RewardsTrackerProps) {
         contentContainerStyle={{
           paddingHorizontal: theme.spacing.lg,
           paddingBottom: theme.spacing.lg,
+          paddingRight: theme.spacing.xl, // Extra padding on the right
         }}
         style={{ marginBottom: theme.spacing.md }}
       >
@@ -233,11 +237,12 @@ export function RewardsTracker({ style }: RewardsTrackerProps) {
                 alignItems: 'center',
                 backgroundColor: isSelected ? theme.colors.primary : theme.colors.surface,
                 borderRadius: theme.borderRadius.full,
-                paddingHorizontal: theme.spacing.lg,
-                paddingVertical: theme.spacing.md,
+                paddingHorizontal: theme.spacing.md,
+                paddingVertical: theme.spacing.sm,
                 marginRight: theme.spacing.md,
                 borderWidth: 1,
                 borderColor: isSelected ? theme.colors.primary : theme.colors.border,
+                minHeight: 40,
               }}
               activeOpacity={0.7}
             >
@@ -250,8 +255,11 @@ export function RewardsTracker({ style }: RewardsTrackerProps) {
                 style={{
                   color: isSelected ? theme.colors.primaryForeground : theme.colors.text.primary,
                   fontWeight: '600',
-                  marginLeft: theme.spacing.xs,
+                  marginLeft: theme.spacing.sm,
+                  fontSize: 14,
+                  lineHeight: 20,
                 }}
+                numberOfLines={1}
               >
                 {category.label}
               </Text>
@@ -269,9 +277,8 @@ export function RewardsTracker({ style }: RewardsTrackerProps) {
         showsVerticalScrollIndicator={false}
       >
         {filteredRewards.map((reward) => {
-          const progress = reward.achievement 
-            ? getRewardProgress(reward.type)
-            : undefined;
+          // Always get progress for all rewards, not just achievements
+          const progress = getRewardProgress(reward.type);
 
           return (
             <RewardTrackerItem

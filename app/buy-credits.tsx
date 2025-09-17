@@ -418,6 +418,38 @@ export default function BuyCreditsScreen() {
               </View>
             </View>
           </View>
+
+          {/* Business Plan Upgrade Suggestion */}
+          <View
+            style={{
+              backgroundColor: theme.colors.primaryContainer,
+              borderRadius: theme.borderRadius.lg,
+              padding: theme.spacing.lg,
+              borderWidth: 1,
+              borderColor: theme.colors.primary + '30',
+              marginTop: theme.spacing.lg,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, marginBottom: theme.spacing.md }}>
+              <Crown size={24} color={theme.colors.primary} />
+              <Text variant="h4" style={{ color: theme.colors.primary, fontWeight: '600' }}>
+                Business Plan Available
+              </Text>
+            </View>
+            
+            <Text variant="body" color="secondary" style={{ marginBottom: theme.spacing.lg }}>
+              Got {(2798).toLocaleString()} credits? Upgrade to Sellar Business and get unlimited listings, 120 monthly boost credits, and premium features!
+            </Text>
+            
+            <Button
+              variant="primary"
+              onPress={() => router.push('/subscription-plans')}
+              size="md"
+              style={{ alignSelf: 'flex-start' }}
+            >
+              View Business Plans
+            </Button>
+          </View>
         </Container>
       </ScrollView>
 

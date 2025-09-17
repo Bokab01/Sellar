@@ -1,17 +1,25 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { useTheme } from '@/theme/ThemeProvider';
+import { useMonetizationStore } from '@/store/useMonetizationStore';
 
 // Import the screen components explicitly
 import MoreScreen from './index';
 import BusinessDashboardScreen from './dashboard';
 import WalletScreen from './wallet';
 import SettingsScreen from './settings';
+import { SafeAreaWrapper } from '@/components';
 
 const Tab = createMaterialTopTabNavigator();
 
 export default function MoreLayout() {
   const { theme } = useTheme();
+  const { refreshSubscription } = useMonetizationStore();
+  
+  // Ensure subscription data is loaded
+  useEffect(() => {
+    refreshSubscription();
+  }, [refreshSubscription]);
 
   // Memoize screen options to prevent unnecessary re-renders
   const screenOptions = useMemo(() => ({
@@ -36,27 +44,29 @@ export default function MoreLayout() {
   }), [theme]);
 
   return (
-    <Tab.Navigator screenOptions={screenOptions}>
-      <Tab.Screen 
-        name="Profile" 
-        component={MoreScreen}
-        options={{ title: 'Profile' }}
-      />
-      <Tab.Screen 
-        name="Dashboard" 
-        component={BusinessDashboardScreen}
-        options={{ title: 'Dashboard' }}
-      />
-      <Tab.Screen 
-        name="Wallet" 
-        component={WalletScreen}
-        options={{ title: 'Wallet' }}
-      />
-      <Tab.Screen 
-        name="Settings" 
-        component={SettingsScreen}
-        options={{ title: 'Settings' }}
-      />
-    </Tab.Navigator>
+    <SafeAreaWrapper>
+      <Tab.Navigator screenOptions={screenOptions}>
+        <Tab.Screen 
+          name="Profile" 
+          component={MoreScreen}
+          options={{ title: 'Profile' }}
+        />
+        <Tab.Screen 
+          name="Dashboard" 
+          component={BusinessDashboardScreen}
+          options={{ title: 'Dashboard' }}
+        />
+        <Tab.Screen 
+          name="Wallet" 
+          component={WalletScreen}
+          options={{ title: 'Wallet' }}
+        />
+        <Tab.Screen 
+          name="Settings" 
+          component={SettingsScreen}
+          options={{ title: 'Settings' }}
+        />
+      </Tab.Navigator>
+    </SafeAreaWrapper>
   );
 }

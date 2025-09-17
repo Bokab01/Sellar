@@ -31,6 +31,7 @@ import {
 import { useImageViewer } from '@/hooks/useImageViewer';
 import { useListingStats } from '@/hooks/useListingStats';
 import { Heart, Share, MessageCircle, Phone, PhoneCall, DollarSign, ArrowLeft, Package } from 'lucide-react-native';
+import { getDisplayName } from '@/hooks/useDisplayName';
 
 export default function ListingDetailScreen() {
   const { theme } = useTheme();
@@ -151,6 +152,7 @@ export default function ListingDetailScreen() {
             id,
             first_name,
             last_name,
+            full_name,
             avatar_url,
             rating,
             total_sales,
@@ -160,7 +162,11 @@ export default function ListingDetailScreen() {
             last_seen,
             response_time,
             location,
-            phone
+            phone,
+            is_business,
+            business_name,
+            display_business_name,
+            business_name_priority
           ),
           categories (
             name,
@@ -193,7 +199,7 @@ export default function ListingDetailScreen() {
 
         // Get profile and category data separately
         const [profileResult, categoryResult] = await Promise.all([
-          supabase.from('profiles').select('id, first_name, last_name, avatar_url, rating, total_sales, total_reviews, is_verified, is_online, last_seen, response_time, location, phone').eq('id', (listingData as any).user_id).single(),
+          supabase.from('profiles').select('id, first_name, last_name, full_name, avatar_url, rating, total_sales, total_reviews, is_verified, is_online, last_seen, response_time, location, phone, is_business, business_name, display_business_name, business_name_priority').eq('id', (listingData as any).user_id).single(),
           supabase.from('categories').select('name, icon').eq('id', (listingData as any).category_id).single()
         ]);
 
@@ -344,7 +350,7 @@ export default function ListingDetailScreen() {
           title: item.title,
           price: item.price,
           seller: {
-            name: `${item.profiles?.first_name} ${item.profiles?.last_name}`,
+            name: getDisplayName(item.profiles, false).displayName,
             avatar: item.profiles?.avatar_url,
             rating: item.profiles?.rating || 0,
           },
@@ -410,7 +416,7 @@ export default function ListingDetailScreen() {
           title: item.title,
           price: item.price,
           seller: {
-            name: `${item.profiles?.first_name} ${item.profiles?.last_name}`,
+            name: getDisplayName(item.profiles, false).displayName,
             avatar: item.profiles?.avatar_url,
             rating: item.profiles?.rating || 0,
           },
@@ -1007,14 +1013,14 @@ export default function ListingDetailScreen() {
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, borderColor: theme.colors.border, padding: theme.spacing.sm, borderRadius: theme.borderRadius.xl, borderWidth: 1 }}>
               <Avatar
-                name={`${listing.profiles.first_name} ${listing.profiles.last_name}`}
+                name={getDisplayName(listing.profiles, false).displayName}
                 source={listing.profiles.avatar_url}
                 size="md"
               />
               <View style={{ flex: 1}}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
                   <Text variant="bodySmall" style={{ fontWeight: '600' }}>
-                    {listing.profiles.first_name} {listing.profiles.last_name}
+                    {getDisplayName(listing.profiles, false).displayName}
                   </Text>
                   {listing.profiles.is_verified && (
                     <Badge text="Verified" variant="success" size="sm" />
@@ -1453,7 +1459,7 @@ export default function ListingDetailScreen() {
                 <ReviewsList
                   userId={listing?.profiles?.id}
                   showWriteReview={true}
-                  reviewedUserName={`${listing?.profiles?.first_name} ${listing?.profiles?.last_name}`}
+                  reviewedUserName={getDisplayName(listing?.profiles, false).displayName}
                   listingId={listingId}
                   listingTitle={listing?.title}
                   isVerifiedPurchase={false} // TODO: Check if user has purchased this item
@@ -1577,7 +1583,7 @@ export default function ListingDetailScreen() {
               <SimpleCallbackRequestButton
                 listingId={listingId!}
                 sellerId={listing.user_id}
-                sellerName={`${listing.profiles.first_name} ${listing.profiles.last_name}`.trim()}
+                sellerName={getDisplayName(listing.profiles, false).displayName}
                 sellerPhone={listing.profiles.phone}
                 listingTitle={listing.title}
                 variant="secondary"

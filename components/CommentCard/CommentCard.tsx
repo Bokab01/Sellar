@@ -19,7 +19,7 @@ interface CommentCardProps {
     };
     content: string;
     timestamp: string;
-    likes: number;
+    likes_count: number;
     isLiked: boolean;
     replies?: CommentCardProps['comment'][];
     depth?: number;
@@ -148,7 +148,7 @@ export function CommentCard({
                 fontWeight: comment.isLiked ? '600' : '400',
               }}
             >
-              {comment.likes}
+              {comment.likes_count}
             </Text>
           </TouchableOpacity>
 

@@ -149,7 +149,6 @@ export function ProfileEditModal({ visible, onClose, onProfileUpdated }: Profile
     try {
       const updates: Partial<UserProfile> = {
         full_name: formData.full_name.trim(),
-        username: formData.username.trim() || undefined,
         email: formData.email.trim(),
         phone: formData.phone.trim() || undefined,
         bio: formData.bio.trim() || undefined,
@@ -169,6 +168,17 @@ export function ProfileEditModal({ visible, onClose, onProfileUpdated }: Profile
         business_name_priority: formData.business_name_priority as any,
         avatar_url: avatar || undefined,
       };
+
+      // Only include username if it has a value
+      if (formData.username.trim()) {
+        updates.username = formData.username.trim();
+      }
+
+      // Auto-set is_business to true if user has business information
+      if (formData.business_name?.trim() || formData.business_type?.trim() || formData.business_description?.trim()) {
+        updates.is_business = true;
+        console.log('🔍 Auto-setting is_business to true because business fields are present');
+      }
 
       const updatedProfile = await updateProfile(updates);
 

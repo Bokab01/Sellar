@@ -52,20 +52,21 @@ export default function SearchResultsScreen() {
   // Transform database listings to component format
   const transformedProducts = products.map((listing: any) => {
     const seller = listing.profiles || null;
-    const badges = [];
     
-    // Add boost badge if listing is boosted
-    if (listing.boost_until && new Date(listing.boost_until) > new Date()) {
-      badges.push({ text: 'Boosted', variant: 'featured' as const });
-    }
+    // Determine the highest priority badge (only show ONE badge per listing)
+    let primaryBadge = null;
     
-    // Add business badges if seller has them
-    if (seller?.account_type === 'business') {
-      badges.push({ text: 'Business', variant: 'info' as const });
-    }
-    
-    if (seller?.verification_status === 'verified') {
-      badges.push({ text: 'Verified', variant: 'success' as const });
+    // Priority order: Urgent > Spotlight > Boosted > Business > Verified
+    if (listing.urgent_until && new Date(listing.urgent_until) > new Date()) {
+      primaryBadge = { text: 'Urgent Sale', variant: 'urgent' as const };
+    } else if (listing.spotlight_until && new Date(listing.spotlight_until) > new Date()) {
+      primaryBadge = { text: 'Spotlight', variant: 'spotlight' as const };
+    } else if (listing.boost_until && new Date(listing.boost_until) > new Date()) {
+      primaryBadge = { text: 'Boosted', variant: 'featured' as const };
+    } else if (seller?.account_type === 'business') {
+      primaryBadge = { text: 'Business', variant: 'info' as const };
+    } else if (seller?.verification_status === 'verified') {
+      primaryBadge = { text: 'Verified', variant: 'success' as const };
     }
 
     return {
@@ -80,7 +81,7 @@ export default function SearchResultsScreen() {
         rating: seller?.rating || 0,
         badges: seller?.account_type === 'business' ? ['business'] : [],
       },
-      badge: badges[0], // Show first badge
+      badge: primaryBadge || undefined, // Convert null to undefined
       location: listing.location,
       views: listing.views_count || 0,
       favorites: listing.favorites_count || 0,

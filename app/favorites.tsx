@@ -67,7 +67,7 @@ export default function FavoritesScreen() {
       // Fetch listings data
       const { data: listingsData, error: listingsError } = await supabase
         .from('listings')
-        .select('id, title, description, price, currency, condition, location, images, status, boost_expires_at, user_id, category_id')
+        .select('id, title, description, price, currency, condition, location, images, status, boost_until, user_id, category_id')
         .in('id', listingIds);
 
       if (listingsError) {
@@ -164,7 +164,7 @@ export default function FavoritesScreen() {
         rating: seller?.rating || 0,
         badges: seller?.account_type === 'business' ? ['business'] : [],
       },
-      badge: listing.boost_expires_at && new Date(listing.boost_expires_at) > new Date() 
+      badge: listing.boost_until && new Date(listing.boost_until) > new Date() 
         ? { text: 'Boosted', variant: 'featured' as const }
         : undefined,
       location: listing.location,

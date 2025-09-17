@@ -104,8 +104,9 @@ export function CustomImagePicker({
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        aspect: [4, 3],
+        aspect: undefined, // Allow flexible aspect ratio
         quality: 0.8,
+        exif: false, // Don't include EXIF data to reduce file size
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -132,13 +133,19 @@ export function CustomImagePicker({
   const pickFromLibrary = async () => {
     if (!(await requestPermissions('library'))) return;
 
+    if (value.length >= limit) {
+      showError(`Maximum ${limit} images already selected`);
+      return;
+    }
+
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: limit > 1,
-        selectionLimit: limit,
+        allowsMultipleSelection: true, // Always allow multiple selection
+        selectionLimit: Math.max(1, limit - value.length), // Only allow selecting up to remaining slots
         quality: 0.8,
-        allowsEditing: limit === 1,
+        allowsEditing: false, // Disable editing to allow multiple selection and flexible cropping
+        exif: false, // Don't include EXIF data to reduce file size
       });
 
       if (!result.canceled && result.assets.length > 0) {
@@ -149,13 +156,29 @@ export function CustomImagePicker({
           name: asset.fileName || `image_${Date.now()}_${index}.jpg`,
         }));
 
-        onChange(newImages);
-        
-        if (uploadImmediately && newImages.length > 0) {
-          handleUpload(newImages);
+        // Check if adding new images would exceed the limit
+        const totalImages = value.length + newImages.length;
+        if (totalImages > limit) {
+          const availableSlots = limit - value.length;
+          if (availableSlots <= 0) {
+            showError(`Maximum ${limit} images allowed`);
+            return;
+          }
+          const imagesToAdd = newImages.slice(0, availableSlots);
+          onChange([...value, ...imagesToAdd]);
+          showSuccess(`${imagesToAdd.length} image${imagesToAdd.length > 1 ? 's' : ''} added! (${newImages.length - imagesToAdd.length} more than limit were ignored)`);
+          
+          if (uploadImmediately && imagesToAdd.length > 0) {
+            handleUpload(imagesToAdd);
+          }
+        } else {
+          onChange([...value, ...newImages]);
+          showSuccess(`${newImages.length} image${newImages.length > 1 ? 's' : ''} added!`);
+          
+          if (uploadImmediately && newImages.length > 0) {
+            handleUpload(newImages);
+          }
         }
-        
-        showSuccess(`${newImages.length} image${newImages.length > 1 ? 's' : ''} selected!`);
       }
     } catch (error) {
       showError('Failed to select images from library');
@@ -396,7 +419,7 @@ export function CustomImagePicker({
                 fontSize: 12,
               }}
             >
-              Add Image
+              {value.length === 0 ? 'Add Images' : 'Add More'}
             </Text>
           </TouchableOpacity>
         )}
@@ -434,7 +457,10 @@ export function CustomImagePicker({
             lineHeight: 22,
             marginBottom: theme.spacing.md,
           }}>
-            Choose how you&apos;d like to add images
+            {limit > 1 
+              ? `Choose how you'd like to add images (up to ${limit - value.length} more)`
+              : "Choose how you'd like to add an image"
+            }
           </Text>
 
           <View style={{ gap: theme.spacing.md }}>
@@ -463,7 +489,7 @@ export function CustomImagePicker({
                 ...theme.shadows.sm,
               }}
             >
-              Choose from Gallery
+              {limit > 1 ? 'Select Multiple Images' : 'Choose from Gallery'}
             </Button>
           </View>
 

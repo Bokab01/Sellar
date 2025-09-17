@@ -197,8 +197,8 @@ export default function SafetyGuidelinesScreen() {
 
           <Text variant="body" style={{ marginBottom: theme.spacing.xl, lineHeight: 22 }}>
             For Sellar-related safety concerns:{'\n'}
-            • Email: safety@sellar.gh{'\n'}
-            • Phone: +233 (0) 123 456 789{'\n'}
+            • Email: safety@sellarghana.com{'\n'}
+            • Phone: +233 (0) 243 887 777{'\n'}
             • In-app support ticket system
           </Text>
 

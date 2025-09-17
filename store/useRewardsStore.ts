@@ -97,7 +97,15 @@ export const useRewardsStore = create<RewardsStore>((set, get) => ({
 
       if (error) throw error;
 
-      set({ rewardSummary: data, loading: false });
+      // Map the database response to the expected interface
+      const mappedSummary = {
+        total_credits_earned: data?.credits?.lifetime_earned || 0,
+        total_rewards: data?.community_points?.total_rewards || 0,
+        achievements_unlocked: 0, // TODO: Add achievements count when implemented
+        recent_rewards: [], // This will be fetched separately
+      };
+
+      set({ rewardSummary: mappedSummary, loading: false });
     } catch (error) {
       console.error('Error fetching reward summary:', error);
       set({ error: error instanceof Error ? error.message : 'Failed to fetch rewards', loading: false });
@@ -122,7 +130,21 @@ export const useRewardsStore = create<RewardsStore>((set, get) => ({
 
       if (error) throw error;
 
-      set({ recentRewards: data || [], loading: false });
+      // Map database fields to interface fields
+      const mappedRewards = (data || []).map(reward => ({
+        id: reward.id,
+        user_id: reward.user_id,
+        reward_type: reward.type,
+        credits_earned: reward.points,
+        trigger_action: reward.description,
+        reference_id: reward.metadata?.post_id || reward.metadata?.review_id || null,
+        reference_type: reward.type,
+        metadata: reward.metadata,
+        is_validated: reward.is_validated,
+        created_at: reward.created_at,
+      }));
+
+      set({ recentRewards: mappedRewards, loading: false });
     } catch (error) {
       console.error('Error fetching recent rewards:', error);
       set({ error: error instanceof Error ? error.message : 'Failed to fetch recent rewards', loading: false });
@@ -175,33 +197,6 @@ export const useRewardsStore = create<RewardsStore>((set, get) => ({
         one_time: true,
       },
       {
-        type: 'first_like_bonus',
-        name: 'First Like',
-        description: 'Earn 1 credit when your post gets its first like',
-        credits: 1,
-        category: 'community',
-        icon: '👍',
-        automatic: true,
-      },
-      {
-        type: 'engagement_milestone_10',
-        name: '10 Likes Milestone',
-        description: 'Earn 2 credits when your post reaches 10 likes',
-        credits: 2,
-        category: 'community',
-        icon: '📈',
-        automatic: true,
-      },
-      {
-        type: 'engagement_milestone_25',
-        name: '25 Likes Milestone',
-        description: 'Earn 5 credits when your post reaches 25 likes',
-        credits: 5,
-        category: 'community',
-        icon: '🚀',
-        automatic: true,
-      },
-      {
         type: 'viral_post',
         name: 'Viral Post',
         description: 'Earn 10 credits when your post gets 50+ likes',
@@ -217,15 +212,6 @@ export const useRewardsStore = create<RewardsStore>((set, get) => ({
         credits: 15,
         category: 'community',
         icon: '💥',
-        automatic: true,
-      },
-      {
-        type: 'helpful_commenter',
-        name: 'Helpful Commenter',
-        description: 'Earn 3 credits when your comment gets 5+ likes',
-        credits: 3,
-        category: 'community',
-        icon: '💬',
         automatic: true,
       },
       {
@@ -367,22 +353,37 @@ export const useRewardsStore = create<RewardsStore>((set, get) => ({
   getRewardProgress: (achievementType: string): ProgressInfo => {
     const achievement = get().achievements.find(a => a.achievement_type === achievementType);
     
-    if (!achievement) {
+    // Check if this reward type has been earned in community_rewards
+    const earnedReward = get().recentRewards.find(r => r.reward_type === achievementType);
+    
+    // If we have an achievement record, use that
+    if (achievement) {
+      const percentage = Math.min((achievement.progress_current / achievement.progress_required) * 100, 100);
+
       return {
-        current: 0,
-        required: 1,
-        percentage: 0,
-        is_completed: false
+        current: achievement.progress_current,
+        required: achievement.progress_required,
+        percentage,
+        is_completed: achievement.is_completed
       };
     }
-
-    const percentage = Math.min((achievement.progress_current / achievement.progress_required) * 100, 100);
-
+    
+    // If no achievement but we have earned this reward, mark as completed
+    if (earnedReward) {
+      return {
+        current: 1,
+        required: 1,
+        percentage: 100,
+        is_completed: true
+      };
+    }
+    
+    // Default: not completed
     return {
-      current: achievement.progress_current,
-      required: achievement.progress_required,
-      percentage,
-      is_completed: achievement.is_completed
+      current: 0,
+      required: 1,
+      percentage: 0,
+      is_completed: false
     };
   },
 

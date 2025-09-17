@@ -11,7 +11,7 @@ import { ListingImage } from '@/components/OptimizedImage/OptimizedImage';
 import { useMemoryManager } from '@/utils/memoryManager';
 import { ImageViewer } from '@/components/ImageViewer/ImageViewer';
 import { useImageViewer } from '@/hooks/useImageViewer';
-import { usePremiumBranding } from '@/lib/premiumBrandingService';
+// Removed usePremiumBranding import to avoid infinite re-renders
 import { Heart, Eye, Crown, Zap, Star } from 'lucide-react-native';
 
 interface PremiumProductCardProps {
@@ -78,15 +78,48 @@ export function PremiumProductCard({
 }: PremiumProductCardProps) {
   const { theme } = useTheme();
   const { shouldLoadHeavyComponent } = useMemoryManager();
-  const {
-    isBusinessUser,
-    getCardStyles,
-    getBadgeConfig,
-    getRibbonStyles,
-    getSellerStyles,
-    getPriorityIndicator,
-    getImageStyles,
-  } = usePremiumBranding();
+  
+  // Simple business user check without complex memoization
+  const isBusinessUser = seller?.isBusinessUser || false;
+  
+  // Simple inline functions without memoization to avoid infinite re-renders
+  const getCardStyles = () => ({
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.lg,
+    overflow: 'hidden' as const,
+    borderWidth: isBusinessUser ? 2 : 1,
+    borderColor: isBusinessUser ? theme.colors.primary : theme.colors.border,
+    ...(isBusinessUser ? theme.shadows.lg : theme.shadows.sm),
+  });
+
+  const getBadgeConfig = () => isBusinessUser ? {
+    text: 'BUSINESS',
+    variant: 'primary' as const,
+    size: 'small' as const,
+  } : null;
+
+  const getRibbonStyles = () => null;
+
+  const getSellerStyles = () => ({
+    container: isBusinessUser ? {
+      backgroundColor: theme.colors.primary + '10',
+      borderRadius: theme.borderRadius.md,
+      padding: theme.spacing.sm,
+      borderWidth: 1,
+      borderColor: theme.colors.primary + '20',
+    } : {},
+    name: isBusinessUser ? {
+      fontWeight: '600' as const,
+      color: theme.colors.primary,
+    } : {},
+    badge: null,
+  });
+
+  const getPriorityIndicator = () => null;
+
+  const getImageStyles = () => ({
+    borderRadius: theme.borderRadius.md,
+  });
 
   // Handle different image formats for ImageViewer
   const images = Array.isArray(image) 

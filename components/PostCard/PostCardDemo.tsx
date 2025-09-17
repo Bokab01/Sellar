@@ -30,9 +30,9 @@ const demoPostsData = [
       'https://picsum.photos/400/300?random=1',
       'https://picsum.photos/400/300?random=2'
     ],
-    likes: 24,
-    comments: 8,
-    shares: 3,
+    likes_count: 24,
+    comments_count: 8,
+    shares_count: 3,
     isLiked: false,
     location: 'East Legon, Accra',
     listing: {
@@ -61,9 +61,9 @@ const demoPostsData = [
     timestamp: '4 hours ago',
     content: '🔥 FLASH SALE ALERT! 50% off all summer dresses this weekend only! Don\'t miss out on these amazing deals. Limited stock available!',
     images: ['https://picsum.photos/400/300?random=2', 'https://picsum.photos/400/300?random=3'],
-    likes: 156,
-    comments: 23,
-    shares: 45,
+    likes_count: 156,
+    comments_count: 23,
+    shares_count: 45,
     isLiked: true,
     location: 'Kumasi Central Market'
   },
@@ -85,9 +85,9 @@ const demoPostsData = [
     },
     timestamp: '1 day ago',
     content: 'Just wanted to share my experience with the Sellar community. Amazing platform for buying and selling! The verification system really helps build trust. Highly recommend to everyone! 👍',
-    likes: 89,
-    comments: 34,
-    shares: 12,
+    likes_count: 89,
+    comments_count: 34,
+    shares_count: 12,
     isLiked: false,
     location: 'Tema Community 1'
   },
@@ -110,9 +110,9 @@ const demoPostsData = [
     },
     timestamp: '2 days ago',
     content: '📢 New Feature Alert! We\'ve just launched our enhanced PostCard design with user ratings, location display, and follow functionality. Check it out and let us know what you think!',
-    likes: 342,
-    comments: 67,
-    shares: 89,
+    likes_count: 342,
+    comments_count: 67,
+    shares_count: 89,
     isLiked: false,
     location: 'Sellar HQ, Accra'
   }

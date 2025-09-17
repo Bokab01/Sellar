@@ -46,7 +46,7 @@ const baseTypography = {
     letterSpacing: 0.5,
   },
   button: {
-    fontSize: 12,
+    fontSize: 14,
     lineHeight: 20,
     fontFamily: getFontFamily('body', 'semiBold'),
     letterSpacing: 0.25,
