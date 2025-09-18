@@ -70,7 +70,7 @@ export function useBusinessFeatures() {
     
     return {
       required: true,
-      message: `${featureName} is available with Sellar Business plan`,
+      message: `${featureName} is available with Sellar Pro plan`,
       action: 'Upgrade to Business',
       route: '/subscription-plans',
     };

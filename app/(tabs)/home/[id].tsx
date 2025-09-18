@@ -12,6 +12,7 @@ import {
   Button,
   Avatar,
   Badge,
+  CompactUserBadges,
   PriceDisplay,
   ItemDetailsTable,
   ListingStatsTable,
@@ -209,6 +210,7 @@ export default function ListingDetailScreen() {
           profiles: profileResult.data || null,
           categories: categoryResult.data || null
         };
+
 
         setListing(combinedData);
       } else if (fetchError) {
@@ -1018,13 +1020,15 @@ export default function ListingDetailScreen() {
                 size="md"
               />
               <View style={{ flex: 1}}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, flexWrap: 'wrap' }}>
                   <Text variant="bodySmall" style={{ fontWeight: '600' }}>
                     {getDisplayName(listing.profiles, false).displayName}
                   </Text>
-                  {listing.profiles.is_verified && (
-                    <Badge text="Verified" variant="success" size="sm" />
-                  )}
+                  <CompactUserBadges
+                    isBusinessUser={listing.profiles.is_business_user}
+                    isVerified={listing.profiles.is_verified}
+                    isBusinessVerified={listing.profiles.is_business_verified}
+                  />
                 </View>
                 <View style={{ marginTop: theme.spacing.xs }}>
                   <CompactReviewSummary userId={listing.profiles.id} />

@@ -49,7 +49,7 @@ export default function BuyCreditsScreen() {
     switch (packageId) {
       case 'starter': return <Zap size={32} color={theme.colors.primary} />;
       case 'seller': return <Star size={32} color={theme.colors.warning} />;
-      case 'pro': return <Crown size={32} color={theme.colors.primary} />;
+      case 'plus': return <Crown size={32} color={theme.colors.primary} />;
       case 'max': return <Building size={32} color={theme.colors.success} />;
       default: return <CreditCard size={32} color={theme.colors.text.muted} />;
     }
@@ -438,7 +438,7 @@ export default function BuyCreditsScreen() {
             </View>
             
             <Text variant="body" color="secondary" style={{ marginBottom: theme.spacing.lg }}>
-              Got {(2798).toLocaleString()} credits? Upgrade to Sellar Business and get unlimited listings, 120 monthly boost credits, and premium features!
+              Got {(2798).toLocaleString()} credits? Upgrade to Sellar Pro and get unlimited listings, 120 monthly boost credits, and premium features!
             </Text>
             
             <Button

@@ -67,6 +67,14 @@
           "resizeMode": "contain",
           "backgroundColor": "#a978ff"
         }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "sellar-ghana",
+          "organization": "sellar-n6"
+        }
       ]
     ],
     "notification": {

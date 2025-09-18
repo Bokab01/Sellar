@@ -220,9 +220,41 @@ export function ItemDetailsTable({
         return '⚙️'; // Default icon
       };
       
+      // Format the value with proper capitalization
+      const formatAttributeValue = (val: string | string[]): string => {
+        if (Array.isArray(val)) {
+          return val.map(v => formatSingleValue(v)).join(', ');
+        }
+        return formatSingleValue(String(val));
+      };
+      
+      const formatSingleValue = (val: string): string => {
+        // Common words that should remain lowercase (except at the beginning)
+        const lowercaseWords = new Set([
+          'and', 'or', 'of', 'the', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'from',
+          'up', 'down', 'out', 'off', 'over', 'under', 'above', 'below', 'between',
+          'among', 'through', 'during', 'before', 'after', 'inside', 'outside', 'upon',
+          'within', 'without', 'against', 'across', 'around', 'behind', 'beyond',
+          'except', 'including', 'regarding', 'concerning', 'considering', 'despite',
+          'throughout', 'toward', 'towards', 'via', 'versus', 'vice'
+        ]);
+        
+        return val
+          .split('_')
+          .map((word, index) => {
+            const lowerWord = word.toLowerCase();
+            // First word is always capitalized, others follow the rules
+            if (index === 0 || !lowercaseWords.has(lowerWord)) {
+              return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+            }
+            return lowerWord;
+          })
+          .join(' ');
+      };
+      
       data.push({
         label: key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        value: Array.isArray(value) ? value.join(', ') : String(value),
+        value: formatAttributeValue(value),
         icon: <Text style={{ fontSize: 16 }}>{getAttributeIcon(key)}</Text>,
       });
     });

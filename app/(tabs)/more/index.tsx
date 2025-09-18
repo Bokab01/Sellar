@@ -16,6 +16,7 @@ import {
   Button,
   PriceDisplay,
   Badge,
+  CompactUserBadges,
   LoadingSkeleton,
   Toast,
 } from '@/components';
@@ -350,13 +351,15 @@ export default function MoreScreen() {
                 style={{ marginRight: theme.spacing.lg }}
               />
               <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, marginBottom: theme.spacing.xs }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, marginBottom: theme.spacing.xs, flexWrap: 'wrap' }}>
                   <Text variant="h3" style={{ fontWeight: '600' }}>
                     {fullName}
                   </Text>
-                  {profile?.is_verified && (
-                    <Badge text="Verified" variant="success" size="sm" />
-                  )}
+                  <CompactUserBadges
+                    isBusinessUser={profile?.is_business_user}
+                    isVerified={profile?.is_verified}
+                    isBusinessVerified={profile?.is_business_verified}
+                  />
                 </View>
                 
                 <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.sm }}>

@@ -7,10 +7,10 @@ import { Button } from '@/components/Button/Button';
 import { EmptyState } from '@/components/EmptyState/EmptyState';
 import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
 import { ReviewForm } from '@/components/ReviewForm/ReviewForm';
-import { useReviews, useDeleteReview, useReviewHelpfulVote, type Review } from '@/hooks/useReviews';
+import { useReviews, useReviewHelpfulVote, type Review } from '@/hooks/useReviews';
 import { useAuthStore } from '@/store/useAuthStore';
 import { formatDistanceToNow } from 'date-fns';
-import { Star, ThumbsUp, Edit, Trash2, MessageSquare } from 'lucide-react-native';
+import { Star, ThumbsUp, Edit, MessageSquare } from 'lucide-react-native';
 
 interface ReviewsListProps {
   userId?: string;
@@ -46,7 +46,7 @@ export function ReviewsList({
     reviewerId,
   });
 
-  const { deleteReview, loading: deleteLoading } = useDeleteReview();
+  // Note: Review deletion is disabled for data integrity
   const { toggleHelpfulVote, loading: voteLoading } = useReviewHelpfulVote();
 
   const handleWriteReview = () => {
@@ -59,28 +59,7 @@ export function ReviewsList({
     setShowReviewForm(true);
   };
 
-  const handleDeleteReview = (review: Review) => {
-    Alert.alert(
-      'Delete Review',
-      'Are you sure you want to delete this review? This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteReview(review.id);
-              refresh();
-              onReviewChange?.();
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete review');
-            }
-          },
-        },
-      ]
-    );
-  };
+  // Note: Review deletion is disabled for data integrity
 
   const handleHelpfulVote = async (review: Review) => {
     if (!user) {
@@ -116,37 +95,39 @@ export function ReviewsList({
           marginTop: theme.spacing.md,
         }}
       >
-        {/* Helpful Vote */}
-        <TouchableOpacity
-          onPress={() => handleHelpfulVote(review)}
-          disabled={voteLoading || !user}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: theme.spacing.xs,
-            paddingVertical: theme.spacing.xs,
-            paddingHorizontal: theme.spacing.sm,
-            borderRadius: theme.borderRadius.md,
-            backgroundColor: review.user_helpful_vote 
-              ? theme.colors.primaryContainer 
-              : theme.colors.surfaceVariant,
-          }}
-        >
-          <ThumbsUp
-            size={14}
-            color={review.user_helpful_vote ? theme.colors.primary : theme.colors.secondary}
-            fill={review.user_helpful_vote ? theme.colors.primary : 'transparent'}
-          />
-          <Text
-            variant="caption"
+        {/* Helpful Vote - Only show for others' reviews */}
+        {!isOwnReview && (
+          <TouchableOpacity
+            onPress={() => handleHelpfulVote(review)}
+            disabled={voteLoading || !user}
             style={{
-              color: review.user_helpful_vote ? theme.colors.primary : theme.colors.secondary,
-              fontWeight: review.user_helpful_vote ? '600' : '400',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: theme.spacing.xs,
+              paddingVertical: theme.spacing.xs,
+              paddingHorizontal: theme.spacing.sm,
+              borderRadius: theme.borderRadius.md,
+              backgroundColor: review.user_helpful_vote 
+                ? theme.colors.primaryContainer 
+                : theme.colors.surfaceVariant,
             }}
           >
-            Helpful {review.helpful_count > 0 && `(${review.helpful_count})`}
-          </Text>
-        </TouchableOpacity>
+            <ThumbsUp
+              size={14}
+              color={review.user_helpful_vote ? theme.colors.primary : theme.colors.secondary}
+              fill={review.user_helpful_vote ? theme.colors.primary : 'transparent'}
+            />
+            <Text
+              variant="caption"
+              style={{
+                color: review.user_helpful_vote ? theme.colors.primary : theme.colors.secondary,
+                fontWeight: review.user_helpful_vote ? '600' : '400',
+              }}
+            >
+              Helpful {review.helpful_count > 0 && `(${review.helpful_count})`}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* Own Review Actions */}
         {isOwnReview && (
@@ -169,24 +150,7 @@ export function ReviewsList({
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => handleDeleteReview(review)}
-              disabled={deleteLoading}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: theme.spacing.xs,
-                paddingVertical: theme.spacing.xs,
-                paddingHorizontal: theme.spacing.sm,
-                borderRadius: theme.borderRadius.md,
-                backgroundColor: theme.colors.errorContainer,
-              }}
-            >
-              <Trash2 size={14} color={theme.colors.error} />
-              <Text variant="caption" style={{ color: theme.colors.error }}>
-                Delete
-              </Text>
-            </TouchableOpacity>
+            {/* Delete button removed - reviews cannot be deleted for data integrity */}
           </View>
         )}
       </View>

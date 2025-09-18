@@ -204,6 +204,12 @@ export default function ChatScreen() {
     checkExistingTransaction(conversation?.listing?.id);
   };
 
+  const handleTransactionUpdated = () => {
+    console.log('Transaction updated, refreshing data...');
+    // Refresh to get the updated transaction
+    checkExistingTransaction(conversation?.listing?.id);
+  };
+
   const handleSendMessage = async () => {
     if (!messageText.trim()) return;
 
@@ -872,7 +878,7 @@ export default function ChatScreen() {
         enableOnAndroid={true}
         enableAutomaticScroll={true}
         keyboardOpeningTime={250}
-        extraScrollHeight={Platform.OS === 'ios' ? 20 : 50}
+        
         extraHeight={Platform.OS === 'android' ? 20 : 0}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -946,7 +952,10 @@ export default function ChatScreen() {
                           timestamp,
                           expiresAt: offer.expires_at,
                           buyer: {
-                            name: getDisplayName(message.sender, false).displayName,
+                            name: getDisplayName(message.sender, false).displayName || 
+                                  message.sender?.full_name || 
+                                  message.sender?.first_name + ' ' + message.sender?.last_name || 
+                                  'User',
                             avatar: message.sender?.avatar_url,
                             rating: message.sender?.rating,
                           },
@@ -1104,6 +1113,7 @@ export default function ChatScreen() {
               listing={conversation.listing}
               existingTransaction={existingTransaction}
               onTransactionCreated={handleTransactionCreated}
+              onTransactionUpdated={handleTransactionUpdated}
             />
           </View>
         )}
@@ -1123,10 +1133,11 @@ export default function ChatScreen() {
               listing={conversation?.listing}
               existingTransaction={existingTransaction}
               onTransactionCreated={handleTransactionCreated}
+              onTransactionUpdated={handleTransactionUpdated}
             />
           </View>
         )}
-        
+
       {/* Message Input - Fixed at bottom */}
       <View
         style={{

@@ -414,6 +414,14 @@ export const dbHelpers = {
     return { data, error };
   },
 
+  async markNotificationAsUnread(notificationId: string) {
+    const { data, error } = await supabase.from('notifications').update({ 
+      is_read: false, 
+      read_at: null 
+    }).eq('id', notificationId).select().single();
+    return { data, error };
+  },
+
   async markAllNotificationsAsRead(userId: string) {
     const { error } = await supabase.from('notifications').update({ 
       is_read: true, 

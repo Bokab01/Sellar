@@ -363,42 +363,8 @@ export function useUpdateReview() {
   return { updateReview, loading, error };
 }
 
-// Hook to delete a review
-export function useDeleteReview() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const { user } = useAuthStore();
-
-  const deleteReview = useCallback(async (reviewId: string) => {
-    if (!user) {
-      throw new Error('Must be logged in to delete a review');
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const { error: deleteError } = await supabase
-        .from('reviews')
-        .delete()
-        .eq('id', reviewId)
-        .eq('reviewer_id', user.id); // Ensure user can only delete their own reviews
-
-      if (deleteError) throw deleteError;
-
-      return true;
-    } catch (err) {
-      console.error('Error deleting review:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete review';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  return { deleteReview, loading, error };
-}
+// Note: Review deletion is disabled for data integrity
+// Users can only edit their reviews, not delete them
 
 // Hook to toggle helpful vote on a review
 export function useReviewHelpfulVote() {
@@ -414,6 +380,19 @@ export function useReviewHelpfulVote() {
     try {
       setLoading(true);
       setError(null);
+
+      // First check if the user is the reviewer (prevent self-voting)
+      const { data: review, error: reviewError } = await supabase
+        .from('reviews')
+        .select('reviewer_id')
+        .eq('id', reviewId)
+        .single();
+
+      if (reviewError) throw reviewError;
+
+      if (review.reviewer_id === user.id) {
+        throw new Error('You cannot vote on your own review');
+      }
 
       if (currentlyVoted) {
         // Remove vote

@@ -14,6 +14,7 @@ export { ProductCard } from './Card/Card';
 export { PremiumProductCard } from './PremiumProductCard/PremiumProductCard';
 export { Badge } from './Badge/Badge';
 export { BusinessBadge, BusinessBadges } from './BusinessBadge/BusinessBadge';
+export { UserBadgeSystem, CompactUserBadges, FullUserBadges, DarkThemeUserBadges } from './UserBadgeSystem';
 export { SponsoredPost, SponsoredPostManager } from './SponsoredPost/SponsoredPost';
 export { FeaturedListings, CompactFeaturedListings } from './FeaturedListings/FeaturedListings';
 export { Avatar } from './Avatar/Avatar';

@@ -113,7 +113,7 @@ export default function TabLayout() {
                 ...theme.shadows.lg,
               }}
             >
-              <Image source={require('@/assets/icon/icon-light.png')} style={{ width: 60, height: 6``````````````````````````````````````````````0 }} />
+              <Image source={require('@/assets/icon/icon-light.png')} style={{ width: 60, height: 60 }} />
             </View>
           ),
           tabBarLabel: 'Sell',

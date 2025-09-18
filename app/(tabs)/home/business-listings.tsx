@@ -6,13 +6,14 @@ import { Text } from '@/components/Typography/Text';
 import { SafeAreaWrapper } from '@/components/Layout';
 import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
 import { EmptyState } from '@/components/EmptyState/EmptyState';
-import { MinimalPremiumProductCard } from '@/components/PremiumProductCard/MinimalPremiumProductCard';
-import { Grid } from '@/components/Grid/Grid';
+import { BusinessProfile } from '@/components/BusinessProfile/BusinessProfile';
+import { BusinessListings } from '@/components/BusinessListings/BusinessListings';
 import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
 import { ArrowLeft, Building2 } from 'lucide-react-native';
 import { TouchableOpacity } from 'react-native';
 import { useDisplayName } from '@/hooks/useDisplayName';
+import { useAuthStore } from '@/store/useAuthStore';
 
 interface BusinessListing {
   id: string;
@@ -32,12 +33,25 @@ interface BusinessListing {
   createdAt: string;
 }
 
+interface BusinessUser {
+  id: string;
+  name: string;
+  avatar?: string;
+  rating?: number;
+  location?: string;
+  phone?: string;
+  isBusinessUser: boolean;
+  listings: BusinessListing[];
+}
+
 export default function BusinessListingsScreen() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const [listings, setListings] = useState<BusinessListing[]>([]);
+  const { user } = useAuthStore();
+  const [businessUsers, setBusinessUsers] = useState<BusinessUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [favorites, setFavorites] = useState<Record<string, boolean>>({});
 
   // Helper function to get display name based on business settings
   const getDisplayName = (profile: any) => {
@@ -71,18 +85,13 @@ export default function BusinessListingsScreen() {
       }
       setError(null);
 
-      // Fetch all business user listings
+      // Fetch business users with their profiles - include both subscription-based and profile-based business users
       const { data: businessUsers, error: businessError } = await supabase
         .from('user_subscriptions')
         .select(`
           user_id,
           status,
           current_period_end,
-          subscription_plans!user_subscriptions_plan_id_fkey (
-            id,
-            name,
-            description
-          ),
           profiles!user_id (
             id,
             first_name,
@@ -93,20 +102,204 @@ export default function BusinessListingsScreen() {
             is_business,
             business_name,
             display_business_name,
-            business_name_priority
+            business_name_priority,
+            phone,
+            location
           )
         `)
         .in('status', ['active', 'cancelled']);
 
+      // Also fetch users who have business profiles but might not have active subscriptions
+      let businessProfileUsers: any[] = [];
+      if (businessUsers && businessUsers.length > 0) {
+        const businessUserIds = businessUsers.map(u => u.user_id);
+        const { data: profileUsers, error: businessProfileError } = await supabase
+          .from('profiles')
+          .select(`
+            id,
+            first_name,
+            last_name,
+            full_name,
+            avatar_url,
+            rating,
+            is_business,
+            business_name,
+            display_business_name,
+            business_name_priority,
+            phone,
+            location
+          `)
+          .eq('is_business', true)
+          .not('id', 'in', `(${businessUserIds.join(',')})`);
+
+        if (businessProfileError) {
+          console.warn('Error fetching business profile users:', businessProfileError);
+        } else {
+          businessProfileUsers = profileUsers || [];
+        }
+      } else {
+        // If no subscription-based business users, fetch all business profile users
+        const { data: profileUsers, error: businessProfileError } = await supabase
+          .from('profiles')
+          .select(`
+            id,
+            first_name,
+            last_name,
+            full_name,
+            avatar_url,
+            rating,
+            is_business,
+            business_name,
+            display_business_name,
+            business_name_priority,
+            phone,
+            location
+          `)
+          .eq('is_business', true);
+
+        if (businessProfileError) {
+          console.warn('Error fetching business profile users:', businessProfileError);
+        } else {
+          businessProfileUsers = profileUsers || [];
+        }
+      }
+
       if (businessError) throw businessError;
 
-      if (!businessUsers || businessUsers.length === 0) {
-        setListings([]);
+      console.log('Subscription-based business users:', businessUsers?.length || 0);
+      console.log('Profile-based business users:', businessProfileUsers?.length || 0);
+
+      // Combine subscription-based and profile-based business users
+      const allBusinessUsers = [
+        ...(businessUsers || []).map(sub => ({
+          user_id: sub.user_id,
+          status: sub.status,
+          current_period_end: sub.current_period_end,
+          profiles: sub.profiles
+        })),
+        ...(businessProfileUsers || []).map(profile => ({
+          user_id: profile.id,
+          status: 'profile_business', // Mark as profile-based business
+          current_period_end: null,
+          profiles: profile
+        }))
+      ];
+
+      console.log('Total business users combined:', allBusinessUsers.length);
+
+      if (allBusinessUsers.length === 0) {
+        console.log('No business users found (subscription or profile-based)');
+        
+        // Final fallback: fetch all users with business profiles
+        console.log('Trying final fallback: fetch all business profiles');
+        const { data: allBusinessProfiles, error: allBusinessProfilesError } = await supabase
+          .from('profiles')
+          .select(`
+            id,
+            first_name,
+            last_name,
+            full_name,
+            avatar_url,
+            rating,
+            is_business,
+            business_name,
+            display_business_name,
+            business_name_priority,
+            phone,
+            location
+          `)
+          .eq('is_business', true);
+
+        if (allBusinessProfilesError) {
+          console.error('Error fetching all business profiles:', allBusinessProfilesError);
+          setBusinessUsers([]);
+          return;
+        }
+
+        if (!allBusinessProfiles || allBusinessProfiles.length === 0) {
+          console.log('No business profiles found at all');
+          setBusinessUsers([]);
+          return;
+        }
+
+        console.log('Found business profiles in fallback:', allBusinessProfiles.length);
+        
+        // Use the fallback business profiles
+        const fallbackBusinessUsers = allBusinessProfiles.map(profile => ({
+          user_id: profile.id,
+          status: 'profile_business',
+          current_period_end: null,
+          profiles: profile
+        }));
+
+        // Fetch listings for fallback business users
+        const fallbackUserIds = fallbackBusinessUsers.map(user => user.user_id);
+        const { data: fallbackListings, error: fallbackListingsError } = await supabase
+          .from('listings')
+          .select(`
+            id,
+            title,
+            price,
+            currency,
+            images,
+            location,
+            views_count,
+            created_at,
+            user_id
+          `)
+          .eq('status', 'active')
+          .in('user_id', fallbackUserIds)
+          .order('created_at', { ascending: false });
+
+        if (fallbackListingsError) {
+          console.error('Error fetching fallback listings:', fallbackListingsError);
+          setBusinessUsers([]);
+          return;
+        }
+
+        // Group fallback listings by business user
+        const fallbackBusinessUsersWithListings: BusinessUser[] = fallbackBusinessUsers.map(businessUser => {
+          const profile = businessUser.profiles;
+          const userListings = fallbackListings?.filter(listing => listing.user_id === businessUser.user_id) || [];
+
+          const transformedListings: BusinessListing[] = userListings.map(listing => ({
+            id: listing.id,
+            title: listing.title,
+            price: listing.price,
+            currency: listing.currency || 'GHS',
+            images: Array.isArray(listing.images) ? listing.images : [],
+            location: listing.location || '',
+            seller: {
+              id: (profile as any)?.id || listing.user_id,
+              name: getDisplayName(profile),
+              avatar: (profile as any)?.avatar_url,
+              rating: (profile as any)?.rating,
+              isBusinessUser: true,
+            },
+            viewCount: listing.views_count || 0,
+            createdAt: listing.created_at,
+          }));
+
+          return {
+            id: businessUser.user_id,
+            name: getDisplayName(profile),
+            avatar: (profile as any)?.avatar_url,
+            rating: (profile as any)?.rating,
+            location: (profile as any)?.location,
+            phone: (profile as any)?.phone,
+            isBusinessUser: true,
+            listings: transformedListings,
+          };
+        });
+
+        console.log('Fallback business users with listings:', fallbackBusinessUsersWithListings.length);
+        setBusinessUsers(fallbackBusinessUsersWithListings);
         return;
       }
 
-      const businessUserIds = businessUsers.map(sub => sub.user_id);
+      const businessUserIds = allBusinessUsers.map(user => user.user_id);
 
+      // Fetch listings for all business users
       const { data: listingsData, error: listingsError } = await supabase
         .from('listings')
         .select(`
@@ -126,13 +319,17 @@ export default function BusinessListingsScreen() {
 
       if (listingsError) throw listingsError;
 
+      console.log('Business users found:', allBusinessUsers.length);
+      console.log('Listings found:', listingsData?.length || 0);
 
-      // Transform data
-      const transformedListings: BusinessListing[] = listingsData?.map(listing => {
-        const businessUser = businessUsers.find(user => user.user_id === listing.user_id);
-        const profile = businessUser?.profiles;
+      // Group listings by business user
+      const businessUsersWithListings: BusinessUser[] = allBusinessUsers.map(businessUser => {
+        const profile = businessUser.profiles;
+        const userListings = listingsData?.filter(listing => listing.user_id === businessUser.user_id) || [];
 
-        return {
+        console.log(`User ${businessUser.user_id} has ${userListings.length} listings`);
+
+        const transformedListings: BusinessListing[] = userListings.map(listing => ({
           id: listing.id,
           title: listing.title,
           price: listing.price,
@@ -148,10 +345,24 @@ export default function BusinessListingsScreen() {
           },
           viewCount: listing.views_count || 0,
           createdAt: listing.created_at,
-        };
-      }) || [];
+        }));
 
-      setListings(transformedListings);
+        return {
+          id: businessUser.user_id,
+          name: getDisplayName(profile),
+          avatar: (profile as any)?.avatar_url,
+          rating: (profile as any)?.rating,
+          location: (profile as any)?.location,
+          phone: (profile as any)?.phone,
+          isBusinessUser: true,
+          listings: transformedListings,
+        };
+      });
+
+      console.log('Business users with listings:', businessUsersWithListings.length);
+      console.log('Business users with listings > 0:', businessUsersWithListings.filter(u => u.listings.length > 0).length);
+
+      setBusinessUsers(businessUsersWithListings);
     } catch (err) {
       console.error('Error fetching business listings:', err);
       setError('Failed to load business listings');
@@ -165,12 +376,27 @@ export default function BusinessListingsScreen() {
     fetchBusinessListings();
   }, []);
 
-  const handleListingPress = (listingId: string) => {
-    router.push(`/(tabs)/home/${listingId}`);
-  };
 
   const handleRefresh = () => {
     fetchBusinessListings(true);
+  };
+
+  const handleFavoritePress = async (listingId: string) => {
+    try {
+      // Import and use the favorites function
+      const { toggleFavorite } = await import('@/lib/favoritesAndViews');
+      const result = await toggleFavorite(listingId);
+      
+      if (!result.error) {
+        // Update local state
+        setFavorites(prev => ({
+          ...prev,
+          [listingId]: !prev[listingId]
+        }));
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
   };
 
   if (loading) {
@@ -202,19 +428,26 @@ export default function BusinessListingsScreen() {
             <LoadingSkeleton width="60%" height={24} />
           </View>
 
-           {/* Loading Content */}
-           <ScrollView style={{ flex: 1 }}>
-             <Grid columns={2} spacing={4}>
-               {Array.from({ length: 6 }).map((_, index) => (
-                 <LoadingSkeleton
-                   key={index}
-                   width="100%"
-                   height={280}
-                   style={{ borderRadius: theme.borderRadius.lg }}
-                 />
-               ))}
-             </Grid>
-           </ScrollView>
+          {/* Loading Content */}
+          <ScrollView style={{ flex: 1 }}>
+            {Array.from({ length: 3 }).map((_, index) => (
+              <View key={index} style={{ marginBottom: theme.spacing.lg }}>
+                <LoadingSkeleton width="100%" height={80} style={{ marginBottom: theme.spacing.md }} />
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={{ flexDirection: 'row', gap: theme.spacing.sm, paddingHorizontal: theme.spacing.lg }}>
+                    {Array.from({ length: 4 }).map((_, cardIndex) => (
+                      <LoadingSkeleton
+                        key={cardIndex}
+                        width={190}
+                        height={280}
+                        style={{ borderRadius: theme.borderRadius.lg }}
+                      />
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
+            ))}
+          </ScrollView>
         </View>
       </SafeAreaWrapper>
     );
@@ -250,10 +483,10 @@ export default function BusinessListingsScreen() {
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
               <Building2 size={24} color={theme.colors.primary} />
-              <Text variant="h3">Business Listings</Text>
+              <Text variant="h3">Sellar Pro Listings</Text>
             </View>
             <Text variant="caption" color="secondary" style={{ marginTop: 2 }}>
-              {listings.length} premium listings from verified businesses
+              {businessUsers.length} Sellar Pro users with premium listings
             </Text>
           </View>
         </View>
@@ -267,11 +500,11 @@ export default function BusinessListingsScreen() {
                onActionPress={() => fetchBusinessListings()}
              />
            </View>
-         ) : listings.length === 0 ? (
+         ) : businessUsers.length === 0 ? (
            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
              <EmptyState
-               title="No Business Listings"
-               description="There are currently no active business listings available."
+               title="No Sellar Pro Listings"
+               description="There are currently no active Sellar Pro listings available."
                actionText="Refresh"
                onActionPress={handleRefresh}
              />
@@ -288,19 +521,31 @@ export default function BusinessListingsScreen() {
               />
             }
           >
-            <Grid columns={2} spacing={4}>
-              {listings.map((listing) => (
-                <MinimalPremiumProductCard
-                  key={listing.id}
-                  image={listing.images}
-                  title={listing.title}
-                  price={listing.price}
-                  currency={listing.currency}
-                  seller={listing.seller}
-                  onPress={() => handleListingPress(listing.id)}
+            {businessUsers.map((businessUser) => (
+              <View key={businessUser.id}>
+                {/* Business Profile */}
+                <BusinessProfile
+                  business={businessUser}
+                  onMessagePress={user?.id !== businessUser.id ? () => router.push(`/profile/${businessUser.id}`) : undefined}
+                  onCallPress={user?.id !== businessUser.id && businessUser.phone ? () => {
+                    // Handle call functionality
+                    console.log('Calling:', businessUser.phone);
+                  } : undefined}
                 />
-              ))}
-            </Grid>
+                
+                {/* Business Listings */}
+                <BusinessListings
+                  businessId={businessUser.id}
+                  businessName={businessUser.name}
+                  listings={businessUser.listings}
+                  onListingPress={(listingId) => router.push(`/(tabs)/home/${listingId}`)}
+                  onSeeAllPress={() => router.push(`/profile/${businessUser.id}`)}
+                  currentUserId={user?.id}
+                  favorites={favorites}
+                  onFavoritePress={handleFavoritePress}
+                />
+              </View>
+            ))}
           </ScrollView>
         )}
       </View>

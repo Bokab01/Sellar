@@ -105,7 +105,6 @@ export function OfferCard({
           borderColor: offer.isOwn 
             ? theme.colors.primary + '30' 
             : theme.colors.border,
-          ...theme.shadows.sm,
           marginVertical: theme.spacing.sm,
         },
         style,

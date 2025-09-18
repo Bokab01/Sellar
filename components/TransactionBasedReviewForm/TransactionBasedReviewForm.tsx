@@ -128,6 +128,11 @@ export function TransactionBasedReviewForm({
       // Determine review type
       const reviewType = user.id === transaction.buyer_id ? 'buyer_to_seller' : 'seller_to_buyer';
 
+      // Determine verification level and transaction confirmation status
+      const bothConfirmed = !!(transaction.buyer_confirmed_at && transaction.seller_confirmed_at);
+      const verificationLevel = bothConfirmed ? 'mutual_confirmed' : 'single_confirmed';
+
+
       const { data: review, error } = await supabase
         .from('reviews')
         .insert({
@@ -138,11 +143,16 @@ export function TransactionBasedReviewForm({
           rating,
           comment: comment.trim(),
           review_type: reviewType,
+          status: 'published',
+          is_transaction_confirmed: bothConfirmed,
+          verification_level: verificationLevel,
+          transaction_value: transaction.agreed_price,
+          reviewer_verification_score: 0
         })
         .select(`
           *,
-          reviewer:profiles!reviews_reviewer_id_fkey(id, full_name, avatar_url, username),
-          transaction:transactions!reviews_transaction_id_fkey(
+          reviewer:profiles!reviews_reviewer_fkey(id, full_name, avatar_url, username),
+          transaction:meetup_transactions!reviews_meetup_transaction_id_fkey(
             id,
             agreed_price,
             status,
@@ -232,6 +242,7 @@ export function TransactionBasedReviewForm({
         onClose={handleClose}
         title="Loading..."
         size="md"
+        position="bottom"
       >
         <View style={{ padding: theme.spacing.lg, alignItems: 'center' }}>
           <Text variant="body" color="secondary">
@@ -251,6 +262,7 @@ export function TransactionBasedReviewForm({
       onClose={handleClose}
       title="Write Review"
       size="lg"
+      position="bottom"
       primaryAction={{
         text: 'Submit Review',
         onPress: handleSubmit,
@@ -262,7 +274,10 @@ export function TransactionBasedReviewForm({
         onPress: handleClose,
       }}
     >
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        style={{ maxHeight: 500 }}
+      >
         <View style={{ gap: theme.spacing.lg }}>
           {/* Transaction Verification Status */}
           <View style={{

@@ -105,7 +105,7 @@ CREATE TABLE listings (
     location VARCHAR(255) NOT NULL,
     images JSONB DEFAULT '[]',
     accept_offers BOOLEAN DEFAULT true,
-    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'sold', 'draft', 'expired', 'suspended', 'pending')),
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'sold', 'draft', 'expired', 'suspended', 'pending', 'reserved')),
     views_count INTEGER DEFAULT 0,
     favorites_count INTEGER DEFAULT 0,
     boost_until TIMESTAMP WITH TIME ZONE,
@@ -124,6 +124,9 @@ CREATE TABLE listings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     CONSTRAINT listings_category_id_fkey FOREIGN KEY (category_id) REFERENCES categories(id)
 );
+
+-- Add comment to document the listings status column
+COMMENT ON COLUMN listings.status IS 'Listing status: active (available), sold (completed), draft (not published), expired (time expired), suspended (moderated), pending (awaiting approval), reserved (temporarily held during offer process)';
 
 -- Listing views tracking
 CREATE TABLE listing_views (
@@ -186,7 +189,7 @@ CREATE TABLE offers (
     amount DECIMAL(12,2) NOT NULL CHECK (amount > 0),
     currency VARCHAR(3) DEFAULT 'GHS',
     message TEXT,
-    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected', 'expired', 'withdrawn')),
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected', 'expired', 'withdrawn', 'countered')),
     expires_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '7 days'),
     parent_offer_id UUID REFERENCES offers(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -280,17 +283,81 @@ CREATE TABLE reviews (
     reviewer_id UUID NOT NULL,
     reviewed_user_id UUID NOT NULL,
     listing_id UUID REFERENCES listings(id) ON DELETE SET NULL,
-    transaction_id UUID, -- Will reference transactions table
+    transaction_id UUID, -- Will reference meetup_transactions table
     rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
     comment TEXT NOT NULL,
+    review_type VARCHAR(20) CHECK (review_type IN ('buyer_to_seller', 'seller_to_buyer')),
+    status VARCHAR(20) DEFAULT 'published' CHECK (status IN ('draft', 'published', 'hidden', 'flagged')),
     is_verified_purchase BOOLEAN DEFAULT false,
+    is_transaction_confirmed BOOLEAN DEFAULT false,
+    verification_level VARCHAR(20) DEFAULT 'unconfirmed' CHECK (verification_level IN ('unconfirmed', 'single_confirmed', 'mutual_confirmed')),
+    reviewer_verification_score INTEGER DEFAULT 0,
+    transaction_value DECIMAL(10,2),
     helpful_count INTEGER DEFAULT 0,
+    not_helpful_count INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(reviewer_id, reviewed_user_id, listing_id),
     CONSTRAINT reviews_reviewer_fkey FOREIGN KEY (reviewer_id) REFERENCES profiles(id) ON DELETE CASCADE,
-    CONSTRAINT reviews_reviewed_user_fkey FOREIGN KEY (reviewed_user_id) REFERENCES profiles(id) ON DELETE CASCADE
+    CONSTRAINT reviews_reviewed_user_fkey FOREIGN KEY (reviewed_user_id) REFERENCES profiles(id) ON DELETE CASCADE,
+    CONSTRAINT reviews_meetup_transaction_id_fkey FOREIGN KEY (transaction_id) REFERENCES meetup_transactions(id) ON DELETE SET NULL
 );
+
+-- Add comments to document the reviews table columns
+COMMENT ON COLUMN reviews.review_type IS 'Type of review: buyer_to_seller (buyer reviewing seller) or seller_to_buyer (seller reviewing buyer)';
+COMMENT ON COLUMN reviews.status IS 'Review status: draft (not published), published (visible), hidden (moderated), flagged (reported)';
+COMMENT ON COLUMN reviews.is_transaction_confirmed IS 'Whether the underlying transaction was confirmed by both parties';
+COMMENT ON COLUMN reviews.verification_level IS 'Verification level of the transaction: unconfirmed, single_confirmed, mutual_confirmed';
+COMMENT ON COLUMN reviews.reviewer_verification_score IS 'Verification score of the reviewer at time of review';
+COMMENT ON COLUMN reviews.transaction_value IS 'Value of the transaction being reviewed';
+COMMENT ON COLUMN reviews.not_helpful_count IS 'Number of users who marked this review as not helpful';
+
+-- Review helpful votes table for community feedback
+CREATE TABLE review_helpful_votes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    review_id UUID NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    is_helpful BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- Prevent duplicate votes from same user on same review
+    UNIQUE(review_id, user_id)
+);
+
+-- Add indexes for performance
+CREATE INDEX idx_review_helpful_votes_review_id ON review_helpful_votes(review_id);
+CREATE INDEX idx_review_helpful_votes_user_id ON review_helpful_votes(user_id);
+CREATE INDEX idx_review_helpful_votes_created_at ON review_helpful_votes(created_at DESC);
+
+-- Add trigger to update review helpful_count
+CREATE OR REPLACE FUNCTION update_review_helpful_count()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Update helpful_count in reviews table
+    UPDATE reviews 
+    SET helpful_count = (
+        SELECT COUNT(*) 
+        FROM review_helpful_votes 
+        WHERE review_id = COALESCE(NEW.review_id, OLD.review_id)
+        AND is_helpful = true
+    )
+    WHERE id = COALESCE(NEW.review_id, OLD.review_id);
+    
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger for helpful count updates
+CREATE TRIGGER trigger_update_review_helpful_count
+    AFTER INSERT OR UPDATE OR DELETE ON review_helpful_votes
+    FOR EACH ROW EXECUTE FUNCTION update_review_helpful_count();
+
+-- Add comments for review_helpful_votes table
+COMMENT ON TABLE review_helpful_votes IS 'Tracks helpful votes on reviews by community members';
+COMMENT ON COLUMN review_helpful_votes.review_id IS 'Reference to the review being voted on';
+COMMENT ON COLUMN review_helpful_votes.user_id IS 'User who cast the vote';
+COMMENT ON COLUMN review_helpful_votes.is_helpful IS 'Whether the vote is helpful (true) or not helpful (false)';
 
 -- =============================================
 -- TRANSACTIONS AND PAYMENTS

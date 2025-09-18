@@ -594,12 +594,12 @@ export const useMonetizationStore = create<MonetizationState>()(
       const planName = currentPlan.subscription_plans?.name?.toLowerCase();
       
       // Check for exact match first
-      if (planName === 'sellar business') {
+      if (planName === 'sellar pro') {
         return true;
       }
       
       // Check for partial matches
-      if (planName?.includes('business') || planName?.includes('starter') || planName?.includes('pro') || planName?.includes('premium')) {
+      if (planName?.includes('business') || planName?.includes('starter') || planName?.includes('plus') || planName?.includes('premium')) {
         return true;
       }
     }

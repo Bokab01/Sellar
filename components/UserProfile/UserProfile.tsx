@@ -3,7 +3,7 @@ import { View, TouchableOpacity } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { Avatar } from '@/components/Avatar/Avatar';
-import { Badge } from '@/components/Badge/Badge';
+import { Badge, CompactUserBadges } from '@/components';
 import { Rating } from '@/components/Rating/Rating';
 import { Button } from '@/components/Button/Button';
 import { MessageCircle, Phone, MapPin, Calendar } from 'lucide-react-native';
@@ -18,6 +18,8 @@ interface UserProfileProps {
     joinDate?: string;
     location?: string;
     isVerified?: boolean;
+    isBusinessUser?: boolean;
+    isBusinessVerified?: boolean;
     isOnline?: boolean;
     responseTime?: string;
     totalSales?: number;
@@ -62,13 +64,15 @@ export function UserProfile({
           isOnline={user.isOnline}
         />
         <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, flexWrap: 'wrap' }}>
             <Text variant="bodySmall" style={{ fontWeight: '600' }}>
               {user.name}
             </Text>
-            {user.isVerified && (
-              <Badge text="Verified" variant="success" size="sm" />
-            )}
+            <CompactUserBadges
+              isBusinessUser={user.isBusinessUser}
+              isVerified={user.isVerified}
+              isBusinessVerified={user.isBusinessVerified}
+            />
           </View>
           {user.rating && (
             <Rating rating={user.rating} size="sm" showValue />
@@ -110,13 +114,15 @@ export function UserProfile({
         />
 
         <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, flexWrap: 'wrap' }}>
             <Text variant={variant === 'full' ? 'h3' : 'body'} style={{ fontWeight: '600' }}>
               {user.name}
             </Text>
-            {user.isVerified && (
-              <Badge text="Verified" variant="success" size="sm" />
-            )}
+            <CompactUserBadges
+              isBusinessUser={user.isBusinessUser}
+              isVerified={user.isVerified}
+              isBusinessVerified={user.isBusinessVerified}
+            />
           </View>
 
           {user.rating && (

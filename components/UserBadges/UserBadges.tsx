@@ -18,6 +18,7 @@ interface UserBadgeData {
   prioritySeller: boolean;
   premium: boolean;
   verified: boolean;
+  businessVerified: boolean;
 }
 
 export function UserBadges({
@@ -73,7 +74,7 @@ export function UserBadges({
       key: 'business',
       show: badges.business,
       icon: Building,
-      text: 'Business',
+      text: 'PRO',
       variant: 'primary' as const,
       color: theme.colors.primary,
       priority: 3,
@@ -86,6 +87,15 @@ export function UserBadges({
       variant: 'success' as const,
       color: theme.colors.success,
       priority: 4,
+    },
+    {
+      key: 'businessVerified',
+      show: badges.businessVerified,
+      icon: CheckCircle,
+      text: 'Business',
+      variant: 'info' as const,
+      color: theme.colors.info,
+      priority: 5,
     },
   ];
 

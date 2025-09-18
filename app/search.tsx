@@ -18,7 +18,11 @@ import { useAppStore } from '@/store/useAppStore';
 
 export default function SearchResultsScreen() {
   const { theme } = useTheme();
-  const { q: initialQuery } = useLocalSearchParams<{ q: string }>();
+  const { q: initialQuery, category: categoryId, categoryName } = useLocalSearchParams<{ 
+    q: string; 
+    category?: string; 
+    categoryName?: string; 
+  }>();
   const [searchQuery, setSearchQuery] = useState(initialQuery || '');
   const { 
     filters,
@@ -35,12 +39,14 @@ export default function SearchResultsScreen() {
     refreshing, 
     refresh 
   } = useListings({
-    search: searchQuery,
+    search: categoryId ? undefined : searchQuery, // Only use search query if not filtering by category
+    category: categoryId, // Add category filter
     location: filters.location,
     priceMin: filters.priceRange.min,
     priceMax: filters.priceRange.max,
     condition: filters.condition,
   });
+
 
   // Update search when query param changes
   useEffect(() => {
@@ -97,7 +103,13 @@ export default function SearchResultsScreen() {
   return (
     <SafeAreaWrapper>
       <AppHeader
-        title={searchQuery ? `Results for "${searchQuery}"` : 'Search Results'}
+        title={
+          categoryName 
+            ? `${categoryName} (${products.length})` 
+            : searchQuery 
+              ? `Results for "${searchQuery}"` 
+              : 'Search Results'
+        }
         showBackButton
         onBackPress={() => router.back()}
       />

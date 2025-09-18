@@ -11,7 +11,6 @@ import {
   Avatar,
   UserDisplayName
 } from '@/components';
-import { TransactionBasedReviewForm } from '@/components/TransactionBasedReviewForm/TransactionBasedReviewForm';
 import { 
   CheckCircle, 
   MapPin, 
@@ -20,7 +19,8 @@ import {
   User,
   MessageSquare,
   QrCode,
-  AlertTriangle
+  AlertTriangle,
+  HandCoins
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase-client';
 
@@ -60,7 +60,6 @@ export function TransactionCompletionModal({
   const [createdTransactionId, setCreatedTransactionId] = useState<string | null>(
     existingTransaction?.id || null
   );
-  const [showReviewForm, setShowReviewForm] = useState(false);
 
   const isBuyer = user?.id !== listing?.user_id;
   const role = isBuyer ? 'buyer' : 'seller';
@@ -139,7 +138,10 @@ export function TransactionCompletionModal({
   };
 
   const renderDetailsStep = () => (
-    <ScrollView showsVerticalScrollIndicator={false}>
+    <ScrollView 
+      showsVerticalScrollIndicator={false}
+      style={{ maxHeight: 500 }}
+    >
       <View style={{ gap: theme.spacing.lg }}>
         {/* Header */}
         <View style={{ alignItems: 'center', marginBottom: theme.spacing.md }}>
@@ -217,7 +219,7 @@ export function TransactionCompletionModal({
             onChangeText={(text) => setTransactionData(prev => ({ ...prev, agreedPrice: text }))}
             placeholder="Enter the final agreed price"
             keyboardType="numeric"
-            leftIcon={<DollarSign size={20} color={theme.colors.text.secondary} />}
+            leftIcon={<HandCoins size={20} color={theme.colors.text.secondary} />}
           />
 
           <Input
@@ -269,7 +271,11 @@ export function TransactionCompletionModal({
   );
 
   const renderConfirmationStep = () => (
-    <View style={{ alignItems: 'center', gap: theme.spacing.lg }}>
+    <ScrollView 
+      showsVerticalScrollIndicator={false}
+      style={{ maxHeight: 400 }}
+    >
+      <View style={{ alignItems: 'center', gap: theme.spacing.lg }}>
       <View style={{
         width: 80,
         height: 80,
@@ -333,7 +339,8 @@ export function TransactionCompletionModal({
           You can leave reviews once confirmed.
         </Text>
       </View>
-    </View>
+      </View>
+    </ScrollView>
   );
 
   const renderSuccessStep = () => (
@@ -370,15 +377,6 @@ export function TransactionCompletionModal({
         <Text variant="caption" color="secondary" style={{ textAlign: 'center', marginBottom: theme.spacing.lg }}>
           This creates a verified transaction that enables authentic reviews and builds trust in the community.
         </Text>
-        
-        {/* Leave Review Button */}
-        <Button
-          variant="primary"
-          onPress={() => setShowReviewForm(true)}
-          style={{ marginTop: theme.spacing.sm }}
-        >
-          Leave Review
-        </Button>
       </View>
     </View>
   );
@@ -434,6 +432,7 @@ export function TransactionCompletionModal({
         onClose={onClose}
         title={getModalTitle()}
         size="lg"
+        position="bottom"
         primaryAction={getPrimaryAction()}
         secondaryAction={getSecondaryAction()}
         dismissOnBackdrop={step !== 'confirmation'}
@@ -443,22 +442,6 @@ export function TransactionCompletionModal({
         {step === 'success' && renderSuccessStep()}
       </AppModal>
 
-      {/* Review Form Modal */}
-      {showReviewForm && createdTransactionId && otherUser && (
-        <TransactionBasedReviewForm
-          visible={showReviewForm}
-          onClose={() => setShowReviewForm(false)}
-          transactionId={createdTransactionId}
-          reviewedUserId={otherUser.id}
-          reviewedUserName={otherUser.full_name || otherUser.username}
-          onSuccess={(review) => {
-            console.log('Review submitted:', review);
-            setShowReviewForm(false);
-            // Optionally close the transaction modal too
-            onClose();
-          }}
-        />
-      )}
     </>
   );
 }

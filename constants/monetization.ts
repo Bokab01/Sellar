@@ -19,13 +19,13 @@ export const CREDIT_PACKAGES = [
     description: 'Great value for regular sellers',
   },
   {
-    id: 'pro',
-    name: 'Pro',
+    id: 'plus',
+    name: 'Plus',
     credits: 300,
     priceGHS: 50,
     pricePerCredit: 0.167,
     popular: false,
-    description: 'For serious sellers',
+    description: 'Plus credits, plus features, plus value',
   },
   {
     id: 'max',
@@ -100,8 +100,8 @@ export const FEATURE_CATALOG = {
 // Unified Business subscription plan
 export const BUSINESS_PLANS = [
   {
-    id: 'sellar_business',
-    name: 'Sellar Business',
+    id: 'sellar_pro',
+    name: 'Sellar Pro',
     priceGHS: 400,
     priceMonthly: 400,
     billingPeriod: 'monthly',

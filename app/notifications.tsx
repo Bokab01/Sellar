@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, ScrollView, TouchableOpacity, RefreshControl, Alert, Animated } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useNotificationStore } from '@/store/useNotificationStore';
+import { dbHelpers } from '@/lib/supabase';
 import { router } from 'expo-router';
 import {
   Text,
@@ -26,9 +28,7 @@ export default function NotificationsScreen() {
     error, 
     unreadCount,
     markAsRead,
-    markAllAsRead,
     deleteNotification,
-    deleteAllNotifications,
     refresh,
     fetchNotifications
   } = useNotificationStore();
@@ -37,22 +37,60 @@ export default function NotificationsScreen() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
+  // Bulk operations state
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedNotifications, setSelectedNotifications] = useState<Set<string>>(new Set());
+  const [bulkActionLoading, setBulkActionLoading] = useState({
+    markAsRead: false,
+    markAsUnread: false,
+    delete: false,
+  });
+
+  // Animation state
+  const bulkActionsOpacity = useRef(new Animated.Value(0)).current;
+  const bulkActionsTranslateY = useRef(new Animated.Value(-20)).current;
+
   // Fetch notifications when component mounts
   useEffect(() => {
     fetchNotifications();
   }, [fetchNotifications]);
+
+  // Animate bulk actions when selection changes
+  useEffect(() => {
+    if (isSelectionMode && selectedNotifications.size > 0) {
+      Animated.parallel([
+        Animated.timing(bulkActionsOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(bulkActionsTranslateY, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(bulkActionsOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(bulkActionsTranslateY, {
+          toValue: -20,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isSelectionMode, selectedNotifications.size]);
 
 
   const handleRefresh = async () => {
     setRefreshing(true);
     await refresh();
     setRefreshing(false);
-  };
-
-  const handleMarkAllRead = async () => {
-    await markAllAsRead();
-    setToastMessage('All notifications marked as read');
-    setShowToast(true);
   };
 
   const handleDeleteNotification = async (notificationId: string) => {
@@ -70,28 +108,6 @@ export default function NotificationsScreen() {
           onPress: async () => {
             await deleteNotification(notificationId);
             setToastMessage('Notification deleted');
-            setShowToast(true);
-          },
-        },
-      ]
-    );
-  };
-
-  const handleDeleteAllNotifications = async () => {
-    Alert.alert(
-      'Delete All Notifications',
-      'Are you sure you want to delete all notifications? This action cannot be undone.',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete All',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteAllNotifications();
-            setToastMessage('All notifications deleted');
             setShowToast(true);
           },
         },
@@ -267,6 +283,130 @@ export default function NotificationsScreen() {
     }
   };
 
+  // Bulk operation functions
+  const toggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode);
+    setSelectedNotifications(new Set());
+  };
+
+  const toggleNotificationSelection = (notificationId: string) => {
+    const newSelected = new Set(selectedNotifications);
+    if (newSelected.has(notificationId)) {
+      newSelected.delete(notificationId);
+    } else {
+      newSelected.add(notificationId);
+    }
+    setSelectedNotifications(newSelected);
+  };
+
+  const selectAllNotifications = () => {
+    const allIds = new Set(notifications.map(notification => notification.id));
+    setSelectedNotifications(allIds);
+  };
+
+  const clearSelection = () => {
+    setSelectedNotifications(new Set());
+  };
+
+  const handleBulkMarkAsRead = async () => {
+    if (selectedNotifications.size === 0) return;
+
+    setBulkActionLoading(prev => ({ ...prev, markAsRead: true }));
+    
+    try {
+      // Mark selected notifications as read
+      for (const notificationId of selectedNotifications) {
+        await markAsRead(notificationId);
+      }
+      
+      setToastMessage(`${selectedNotifications.size} notifications marked as read`);
+      setShowToast(true);
+      
+      clearSelection();
+      setIsSelectionMode(false);
+      
+    } catch (error) {
+      console.error('Bulk mark as read error:', error);
+      setToastMessage('Failed to mark notifications as read');
+      setShowToast(true);
+    } finally {
+      setBulkActionLoading(prev => ({ ...prev, markAsRead: false }));
+    }
+  };
+
+  const handleBulkMarkAsUnread = async () => {
+    if (selectedNotifications.size === 0) return;
+
+    setBulkActionLoading(prev => ({ ...prev, markAsUnread: true }));
+    
+    try {
+      // Mark selected notifications as unread
+      for (const notificationId of selectedNotifications) {
+        // We need to implement markAsUnread in the store
+        // For now, we'll use a direct database call
+        const { error } = await dbHelpers.markNotificationAsUnread(notificationId);
+        if (error) {
+          console.error('Error marking notification as unread:', error);
+        }
+      }
+      
+      setToastMessage(`${selectedNotifications.size} notifications marked as unread`);
+      setShowToast(true);
+      
+      clearSelection();
+      setIsSelectionMode(false);
+      
+      // Refresh notifications to update the UI
+      await refresh();
+      
+    } catch (error) {
+      console.error('Bulk mark as unread error:', error);
+      setToastMessage('Failed to mark notifications as unread');
+      setShowToast(true);
+    } finally {
+      setBulkActionLoading(prev => ({ ...prev, markAsUnread: false }));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedNotifications.size === 0) return;
+
+    Alert.alert(
+      'Delete Notifications',
+      `Are you sure you want to delete ${selectedNotifications.size} notification${selectedNotifications.size > 1 ? 's' : ''}? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setBulkActionLoading(prev => ({ ...prev, delete: true }));
+            
+            try {
+              // Delete selected notifications
+              for (const notificationId of selectedNotifications) {
+                await deleteNotification(notificationId);
+              }
+              
+              setToastMessage(`${selectedNotifications.size} notifications deleted`);
+              setShowToast(true);
+              
+              clearSelection();
+              setIsSelectionMode(false);
+              
+            } catch (error) {
+              console.error('Bulk delete error:', error);
+              setToastMessage('Failed to delete notifications');
+              setShowToast(true);
+            } finally {
+              setBulkActionLoading(prev => ({ ...prev, delete: false }));
+            }
+          },
+        },
+      ]
+    );
+  };
+
   if (loading) {
     return (
       <SafeAreaWrapper>
@@ -313,25 +453,110 @@ export default function NotificationsScreen() {
         showBackButton
         onBackPress={() => router.back()}
         rightActions={notifications.length > 0 ? [
+          isSelectionMode && selectedNotifications.size > 0 && (
+            <Button
+              key="select-all"
+              variant="icon"
+              size="sm"
+              icon={<CheckSquare size={20} color={theme.colors.primary} />}
+              onPress={selectAllNotifications}
+              style={{
+                backgroundColor: theme.colors.primary + '15',
+                borderRadius: 20,
+                marginRight: theme.spacing.sm,
+              }}
+            />
+          ),
+          // Selection mode toggle
           <Button
-            key="mark-all-read"
-            variant="ghost"
-            onPress={handleMarkAllRead}
+            key="selection-toggle"
+            variant="icon"
             size="sm"
-            style={{ marginRight: theme.spacing.sm }}
-          >
-            Mark All Read
-          </Button>,
-          <Button
-            key="delete-all"
-            variant="ghost"
-            onPress={handleDeleteAllNotifications}
-            size="sm"
-          >
-            Delete All
-          </Button>,
+            icon={isSelectionMode ? <Square size={20} color={theme.colors.text.primary} /> : <CheckSquare size={20} color={theme.colors.text.primary} />}
+            onPress={toggleSelectionMode}
+            style={{
+              backgroundColor: isSelectionMode ? theme.colors.primary + '15' : 'transparent',
+              borderRadius: 20,
+            }}
+          />
         ] : []}
       />
+
+      {/* Bulk Action Buttons */}
+      {isSelectionMode && selectedNotifications.size > 0 && (
+        <Animated.View style={{
+          backgroundColor: theme.colors.surface,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.colors.border,
+          opacity: bulkActionsOpacity,
+          transform: [{ translateY: bulkActionsTranslateY }],
+        }}>
+          <View style={{
+            flexDirection: 'row',
+            paddingHorizontal: theme.spacing.lg,
+            paddingVertical: theme.spacing.sm,
+            gap: theme.spacing.sm,
+          }}>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<MailOpen size={14} color={theme.colors.primary} />}
+              onPress={handleBulkMarkAsRead}
+              loading={bulkActionLoading.markAsRead}
+              style={{ 
+                flex: 1,
+                backgroundColor: theme.colors.primary + '10',
+                borderColor: theme.colors.primary + '30',
+                borderWidth: 1,
+                elevation: 0,
+                shadowOpacity: 0,
+                shadowRadius: 0,
+                shadowOffset: { width: 0, height: 0 },
+              }}
+            >
+              Read
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Mail size={14} color={theme.colors.warning} />}
+              onPress={handleBulkMarkAsUnread}
+              loading={bulkActionLoading.markAsUnread}
+              style={{ 
+                flex: 1,
+                backgroundColor: theme.colors.warning + '10',
+                borderColor: theme.colors.warning + '30',
+                borderWidth: 1,
+                elevation: 0,
+                shadowOpacity: 0,
+                shadowRadius: 0,
+                shadowOffset: { width: 0, height: 0 },
+              }}
+            >
+              Unread
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Trash2 size={14} color={theme.colors.error} />}
+              onPress={handleBulkDelete}
+              loading={bulkActionLoading.delete}
+              style={{ 
+                flex: 1,
+                backgroundColor: theme.colors.error + '10',
+                borderColor: theme.colors.error + '30',
+                borderWidth: 1,
+                elevation: 0,
+                shadowOpacity: 0,
+                shadowRadius: 0,
+                shadowOffset: { width: 0, height: 0 },
+              }}
+            >
+              Delete
+            </Button>
+          </View>
+        </Animated.View>
+      )}
 
       <View style={{ flex: 1 }}>
         {notifications.length > 0 ? (
@@ -399,7 +624,14 @@ export default function NotificationsScreen() {
                     }}
                   >
                     <TouchableOpacity
-                      onPress={() => handleNotificationPress(notification)}
+                      onPress={() => isSelectionMode ? toggleNotificationSelection(notification.id) : handleNotificationPress(notification)}
+                      onLongPress={() => {
+                        if (!isSelectionMode) {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                          setIsSelectionMode(true);
+                          toggleNotificationSelection(notification.id);
+                        }
+                      }}
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',
@@ -408,9 +640,30 @@ export default function NotificationsScreen() {
                       }}
                       activeOpacity={0.7}
                     >
-                      {/* Left Icon */}
+                      {/* Selection Checkbox or Left Icon */}
                       <View style={{ marginRight: theme.spacing.md }}>
-                        {getNotificationIcon(notification.type)}
+                        {isSelectionMode ? (
+                          <TouchableOpacity
+                            onPress={() => toggleNotificationSelection(notification.id)}
+                            style={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: 4,
+                              borderWidth: 2,
+                              borderColor: selectedNotifications.has(notification.id) ? theme.colors.primary : theme.colors.border,
+                              backgroundColor: selectedNotifications.has(notification.id) ? theme.colors.primary : 'transparent',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            {selectedNotifications.has(notification.id) && (
+                              <CheckSquare size={16} color="white" />
+                            )}
+                          </TouchableOpacity>
+                        ) : (
+                          getNotificationIcon(notification.type)
+                        )}
                       </View>
 
                       {/* Content */}
@@ -455,33 +708,35 @@ export default function NotificationsScreen() {
                       </View>
 
                       {/* Right Side */}
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: theme.spacing.sm,
-                        }}
-                      >
-                        {hasActionableContent && (
-                          <ChevronRight
-                            size={16}
-                            color={theme.colors.text.muted}
-                          />
-                        )}
-                        
-                        {/* Delete Button */}
-                        <TouchableOpacity
-                          onPress={() => handleDeleteNotification(notification.id)}
+                      {!isSelectionMode && (
+                        <View
                           style={{
-                            padding: theme.spacing.sm,
-                            borderRadius: theme.borderRadius.sm,
-                            backgroundColor: theme.colors.error + '10',
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: theme.spacing.sm,
                           }}
-                          activeOpacity={0.7}
                         >
-                          <Trash2 size={16} color={theme.colors.error} />
-                        </TouchableOpacity>
-                      </View>
+                          {hasActionableContent && (
+                            <ChevronRight
+                              size={16}
+                              color={theme.colors.text.muted}
+                            />
+                          )}
+                          
+                          {/* Delete Button */}
+                          <TouchableOpacity
+                            onPress={() => handleDeleteNotification(notification.id)}
+                            style={{
+                              padding: theme.spacing.sm,
+                              borderRadius: theme.borderRadius.sm,
+                              backgroundColor: theme.colors.error + '10',
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Trash2 size={16} color={theme.colors.error} />
+                          </TouchableOpacity>
+                        </View>
+                      )}
                     </TouchableOpacity>
                   </View>
                 );

@@ -69,6 +69,60 @@ export default function SmartSearchScreen() {
     }
   }, []);
 
+  // Fetch trending categories based on actual listing counts
+  const fetchTrendingCategories = useCallback(async () => {
+    try {
+      // Get categories with their listing counts
+      const { data: categoryStats } = await supabase
+        .rpc('get_category_listing_counts');
+
+      if (categoryStats && categoryStats.length > 0) {
+        return categoryStats.slice(0, 3).map((stat: any) => ({
+          id: `category-${stat.category_id}`, // Use category- prefix for proper handling
+          type: 'category' as const, // Change to category type for proper navigation
+          title: stat.category_name,
+          count: stat.listing_count,
+        }));
+      }
+
+      // Fallback: get categories and count listings manually
+      const { data: categories } = await supabase
+        .from('categories')
+        .select('id, name, slug')
+        .eq('is_active', true)
+        .limit(10);
+
+      if (categories) {
+        const categoriesWithCounts = await Promise.all(
+          categories.map(async (category) => {
+            const { count } = await supabase
+              .from('listings')
+              .select('*', { count: 'exact', head: true })
+              .eq('category_id', category.id)
+              .eq('status', 'active');
+            
+            return {
+              id: `category-${category.id}`, // Use category- prefix for proper handling
+              type: 'category' as const, // Change to category type for proper navigation
+              title: category.name,
+              count: count || 0,
+            };
+          })
+        );
+
+        // Sort by count and return top 3
+        return categoriesWithCounts
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 3);
+      }
+
+      return [];
+    } catch (error) {
+      console.error('Error fetching trending categories:', error);
+      return [];
+    }
+  }, []);
+
   // Debounced search function
   const searchSuggestions = useCallback(async (query: string, currentRecentSearches: string[]) => {
     if (!query.trim()) {
@@ -79,14 +133,13 @@ export default function SmartSearchScreen() {
         title: search,
       }));
 
-      // Add some trending categories
-      const trending = [
-        { id: 'trending-1', type: 'trending' as const, title: 'Electronics', count: 45 },
-        { id: 'trending-2', type: 'trending' as const, title: 'Fashion', count: 32 },
-        { id: 'trending-3', type: 'trending' as const, title: 'Home & Garden', count: 28 },
-      ];
+      // Fetch real trending categories
+      const trending = await fetchTrendingCategories();
 
-      setSuggestions([...recent, ...trending]);
+      // Only show trending if we have categories with listings
+      const validTrending = trending.filter(t => t.count > 0);
+      
+      setSuggestions([...recent, ...validTrending]);
       return;
     }
 
@@ -179,11 +232,24 @@ export default function SmartSearchScreen() {
     // Add to recent searches with AsyncStorage persistence
     await addToRecentSearches(query);
 
-    // Navigate to search results
-    router.push({
-      pathname: '/search',
-      params: { q: query }
-    });
+    // Navigate to search results with different parameters based on suggestion type
+    if (suggestion.type === 'category') {
+      // For category suggestions, pass the category ID and name (NO search query)
+      const categoryId = suggestion.id.replace('category-', '');
+      router.push({
+        pathname: '/search',
+        params: { 
+          category: categoryId,
+          categoryName: suggestion.title
+        }
+      });
+    } else {
+      // For other suggestions, use regular text search
+      router.push({
+        pathname: '/search',
+        params: { q: query }
+      });
+    }
   };
 
   const handleClearRecent = async () => {
@@ -305,7 +371,8 @@ export default function SmartSearchScreen() {
                   backgroundColor: theme.colors.surface,
                 }}>
                   <Text variant="bodySmall" color="muted">
-                    {searchQuery ? 'Suggestions' : 'Recent & Trending'}
+                    {searchQuery ? 'Suggestions' : 
+                     (suggestions.some(s => s.type === 'category') ? 'Recent & Trending' : 'Recent Searches')}
                   </Text>
                   {!searchQuery && recentSearches.length > 0 && (
                     <Button

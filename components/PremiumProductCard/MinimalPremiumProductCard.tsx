@@ -7,6 +7,7 @@ import { useImageViewer } from '@/hooks/useImageViewer';
 import { ImageViewer } from '@/components/ImageViewer/ImageViewer';
 import { PriceDisplay } from '@/components/PriceDisplay/PriceDisplay';
 import { CompactUserBadges } from '@/components/UserBadges/UserBadges';
+import { Heart, Eye } from 'lucide-react-native';
 
 interface MinimalPremiumProductCardProps {
   title: string;
@@ -19,6 +20,11 @@ interface MinimalPremiumProductCardProps {
     isBusinessUser?: boolean;
   };
   onPress?: () => void;
+  // New props for view count and favorites
+  viewCount?: number;
+  isFavorited?: boolean;
+  onFavoritePress?: () => void;
+  listingId?: string;
 }
 
 export function MinimalPremiumProductCard({
@@ -28,6 +34,10 @@ export function MinimalPremiumProductCard({
   image,
   seller,
   onPress,
+  viewCount = 0,
+  isFavorited = false,
+  onFavoritePress,
+  listingId,
 }: MinimalPremiumProductCardProps) {
   const { theme } = useTheme();
   const { shouldLoadHeavyComponent } = useMemoryManager();
@@ -63,7 +73,7 @@ export function MinimalPremiumProductCard({
   });
 
   const getBadgeConfig = () => isBusinessUser ? {
-    text: 'BUSINESS',
+    text: 'PRO',
     variant: 'primary' as const,
     size: 'small' as const,
   } : null;
@@ -93,8 +103,8 @@ export function MinimalPremiumProductCard({
         onPress={onPress}
         style={{
           ...cardStyles,
-          // Remove fixed width - let container determine width like ProductCard
-          height: 280, // Match ProductCard grid layout height
+          width: '100%', // Take full width of container
+          height: 280, // Fixed height for consistency
           marginBottom: theme.spacing.sm,
         }}
         activeOpacity={0.8}
@@ -116,10 +126,10 @@ export function MinimalPremiumProductCard({
           }}>
             <Text variant="caption" style={{ 
               color: theme.colors.primaryForeground, 
-              fontSize: 10,
-              fontWeight: '600'
+              fontSize: 8,
+              fontWeight: '700'
             }}>
-              ⭐ BUSINESS
+              ⭐ PRO
             </Text>
           </View>
         )}
@@ -133,8 +143,10 @@ export function MinimalPremiumProductCard({
               }
             }}
             style={{ 
-              height: 182, // Match ProductCard grid image height (65% of 280px)
+              height: 182, // Fixed height for image section
+              width: '100%', // Full width of card
               position: 'relative',
+              overflow: 'hidden', // Prevent image from expanding beyond container
             }}
           >
             <Image
@@ -147,19 +159,53 @@ export function MinimalPremiumProductCard({
                 backgroundColor: theme.colors.surfaceVariant,
               }}
               resizeMode="cover"
+              onError={() => {
+                // Handle image loading errors gracefully
+                console.log('Image failed to load for listing');
+              }}
             />
             
-            {/* Gradient overlay for better text readability */}
-            <View style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: 60,
-              backgroundColor: 'rgba(0,0,0,0.3)',
-              borderTopLeftRadius: theme.borderRadius.lg,
-              borderTopRightRadius: theme.borderRadius.lg,
-            }} />
+            {/* View Count */}
+            {viewCount > 0 && (
+              <View style={{
+                position: 'absolute',
+                top: theme.spacing.sm,
+                left: theme.spacing.sm,
+                backgroundColor: 'rgba(0,0,0,0.6)',
+                paddingHorizontal: theme.spacing.xs,
+                paddingVertical: 2,
+                borderRadius: theme.borderRadius.sm,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 2,
+              }}>
+                <Eye size={12} color="white" />
+                <Text variant="caption" style={{ color: 'white', fontSize: 10 }}>
+                  {viewCount}
+                </Text>
+              </View>
+            )}
+
+            {/* Heart/Favorite Icon */}
+            {onFavoritePress && (
+              <TouchableOpacity
+                onPress={onFavoritePress}
+                style={{
+                  position: 'absolute',
+                  bottom: theme.spacing.sm,
+                  right: theme.spacing.sm,
+                  backgroundColor: 'rgba(0,0,0,0.6)',
+                  padding: theme.spacing.xs,
+                  borderRadius: theme.borderRadius.full,
+                }}
+              >
+                <Heart 
+                  size={16} 
+                  color={isFavorited ? theme.colors.error : 'white'} 
+                  fill={isFavorited ? theme.colors.error : 'transparent'}
+                />
+              </TouchableOpacity>
+            )}
           </TouchableOpacity>
         ) : (
           <View style={{ 
@@ -178,14 +224,14 @@ export function MinimalPremiumProductCard({
         <View style={{ 
           padding: theme.spacing.md, // Match ProductCard grid padding
           flex: 1,
-          justifyContent: 'space-between',
+          justifyContent: 'center', // Center content since we removed seller info
           minHeight: 98, // Remaining height after image (280 - 182 = 98)
         }}>
           {/* Title and Price */}
           <View>
             <Text 
               variant="body" 
-              numberOfLines={1} 
+              numberOfLines={2} // Allow 2 lines for title
               style={{ 
                 marginBottom: theme.spacing.xs,
                 fontWeight: '600',
@@ -201,67 +247,11 @@ export function MinimalPremiumProductCard({
               currency={currency}
               size="md" // Use medium size to match grid layout
               style={{ 
-                marginBottom: theme.spacing.xs,
                 fontWeight: '700',
               }}
             />
           </View>
           
-          {/* Seller Info */}
-          <View style={{
-            ...sellerStyles.container,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
-            <View style={{ flex: 1 }}>
-              <Text 
-                variant="caption" 
-                color="secondary"
-                style={{
-                  ...sellerStyles.name,
-                  fontSize: 10, // Smaller to fit in compact space
-                }}
-                numberOfLines={1}
-              >
-                {seller.name}
-              </Text>
-              
-              {seller.isBusinessUser && (
-                <Text 
-                  variant="caption" 
-                  style={{ 
-                    color: theme.colors.primary,
-                    fontSize: 8, // Smaller for compact layout
-                    fontWeight: '500',
-                    marginTop: 1,
-                  }}
-                >
-                  Verified Business
-                </Text>
-              )}
-            </View>
-            
-            {/* Premium Badge */}
-            {seller.isBusinessUser && (
-              <View style={{
-                backgroundColor: theme.colors.primary + '15',
-                paddingHorizontal: 4, // Smaller padding for compact layout
-                paddingVertical: 1,
-                borderRadius: theme.borderRadius.sm,
-                borderWidth: 1,
-                borderColor: theme.colors.primary + '30',
-              }}>
-                <Text variant="caption" style={{ 
-                  color: theme.colors.primary,
-                  fontSize: 7, // Smaller font for compact layout
-                  fontWeight: '600'
-                }}>
-                  PREMIUM
-                </Text>
-              </View>
-            )}
-          </View>
         </View>
       </TouchableOpacity>
 

@@ -3,8 +3,9 @@ import { View } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { Button, Badge } from '@/components';
-import { CheckCircle, Clock, Users } from 'lucide-react-native';
+import { CheckCircle, Clock, Users, Star } from 'lucide-react-native';
 import { TransactionCompletionModal } from '../TransactionCompletionModal/TransactionCompletionModal';
+import { TransactionBasedReviewForm } from '../TransactionBasedReviewForm/TransactionBasedReviewForm';
 
 interface TransactionCompletionButtonProps {
   conversationId: string;
@@ -12,6 +13,7 @@ interface TransactionCompletionButtonProps {
   listing: any;
   existingTransaction?: any;
   onTransactionCreated?: (transactionId: string) => void;
+  onTransactionUpdated?: () => void;
   style?: any;
 }
 
@@ -21,11 +23,13 @@ export function TransactionCompletionButton({
   listing,
   existingTransaction,
   onTransactionCreated,
+  onTransactionUpdated,
   style,
 }: TransactionCompletionButtonProps) {
   const { theme } = useTheme();
   const { user } = useAuthStore();
   const [showModal, setShowModal] = useState(false);
+  const [showReviewForm, setShowReviewForm] = useState(false);
 
   // If transaction already exists, show status
   if (existingTransaction) {
@@ -42,9 +46,10 @@ export function TransactionCompletionButton({
       // Both users confirmed - transaction is complete
       if (currentUserConfirmed && otherUserConfirmed) {
         return {
-          text: 'Transaction Completed',
+          text: 'Leave Review',
           variant: 'success' as const,
-          icon: <CheckCircle size={16} color={theme.colors.success} />,
+          icon: <Star size={16} color={theme.colors.success} />,
+          showReviewButton: true,
         };
       }
 
@@ -103,7 +108,45 @@ export function TransactionCompletionButton({
             otherUser={otherUser}
             listing={listing}
             existingTransaction={existingTransaction}
-            onTransactionCreated={onTransactionCreated}
+            onTransactionCreated={(transactionId) => {
+              onTransactionCreated?.(transactionId);
+              onTransactionUpdated?.();
+            }}
+          />
+        </>
+      );
+    }
+
+    // If transaction is completed, show review button
+    if (statusInfo.showReviewButton) {
+      return (
+        <>
+          <Button
+            variant="primary"
+            onPress={() => setShowReviewForm(true)}
+            leftIcon={statusInfo.icon}
+            style={[
+              {
+                backgroundColor: theme.colors.success,
+                borderColor: theme.colors.success,
+              },
+              style,
+            ]}
+          >
+            {statusInfo.text}
+          </Button>
+
+          <TransactionBasedReviewForm
+            visible={showReviewForm}
+            onClose={() => setShowReviewForm(false)}
+            transactionId={existingTransaction.id}
+            reviewedUserId={otherUser.id}
+            reviewedUserName={otherUser.full_name || otherUser.first_name + ' ' + otherUser.last_name}
+            onSuccess={() => {
+              setShowReviewForm(false);
+              // Refresh transaction data to update button state
+              onTransactionUpdated?.();
+            }}
           />
         </>
       );

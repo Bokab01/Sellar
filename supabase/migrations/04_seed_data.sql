@@ -58,7 +58,7 @@ INSERT INTO categories (id, name, slug, parent_id, icon, is_active, sort_order) 
 INSERT INTO credit_packages (id, name, credits, price_ghs, description, is_active) VALUES
 ('c0000000-0000-4000-8000-000000000001', 'Starter', 50, 15.00, 'Perfect for getting started', true),
 ('c0000000-0000-4000-8000-000000000002', 'Seller', 120, 25.00, 'Great value for regular sellers', true),
-('c0000000-0000-4000-8000-000000000003', 'Pro', 300, 50.00, 'For serious sellers', true),
+('c0000000-0000-4000-8000-000000000003', 'Plus', 300, 50.00, 'Plus credits, plus features, plus value', true),
 ('c0000000-0000-4000-8000-000000000004', 'Max', 700, 100.00, 'Maximum value for power users', true);
 
 -- =============================================
@@ -66,7 +66,7 @@ INSERT INTO credit_packages (id, name, credits, price_ghs, description, is_activ
 -- =============================================
 
 INSERT INTO subscription_plans (id, name, description, price_ghs, billing_cycle, features, is_active) VALUES
-('a0000000-0000-4000-8000-000000000001', 'Sellar Business', 'Complete business solution for serious sellers', 400.00, 'monthly', 
+('a0000000-0000-4000-8000-000000000001', 'Sellar Pro', 'Complete business solution for serious sellers', 400.00, 'monthly', 
 '[
   "unlimited_listings",
   "120_boost_credits_monthly",

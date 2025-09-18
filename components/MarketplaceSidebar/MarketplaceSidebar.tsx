@@ -12,6 +12,7 @@ import {
   Button,
   LoadingSkeleton,
   Badge,
+  DarkThemeUserBadges,
 } from '@/components';
 import { 
   ShoppingBag, 
@@ -306,13 +307,13 @@ export function MarketplaceSidebar({ isVisible, onClose }: MarketplaceSidebarPro
               {profile?.full_name || `${user?.user_metadata?.first_name || 'User'} ${user?.user_metadata?.last_name || ''}`.trim()}
             </Text>
 
-            {profile?.is_verified && (
-              <Badge
-                text="Verified"
-                variant="success"
-                style={{ marginBottom: theme.spacing.sm }}
+            <View style={{ marginBottom: theme.spacing.sm, alignItems: 'center' }}>
+              <DarkThemeUserBadges
+                isBusinessUser={profile?.is_business_user}
+                isVerified={profile?.is_verified}
+                isBusinessVerified={profile?.is_business_verified}
               />
-            )}
+            </View>
 
             {/* Credits Display */}
             <View

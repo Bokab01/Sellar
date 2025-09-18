@@ -56,7 +56,8 @@ import {
   Search,
   Filter,
   ListFilterPlus,
-  ChevronUp
+  ChevronUp,
+  Grid2X2
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 
@@ -445,7 +446,7 @@ export default function HomeScreen() {
     { 
       id: 'other', 
       label: 'Other', 
-      icon: <MoreHorizontal size={24} color={theme.colors.primary} />, 
+      icon: <Grid2X2 size={24} color={theme.colors.primary} />, 
       count: categoryCounts.other || 0 
     },
   ];
@@ -836,7 +837,8 @@ export default function HomeScreen() {
                   }}
                   scrollEventThrottle={16}
                   contentContainerStyle={{
-                    paddingHorizontal: theme.spacing.lg,
+                    paddingHorizontal: theme.spacing.md,
+                    marginVertical: theme.spacing.sm,
                     gap: theme.spacing.sm,
                     alignItems: 'center',
                     paddingTop: theme.spacing.md, // Add top padding to account for indicator
@@ -895,8 +897,8 @@ export default function HomeScreen() {
                             color: isSelected 
                               ? theme.colors.primaryForeground 
                               : theme.colors.text.primary,
-                            fontWeight: isSelected ? '600' : '500',
-                            fontSize: 14,
+                            fontWeight: isSelected ? '600' : '700',
+                            fontSize: 13,
                           }}
                         >
                           {category.label}
@@ -911,7 +913,7 @@ export default function HomeScreen() {
                             borderRadius: theme.borderRadius.full,
                             paddingHorizontal: theme.spacing.sm,
                             paddingVertical: theme.spacing.xs,
-                            minWidth: 28,
+                            minWidth: 24,
                             alignItems: 'center',
                             borderWidth: 1,
                             borderColor: isSelected 
@@ -944,7 +946,7 @@ export default function HomeScreen() {
 
               {/* Featured Business Listings - USING WORKING MINIMAL VERSION */}
               <FixedFeaturedListings
-                maxItems={6}
+                maxItems={10}
                 layout="horizontal"
                 onViewAll={() => {
                   router.push('/(tabs)/home/business-listings');

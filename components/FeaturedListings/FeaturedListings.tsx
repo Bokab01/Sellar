@@ -192,10 +192,10 @@ export function FeaturedListings({
           }}>
             <View>
               <Text variant="h3" style={{ fontWeight: '600' }}>
-                Featured Business Listings
+                Featured Sellar Pro Listings
               </Text>
               <Text variant="bodySmall" color="muted">
-                Premium listings from verified business sellers
+                Premium listings from Pro sellers
               </Text>
             </View>
           </View>
@@ -224,11 +224,11 @@ export function FeaturedListings({
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.xs }}>
             <Crown size={20} color={theme.colors.primary} style={{ marginRight: theme.spacing.sm }} />
             <Text variant="h3" style={{ fontWeight: '600' }}>
-              Featured Business Listings
+              Featured Sellar Pro Listings
             </Text>
           </View>
           <Text variant="bodySmall" color="muted">
-            Premium listings from verified business sellers
+            Premium listings from Pro sellers
           </Text>
         </View>
         
@@ -412,7 +412,7 @@ export function CompactFeaturedListings({
         marginBottom: theme.spacing.md,
       }}>
         <Text variant="body" style={{ fontWeight: '600' }}>
-          Featured Business
+          Featured Sellar Pro
         </Text>
         {onViewAll && (
           <TouchableOpacity onPress={onViewAll}>

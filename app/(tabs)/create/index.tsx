@@ -437,6 +437,24 @@ export default function CreateListingScreen() {
         'cameras': '00000000-0000-4000-8000-000000000001',
         'accessories': '00000000-0000-4000-8000-000000000001',
         
+        // Electronics detailed subcategories
+        'phones-tablets': '00000000-0000-4000-8000-000000000001',
+        'feature-phones': '00000000-0000-4000-8000-000000000001',
+        'tablets': '00000000-0000-4000-8000-000000000001',
+        'phone-accessories': '00000000-0000-4000-8000-000000000001',
+        'smartwatches': '00000000-0000-4000-8000-000000000001',
+        'desktops': '00000000-0000-4000-8000-000000000001',
+        'computer-accessories': '00000000-0000-4000-8000-000000000001',
+        'software': '00000000-0000-4000-8000-000000000001',
+        'headphones-earphones': '00000000-0000-4000-8000-000000000001',
+        'speakers': '00000000-0000-4000-8000-000000000001',
+        'tv-monitors': '00000000-0000-4000-8000-000000000001',
+        'video-games': '00000000-0000-4000-8000-000000000001',
+        'gaming-accessories': '00000000-0000-4000-8000-000000000001',
+        'kitchen-appliances': '00000000-0000-4000-8000-000000000001',
+        'cleaning-appliances': '00000000-0000-4000-8000-000000000001',
+        'air-conditioning': '00000000-0000-4000-8000-000000000001',
+        
         // Fashion subcategories
         'clothing': '00000000-0000-4000-8000-000000000002',
         'shoes': '00000000-0000-4000-8000-000000000002',
@@ -444,11 +462,39 @@ export default function CreateListingScreen() {
         'jewelry': '00000000-0000-4000-8000-000000000002',
         'watches': '00000000-0000-4000-8000-000000000002',
         
+        // Fashion detailed subcategories
+        'mens-fashion': '00000000-0000-4000-8000-000000000002',
+        'womens-fashion': '00000000-0000-4000-8000-000000000002',
+        'kids-fashion': '00000000-0000-4000-8000-000000000002',
+        'mens-clothing': '00000000-0000-4000-8000-000000000002',
+        'womens-clothing': '00000000-0000-4000-8000-000000000002',
+        'boys-clothing': '00000000-0000-4000-8000-000000000002',
+        'girls-clothing': '00000000-0000-4000-8000-000000000002',
+        'mens-shoes': '00000000-0000-4000-8000-000000000002',
+        'womens-shoes': '00000000-0000-4000-8000-000000000002',
+        'kids-shoes': '00000000-0000-4000-8000-000000000002',
+        'mens-accessories': '00000000-0000-4000-8000-000000000002',
+        'womens-accessories': '00000000-0000-4000-8000-000000000002',
+        'bags-handbags': '00000000-0000-4000-8000-000000000002',
+        
         // Vehicles subcategories
         'cars': '00000000-0000-4000-8000-000000000003',
         'motorcycles': '00000000-0000-4000-8000-000000000003',
         'bicycles': '00000000-0000-4000-8000-000000000003',
         'parts': '00000000-0000-4000-8000-000000000003',
+        
+        // Vehicles detailed subcategories
+        'sedans': '00000000-0000-4000-8000-000000000003',
+        'suvs': '00000000-0000-4000-8000-000000000003',
+        'hatchbacks': '00000000-0000-4000-8000-000000000003',
+        'luxury-cars': '00000000-0000-4000-8000-000000000003',
+        'sport-bikes': '00000000-0000-4000-8000-000000000003',
+        'cruiser-bikes': '00000000-0000-4000-8000-000000000003',
+        'scooters': '00000000-0000-4000-8000-000000000003',
+        'auto-parts': '00000000-0000-4000-8000-000000000003',
+        'car-parts': '00000000-0000-4000-8000-000000000003',
+        'car-accessories': '00000000-0000-4000-8000-000000000003',
+        'tires-wheels': '00000000-0000-4000-8000-000000000003',
         
         // Home & Garden subcategories
         'furniture': '00000000-0000-4000-8000-000000000004',
@@ -457,13 +503,21 @@ export default function CreateListingScreen() {
         'garden': '00000000-0000-4000-8000-000000000004',
         'tools': '00000000-0000-4000-8000-000000000004',
         
+        // Home & Garden detailed subcategories
+        'home-decor': '00000000-0000-4000-8000-000000000004',
+        'wall-art': '00000000-0000-4000-8000-000000000004',
+        'lighting': '00000000-0000-4000-8000-000000000004',
+        'rugs-carpets': '00000000-0000-4000-8000-000000000004',
+        'plants': '00000000-0000-4000-8000-000000000004',
+        'garden-tools': '00000000-0000-4000-8000-000000000004',
+        'outdoor-furniture': '00000000-0000-4000-8000-000000000004',
+        
         // Furniture subcategories (missing ones that were causing the error)
         'living-room': '00000000-0000-4000-8000-000000000004',
         'bedroom': '00000000-0000-4000-8000-000000000004',
         'dining-room': '00000000-0000-4000-8000-000000000004',
         'office-furniture': '00000000-0000-4000-8000-000000000004',
         'kitchen-furniture': '00000000-0000-4000-8000-000000000004',
-        'outdoor-furniture': '00000000-0000-4000-8000-000000000004',
         
         // Health & Sports subcategories
         'fitness': '00000000-0000-4000-8000-000000000005',
@@ -471,32 +525,128 @@ export default function CreateListingScreen() {
         'health': '00000000-0000-4000-8000-000000000005',
         'outdoor': '00000000-0000-4000-8000-000000000005',
         
+        // Sports & Fitness detailed subcategories
+        'sports-fitness': '00000000-0000-4000-8000-000000000005',
+        'fitness-equipment': '00000000-0000-4000-8000-000000000005',
+        'sports-equipment': '00000000-0000-4000-8000-000000000005',
+        'weights': '00000000-0000-4000-8000-000000000005',
+        'cardio-equipment': '00000000-0000-4000-8000-000000000005',
+        'yoga-pilates': '00000000-0000-4000-8000-000000000005',
+        'football': '00000000-0000-4000-8000-000000000005',
+        'basketball': '00000000-0000-4000-8000-000000000005',
+        'tennis': '00000000-0000-4000-8000-000000000005',
+        
         // Business subcategories
         'office': '00000000-0000-4000-8000-000000000006',
         'industrial': '00000000-0000-4000-8000-000000000006',
         'agriculture': '00000000-0000-4000-8000-000000000006',
+        
+        // Business & Industrial detailed subcategories
+        'business-industrial': '00000000-0000-4000-8000-000000000006',
+        'office-equipment': '00000000-0000-4000-8000-000000000006',
+        'industrial-equipment': '00000000-0000-4000-8000-000000000006',
+        'restaurant-equipment': '00000000-0000-4000-8000-000000000006',
+        'printers-scanners': '00000000-0000-4000-8000-000000000006',
+        'office-supplies': '00000000-0000-4000-8000-000000000006',
         
         // Education subcategories
         'books': '00000000-0000-4000-8000-000000000007',
         'supplies': '00000000-0000-4000-8000-000000000007',
         'instruments': '00000000-0000-4000-8000-000000000007',
         
+        // Books & Media detailed subcategories
+        'books-media': '00000000-0000-4000-8000-000000000007',
+        'textbooks': '00000000-0000-4000-8000-000000000007',
+        'fiction': '00000000-0000-4000-8000-000000000007',
+        'non-fiction': '00000000-0000-4000-8000-000000000007',
+        'media': '00000000-0000-4000-8000-000000000007',
+        'movies': '00000000-0000-4000-8000-000000000007',
+        'music': '00000000-0000-4000-8000-000000000007',
+        
         // Entertainment subcategories
         'games': '00000000-0000-4000-8000-000000000008',
-        'music': '00000000-0000-4000-8000-000000000008',
-        'movies': '00000000-0000-4000-8000-000000000008',
-        'collectibles': '00000000-0000-4000-8000-000000000008',
+        
+        // Art & Crafts detailed subcategories
+        'art-crafts': '00000000-0000-4000-8000-000000000008',
+        'artwork': '00000000-0000-4000-8000-000000000008',
+        'craft-supplies': '00000000-0000-4000-8000-000000000008',
+        'handmade-items': '00000000-0000-4000-8000-000000000008',
+        
+        // Tickets & Events detailed subcategories
+        'tickets-events': '00000000-0000-4000-8000-000000000008',
+        'event-tickets': '00000000-0000-4000-8000-000000000008',
+        'gift-vouchers': '00000000-0000-4000-8000-000000000008',
+        'concerts': '00000000-0000-4000-8000-000000000008',
+        'sports-tickets': '00000000-0000-4000-8000-000000000008',
+        'theater-shows': '00000000-0000-4000-8000-000000000008',
         
         // Food subcategories
         'groceries': '00000000-0000-4000-8000-000000000009',
         'restaurant': '00000000-0000-4000-8000-000000000009',
         'catering': '00000000-0000-4000-8000-000000000009',
         
+        // Food & Beverages detailed subcategories
+        'food-beverages': '00000000-0000-4000-8000-000000000009',
+        'local-food': '00000000-0000-4000-8000-000000000009',
+        'beverages': '00000000-0000-4000-8000-000000000009',
+        'specialty-foods': '00000000-0000-4000-8000-000000000009',
+        
         // Services subcategories
         'professional': '00000000-0000-4000-8000-000000000010',
         'personal': '00000000-0000-4000-8000-000000000010',
         'maintenance': '00000000-0000-4000-8000-000000000010',
         'transport': '00000000-0000-4000-8000-000000000010',
+        
+        // Services detailed subcategories
+        'professional-services': '00000000-0000-4000-8000-000000000010',
+        'home-services': '00000000-0000-4000-8000-000000000010',
+        'consulting': '00000000-0000-4000-8000-000000000010',
+        'legal': '00000000-0000-4000-8000-000000000010',
+        'accounting': '00000000-0000-4000-8000-000000000010',
+        'cleaning': '00000000-0000-4000-8000-000000000010',
+        'repairs': '00000000-0000-4000-8000-000000000010',
+        'gardening-services': '00000000-0000-4000-8000-000000000010',
+        
+        // Baby & Kids detailed subcategories
+        'baby-kids': '00000000-0000-4000-8000-000000000010',
+        'baby-gear': '00000000-0000-4000-8000-000000000010',
+        'toys-games': '00000000-0000-4000-8000-000000000010',
+        'strollers': '00000000-0000-4000-8000-000000000010',
+        'baby-furniture': '00000000-0000-4000-8000-000000000010',
+        'feeding': '00000000-0000-4000-8000-000000000010',
+        'educational-toys': '00000000-0000-4000-8000-000000000010',
+        'outdoor-toys': '00000000-0000-4000-8000-000000000010',
+        'board-games': '00000000-0000-4000-8000-000000000010',
+        
+        // Beauty & Health detailed subcategories
+        'beauty-health': '00000000-0000-4000-8000-000000000010',
+        'skincare': '00000000-0000-4000-8000-000000000010',
+        'health-wellness': '00000000-0000-4000-8000-000000000010',
+        'makeup': '00000000-0000-4000-8000-000000000010',
+        'skincare-products': '00000000-0000-4000-8000-000000000010',
+        'fragrances': '00000000-0000-4000-8000-000000000010',
+        'supplements': '00000000-0000-4000-8000-000000000010',
+        'medical-devices': '00000000-0000-4000-8000-000000000010',
+        
+        // Pets & Animals detailed subcategories
+        'pets-animals': '00000000-0000-4000-8000-000000000010',
+        'pet-supplies': '00000000-0000-4000-8000-000000000010',
+        'pets-for-sale': '00000000-0000-4000-8000-000000000010',
+        'dog-supplies': '00000000-0000-4000-8000-000000000010',
+        'cat-supplies': '00000000-0000-4000-8000-000000000010',
+        'pet-food': '00000000-0000-4000-8000-000000000010',
+        'dogs': '00000000-0000-4000-8000-000000000010',
+        'cats': '00000000-0000-4000-8000-000000000010',
+        'birds': '00000000-0000-4000-8000-000000000010',
+        'fish-aquarium': '00000000-0000-4000-8000-000000000010',
+        
+        // Other detailed subcategories
+        'other': '00000000-0000-4000-8000-000000000000',
+        'lost-found': '00000000-0000-4000-8000-000000000000',
+        'miscellaneous': '00000000-0000-4000-8000-000000000000',
+        'coins-stamps': '00000000-0000-4000-8000-000000000000',
+        'vintage-items': '00000000-0000-4000-8000-000000000000',
+        'memorabilia': '00000000-0000-4000-8000-000000000000',
       };
       
       const DEFAULT_CATEGORY_UUID = '00000000-0000-4000-8000-000000000000'; // General/Other
@@ -1195,11 +1345,45 @@ export default function CreateListingScreen() {
           {formData.categoryAttributes && Object.keys(formData.categoryAttributes).length > 0 && (
             <>
               <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: theme.spacing.xs }} />
-              {Object.entries(formData.categoryAttributes).map(([key, value]) => (
-                <Text key={key} variant="caption" color="muted">
-                  {key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}: {Array.isArray(value) ? value.join(', ') : String(value)}
-                </Text>
-              ))}
+              {Object.entries(formData.categoryAttributes).map(([key, value]) => {
+                // Format the value with proper capitalization
+                const formatAttributeValue = (val: string | string[]): string => {
+                  if (Array.isArray(val)) {
+                    return val.map(v => formatSingleValue(v)).join(', ');
+                  }
+                  return formatSingleValue(String(val));
+                };
+                
+                const formatSingleValue = (val: string): string => {
+                  // Common words that should remain lowercase (except at the beginning)
+                  const lowercaseWords = new Set([
+                    'and', 'or', 'of', 'the', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'from',
+                    'up', 'down', 'out', 'off', 'over', 'under', 'above', 'below', 'between',
+                    'among', 'through', 'during', 'before', 'after', 'inside', 'outside', 'upon',
+                    'within', 'without', 'against', 'across', 'around', 'behind', 'beyond',
+                    'except', 'including', 'regarding', 'concerning', 'considering', 'despite',
+                    'throughout', 'toward', 'towards', 'via', 'versus', 'vice'
+                  ]);
+                  
+                  return val
+                    .split('_')
+                    .map((word, index) => {
+                      const lowerWord = word.toLowerCase();
+                      // First word is always capitalized, others follow the rules
+                      if (index === 0 || !lowercaseWords.has(lowerWord)) {
+                        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+                      }
+                      return lowerWord;
+                    })
+                    .join(' ');
+                };
+                
+                return (
+                  <Text key={key} variant="caption" color="muted">
+                    {key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}: {formatAttributeValue(value)}
+                  </Text>
+                );
+              })}
             </>
           )}
         </View>

@@ -16,15 +16,16 @@ BEGIN
     WHERE id = NEW.follower_id;
     
     -- Create notification for the user being followed
+    -- Handle null username by providing a fallback
     INSERT INTO notifications (user_id, type, title, body, data)
     VALUES (
         NEW.following_id,
         'follow',
         'New Follower! 👥',
-        follower_username || ' started following you',
+        COALESCE(follower_username, 'Someone') || ' started following you',
         jsonb_build_object(
             'follower_id', NEW.follower_id,
-            'follower_username', follower_username,
+            'follower_username', COALESCE(follower_username, 'Unknown User'),
             'follower_avatar', follower_avatar,
             'followed_at', NEW.created_at
         )
@@ -59,15 +60,16 @@ BEGIN
     END IF;
     
     -- Create notification for the post owner
+    -- Handle null username by providing a fallback
     INSERT INTO notifications (user_id, type, title, body, data)
     VALUES (
         post_owner_id,
         'like',
         'Post Liked! ❤️',
-        liker_username || ' liked your post',
+        COALESCE(liker_username, 'Someone') || ' liked your post',
         jsonb_build_object(
             'liker_id', NEW.user_id,
-            'liker_username', liker_username,
+            'liker_username', COALESCE(liker_username, 'Unknown User'),
             'liker_avatar', liker_avatar,
             'post_id', NEW.post_id,
             'post_content', LEFT(post_content, 100),
@@ -104,15 +106,16 @@ BEGIN
     END IF;
     
     -- Create notification for the post owner
+    -- Handle null username by providing a fallback
     INSERT INTO notifications (user_id, type, title, body, data)
     VALUES (
         post_owner_id,
         'comment',
         'New Comment! 💬',
-        commenter_username || ' commented on your post',
+        COALESCE(commenter_username, 'Someone') || ' commented on your post',
         jsonb_build_object(
             'commenter_id', NEW.user_id,
-            'commenter_username', commenter_username,
+            'commenter_username', COALESCE(commenter_username, 'Unknown User'),
             'commenter_avatar', commenter_avatar,
             'post_id', NEW.post_id,
             'post_content', LEFT(post_content, 100),
@@ -157,15 +160,16 @@ BEGIN
     END IF;
     
     -- Create notification for the recipient
+    -- Handle null username by providing a fallback
     INSERT INTO notifications (user_id, type, title, body, data)
     VALUES (
         recipient_id,
         'message',
         'New Message! 💬',
-        sender_username || ' sent you a message',
+        COALESCE(sender_username, 'Someone') || ' sent you a message',
         jsonb_build_object(
             'sender_id', NEW.sender_id,
-            'sender_username', sender_username,
+            'sender_username', COALESCE(sender_username, 'Unknown User'),
             'sender_avatar', sender_avatar,
             'conversation_id', conversation_id,
             'message_id', NEW.id,

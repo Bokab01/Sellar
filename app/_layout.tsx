@@ -20,6 +20,23 @@ import { offlineStorage } from '@/lib/offlineStorage';
 import { memoryManager } from '@/utils/memoryManager';
 import { recoverFromCorruptedSession } from '@/utils/authErrorHandler';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
+import * as Sentry from '@sentry/react-native';
+
+Sentry.init({
+  dsn: 'https://6599b79bf71d8de895ac3c894c856fe7@o4509911485775872.ingest.de.sentry.io/4510037487124560',
+
+  // Adds more context data to events (IP address, cookies, user, etc.)
+  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
+  sendDefaultPii: true,
+
+  // Configure Session Replay
+  replaysSessionSampleRate: 0.1,
+  replaysOnErrorSampleRate: 1,
+  integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
+
+  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
+  // spotlight: __DEV__,
+});
 
 // App content component that uses theme context
 function AppContent() {
@@ -176,10 +193,10 @@ function AppContent() {
   );
 }
 
-export default function RootLayout() {
+export default Sentry.wrap(function RootLayout() {
   return (
     <ThemeProvider>
       <AppContent />
     </ThemeProvider>
   );
-}
+});

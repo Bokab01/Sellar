@@ -6,7 +6,7 @@ import { Button } from '@/components/Button/Button';
 import { Avatar } from '@/components/Avatar/Avatar';
 import { Badge } from '@/components/Badge/Badge';
 import { PriceDisplay } from '@/components/PriceDisplay/PriceDisplay';
-import { CompactUserBadges } from '@/components/UserBadges/UserBadges';
+import { CompactUserBadges } from '@/components/UserBadgeSystem';
 import { ListingImage } from '@/components/OptimizedImage/OptimizedImage';
 import { useMemoryManager } from '@/utils/memoryManager';
 import { ImageViewer } from '@/components/ImageViewer/ImageViewer';
@@ -26,6 +26,8 @@ interface PremiumProductCardProps {
     avatar?: string;
     rating?: number;
     isBusinessUser?: boolean; // New prop to identify business users
+    isVerified?: boolean; // ID verification status
+    isBusinessVerified?: boolean; // Business verification status
   };
   badge?: {
     text: string;
@@ -93,7 +95,7 @@ export function PremiumProductCard({
   });
 
   const getBadgeConfig = () => isBusinessUser ? {
-    text: 'BUSINESS',
+    text: 'PRO',
     variant: 'primary' as const,
     size: 'small' as const,
   } : null;
@@ -297,20 +299,11 @@ export function PremiumProductCard({
             </View>
           )}
         </View>
-        {seller.isBusinessUser && styles.badge && (
-          <View style={styles.badge}>
-            <Text
-              variant="caption"
-              style={{
-                color: theme.colors.primaryForeground,
-                fontSize: 8,
-                fontWeight: '600',
-              }}
-            >
-              BUSINESS
-            </Text>
-          </View>
-        )}
+        <CompactUserBadges
+          isBusinessUser={seller.isBusinessUser}
+          isVerified={seller.isVerified}
+          isBusinessVerified={seller.isBusinessVerified}
+        />
       </View>
     );
   };

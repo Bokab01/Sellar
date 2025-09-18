@@ -65,7 +65,7 @@ export function useTransactionBasedReviews(options: {
         .from('reviews')
         .select(`
           *,
-          reviewer:profiles!reviews_reviewer_id_fkey(
+          reviewer:profiles!reviews_reviewer_fkey(
             id,
             full_name,
             avatar_url,
@@ -167,7 +167,7 @@ export function useCreateTransactionBasedReview() {
         })
         .select(`
           *,
-          reviewer:profiles!reviews_reviewer_id_fkey(
+          reviewer:profiles!reviews_reviewer_fkey(
             id,
             full_name,
             avatar_url,
@@ -384,6 +384,19 @@ export function useReviewHelpfulVote() {
 
     try {
       setLoading(true);
+
+      // First check if the user is the reviewer (prevent self-voting)
+      const { data: review, error: reviewError } = await supabase
+        .from('reviews')
+        .select('reviewer_id')
+        .eq('id', reviewId)
+        .single();
+
+      if (reviewError) throw reviewError;
+
+      if (review.reviewer_id === user.id) {
+        throw new Error('You cannot vote on your own review');
+      }
 
       // Check if user already voted
       const { data: existingVote, error: checkError } = await supabase

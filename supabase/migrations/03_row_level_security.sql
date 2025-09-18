@@ -344,9 +344,37 @@ CREATE POLICY "Users can insert their own reviews" ON reviews
 CREATE POLICY "Users can update their own reviews" ON reviews
     FOR UPDATE USING (auth.uid() = reviewer_id);
 
--- Users can delete reviews they write
-CREATE POLICY "Users can delete their own reviews" ON reviews
-    FOR DELETE USING (auth.uid() = reviewer_id);
+-- Note: Users cannot delete reviews - reviews are permanent for data integrity
+
+-- =============================================
+-- REVIEW HELPFUL VOTES POLICIES
+-- =============================================
+
+-- Enable RLS on review_helpful_votes table
+ALTER TABLE review_helpful_votes ENABLE ROW LEVEL SECURITY;
+
+-- Users can view all helpful votes
+CREATE POLICY "Anyone can view helpful votes" ON review_helpful_votes
+    FOR SELECT USING (true);
+
+-- Users can insert their own helpful votes (but not on their own reviews)
+CREATE POLICY "Users can vote on others' reviews" ON review_helpful_votes
+    FOR INSERT WITH CHECK (
+        auth.uid() = user_id 
+        AND NOT EXISTS (
+            SELECT 1 FROM reviews 
+            WHERE reviews.id = review_id 
+            AND reviews.reviewer_id = auth.uid()
+        )
+    );
+
+-- Users can update their own votes
+CREATE POLICY "Users can update their own votes" ON review_helpful_votes
+    FOR UPDATE USING (auth.uid() = user_id);
+
+-- Users can delete their own votes
+CREATE POLICY "Users can delete their own votes" ON review_helpful_votes
+    FOR DELETE USING (auth.uid() = user_id);
 
 -- =============================================
 -- TRANSACTIONS POLICIES

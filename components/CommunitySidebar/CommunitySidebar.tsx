@@ -12,6 +12,7 @@ import {
   Button,
   LoadingSkeleton,
   Badge,
+  CompactUserBadges,
 } from '@/components';
 import { 
   Users, 
@@ -318,9 +319,16 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
                 size="md"
               />
               <View style={{ marginLeft: theme.spacing.md, flex: 1 }}>
-                <Text variant="body" style={{ fontWeight: '600' }}>
-                  {(profile?.first_name || user.user_metadata?.first_name || 'User')} {(profile?.last_name || user.user_metadata?.last_name || '')}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs, flexWrap: 'wrap', marginBottom: theme.spacing.xs }}>
+                  <Text variant="body" style={{ fontWeight: '600' }}>
+                    {(profile?.first_name || user.user_metadata?.first_name || 'User')} {(profile?.last_name || user.user_metadata?.last_name || '')}
+                  </Text>
+                  <CompactUserBadges
+                    isBusinessUser={profile?.is_business}
+                    isVerified={profile?.is_verified}
+                    isBusinessVerified={profile?.verification_level === 'business'}
+                  />
+                </View>
                 <Text variant="caption" color="muted">Your Profile</Text>
               </View>
             </View>

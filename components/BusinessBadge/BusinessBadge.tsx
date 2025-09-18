@@ -28,7 +28,7 @@ export function BusinessBadge({
     switch (type) {
       case 'business':
         return {
-          text: 'BUSINESS',
+          text: 'PRO',
           icon: Building,
           color: theme.colors.primary,
           backgroundColor: theme.colors.primary + '20',
@@ -68,7 +68,7 @@ export function BusinessBadge({
         };
       default:
         return {
-          text: 'BUSINESS',
+          text: 'PRO',
           icon: Building,
           color: theme.colors.primary,
           backgroundColor: theme.colors.primary + '20',

@@ -430,7 +430,7 @@ export default function WalletScreen() {
           {/* Business Plan Preview */}
           <View style={styles.sectionContainer}>
             <Text variant="h3" style={{ marginBottom: theme.spacing.lg }}>
-              Sellar Business Plan
+              Sellar Pro Plan
             </Text>
             
             <TouchableOpacity
@@ -458,7 +458,7 @@ export default function WalletScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text variant="h4" style={{ marginBottom: theme.spacing.xs }}>
-                    Sellar Business
+                    Sellar Pro
                   </Text>
                   <Text variant="bodySmall" color="muted">
                     120 credits monthly • Unlimited listings • Premium features

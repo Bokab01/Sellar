@@ -1,7 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { Text, Badge, BusinessBadge, Avatar } from '@/components';
+import { Text, Badge, BusinessBadge, Avatar, CompactUserBadges } from '@/components';
 import { useDisplayName } from '@/hooks/useDisplayName';
 import { UserProfile } from '@/hooks/useProfile';
 
@@ -88,11 +88,11 @@ export function UserDisplayName({
         {getDisplayText()}
       </Text>
       
-      {showBadge && displayInfo.showBusinessBadge && (
-        <BusinessBadge 
-          type="business"
-          size="small"
-          variant={profile.verification_level === 'business' ? 'default' : 'default'}
+      {showBadge && (
+        <CompactUserBadges
+          isBusinessUser={displayInfo.showBusinessBadge}
+          isVerified={profile.is_verified}
+          isBusinessVerified={profile.verification_level === 'business'}
         />
       )}
     </View>

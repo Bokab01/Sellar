@@ -77,7 +77,7 @@ export function FixedFeaturedListings({
         setLoading(true);
         setError(null);
 
-        // Fetch business user listings with priority placement
+        // Fetch featured listings - mix of business users and regular users with boosted listings
         const { data: businessUsers, error: businessError } = await supabase
           .from('user_subscriptions')
           .select(`
@@ -104,19 +104,79 @@ export function FixedFeaturedListings({
           `)
           .in('status', ['active', 'cancelled']);
 
-        if (businessError) throw businessError;
+        // Also fetch users who have business profiles but might not have active subscriptions
+        let businessProfileUsers: any[] = [];
+        if (businessUsers && businessUsers.length > 0) {
+          const businessUserIds = businessUsers.map(u => u.user_id);
+          const { data: profileUsers, error: businessProfileError } = await supabase
+            .from('profiles')
+            .select(`
+              id,
+              first_name,
+              last_name,
+              full_name,
+              avatar_url,
+              rating,
+              is_business,
+              business_name,
+              display_business_name,
+              business_name_priority
+            `)
+            .eq('is_business', true)
+            .not('id', 'in', `(${businessUserIds.join(',')})`);
 
-        if (!businessUsers || businessUsers.length === 0) {
-          if (isMounted) {
-            setListings([]);
-            setLoading(false);
+          if (businessProfileError) {
+            console.warn('Error fetching business profile users:', businessProfileError);
+          } else {
+            businessProfileUsers = profileUsers || [];
           }
-          return;
+        } else {
+          // If no subscription-based business users, fetch all business profile users
+          const { data: profileUsers, error: businessProfileError } = await supabase
+            .from('profiles')
+            .select(`
+              id,
+              first_name,
+              last_name,
+              full_name,
+              avatar_url,
+              rating,
+              is_business,
+              business_name,
+              display_business_name,
+              business_name_priority
+            `)
+            .eq('is_business', true);
+
+          if (businessProfileError) {
+            console.warn('Error fetching business profile users:', businessProfileError);
+          } else {
+            businessProfileUsers = profileUsers || [];
+          }
         }
 
-        const businessUserIds = businessUsers.map(sub => sub.user_id);
+        if (businessError) throw businessError;
 
-        const { data: listingsData, error: listingsError } = await supabase
+        // Combine subscription-based and profile-based business users
+        const allBusinessUsers = [
+          ...(businessUsers || []).map(sub => ({
+            user_id: sub.user_id,
+            status: sub.status,
+            current_period_end: sub.current_period_end,
+            profiles: sub.profiles
+          })),
+          ...(businessProfileUsers || []).map(profile => ({
+            user_id: profile.id,
+            status: 'profile_business',
+            current_period_end: null,
+            profiles: profile
+          }))
+        ];
+
+        const businessUserIds = allBusinessUsers.map(user => user.user_id);
+
+        // Fetch listings from business users first (priority)
+        const { data: businessListings, error: businessListingsError } = await supabase
           .from('listings')
           .select(`
             id,
@@ -132,15 +192,90 @@ export function FixedFeaturedListings({
           .eq('status', 'active')
           .in('user_id', businessUserIds)
           .order('created_at', { ascending: false })
-          .limit(maxItems);
+          .limit(Math.ceil(maxItems * 0.7)); // 70% from business users
 
-        if (listingsError) throw listingsError;
+        if (businessListingsError) throw businessListingsError;
 
+        // Fetch additional listings from regular users with boosted features
+        const { data: boostedListings, error: boostedListingsError } = await supabase
+          .from('listings')
+          .select(`
+            id,
+            title,
+            price,
+            currency,
+            images,
+            location,
+            views_count,
+            created_at,
+            user_id
+          `)
+          .eq('status', 'active')
+          .not('user_id', 'in', `(${businessUserIds.join(',')})`)
+          .order('views_count', { ascending: false })
+          .limit(Math.ceil(maxItems * 0.3)); // 30% from regular users
+
+        if (boostedListingsError) throw boostedListingsError;
+
+        // Combine and limit results
+        const allListings = [
+          ...(businessListings || []),
+          ...(boostedListings || [])
+        ].slice(0, maxItems);
+
+        // Get unique user IDs for profile fetching
+        const allUserIds = [...new Set(allListings.map(listing => listing.user_id))];
+        const businessUserIdsSet = new Set(businessUserIds);
+        const regularUserIds = allUserIds.filter(id => !businessUserIdsSet.has(id));
+
+        // Fetch profiles for regular users
+        let regularUserProfiles: any[] = [];
+        if (regularUserIds.length > 0) {
+          const { data: regularProfiles, error: regularProfilesError } = await supabase
+            .from('profiles')
+            .select(`
+              id,
+              first_name,
+              last_name,
+              full_name,
+              avatar_url,
+              rating,
+              is_business,
+              business_name,
+              display_business_name,
+              business_name_priority
+            `)
+            .in('id', regularUserIds);
+
+          if (regularProfilesError) {
+            console.warn('Error fetching regular user profiles:', regularProfilesError);
+          } else {
+            regularUserProfiles = regularProfiles || [];
+          }
+        }
 
         // Transform data with stable values (no Math.random)
-        const transformedListings: FeaturedListing[] = listingsData?.map(listing => {
-          const businessUser = businessUsers.find(user => user.user_id === listing.user_id);
-          const profile = businessUser?.profiles;
+        const transformedListings: FeaturedListing[] = allListings?.map(listing => {
+          const businessUser = allBusinessUsers?.find(user => user.user_id === listing.user_id);
+          const isBusinessUser = !!businessUser;
+          
+          let sellerProfile;
+          if (isBusinessUser) {
+            sellerProfile = businessUser.profiles;
+          } else {
+            sellerProfile = regularUserProfiles.find(profile => profile.id === listing.user_id) || {
+              id: listing.user_id,
+              first_name: 'User',
+              last_name: '',
+              full_name: 'User',
+              avatar_url: null,
+              rating: null,
+              is_business: false,
+              business_name: null,
+              display_business_name: false,
+              business_name_priority: 'hidden'
+            };
+          }
 
           // Use stable pseudo-random values based on listing ID
           const idHash = listing.id.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
@@ -153,15 +288,15 @@ export function FixedFeaturedListings({
             images: Array.isArray(listing.images) ? listing.images : [],
             location: listing.location || '',
             seller: {
-              id: (profile as any)?.id || listing.user_id,
-              name: getDisplayName(profile),
-              avatar: (profile as any)?.avatar_url,
-              rating: (profile as any)?.rating,
-              isBusinessUser: true,
+              id: (sellerProfile as any)?.id || listing.user_id,
+              name: getDisplayName(sellerProfile),
+              avatar: (sellerProfile as any)?.avatar_url,
+              rating: (sellerProfile as any)?.rating,
+              isBusinessUser: isBusinessUser,
             },
             isBoosted: idHash % 2 === 0, // Stable based on ID hash
             isSponsored: idHash % 3 === 0, // Stable based on ID hash
-            isPriority: true,
+            isPriority: isBusinessUser, // Business users get priority
             viewCount: listing.views_count || 0,
             createdAt: listing.created_at,
           };
@@ -263,11 +398,11 @@ export function FixedFeaturedListings({
         marginBottom: theme.spacing.lg,
       }}>
         <View>
-          <Text variant="h3" style={{ marginBottom: theme.spacing.xs }}>
-            Featured Business Listings
+          <Text style={{ marginBottom: theme.spacing.xs, fontSize: 20, fontWeight: '600' }}>
+            Featured Sellar Pro Listings
           </Text>
           <Text variant="bodySmall" color="secondary">
-            Premium listings from verified business users
+            Premium listings from business users
           </Text>
         </View>
         <TouchableOpacity onPress={handleViewAll}>
@@ -285,8 +420,8 @@ export function FixedFeaturedListings({
         <View style={{
           flexDirection: 'row',
           flexWrap: 'wrap',
-          paddingHorizontal: theme.spacing.lg,
-          gap: theme.spacing.md,
+          paddingHorizontal: theme.spacing.sm,
+          gap: theme.spacing.sm,
         }}>
         {listings.map((listing) => (
           <View key={listing.id} style={{ width: '48%' }}>
@@ -310,20 +445,21 @@ export function FixedFeaturedListings({
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{
-          paddingHorizontal: theme.spacing.lg,
-          gap: theme.spacing.md,
+          paddingHorizontal: theme.spacing.sm,
+          gap: theme.spacing.sm - 5,
         }}
       >
         {listings.map((listing) => (
-          <MinimalPremiumProductCard
-            key={listing.id}
-            image={listing.images}
-            title={listing.title}
-            price={listing.price}
-            currency={listing.currency}
-            seller={listing.seller}
-            onPress={() => handleListingPress(listing.id)}
-          />
+          <View key={listing.id} style={{ width: 190 }}>
+            <MinimalPremiumProductCard
+              image={listing.images}
+              title={listing.title}
+              price={listing.price}
+              currency={listing.currency}
+              seller={listing.seller}
+              onPress={() => handleListingPress(listing.id)}
+            />
+          </View>
         ))}
       </ScrollView>
     );

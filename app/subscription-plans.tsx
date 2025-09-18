@@ -156,7 +156,7 @@ export default function SubscriptionPlansScreen() {
     
     Alert.alert(
       'Upgrade with Credits',
-      `Upgrade to Sellar Business for ${creditsRequired.toLocaleString()} credits?\n\nYou currently have ${balance.toLocaleString()} credits.`,
+      `Upgrade to Sellar Pro for ${creditsRequired.toLocaleString()} credits?\n\nYou currently have ${balance.toLocaleString()} credits.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -164,13 +164,13 @@ export default function SubscriptionPlansScreen() {
           style: 'default',
           onPress: async () => {
             setSubscribing(true);
-            setSelectedPlan('sellar_business');
+            setSelectedPlan('sellar_pro');
             
             try {
               const result = await upgradeToBusinessWithCredits();
               
               if (result.success) {
-                setToastMessage('Successfully upgraded to Sellar Business! Welcome to premium features.');
+                setToastMessage('Successfully upgraded to Sellar Pro! Welcome to premium features.');
                 setToastVariant('success');
                 setShowToast(true);
               } else {

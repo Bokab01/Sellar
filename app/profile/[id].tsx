@@ -27,7 +27,6 @@ import {
   Chip,
   FullUserBadges,
   UserDisplayName,
-  TrustMetricsDisplay,
   EnhancedReviewCard,
 } from '@/components';
 import { 
@@ -43,6 +42,17 @@ import {
   MessageSquare,
   Info
 } from 'lucide-react-native';
+
+// Helper function to format response time expectation
+const formatResponseTime = (responseTime: string): string => {
+  const timeMap: Record<string, string> = {
+    'within_minutes': 'within minutes',
+    'within_hours': 'within hours', 
+    'within_day': 'within a day',
+    'within_week': 'within a week'
+  };
+  return timeMap[responseTime] || responseTime;
+};
 
 type TabType = 'listings' | 'reviews' | 'about' | 'posts';
 
@@ -60,7 +70,6 @@ export default function UserProfileScreen() {
   const [activeTab, setActiveTab] = useState<TabType>((tab as TabType) || 'listings');
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
-  const [trustMetrics, setTrustMetrics] = useState<any>(null);
 
   // Get user's listings
   const { 
@@ -104,8 +113,6 @@ export default function UserProfileScreen() {
         setError(fetchError.message);
       } else {
         setProfile(data);
-        // Fetch trust metrics
-        await fetchTrustMetrics();
       }
     } catch (err) {
       setError('Failed to load profile');
@@ -114,22 +121,6 @@ export default function UserProfileScreen() {
     }
   };
 
-  const fetchTrustMetrics = async () => {
-    try {
-      // Get trust metrics using the database function
-      const { data, error } = await supabase
-        .rpc('get_user_trust_metrics', { p_user_id: profileId });
-
-      if (error) {
-        console.error('Error fetching trust metrics:', error);
-        return;
-      }
-
-      setTrustMetrics(data);
-    } catch (err) {
-      console.error('Error fetching trust metrics:', err);
-    }
-  };
 
   const checkFollowStatus = async () => {
     if (!currentUser || currentUser.id === profileId) return;
@@ -382,75 +373,166 @@ export default function UserProfileScreen() {
       case 'about':
         return (
           <View style={{ gap: theme.spacing.lg }}>
-            {/* Trust Metrics */}
-            {trustMetrics && (
-              <TrustMetricsDisplay
-                metrics={trustMetrics}
-                variant="full"
-                showDetails={true}
-              />
-            )}
+            {/* Professional About Section */}
+            <View style={{
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.borderRadius.lg,
+              padding: theme.spacing.lg,
+              ...theme.shadows.sm,
+            }}>
+              {profile.bio ? (
+                <View>
+                  <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+                    About
+                  </Text>
+                  <Text variant="body" style={{ lineHeight: 24, color: theme.colors.text.primary }}>
+                    {profile.bio}
+                  </Text>
+                </View>
+              ) : (
+                <View style={{ alignItems: 'center', paddingVertical: theme.spacing.lg }}>
+                  <Info size={32} color={theme.colors.text.muted} />
+                  <Text variant="h4" style={{ marginTop: theme.spacing.sm, marginBottom: theme.spacing.xs }}>
+                    {isOwnProfile ? "Tell others about yourself" : "No bio available"}
+                  </Text>
+                  <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
+                    {isOwnProfile 
+                      ? "Add a bio to help others get to know you better" 
+                      : `${profile.first_name} hasn't added a bio yet`
+                    }
+                  </Text>
+                </View>
+              )}
+            </View>
 
-            {profile.bio && (
-              <View>
-                <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
-                  About
-                </Text>
-                <Text variant="body" style={{ lineHeight: 24 }}>
-                  {profile.bio}
-                </Text>
-              </View>
-            )}
-
-            <View>
-              <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
-                Details
+            {/* Professional Details Card */}
+            <View style={{
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.borderRadius.lg,
+              padding: theme.spacing.lg,
+              ...theme.shadows.sm,
+            }}>
+              <Text variant="h4" style={{ marginBottom: theme.spacing.lg }}>
+                Profile Details
               </Text>
-              <View style={{ gap: theme.spacing.md }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-                  <MapPin size={16} color={theme.colors.text.muted} />
-                  <Text variant="body" color="secondary">
-                    {profile.location}
-                  </Text>
-                </View>
-                
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-                  <Calendar size={16} color={theme.colors.text.muted} />
-                  <Text variant="body" color="secondary">
-                    Member since {new Date(profile.created_at).toLocaleDateString()}
-                  </Text>
-                </View>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-                  <Star size={16} color={theme.colors.warning} />
-                                  <CompactReviewSummary userId={profileId!} />
-                </View>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-                  <Package size={16} color={theme.colors.text.muted} />
-                  <Text variant="body" color="secondary">
-                    {profile.total_sales || 0} successful sales
-                  </Text>
-                </View>
-
-                {profile.response_time && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-                    <MessageCircle size={16} color={theme.colors.text.muted} />
-                    <Text variant="body" color="secondary">
-                      Usually responds {profile.response_time}
+              
+              <View style={{ gap: theme.spacing.lg }}>
+                {/* Location */}
+                <View style={{ 
+                  flexDirection: 'row', 
+                  alignItems: 'center', 
+                  gap: theme.spacing.md,
+                  paddingVertical: theme.spacing.sm,
+                }}>
+                  <View style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: theme.borderRadius.full,
+                    backgroundColor: theme.colors.primary + '15',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <MapPin size={18} color={theme.colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="bodySmall" color="secondary" style={{ marginBottom: 2 }}>
+                      Location
                     </Text>
+                    <Text variant="body" style={{ fontWeight: '500' }}>
+                      {profile.location}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Member Since */}
+                <View style={{ 
+                  flexDirection: 'row', 
+                  alignItems: 'center', 
+                  gap: theme.spacing.md,
+                  paddingVertical: theme.spacing.sm,
+                }}>
+                  <View style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: theme.borderRadius.full,
+                    backgroundColor: theme.colors.success + '15',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Calendar size={18} color={theme.colors.success} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="bodySmall" color="secondary" style={{ marginBottom: 2 }}>
+                      Member Since
+                    </Text>
+                    <Text variant="body" style={{ fontWeight: '500' }}>
+                      {new Date(profile.created_at).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })}
+                    </Text>
+                  </View>
+                </View>
+
+
+                {/* Sales */}
+                <View style={{ 
+                  flexDirection: 'row', 
+                  alignItems: 'center', 
+                  gap: theme.spacing.md,
+                  paddingVertical: theme.spacing.sm,
+                }}>
+                  <View style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: theme.borderRadius.full,
+                    backgroundColor: theme.colors.info + '15',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <Package size={18} color={theme.colors.info} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="bodySmall" color="secondary" style={{ marginBottom: 2 }}>
+                      Successful Sales
+                    </Text>
+                    <Text variant="body" style={{ fontWeight: '500' }}>
+                      {profile.total_sales || 0} completed transactions
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Response Time */}
+                {profile.response_time_expectation && (
+                  <View style={{ 
+                    flexDirection: 'row', 
+                    alignItems: 'center', 
+                    gap: theme.spacing.md,
+                    paddingVertical: theme.spacing.sm,
+                  }}>
+                    <View style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: theme.borderRadius.full,
+                      backgroundColor: theme.colors.secondary + '15',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <MessageCircle size={18} color={theme.colors.secondary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text variant="bodySmall" color="secondary" style={{ marginBottom: 2 }}>
+                        Response Time
+                      </Text>
+                      <Text variant="body" style={{ fontWeight: '500' }}>
+                        Usually responds {formatResponseTime(profile.response_time_expectation)}
+                      </Text>
+                    </View>
                   </View>
                 )}
               </View>
             </View>
-
-            {!profile.bio && (
-              <EmptyState
-                icon={<Info size={48} color={theme.colors.text.muted} />}
-                title="No bio available"
-                description={isOwnProfile ? "Add a bio to tell others about yourself" : `${profile.first_name} hasn't added a bio yet`}
-              />
-            )}
           </View>
         );
 
@@ -541,6 +623,7 @@ export default function UserProfileScreen() {
             padding: theme.spacing.xl,
             borderBottomWidth: 1,
             borderBottomColor: theme.colors.border,
+            ...theme.shadows.sm,
           }}
         >
           {/* Avatar and Basic Info */}
@@ -555,24 +638,34 @@ export default function UserProfileScreen() {
             />
 
             <View style={{ alignItems: 'center', marginBottom: theme.spacing.lg }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, marginBottom: theme.spacing.sm }}>
+              {/* Name and Rating */}
+              <View style={{ alignItems: 'center', marginBottom: theme.spacing.md }}>
                 <UserDisplayName
                   profile={profile}
                   variant="full"
                   showBadge={true}
                   textVariant="h2"
-                  style={{ fontWeight: '600' }}
+                  style={{ fontWeight: '600', marginBottom: theme.spacing.sm }}
                 />
+                
+                {/* Rating */}
+                <CompactReviewSummary userId={profileId!} />
               </View>
 
               {/* User Badges */}
-              <FullUserBadges userId={profileId} />
+              <View style={{ marginBottom: theme.spacing.sm }}>
+                <FullUserBadges userId={profileId} />
+              </View>
 
-              <CompactReviewSummary userId={profileId!} />
-
+              {/* Last Seen */}
               {profile.last_seen && !profile.is_online && (
-                <Text variant="caption" color="muted" style={{ marginTop: theme.spacing.sm }}>
-                  Last seen {new Date(profile.last_seen).toLocaleString()}
+                <Text variant="caption" color="muted" style={{ marginTop: theme.spacing.xs }}>
+                  Last seen {new Date(profile.last_seen).toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
                 </Text>
               )}
             </View>
@@ -588,6 +681,8 @@ export default function UserProfileScreen() {
                 borderBottomWidth: 1,
                 borderColor: theme.colors.border,
                 marginBottom: theme.spacing.lg,
+                backgroundColor: theme.colors.surfaceVariant + '30',
+                borderRadius: theme.borderRadius.md,
               }}
             >
               <View style={{ alignItems: 'center' }}>
@@ -599,7 +694,12 @@ export default function UserProfileScreen() {
                 </Text>
               </View>
               <View style={{ alignItems: 'center' }}>
-                <CompactReviewSummary userId={profileId!} />
+                <Text variant="h3" style={{ fontWeight: '700' }}>
+                  {filteredListings.length}
+                </Text>
+                <Text variant="caption" color="muted">
+                  Listings
+                </Text>
               </View>
               <View style={{ alignItems: 'center' }}>
                 <Text variant="h3" style={{ fontWeight: '700' }}>
@@ -613,7 +713,12 @@ export default function UserProfileScreen() {
 
             {/* Action Buttons */}
             {!isOwnProfile && (
-              <View style={{ flexDirection: 'row', gap: theme.spacing.md, width: '100%' }}>
+              <View style={{ 
+                flexDirection: 'row', 
+                gap: theme.spacing.md, 
+                width: '100%',
+                paddingTop: theme.spacing.sm,
+              }}>
                 <Button
                   variant={isFollowing ? 'tertiary' : 'primary'}
                   icon={isFollowing ? 
