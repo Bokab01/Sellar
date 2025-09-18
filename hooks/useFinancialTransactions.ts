@@ -16,35 +16,30 @@ export type TransactionStatus =
 export interface FinancialTransaction {
   id: string;
   user_id: string;
-  transaction_type: TransactionType;
-  status: TransactionStatus;
+  type: 'earned' | 'spent';
   amount: number;
-  currency: string;
+  balance_before: number;
+  balance_after: number;
+  reference_id?: string;
+  reference_type?: string;
+  metadata?: Record<string, any>;
+  created_at: string;
+  // Additional properties for transaction details
+  transaction_type?: string;
+  status?: 'pending' | 'completed' | 'failed' | 'cancelled';
+  title?: string;
+  description?: string;
+  currency?: string;
   credits_amount?: number;
   payment_method?: string;
   payment_reference?: string;
-  payment_provider?: string;
-  title: string;
-  description?: string;
-  category?: string;
-  related_listing_id?: string;
-  related_order_id?: string;
-  related_subscription_id?: string;
-  related_user_id?: string;
-  balance_before?: number;
-  balance_after?: number;
-  metadata?: Record<string, any>;
   receipt_url?: string;
-  created_at: string;
-  updated_at: string;
-  processed_at?: string;
 }
 
 export interface TransactionFilters {
   id?: string;
-  type?: TransactionType;
-  status?: TransactionStatus;
-  category?: string;
+  type?: 'earned' | 'spent';
+  reference_type?: string;
   dateFrom?: string;
   dateTo?: string;
   minAmount?: number;
@@ -52,16 +47,23 @@ export interface TransactionFilters {
 }
 
 export interface TransactionSummary {
-  total_transactions: number;
-  total_amount: number;
-  total_credits: number;
-  pending_transactions: number;
-  completed_transactions: number;
-  failed_transactions: number;
+  credits: {
+    current_balance: number;
+    lifetime_earned: number;
+    lifetime_spent: number;
+  };
+  transactions: {
+    total_count: number;
+    earned_count: number;
+    spent_count: number;
+    total_earned_amount: number;
+    total_spent_amount: number;
+  };
+  recent_transactions: FinancialTransaction[];
 }
 
 export interface TransactionAnalytics {
-  transaction_type: TransactionType;
+  transaction_type: 'earned' | 'spent';
   total_count: number;
   total_amount: number;
   avg_amount: number;
@@ -95,7 +97,7 @@ export function useFinancialTransactions(options: {
       setError(null);
 
       let query = supabase
-        .from('transactions')
+        .from('credit_transactions')
         .select('*')
         .eq('user_id', stableUserId)
         .order('created_at', { ascending: false })
@@ -103,13 +105,10 @@ export function useFinancialTransactions(options: {
 
       // Apply filters
       if (stableFilters.type) {
-        query = query.eq('transaction_type', stableFilters.type);
+        query = query.eq('type', stableFilters.type);
       }
-      if (stableFilters.status) {
-        query = query.eq('status', stableFilters.status);
-      }
-      if (stableFilters.category) {
-        query = query.eq('category', stableFilters.category);
+      if (stableFilters.reference_type) {
+        query = query.eq('reference_type', stableFilters.reference_type);
       }
       if (stableFilters.dateFrom) {
         query = query.gte('created_at', stableFilters.dateFrom);

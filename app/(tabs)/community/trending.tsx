@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, ScrollView, TouchableOpacity, RefreshControl, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 // import { useAuthStore } from '@/store/useAuthStore';
@@ -19,7 +19,7 @@ interface TrendingTopic {
   id: string;
   tag: string;
   posts_count: number;
-  engagement_count: number;
+  total_engagement: number; // Changed from engagement_count to match database
   growth_percentage: number;
   category: 'electronics' | 'fashion' | 'home' | 'automotive' | 'general' | 'food' | 'beauty' | 'sports' | 'education' | 'business';
   sample_posts: string[];
@@ -32,7 +32,7 @@ interface TrendingPost {
   author_avatar?: string;
   likes_count: number;
   comments_count: number;
-  views_count: number;
+  shares_count: number; // Changed from views_count to match database
   created_at: string;
   hashtags: string[];
 }
@@ -47,7 +47,7 @@ export default function TrendingTopicsScreen() {
   const [activeTab, setActiveTab] = useState<'topics' | 'posts'>('topics');
   const [error, setError] = useState<string | null>(null);
 
-  const fetchTrendingData = async () => {
+  const fetchTrendingData = useCallback(async () => {
     try {
       setError(null);
       
@@ -58,8 +58,10 @@ export default function TrendingTopicsScreen() {
       }
     } catch (err: any) {
       console.error('Error fetching trending data:', err);
-      if (err.message.includes('relation "hashtags" does not exist')) {
-        setError('Trending features not yet enabled. Please apply the trending system migration.');
+      if (err.message.includes('relation "hashtags" does not exist') || 
+          err.message.includes('Could not find the table')) {
+        // Set helpful error message for missing trending system
+        setError('Trending system not yet set up. Please apply the trending system migration to enable hashtag tracking.');
       } else {
         setError(err.message || 'Failed to load trending data');
       }
@@ -67,13 +69,13 @@ export default function TrendingTopicsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [activeTab]);
 
   useEffect(() => {
     fetchTrendingData();
   }, [activeTab, fetchTrendingData]);
 
-  const fetchTrendingTopics = async () => {
+  const fetchTrendingTopics = useCallback(async () => {
     try {
       // Try to use RPC function first
       const { data, error } = await supabase.rpc('get_trending_hashtags', {
@@ -87,35 +89,18 @@ export default function TrendingTopicsScreen() {
 
       setTopics(data || []);
     } catch (rpcError: any) {
-      if (rpcError.message.includes('Could not find the function')) {
-        // Fallback to direct query
-        const { data, error } = await supabase
-          .from('hashtags')
-          .select('*')
-          .order('posts_count', { ascending: false })
-          .limit(20);
-
-        if (error) throw error;
-
-        const transformedData = (data || []).map((hashtag: any) => ({
-          id: hashtag.id,
-          tag: hashtag.tag,
-          posts_count: hashtag.posts_count || 0,
-          engagement_count: hashtag.total_engagement || 0,
-          growth_percentage: hashtag.posts_count > 0 ? 
-            Math.round((hashtag.total_engagement / hashtag.posts_count) * 10) / 10 : 0,
-          category: hashtag.category || 'general',
-          sample_posts: ['Sample post content...'], // TODO: Fetch sample posts
-        }));
-
-        setTopics(transformedData);
+      if (rpcError.message.includes('Could not find the function') || 
+          rpcError.message.includes('Could not find the table')) {
+        // Fallback: Show empty state with setup instructions
+        setTopics([]);
+        setError('Trending system not yet set up. Please apply the trending system migration to enable hashtag tracking.');
       } else {
         throw rpcError;
       }
     }
-  };
+  }, []);
 
-  const fetchTrendingPosts = async () => {
+  const fetchTrendingPosts = useCallback(async () => {
     try {
       // Try to use RPC function first
       const { data, error } = await supabase.rpc('get_trending_posts', {
@@ -129,7 +114,8 @@ export default function TrendingTopicsScreen() {
 
       setPosts(data || []);
     } catch (rpcError: any) {
-      if (rpcError.message.includes('Could not find the function')) {
+      if (rpcError.message.includes('Could not find the function') || 
+          rpcError.message.includes('Could not find the table')) {
         // Fallback to direct query
         const { data, error } = await supabase
           .from('posts')
@@ -138,7 +124,7 @@ export default function TrendingTopicsScreen() {
             content,
             likes_count,
             comments_count,
-            views_count,
+            shares_count,
             created_at,
             profiles:user_id (
               first_name,
@@ -158,7 +144,7 @@ export default function TrendingTopicsScreen() {
           author_avatar: post.profiles?.avatar_url,
           likes_count: post.likes_count || 0,
           comments_count: post.comments_count || 0,
-          views_count: post.views_count || 0,
+          shares_count: post.shares_count || 0, // Use shares_count as engagement metric
           created_at: post.created_at,
           hashtags: [], // TODO: Extract hashtags from content
         }));
@@ -168,18 +154,18 @@ export default function TrendingTopicsScreen() {
         throw rpcError;
       }
     }
-  };
+  }, []);
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     setRefreshing(true);
     fetchTrendingData();
-  };
+  }, [fetchTrendingData]);
 
   const handleTopicPress = (topic: TrendingTopic) => {
     // Navigate to hashtag posts screen
     Alert.alert(
       `#${topic.tag}`,
-      `${topic.posts_count} posts • ${topic.engagement_count} engagements`,
+      `${topic.posts_count} posts • ${topic.total_engagement} engagements`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -401,7 +387,7 @@ export default function TrendingTopicsScreen() {
                       </View>
                       <View style={{ alignItems: 'center' }}>
                         <Text variant="body" weight="semibold">
-                          {(topic.engagement_count || 0).toLocaleString()}
+                          {(topic.total_engagement || 0).toLocaleString()}
                         </Text>
                         <Text variant="caption" color="muted">Engagements</Text>
                       </View>
@@ -535,7 +521,7 @@ export default function TrendingTopicsScreen() {
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                           <Eye size={16} color={theme.colors.text.muted} />
                           <Text variant="caption" style={{ marginLeft: theme.spacing.xs }}>
-                            {(post.views_count || 0).toLocaleString()}
+                            {(post.shares_count || 0).toLocaleString()}
                           </Text>
                         </View>
                       </View>

@@ -443,7 +443,7 @@ export async function activateListingFeature(
     const { data, error } = await supabase.rpc('purchase_feature', {
       p_user_id: userId,
       p_feature_key: featureKey,
-      p_credits: feature.credits,
+      p_credits: feature.regularCredits,
       p_metadata: { listing_id: listingId },
     });
 
@@ -473,7 +473,7 @@ export async function activateUserFeature(
     const { data, error } = await supabase.rpc('purchase_feature', {
       p_user_id: userId,
       p_feature_key: featureKey,
-      p_credits: feature.credits,
+      p_credits: feature.regularCredits,
       p_metadata: {},
     });
 

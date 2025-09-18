@@ -83,7 +83,7 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
         break;
       case 'chat':
         // Navigate to live chat
-        router.push('/support/chat');
+        router.push('/support-tickets');
         break;
     }
   };
@@ -382,7 +382,7 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
               {tickets.map((ticket) => (
                 <TouchableOpacity
                   key={ticket.id}
-                  onPress={() => router.push(`/support/ticket/${ticket.id}`)}
+                  onPress={() => router.push(`/support-tickets`)}
                   style={{
                     backgroundColor: theme.colors.background,
                     borderRadius: theme.borderRadius.lg,
@@ -411,7 +411,7 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
                     </Text>
                     <Badge 
                       text={ticket.priority} 
-                      variant={ticket.priority === 'urgent' ? 'destructive' : ticket.priority === 'high' ? 'warning' : 'info'}
+                      variant={ticket.priority === 'urgent' ? 'error' : ticket.priority === 'high' ? 'warning' : 'info'}
                     />
                   </View>
                 </TouchableOpacity>

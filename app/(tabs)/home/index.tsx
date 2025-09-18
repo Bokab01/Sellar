@@ -55,7 +55,8 @@ import {
   Grid3X3,
   Search,
   Filter,
-  ListFilterPlus
+  ListFilterPlus,
+  ChevronUp
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 
@@ -121,6 +122,16 @@ export default function HomeScreen() {
   const headerTranslateY = useRef(new Animated.Value(0)).current;
   const searchBarOpacity = useRef(new Animated.Value(0)).current;
   const searchBarTranslateY = useRef(new Animated.Value(-searchBarHeight)).current;
+  
+  // Animated values for floating search input
+  const floatingSearchTranslateY = useRef(new Animated.Value(0)).current;
+  const floatingSearchOpacity = useRef(new Animated.Value(1)).current;
+  
+  // Scroll-to-top FAB state
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
+  const scrollToTopOpacity = useRef(new Animated.Value(0)).current;
+  const scrollToTopScale = useRef(new Animated.Value(0.8)).current;
+  const mainScrollViewRef = useRef<any>(null);
 
   // Category counts from database
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
@@ -128,6 +139,13 @@ export default function HomeScreen() {
   const [categoryIdMap, setCategoryIdMap] = useState<Record<string, string>>({});
 
   // Smart search modal removed - now using dedicated screen
+
+  // Scroll to top function
+  const scrollToTop = () => {
+    if (mainScrollViewRef.current) {
+      mainScrollViewRef.current.scrollTo({ y: 0, animated: true });
+    }
+  };
 
   // Handle scroll animations
   const handleScroll = Animated.event(
@@ -138,12 +156,48 @@ export default function HomeScreen() {
         const currentScrollY = event.nativeEvent.contentOffset.y;
         const diff = currentScrollY - lastScrollY.current;
         
+        // Show/hide scroll-to-top FAB
+        if (currentScrollY > 300) {
+          if (!showScrollToTop) {
+            setShowScrollToTop(true);
+            Animated.parallel([
+              Animated.timing(scrollToTopOpacity, {
+                toValue: 1,
+                duration: 200,
+                useNativeDriver: true,
+              }),
+              Animated.spring(scrollToTopScale, {
+                toValue: 1,
+                useNativeDriver: true,
+                tension: 100,
+                friction: 8,
+              }),
+            ]).start();
+          }
+        } else {
+          if (showScrollToTop) {
+            setShowScrollToTop(false);
+            Animated.parallel([
+              Animated.timing(scrollToTopOpacity, {
+                toValue: 0,
+                duration: 200,
+                useNativeDriver: true,
+              }),
+              Animated.timing(scrollToTopScale, {
+                toValue: 0.8,
+                duration: 200,
+                useNativeDriver: true,
+              }),
+            ]).start();
+          }
+        }
+
         // Determine scroll direction
         if (diff > 0 && currentScrollY > 50) {
           // Scrolling down
           if (scrollDirection.current !== 'down') {
             scrollDirection.current = 'down';
-            // Hide header, show sticky search
+            // Hide header, show sticky search, hide floating search
             Animated.parallel([
               Animated.timing(headerTranslateY, {
                 toValue: -headerHeight,
@@ -160,13 +214,24 @@ export default function HomeScreen() {
                 duration: 300,
                 useNativeDriver: true,
               }),
+              // Hide floating search input
+              Animated.timing(floatingSearchTranslateY, {
+                toValue: -100,
+                duration: 300,
+                useNativeDriver: true,
+              }),
+              Animated.timing(floatingSearchOpacity, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+              }),
             ]).start();
           }
         } else if (diff < 0 || currentScrollY <= 50) {
           // Scrolling up or at top
           if (scrollDirection.current !== 'up') {
             scrollDirection.current = 'up';
-            // Show header, hide sticky search
+            // Show header, hide sticky search, show floating search
             Animated.parallel([
               Animated.timing(headerTranslateY, {
                 toValue: 0,
@@ -180,6 +245,17 @@ export default function HomeScreen() {
               }),
               Animated.timing(searchBarTranslateY, {
                 toValue: -searchBarHeight,
+                duration: 300,
+                useNativeDriver: true,
+              }),
+              // Show floating search input
+              Animated.timing(floatingSearchTranslateY, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+              }),
+              Animated.timing(floatingSearchOpacity, {
+                toValue: 1,
                 duration: 300,
                 useNativeDriver: true,
               }),
@@ -500,8 +576,16 @@ export default function HomeScreen() {
       flex: 1, 
       backgroundColor: theme.colors.background,
     }}>
-      {/* Enhanced Search Header */}
-      <View style={{ paddingTop: insets.top, }}>
+      {/* Enhanced Search Header - Floating */}
+      <Animated.View style={{ 
+        position: 'absolute',
+        top: insets.top + theme.spacing.md,
+        left: 0,
+        right: 0,
+        zIndex: 10,
+        transform: [{ translateY: floatingSearchTranslateY }],
+        opacity: floatingSearchOpacity,
+      }}>
         <EnhancedSearchHeader
           searchQuery={searchQuery}
           onSearchPress={() => router.push('/smart-search')}
@@ -509,7 +593,7 @@ export default function HomeScreen() {
           onAvatarPress={() => setSidebarVisible(true)}
           placeholder= 'Search here...'
         />
-      </View>
+      </Animated.View>
 
       {/* Sticky Search Bar - Appears when scrolling down */}
    {/*    <Animated.View
@@ -620,9 +704,11 @@ export default function HomeScreen() {
             </View>
           ) : (
             <Animated.ScrollView
+              ref={mainScrollViewRef}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{
                 // Full-bleed implementation: no horizontal padding on container
+                paddingTop: 100, // Add top padding to account for floating search input
                 paddingBottom: Math.max(theme.spacing.xl, insets.bottom + theme.spacing.md),
               }}
               refreshControl={
@@ -950,6 +1036,35 @@ export default function HomeScreen() {
           setSelectedCategories([]);
         }}
       />
+
+      {/* Scroll to Top FAB */}
+      <Animated.View
+        style={{
+          position: 'absolute',
+          bottom: insets.bottom + theme.spacing.xl,
+          right: theme.spacing.lg,
+          zIndex: 1000,
+          opacity: scrollToTopOpacity,
+          transform: [{ scale: scrollToTopScale }],
+        }}
+      >
+        <TouchableOpacity
+          onPress={scrollToTop}
+          style={{
+            backgroundColor: theme.colors.primary,
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            justifyContent: 'center',
+            alignItems: 'center',
+            ...theme.shadows.lg,
+            elevation: 8,
+          }}
+          activeOpacity={0.8}
+        >
+          <ChevronUp size={24} color={theme.colors.primaryForeground} />
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 }

@@ -864,7 +864,11 @@ export default function ChatScreen() {
       <KeyboardAwareScrollView
         ref={scrollViewRef}
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingVertical: theme.spacing.md }}
+        contentContainerStyle={{ 
+          paddingVertical: theme.spacing.md,
+          paddingBottom: theme.spacing.xl, // Extra padding to ensure content doesn't get hidden behind input
+          flexGrow: 1, // Ensure content fills available space
+        }}
         enableOnAndroid={true}
         enableAutomaticScroll={true}
         keyboardOpeningTime={250}
@@ -1081,8 +1085,12 @@ export default function ChatScreen() {
               </View>
             </View>
           )}
-        {/* Transaction Completion Button */}
-        {conversation?.listing && otherUser && !existingTransaction && (
+       
+
+      </KeyboardAwareScrollView>
+      
+       {/* Transaction Completion Button */}
+       {conversation?.listing && otherUser && !existingTransaction && (
           <View style={{
             paddingHorizontal: theme.spacing.lg,
             paddingVertical: theme.spacing.md,
@@ -1118,46 +1126,44 @@ export default function ChatScreen() {
             />
           </View>
         )}
+        
+      {/* Message Input - Fixed at bottom */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'flex-end',
+          backgroundColor: theme.colors.surface,
+          borderTopWidth: 1,
+          borderTopColor: theme.colors.border,
+          paddingHorizontal: theme.spacing.lg,
+          paddingTop: theme.spacing.md,
+          paddingBottom: Platform.OS === 'android' ? Math.max(insets.bottom, theme.spacing.md) : theme.spacing.md,
+          gap: theme.spacing.xs,
+        }}
+      >
+        {/* Image Picker */}
+        <ChatImagePicker
+          onImageSelected={handleSendImage}
+          disabled={false}
+        />
 
         {/* Message Input */}
-        <View
+        <MessageInput
+          value={messageText}
+          onChangeText={setMessageText}
+          onSend={handleSendMessage}
+          placeholder={conversation?.listing?.title 
+            ? `Message about ${truncateText(String(conversation.listing.title))}...` 
+            : "Type a message..."}
           style={{
-            flexDirection: 'row',
-            alignItems: 'flex-end',
-            backgroundColor: theme.colors.surface,
-            borderTopWidth: 1,
-            borderTopColor: theme.colors.border,
-            paddingHorizontal: theme.spacing.lg,
-            paddingTop: theme.spacing.md,
-            paddingBottom: Platform.OS === 'android' ? Math.max(insets.bottom, theme.spacing.md) : theme.spacing.md,
-            gap: theme.spacing.xs,
+            flex: 1,
+            borderTopWidth: 0,
+            paddingHorizontal: 0,
+            paddingVertical: 0,
           }}
-        >
-          {/* Image Picker */}
-          <ChatImagePicker
-            onImageSelected={handleSendImage}
-            disabled={false}
-          />
-
-          {/* Message Input */}
-          <MessageInput
-            value={messageText}
-            onChangeText={setMessageText}
-            onSend={handleSendMessage}
-            placeholder={conversation?.listing?.title 
-              ? `Message about ${truncateText(String(conversation.listing.title))}...` 
-              : "Type a message..."}
-            style={{
-              flex: 1,
-              borderTopWidth: 0,
-              paddingHorizontal: 0,
-              paddingVertical: 0,
-            }}
-            conversationId={conversationId}
-          />
-        </View>
-
-      </KeyboardAwareScrollView>
+          conversationId={conversationId}
+        />
+      </View>
 
       {/* Make Offer Modal */}
       <AppModal

@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import { Tabs } from 'expo-router';
-import { View, Text } from 'react-native';
+import { View, Text, Image } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { MessageCircle, Plus, Users, EllipsisVertical, House } from 'lucide-react-native';
+import { MessageCircle, Plus, Users, EllipsisVertical, House, BadgePlus, CirclePlus } from 'lucide-react-native';
 import { useChatStore } from '@/store/useChatStore';
 
 export default function TabLayout() {
@@ -104,19 +104,19 @@ export default function TabLayout() {
             <View
               style={{
                 backgroundColor: theme.colors.primary,
-                borderRadius: 28,
-                width: 56,
-                height: 56,
+                borderRadius: 20,
+                width: 40,
+                height: 40,
                 justifyContent: 'center',
                 alignItems: 'center',
                 marginBottom: 20,
                 ...theme.shadows.lg,
               }}
             >
-              <Plus size={28} color={theme.colors.primaryForeground} />
+              <Image source={require('@/assets/icon/icon-light.png')} style={{ width: 60, height: 6``````````````````````````````````````````````0 }} />
             </View>
           ),
-          tabBarLabel: () => null,
+          tabBarLabel: 'Sell',
         }}
       />
 

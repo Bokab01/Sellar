@@ -12,7 +12,7 @@ import {
   AlertTriangle,
   RefreshCw
 } from 'lucide-react-native';
-import { FinancialTransaction as Transaction } from '@/hooks/useTransactions';
+import { FinancialTransaction as Transaction } from '@/hooks/useFinancialTransactions';
 import { 
   formatTransactionType, 
   formatTransactionStatus, 
@@ -37,33 +37,10 @@ export function TransactionCard({
   compact = false 
 }: TransactionCardProps) {
   const { theme } = useTheme();
-  const typeInfo = getTransactionTypeInfo(transaction.transaction_type);
-  const isIncoming = isIncomingTransaction(transaction.transaction_type);
-  const statusColor = getTransactionStatusColor(transaction.status);
-
-  const getStatusIcon = () => {
-    const iconProps = { size: 16, color: statusColor };
-    
-    switch (transaction.status) {
-      case 'completed':
-        return <CheckCircle {...iconProps} color={theme.colors.success} />;
-      case 'pending':
-        return <Clock {...iconProps} color={theme.colors.warning} />;
-      case 'processing':
-        return <RefreshCw {...iconProps} color={theme.colors.primary} />;
-      case 'failed':
-        return <XCircle {...iconProps} color={theme.colors.error} />;
-      case 'cancelled':
-        return <XCircle {...iconProps} color={theme.colors.text.secondary} />;
-      case 'refunded':
-        return <RefreshCw {...iconProps} color={theme.colors.secondary} />;
-      default:
-        return <Circle {...iconProps} />;
-    }
-  };
+  const isIncoming = transaction.type === 'earned';
 
   const getTransactionIcon = () => {
-    const iconProps = { size: compact ? 20 : 24, color: typeInfo.color };
+    const iconProps = { size: compact ? 20 : 24 };
     
     if (isIncoming) {
       return <ArrowDownLeft {...iconProps} color={theme.colors.success} />;
@@ -74,14 +51,126 @@ export function TransactionCard({
 
   const formatTransactionAmount = () => {
     const sign = isIncoming ? '+' : '-';
-    const amountText = formatAmount(Math.abs(transaction.amount), transaction.currency);
-    return `${sign}${amountText}`;
+    return `${sign}${transaction.amount} credits`;
   };
 
-  const formatCreditsText = () => {
-    if (!transaction.credits_amount) return null;
-    const sign = isIncoming ? '+' : '-';
-    return `${sign}${formatCredits(Math.abs(transaction.credits_amount))}`;
+  const getTransactionTitle = () => {
+    if (transaction.metadata?.reason) {
+      return transaction.metadata.reason;
+    }
+    if (transaction.reference_type) {
+      switch (transaction.reference_type) {
+        case 'feature_purchase':
+          return 'Feature Purchase';
+        case 'community_reward':
+          return 'Community Reward';
+        case 'referral_bonus':
+          return 'Referral Bonus';
+        case 'payment_purchase':
+          return 'Credit Purchase';
+        case 'subscription_upgrade':
+          return 'Business Plan Upgrade';
+        case 'first_post_bonus':
+          return 'First Post Bonus';
+        case 'viral_post_bonus':
+          return 'Viral Post Bonus';
+        case 'positive_review_bonus':
+          return 'Positive Review Bonus';
+        case 'anniversary_bonus':
+          return 'Anniversary Bonus';
+        case 'business_plan_bonus':
+          return 'Business Plan Bonus';
+        default:
+          return transaction.reference_type.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+      }
+    }
+    return isIncoming ? 'Credits Earned' : 'Credits Spent';
+  };
+
+  const getTransactionDescription = () => {
+    if (transaction.metadata?.description) {
+      return transaction.metadata.description;
+    }
+    if (transaction.metadata?.feature_name) {
+      return `Applied ${transaction.metadata.feature_name} to listing`;
+    }
+    if (transaction.metadata?.reward_type) {
+      switch (transaction.metadata.reward_type) {
+        case 'first_post':
+          return 'Congratulations on your first post!';
+        case 'viral_post':
+          return 'Your post went viral!';
+        case 'positive_review':
+          return 'Thank you for the positive review!';
+        case 'anniversary':
+          return 'Happy anniversary with Sellar!';
+        default:
+          return 'Community engagement reward';
+      }
+    }
+    if (transaction.reference_type) {
+      switch (transaction.reference_type) {
+        case 'feature_purchase':
+          return 'Premium feature activated';
+        case 'community_reward':
+          return 'Reward for community engagement';
+        case 'referral_bonus':
+          return 'Bonus for referring a friend';
+        case 'payment_purchase':
+          return 'Credits purchased successfully';
+        case 'subscription_upgrade':
+          return 'Upgraded to business plan';
+        case 'first_post_bonus':
+          return 'Welcome bonus for your first post';
+        case 'viral_post_bonus':
+          return 'Bonus for creating a viral post';
+        case 'positive_review_bonus':
+          return 'Bonus for leaving a positive review';
+        case 'anniversary_bonus':
+          return 'Anniversary celebration bonus';
+        case 'business_plan_bonus':
+          return 'Monthly business plan allocation';
+        default:
+          return transaction.reference_type.replace('_', ' ');
+      }
+    }
+    return isIncoming ? 'Credits added to your account' : 'Credits deducted from your account';
+  };
+
+  const getReferenceDisplay = () => {
+    if (!transaction.reference_id) return null;
+    
+    // For feature purchases, show the feature name if available
+    if (transaction.reference_type === 'feature_purchase' && transaction.metadata?.feature_name) {
+      return `Feature: ${transaction.metadata.feature_name}`;
+    }
+    
+    // For community rewards, show the reward type
+    if (transaction.reference_type === 'community_reward' && transaction.metadata?.reward_type) {
+      return `Reward: ${transaction.metadata.reward_type.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}`;
+    }
+    
+    // For referral bonuses, show it's a referral
+    if (transaction.reference_type === 'referral_bonus') {
+      return 'Referral Bonus';
+    }
+    
+    // For payment purchases, show the amount paid
+    if (transaction.reference_type === 'payment_purchase' && transaction.metadata?.payment_amount) {
+      return `Payment: GHS ${transaction.metadata.payment_amount}`;
+    }
+    
+    // For subscription upgrades, show the plan
+    if (transaction.reference_type === 'subscription_upgrade' && transaction.metadata?.plan_name) {
+      return `Plan: ${transaction.metadata.plan_name}`;
+    }
+    
+    // Default: show reference ID if it's not a UUID (which would be user-unfriendly)
+    if (transaction.reference_id && !transaction.reference_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      return `Ref: ${transaction.reference_id}`;
+    }
+    
+    return null;
   };
 
   return (
@@ -111,7 +200,7 @@ export function TransactionCard({
               width: compact ? 40 : 48,
               height: compact ? 40 : 48,
               borderRadius: compact ? 20 : 24,
-              backgroundColor: typeInfo.color + '20',
+              backgroundColor: isIncoming ? theme.colors.success + '20' : theme.colors.error + '20',
               alignItems: 'center',
               justifyContent: 'center',
               marginRight: theme.spacing.md,
@@ -135,25 +224,24 @@ export function TransactionCard({
                 }}
                 numberOfLines={1}
               >
-                {transaction.title}
+                {getTransactionTitle()}
               </Text>
               
-              {/* Status Icon */}
-              {getStatusIcon()}
+              {/* Status Icon - Always completed for credit transactions */}
+              <CheckCircle size={16} color={theme.colors.success} />
             </View>
 
-            {/* Transaction Type and Description */}
+            {/* Transaction Description */}
             <Text 
               variant="bodySmall" 
               color="secondary"
               numberOfLines={compact ? 1 : 2}
               style={{ marginBottom: theme.spacing.xs }}
             >
-              {formatTransactionType(transaction.transaction_type)}
-              {transaction.description && ` • ${transaction.description}`}
+              {getTransactionDescription()}
             </Text>
 
-            {/* Date and Status */}
+            {/* Date */}
             {showDate && (
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text variant="caption" color="muted">
@@ -176,9 +264,8 @@ export function TransactionCard({
                 />
                 
                 <Badge
-                  text={formatTransactionStatus(transaction.status)}
-                  variant={transaction.status === 'completed' ? 'success' : 
-                          transaction.status === 'failed' ? 'error' : 'warning'}
+                  text="Completed"
+                  variant="success"
                   size="small"
                 />
               </View>
@@ -199,23 +286,21 @@ export function TransactionCard({
             {formatTransactionAmount()}
           </Text>
           
-          {/* Credits amount if applicable */}
-          {transaction.credits_amount && (
-            <Text 
-              variant="caption" 
-              style={{ 
-                color: isIncoming ? theme.colors.success : theme.colors.error,
-                opacity: 0.8,
-              }}
-            >
-              {formatCreditsText()}
-            </Text>
-          )}
+          {/* Balance info */}
+          <Text 
+            variant="caption" 
+            style={{ 
+              color: theme.colors.text.secondary,
+              opacity: 0.8,
+            }}
+          >
+            Balance: {transaction.balance_after}
+          </Text>
         </View>
       </View>
 
-      {/* Payment method if available */}
-      {transaction.payment_method && transaction.payment_method !== 'credits' && (
+      {/* Reference info if available */}
+      {getReferenceDisplay() && (
         <View style={{
           marginTop: theme.spacing.md,
           paddingTop: theme.spacing.md,
@@ -223,8 +308,7 @@ export function TransactionCard({
           borderTopColor: theme.colors.border,
         }}>
           <Text variant="caption" color="muted">
-            Payment method: {transaction.payment_method.replace('_', ' ').toUpperCase()}
-            {transaction.payment_reference && ` • Ref: ${transaction.payment_reference}`}
+            {getReferenceDisplay()}
           </Text>
         </View>
       )}
@@ -240,8 +324,40 @@ export function CompactTransactionCard(props: Omit<TransactionCardProps, 'compac
 // Transaction list item for simple lists
 export function TransactionListItem({ transaction, onPress }: TransactionCardProps) {
   const { theme } = useTheme();
-  const isIncoming = isIncomingTransaction(transaction.transaction_type);
-  const typeInfo = getTransactionTypeInfo(transaction.transaction_type);
+  const isIncoming = transaction.type === 'earned';
+
+  const getTransactionTitle = () => {
+    if (transaction.metadata?.reason) {
+      return transaction.metadata.reason;
+    }
+    if (transaction.reference_type) {
+      switch (transaction.reference_type) {
+        case 'feature_purchase':
+          return 'Feature Purchase';
+        case 'community_reward':
+          return 'Community Reward';
+        case 'referral_bonus':
+          return 'Referral Bonus';
+        case 'payment_purchase':
+          return 'Credit Purchase';
+        case 'subscription_upgrade':
+          return 'Business Plan Upgrade';
+        case 'first_post_bonus':
+          return 'First Post Bonus';
+        case 'viral_post_bonus':
+          return 'Viral Post Bonus';
+        case 'positive_review_bonus':
+          return 'Positive Review Bonus';
+        case 'anniversary_bonus':
+          return 'Anniversary Bonus';
+        case 'business_plan_bonus':
+          return 'Business Plan Bonus';
+        default:
+          return transaction.reference_type.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+      }
+    }
+    return isIncoming ? 'Credits Earned' : 'Credits Spent';
+  };
 
   return (
     <TouchableOpacity
@@ -262,7 +378,7 @@ export function TransactionListItem({ transaction, onPress }: TransactionCardPro
           width: 32,
           height: 32,
           borderRadius: 16,
-          backgroundColor: typeInfo.color + '20',
+          backgroundColor: isIncoming ? theme.colors.success + '20' : theme.colors.error + '20',
           alignItems: 'center',
           justifyContent: 'center',
           marginRight: theme.spacing.md,
@@ -278,7 +394,7 @@ export function TransactionListItem({ transaction, onPress }: TransactionCardPro
       {/* Details */}
       <View style={{ flex: 1 }}>
         <Text variant="body" numberOfLines={1} style={{ marginBottom: 2 }}>
-          {transaction.title}
+          {getTransactionTitle()}
         </Text>
         <Text variant="caption" color="secondary" numberOfLines={1}>
           {new Date(transaction.created_at).toLocaleDateString()}
@@ -293,7 +409,7 @@ export function TransactionListItem({ transaction, onPress }: TransactionCardPro
           fontWeight: '600',
         }}
       >
-        {isIncoming ? '+' : '-'}{formatAmount(Math.abs(transaction.amount), transaction.currency)}
+        {isIncoming ? '+' : '-'}{transaction.amount} credits
       </Text>
     </TouchableOpacity>
   );

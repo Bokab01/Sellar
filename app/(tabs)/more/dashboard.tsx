@@ -118,7 +118,7 @@ export default function BusinessDashboardScreen() {
       ]);
       
       setQuickStats(stats);
-      setAnalyticsData(analytics);
+        setAnalyticsData(analytics);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
@@ -159,43 +159,43 @@ export default function BusinessDashboardScreen() {
         }}
         style={{ flexGrow: 0 }}
       >
-        <View style={{
-          backgroundColor: theme.colors.surfaceVariant,
+      <View style={{
+        backgroundColor: theme.colors.surfaceVariant,
           borderRadius: 50,
-          padding: theme.spacing.xs,
-          flexDirection: 'row',
-        }}>
-          {availableTabs.map((tab, index) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <TouchableOpacity
-                key={tab.id}
-                onPress={() => setActiveTab(tab.id)}
-                style={{
-                  paddingVertical: theme.spacing.sm,
-                  paddingHorizontal: theme.spacing.lg,
-                  backgroundColor: isActive ? theme.colors.primary : 'transparent',
+        padding: theme.spacing.xs,
+        flexDirection: 'row',
+      }}>
+        {availableTabs.map((tab, index) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <TouchableOpacity
+              key={tab.id}
+              onPress={() => setActiveTab(tab.id)}
+              style={{
+                paddingVertical: theme.spacing.sm,
+                paddingHorizontal: theme.spacing.lg,
+                backgroundColor: isActive ? theme.colors.primary : 'transparent',
                   borderRadius: 50,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: theme.spacing.xs,
-                  marginRight: index < availableTabs.length - 1 ? theme.spacing.xs : 0,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.xs,
+                marginRight: index < availableTabs.length - 1 ? theme.spacing.xs : 0,
+              }}
+            >
+              {tab.icon(isActive ? theme.colors.text.inverse : theme.colors.text.primary)}
+              <Text
+                variant="bodySmall"
+                style={{
+                  color: isActive ? theme.colors.text.inverse : theme.colors.text.primary,
+                  fontWeight: isActive ? '600' : '500',
                 }}
               >
-                {tab.icon(isActive ? theme.colors.text.inverse : theme.colors.text.primary)}
-                <Text
-                  variant="bodySmall"
-                  style={{
-                    color: isActive ? theme.colors.text.inverse : theme.colors.text.primary,
-                    fontWeight: isActive ? '600' : '500',
-                  }}
-                >
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
       </ScrollView>
     </View>
   ), [availableTabs, activeTab, theme]);

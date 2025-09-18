@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
@@ -19,23 +20,56 @@ export function useRealtime({
 }: UseRealtimeOptions) {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const callbacksRef = useRef({ onInsert, onUpdate, onDelete });
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isReconnectingRef = useRef(false);
 
   // Update callbacks ref when they change
   useEffect(() => {
     callbacksRef.current = { onInsert, onUpdate, onDelete };
   }, [onInsert, onUpdate, onDelete]);
 
-  useEffect(() => {
-    // Clean up existing channel first
-    if (channelRef.current) {
-      console.log(`🔗 Cleaning up existing real-time subscription for ${table}`);
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
+  // Reconnection function
+  const reconnectChannel = useCallback(async () => {
+    if (isReconnectingRef.current) return;
+    
+    isReconnectingRef.current = true;
+    console.log(`🔗 Attempting to reconnect real-time subscription for ${table}...`);
+    
+    try {
+      // Clean up existing channel
+      if (channelRef.current) {
+        await supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+      
+      // Wait a bit before reconnecting
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Recreate the subscription
+      await setupChannel();
+      
+      console.log(`🔗 Successfully reconnected real-time subscription for ${table}`);
+    } catch (error) {
+      console.error(`🔗 Failed to reconnect real-time subscription for ${table}:`, error);
+      
+      // Schedule another reconnection attempt
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      reconnectTimeoutRef.current = setTimeout(() => {
+        isReconnectingRef.current = false;
+        reconnectChannel();
+      }, 5000);
+    } finally {
+      isReconnectingRef.current = false;
     }
+  }, [table, filter]);
 
-    // Skip if table is not provided
-    if (!table) {
-      console.warn('🔗 No table provided for real-time subscription');
+  // Setup channel function
+  const setupChannel = useCallback(async () => {
+    if (channelRef.current) {
+      console.log(`🔗 Channel already exists for ${table}, skipping setup`);
       return;
     }
 
@@ -81,20 +115,22 @@ export function useRealtime({
             console.log(`🔗 Successfully subscribed to ${table} real-time updates`);
           } else if (status === 'CHANNEL_ERROR') {
             console.error(`🔗 Error subscribing to ${table} real-time updates`);
-            // Attempt to reconnect after a delay
-            setTimeout(() => {
-              console.log(`🔗 Attempting to reconnect to ${table} real-time updates...`);
-              if (channelRef.current) {
-                try {
-                  supabase.removeChannel(channelRef.current);
-                  channelRef.current = null;
-                } catch (err) {
-                  console.error(`🔗 Error removing failed channel:`, err);
-                }
-              }
+            // Schedule reconnection
+            if (reconnectTimeoutRef.current) {
+              clearTimeout(reconnectTimeoutRef.current);
+            }
+            reconnectTimeoutRef.current = setTimeout(() => {
+              reconnectChannel();
             }, 5000);
           } else if (status === 'TIMED_OUT') {
             console.error(`🔗 Real-time subscription timed out for ${table}`);
+            // Schedule reconnection
+            if (reconnectTimeoutRef.current) {
+              clearTimeout(reconnectTimeoutRef.current);
+            }
+            reconnectTimeoutRef.current = setTimeout(() => {
+              reconnectChannel();
+            }, 5000);
           } else if (status === 'CLOSED') {
             console.log(`🔗 Real-time subscription closed for ${table}`);
           }
@@ -104,9 +140,23 @@ export function useRealtime({
     } catch (err) {
       console.error(`🔗 Failed to set up real-time subscription for ${table}:`, err);
     }
+  }, [table, filter, reconnectChannel]);
+
+  // Initial setup
+  useEffect(() => {
+    if (!table) {
+      console.log(`🔗 No table specified for real-time subscription`);
+      return;
+    }
+
+    setupChannel();
 
     return () => {
       console.log(`🔗 Cleaning up real-time subscription for ${table}`);
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
       if (channelRef.current) {
         try {
           supabase.removeChannel(channelRef.current);
@@ -116,7 +166,40 @@ export function useRealtime({
         channelRef.current = null;
       }
     };
-  }, [table, filter]); // Only depend on table and filter, not callbacks
+  }, [table, filter, setupChannel]);
+
+  // App state handling for reconnection
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      console.log(`🔗 App state changed for ${table}:`, appStateRef.current, '->', nextAppState);
+      
+      if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
+        console.log(`🔗 App came to foreground, checking real-time connection for ${table}...`);
+        
+        // Check if channel is still active
+        if (channelRef.current) {
+          const status = channelRef.current.state;
+          console.log(`🔗 Current channel status for ${table}:`, status);
+          
+          if (status === 'closed' || status === 'errored') {
+            console.log(`🔗 Channel is ${status}, reconnecting for ${table}...`);
+            reconnectChannel();
+          }
+        } else {
+          console.log(`🔗 No channel found, setting up for ${table}...`);
+          setupChannel();
+        }
+      }
+      
+      appStateRef.current = nextAppState;
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription?.remove();
+    };
+  }, [table, reconnectChannel, setupChannel]);
 
   return channelRef.current;
 }

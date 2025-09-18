@@ -625,7 +625,7 @@ class ListingReservationSystem {
           notifications.push(
             {
               user_id: data.buyerId,
-              title: 'Reservation Cancelled',
+              title: 'Reservation Cancelled ❌',
               message: `The reservation has been cancelled by the ${cancelledByText}${data.reason ? `: ${data.reason}` : '.'}`,
               notification_type: 'reservation_cancelled',
               related_id: reservationId,
@@ -633,7 +633,7 @@ class ListingReservationSystem {
             },
             {
               user_id: data.sellerId,
-              title: 'Reservation Cancelled',
+              title: 'Reservation Cancelled ❌',
               message: `The reservation has been cancelled by the ${cancelledByText}${data.reason ? `: ${data.reason}` : '.'}`,
               notification_type: 'reservation_cancelled',
               related_id: reservationId,

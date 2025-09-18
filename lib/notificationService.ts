@@ -245,7 +245,7 @@ class NotificationService {
         break;
       
       case 'rejected':
-        title = 'Offer Declined';
+        title = 'Offer Declined 📝';
         body = `Your offer of ${data.currency} ${data.amount.toLocaleString()} for "${data.listingTitle}" was declined${data.rejectionReason ? `: ${data.rejectionReason}` : '.'}`;
         type = 'offer_rejected';
         break;
@@ -391,18 +391,18 @@ class NotificationService {
         break;
       
       case 'expired':
-        title = 'Listing Expired';
-        body = `Your listing "${listingTitle}" has expired. Renew to keep it active`;
+        title = 'Listing Expired ⏰';
+        body = `Your listing "${listingTitle}" has expired. Renew to keep it active!`;
         break;
       
       case 'approved':
         title = 'Listing Approved ✅';
-        body = `Your listing "${listingTitle}" has been approved and is now live`;
+        body = `Your listing "${listingTitle}" has been approved and is now live!`;
         break;
       
       case 'rejected':
-        title = 'Listing Rejected';
-        body = `Your listing "${listingTitle}" was rejected. Please review and resubmit`;
+        title = 'Listing Needs Review 📝';
+        body = `Your listing "${listingTitle}" needs some adjustments. Please review and resubmit.`;
         break;
     }
 

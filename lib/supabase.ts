@@ -237,6 +237,14 @@ export const dbHelpers = {
       query = query.eq('user_id', options.userId);
     }
 
+    if (options.postType) {
+      query = query.eq('type', options.postType);
+    }
+
+    if (options.location) {
+      query = query.ilike('location', `%${options.location}%`);
+    }
+
     if (options.following) {
       // Add following filter logic if needed
     }
@@ -388,7 +396,8 @@ export const dbHelpers = {
   },
 
   async getNotifications(userId: string, limit = 20, offset = 0) {
-    const { data, error } = await db.notifications
+    const { data, error } = await supabase
+      .from('notifications')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
@@ -398,19 +407,55 @@ export const dbHelpers = {
   },
 
   async markNotificationAsRead(notificationId: string) {
-    const { data, error } = await db.notifications.update({ 
+    const { data, error } = await supabase.from('notifications').update({ 
       is_read: true, 
       read_at: new Date().toISOString() 
-    }, notificationId).select().single();
+    }).eq('id', notificationId).select().single();
     return { data, error };
   },
 
   async markAllNotificationsAsRead(userId: string) {
-    const { error } = await db.notifications.update({ 
+    const { error } = await supabase.from('notifications').update({ 
       is_read: true, 
       read_at: new Date().toISOString() 
     }).eq('user_id', userId);
     return { error };
+  },
+
+  async deleteNotification(notificationId: string) {
+    if (!notificationId || notificationId === 'undefined') {
+      console.error('🗑️ Invalid notification ID provided');
+      return { error: { message: 'Invalid notification ID' } };
+    }
+    
+    try {
+      const { error } = await supabase.from('notifications').delete().eq('id', notificationId);
+      if (error) {
+        console.error('🗑️ Error deleting notification:', error);
+      }
+      return { error };
+    } catch (err) {
+      console.error('🗑️ Exception during delete operation:', err);
+      return { error: { message: 'Database operation failed' } };
+    }
+  },
+
+  async deleteAllNotifications(userId: string) {
+    if (!userId || userId === 'undefined') {
+      console.error('🗑️ Invalid user ID provided');
+      return { error: { message: 'Invalid user ID' } };
+    }
+    
+    try {
+      const { error } = await supabase.from('notifications').delete().eq('user_id', userId);
+      if (error) {
+        console.error('🗑️ Error deleting all notifications:', error);
+      }
+      return { error };
+    } catch (err) {
+      console.error('🗑️ Exception during delete operation:', err);
+      return { error: { message: 'Database operation failed' } };
+    }
   },
 
   // Device token operations

@@ -4,9 +4,10 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useProfile } from '@/hooks/useProfile';
 import { useNotificationStore } from '@/store/useNotificationStore';
+import { useFavoritesCount } from '@/hooks/useFavoritesCount';
 import { router } from 'expo-router';
 import { Text, Avatar } from '@/components';
-import { Filter, Bell, Heart } from 'lucide-react-native';
+import { Filter, Bell, Heart, ListFilter, ListFilterPlusIcon, LucideListFilterPlus, ListFilterPlus } from 'lucide-react-native';
 
 interface EnhancedSearchHeaderProps {
   searchQuery?: string;
@@ -27,6 +28,7 @@ export function EnhancedSearchHeader({
   const { user } = useAuthStore();
   const { profile } = useProfile();
   const { unreadCount } = useNotificationStore();
+  const { favoritesCount } = useFavoritesCount();
 
   const firstName = profile?.first_name || user?.user_metadata?.first_name || 'User';
   const lastName = profile?.last_name || user?.user_metadata?.last_name || '';
@@ -35,24 +37,18 @@ export function EnhancedSearchHeader({
   return (
     <View
       style={{
+        flexDirection: 'row',
+        alignItems: 'center',
         backgroundColor: theme.colors.surface,
-        borderWidth: 0,
-        marginTop: theme.spacing.md,
-        marginHorizontal: theme.spacing.md,
+        borderRadius: theme.borderRadius.full,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        paddingHorizontal: theme.spacing.sm,
+        paddingVertical: theme.spacing.sm - 1,
+        marginHorizontal: theme.spacing.sm, // Minimal margins for true floating effect
+        ...theme.shadows.sm, // Add shadow for floating effect
       }}
     >
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          backgroundColor: theme.colors.surface,
-          borderRadius: theme.borderRadius.lg,
-          borderWidth: 1,
-          borderColor: theme.colors.border,
-          paddingHorizontal: theme.spacing.sm,
-          paddingVertical: theme.spacing.xs,
-        }}
-      >
         {/* Avatar Button */}
         <TouchableOpacity
           onPress={onAvatarPress}
@@ -142,9 +138,20 @@ export function EnhancedSearchHeader({
             )}
           </TouchableOpacity>
 
+          {/* Separator */}
+          <View
+            style={{
+              width: 2,
+              height: 20,
+              backgroundColor: theme.colors.border,
+              marginHorizontal: theme.spacing.xs,
+            }}
+          />
+
           {/* Favorites */}
           <TouchableOpacity
             style={{
+              position: 'relative',
               padding: theme.spacing.sm,
               marginRight: theme.spacing.xs,
             }}
@@ -152,6 +159,34 @@ export function EnhancedSearchHeader({
             activeOpacity={0.7}
           >
             <Heart size={18} color={theme.colors.text.primary} />
+            {favoritesCount > 0 && (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: -1,
+                  right: -1,
+                  backgroundColor: theme.colors.error,
+                  borderRadius: 8,
+                  minWidth: 16,
+                  height: 16,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  padding: 0
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#FFF',
+                    fontSize: 9,
+                    fontWeight: '600',
+                    textAlign: 'center',
+                    lineHeight: 10,
+                  }}
+                >
+                  {favoritesCount > 9 ? '9+' : favoritesCount}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
 
           {/* Separator */}
@@ -172,10 +207,9 @@ export function EnhancedSearchHeader({
             onPress={onFilterPress}
             activeOpacity={0.7}
           >
-            <Filter size={18} color={theme.colors.text.primary} />
+            <ListFilterPlus size={18} color={theme.colors.text.primary} />
           </TouchableOpacity>
         </View>
-      </View>
     </View>
   );
 }

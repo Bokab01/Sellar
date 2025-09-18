@@ -91,8 +91,8 @@ export default function TransactionAnalyticsScreen() {
   const renderOverviewCards = () => {
     if (!analytics || !summary) return null;
 
-    const totalSpent = summary?.total_amount || 0;
-    const totalEarned = summary?.total_credits || 0;
+    const totalSpent = summary?.transactions.total_spent_amount || 0;
+    const totalEarned = summary?.transactions.total_earned_amount || 0;
     const netChange = totalEarned - totalSpent;
 
     return (
@@ -128,7 +128,7 @@ export default function TransactionAnalyticsScreen() {
               <BarChart3 size={24} color={theme.colors.primary} />
             </View>
             <Text variant="h2" style={{ marginBottom: theme.spacing.xs }}>
-              {summary?.total_transactions || 0}
+              {summary?.transactions.total_count || 0}
             </Text>
             <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
               Transactions
@@ -205,7 +205,7 @@ export default function TransactionAnalyticsScreen() {
     if (!analytics) return null;
 
     const typeEntries = analytics ? [analytics] : [];
-    const totalTransactions = summary?.total_transactions || 0;
+    const totalTransactions = summary?.transactions.total_count || 0;
 
     return (
       <View style={{

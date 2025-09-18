@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { View, ScrollView, TouchableOpacity, RefreshControl, Pressable, Alert } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, ScrollView, TouchableOpacity, RefreshControl, Pressable, Alert, Animated } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useCommunityPosts } from '@/hooks/useCommunity';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -12,7 +13,6 @@ import {
   Text,
   SafeAreaWrapper,
   AppHeader,
-
   Avatar,
   EmptyState,
   ErrorState,
@@ -20,16 +20,87 @@ import {
   PostCard,
   CommunitySidebar,
   SidebarToggle,
+  CommunityFilters,
 } from '@/components';
-import { Plus, Users } from 'lucide-react-native';
+import { Plus, Users, ChevronUp } from 'lucide-react-native';
 
 export default function CommunityScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
   const { profile } = useProfile();
-  const { posts, loading, error, refreshing, refresh, updatePost, deletePost } = useCommunityPosts();
+  const insets = useSafeAreaInsets();
   const [sidebarVisible, setSidebarVisible] = useState(false);
+  
+  // Scroll-to-top FAB state
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
+  const scrollToTopOpacity = useRef(new Animated.Value(0)).current;
+  const scrollToTopScale = useRef(new Animated.Value(0.8)).current;
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [filters, setFilters] = useState<{ postType: string | null; location: string | null }>({
+    postType: null,
+    location: null,
+  });
+  const { posts, loading, error, refreshing, refresh, updatePost, deletePost } = useCommunityPosts(filters);
   const { followingStates, followUser, unfollowUser, isFollowing, refreshAllFollowStates } = useFollowState();
+
+  // Scroll to top function
+  const scrollToTop = () => {
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({ y: 0, animated: true });
+    }
+  };
+
+  // Handle scroll for FAB visibility
+  const handleScroll = (event: any) => {
+    const currentScrollY = event.nativeEvent.contentOffset.y;
+    
+    // Show/hide scroll-to-top FAB
+    if (currentScrollY > 300) {
+      if (!showScrollToTop) {
+        setShowScrollToTop(true);
+        Animated.parallel([
+          Animated.timing(scrollToTopOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.spring(scrollToTopScale, {
+            toValue: 1,
+            useNativeDriver: true,
+            tension: 100,
+            friction: 8,
+          }),
+        ]).start();
+      }
+    } else {
+      if (showScrollToTop) {
+        setShowScrollToTop(false);
+        Animated.parallel([
+          Animated.timing(scrollToTopOpacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scrollToTopScale, {
+            toValue: 0.8,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    }
+  };
+
+  // Get unique locations from posts for filter options
+  const availableLocations = React.useMemo(() => {
+    const locations = new Set<string>();
+    posts.forEach(post => {
+      if (post.location && post.location.trim()) {
+        locations.add(post.location.trim());
+      }
+    });
+    return Array.from(locations).sort();
+  }, [posts]);
 
   // App resume handling - refresh posts when app comes back from background
   const { isRefreshing, isReconnecting } = useAppResume({
@@ -176,6 +247,13 @@ export default function CommunityScreen() {
       />
 
       <View style={{ flex: 1 }}>
+        {/* Community Filters */}
+        <CommunityFilters
+          filters={filters}
+          onFiltersChange={setFilters}
+          availableLocations={availableLocations}
+        />
+
         {loading ? (
           <ScrollView
             contentContainerStyle={{
@@ -199,11 +277,14 @@ export default function CommunityScreen() {
           />
         ) : transformedPosts.length > 0 ? (
           <ScrollView
+            ref={scrollViewRef}
             contentContainerStyle={{
               padding: theme.spacing.sm,
               paddingBottom: theme.spacing.xl,
             }}
             showsVerticalScrollIndicator={false}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -293,11 +374,21 @@ export default function CommunityScreen() {
         ) : (
           <EmptyState
             icon={<Users size={64} color={theme.colors.text.muted} />}
-            title="Welcome to the Community"
-            description="Share your experiences, ask questions, and connect with other buyers and sellers."
+            title={filters.postType || filters.location ? "No Posts Found" : "Welcome to the Community"}
+            description={
+              filters.postType || filters.location 
+                ? `No posts found matching your current filters. Try adjusting your filters or create a new post.`
+                : "Share your experiences, ask questions, and connect with other buyers and sellers."
+            }
             action={{
-              text: 'Create First Post',
-              onPress: () => router.push('/(tabs)/community/create-post'),
+              text: filters.postType || filters.location ? 'Clear Filters' : 'Create First Post',
+              onPress: () => {
+                if (filters.postType || filters.location) {
+                  setFilters({ postType: null, location: null });
+                } else {
+                  router.push('/(tabs)/community/create-post');
+                }
+              },
             }}
           />
         )}
@@ -324,6 +415,35 @@ export default function CommunityScreen() {
         isVisible={sidebarVisible}
         onClose={() => setSidebarVisible(false)}
       />
+
+      {/* Scroll to Top FAB */}
+      <Animated.View
+        style={{
+          position: 'absolute',
+          bottom: insets.bottom + theme.spacing.xl,
+          right: theme.spacing.lg,
+          zIndex: 1000,
+          opacity: scrollToTopOpacity,
+          transform: [{ scale: scrollToTopScale }],
+        }}
+      >
+        <TouchableOpacity
+          onPress={scrollToTop}
+          style={{
+            backgroundColor: theme.colors.primary,
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            justifyContent: 'center',
+            alignItems: 'center',
+            ...theme.shadows.lg,
+            elevation: 8,
+          }}
+          activeOpacity={0.8}
+        >
+          <ChevronUp size={24} color={theme.colors.primaryForeground} />
+        </TouchableOpacity>
+      </Animated.View>
     </SafeAreaWrapper>
   );
 }

@@ -1,17 +1,53 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { dbHelpers, supabase } from '@/lib/supabase';
 import { useCommunityRealtime } from './useRealtime';
 import { useAuthStore } from '@/store/useAuthStore';
 import { addProfileRefreshListener } from './useProfile';
+import { useRealtimeConnection } from './useRealtimeConnection';
 
-export function useCommunityPosts(options: { following?: boolean; limit?: number; userId?: string } = {}) {
+export function useCommunityPosts(options: { 
+  following?: boolean; 
+  limit?: number; 
+  userId?: string;
+  postType?: string | null;
+  location?: string | null;
+} = {}) {
   const { user } = useAuthStore();
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  
+  const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasInitialDataRef = useRef(false);
+  const forceReconnectRef = useRef<(() => void) | null>(null);
+
+  // Monitor real-time connection
+  const { isConnected, isReconnecting, forceReconnect } = useRealtimeConnection({
+    onConnectionLost: () => {
+      console.log('🔗 Real-time connection lost for community, will retry...');
+    },
+    onConnectionRestored: () => {
+      console.log('🔗 Real-time connection restored for community');
+      // If we don't have initial data yet, try to fetch
+      if (!hasInitialDataRef.current && posts.length === 0) {
+        fetchPosts();
+      }
+    },
+  });
+
+  // Store forceReconnect in ref to avoid dependency issues
+  useEffect(() => {
+    forceReconnectRef.current = forceReconnect;
+  }, [forceReconnect]);
 
   const fetchPosts = useCallback(async (isRefresh = false) => {
+    // Clear any existing timeout
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+      fetchTimeoutRef.current = null;
+    }
+
     try {
       if (isRefresh) {
         setRefreshing(true);
@@ -21,23 +57,46 @@ export function useCommunityPosts(options: { following?: boolean; limit?: number
       
       setError(null);
 
-      const { data, error: fetchError } = await dbHelpers.getPosts({
+      // Set a timeout for the fetch operation
+      const fetchPromise = dbHelpers.getPosts({
         ...options,
         limit: options.limit || 20,
       });
+
+      const timeoutPromise = new Promise((_, reject) => {
+        fetchTimeoutRef.current = setTimeout(() => {
+          reject(new Error('Request timeout - please check your connection'));
+        }, 15000); // 15 second timeout
+      });
+
+      const { data, error: fetchError } = await Promise.race([fetchPromise, timeoutPromise]) as any;
+
+      // Clear timeout on success
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+        fetchTimeoutRef.current = null;
+      }
 
       if (fetchError) {
         setError(fetchError.message);
       } else {
         setPosts(data || []);
+        hasInitialDataRef.current = true;
       }
     } catch (err) {
-      setError('Failed to load posts');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load posts';
+      setError(errorMessage);
+      
+      // If it's a timeout or connection error, try to reconnect real-time
+      if (errorMessage.includes('timeout') || errorMessage.includes('connection')) {
+        console.log('🔗 Fetch failed due to connection issue, attempting to reconnect...');
+        forceReconnectRef.current?.();
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [options.following, options.userId, options.limit]);
+  }, [options.following, options.userId, options.limit, options.postType, options.location]);
 
   // Real-time updates
   const handleRealtimeUpdate = useCallback((newPost: any) => {
@@ -62,7 +121,7 @@ export function useCommunityPosts(options: { following?: boolean; limit?: number
 
   useEffect(() => {
     fetchPosts();
-  }, [options.following, options.userId]);
+  }, [options.following, options.userId, options.postType, options.location]);
 
   // Listen for profile refresh events to update posts with new profile data
   useEffect(() => {
@@ -73,6 +132,15 @@ export function useCommunityPosts(options: { following?: boolean; limit?: number
 
     return () => removeListener();
   }, [fetchPosts]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const createPost = async (content: string, images: string[] = [], listingId?: string, type?: string) => {
     if (!user) return { error: 'Not authenticated' };
@@ -256,5 +324,9 @@ export function useCommunityPosts(options: { following?: boolean; limit?: number
     likePost,
     sharePost,
     updateCommentCount,
+    // Real-time connection status
+    isRealtimeConnected: isConnected,
+    isRealtimeReconnecting: isReconnecting,
+    forceReconnect,
   };
 }

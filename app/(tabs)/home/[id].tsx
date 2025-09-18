@@ -752,7 +752,7 @@ export default function ListingDetailScreen() {
     return (
       <SafeAreaWrapper>
         <AppHeader
-          title="Loading..."
+          title=""
           showBackButton
           onBackPress={() => router.back()}
         />

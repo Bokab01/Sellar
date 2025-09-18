@@ -23,6 +23,8 @@ interface NotificationState {
   fetchNotifications: () => Promise<void>;
   markAsRead: (notificationId: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
+  deleteNotification: (notificationId: string) => Promise<void>;
+  deleteAllNotifications: () => Promise<void>;
   refresh: () => Promise<void>;
   reset: () => void;
 }
@@ -34,19 +36,28 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   error: null,
 
   fetchNotifications: async () => {
-    const { user } = useAuthStore.getState();
-    if (!user) return;
+    const { user, session } = useAuthStore.getState();
+    const userId = user?.id || session?.user?.id;
+    if (!userId) {
+      console.log('🔔 No user found, skipping notification fetch');
+      return;
+    }
 
     try {
       set({ loading: true, error: null });
+      console.log('🔔 Fetching notifications for user:', userId);
 
-      const { data, error: fetchError } = await dbHelpers.getNotifications(user.id);
+      const { data, error: fetchError } = await dbHelpers.getNotifications(userId);
 
       if (fetchError) {
+        console.error('🔔 Error fetching notifications:', fetchError);
         set({ error: fetchError.message, loading: false });
       } else {
+        console.log('🔔 Raw notification data:', data);
         const notifications = (data || []).filter((n: any) => n && typeof n === 'object' && !n.error) as unknown as Notification[];
         const unreadCount = notifications.filter((n: any) => !n.is_read).length;
+        
+        console.log('🔔 Processed notifications:', notifications.length, 'unread:', unreadCount);
         
         set({ 
           notifications, 
@@ -56,6 +67,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         });
       }
     } catch (err) {
+      console.error('🔔 Exception fetching notifications:', err);
       set({ 
         error: 'Failed to load notifications', 
         loading: false 
@@ -93,11 +105,12 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   markAllAsRead: async () => {
-    const { user } = useAuthStore.getState();
-    if (!user) return;
+    const { user, session } = useAuthStore.getState();
+    const userId = user?.id || session?.user?.id;
+    if (!userId) return;
 
     try {
-      const { error } = await dbHelpers.markAllNotificationsAsRead(user.id);
+      const { error } = await dbHelpers.markAllNotificationsAsRead(userId);
       
       if (error) {
         console.error('Failed to mark all notifications as read:', error);
@@ -119,6 +132,58 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       
     } catch (error) {
       console.error('Failed to mark all notifications as read:', error);
+    }
+  },
+
+  deleteNotification: async (notificationId: string) => {
+    try {
+      const { error } = await dbHelpers.deleteNotification(notificationId);
+      
+      if (error) {
+        console.error('Failed to delete notification:', error);
+        return;
+      }
+      
+      // Update local state immediately for instant UI feedback
+      const { notifications } = get();
+      const updatedNotifications = notifications.filter(n => n.id !== notificationId);
+      const newUnreadCount = updatedNotifications.filter(n => !n.is_read).length;
+      
+      set({ 
+        notifications: updatedNotifications,
+        unreadCount: newUnreadCount
+      });
+      
+    } catch (error) {
+      console.error('Failed to delete notification:', error);
+    }
+  },
+
+  deleteAllNotifications: async () => {
+    const { user, session } = useAuthStore.getState();
+    const userId = user?.id || session?.user?.id;
+    
+    if (!userId) {
+      console.error('No user ID found for deleting notifications');
+      return;
+    }
+
+    try {
+      const { error } = await dbHelpers.deleteAllNotifications(userId);
+      
+      if (error) {
+        console.error('Failed to delete all notifications:', error);
+        return;
+      }
+      
+      // Update local state
+      set({ 
+        notifications: [],
+        unreadCount: 0
+      });
+      
+    } catch (error) {
+      console.error('Failed to delete all notifications:', error);
     }
   },
 

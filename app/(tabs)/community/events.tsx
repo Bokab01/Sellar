@@ -1,226 +1,307 @@
-import React, { useState, useEffect } from 'react';
-import { View, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, ScrollView, TouchableOpacity, RefreshControl, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-// import { useAuthStore } from '@/store/useAuthStore';
+import { useEventsStore } from '@/store/useEventsStore';
+import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
 import {
   Text,
   SafeAreaWrapper,
   AppHeader,
-  Button,
   EmptyState,
   LoadingSkeleton,
+  Button,
+  SearchBar,
 } from '@/components';
-import { Calendar, MapPin, Users, Plus } from 'lucide-react-native';
+import { 
+  Calendar, 
+  MapPin, 
+  Users, 
+  Filter, 
+  Plus,
+  Heart,
+  MessageCircle,
+  Share2,
+  Wifi,
+  WifiOff
+} from 'lucide-react-native';
+import { Event, EventFilters } from '@/types/events';
+import { EVENT_TYPES, EVENT_CATEGORIES, formatEventDuration, formatTicketPrice } from '@/constants/events';
 
-interface CommunityEvent {
-  id: string;
-  title: string;
-  description: string;
-  date: string;
-  time: string;
-  location: string;
-  attendees_count: number;
-  max_attendees?: number;
-  image?: string;
-  organizer: {
-    name: string;
-    avatar?: string;
-  };
-  is_attending: boolean;
-  category: 'meetup' | 'workshop' | 'sale' | 'networking' | 'other';
-}
-
-export default function CommunityEventsScreen() {
+export default function EventsScreen() {
   const { theme } = useTheme();
-  // const { user } = useAuthStore();
-  const [events, setEvents] = useState<CommunityEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'upcoming' | 'attending'>('upcoming');
+  const {
+    events,
+    loading,
+    refreshing,
+    error,
+    filters,
+    fetchEvents,
+    refreshEvents,
+    setFilters,
+    clearError,
+    registerForEvent,
+    likeEvent,
+    unlikeEvent,
+    shareEvent,
+  } = useEventsStore();
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+
+  // Fetch events on component mount
   useEffect(() => {
-    // Simulate loading and populate with sample events
-    setTimeout(() => {
-      setEvents([
-        {
-          id: '1',
-          title: 'Weekend Marketplace',
-          description: 'Join us for a weekend marketplace where local sellers showcase their best products. Great deals and networking opportunities!',
-          date: '2024-02-15',
-          time: '10:00 AM',
-          location: 'Accra Mall, Accra',
-          attendees_count: 45,
-          max_attendees: 100,
-          organizer: {
-            name: 'Sellar Team',
-            avatar: undefined,
-          },
-          is_attending: false,
-          category: 'sale',
-        },
-        {
-          id: '2',
-          title: 'Digital Marketing Workshop',
-          description: 'Learn how to effectively market your products online. Perfect for small business owners and entrepreneurs.',
-          date: '2024-02-20',
-          time: '2:00 PM',
-          location: 'Tech Hub, Kumasi',
-          attendees_count: 28,
-          max_attendees: 50,
-          organizer: {
-            name: 'Marketing Experts GH',
-            avatar: undefined,
-          },
-          is_attending: true,
-          category: 'workshop',
-        },
-        {
-          id: '3',
-          title: 'Sellers Networking Meetup',
-          description: 'Connect with other sellers, share experiences, and build valuable business relationships.',
-          date: '2024-02-25',
-          time: '6:00 PM',
-          location: 'Community Center, Tema',
-          attendees_count: 67,
-          organizer: {
-            name: 'Ghana Sellers Union',
-            avatar: undefined,
-          },
-          is_attending: false,
-          category: 'networking',
-        },
-      ]);
-      setLoading(false);
-    }, 1000);
+    fetchEvents();
+  }, [fetchEvents]);
+
+  // Handle refresh
+  const handleRefresh = useCallback(() => {
+    refreshEvents();
+  }, [refreshEvents]);
+
+  // Handle search
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+    // TODO: Implement search functionality
   }, []);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    // Simulate refresh
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
-  };
+  // Handle filter change
+  const handleFilterChange = useCallback((newFilters: Partial<EventFilters>) => {
+    setFilters(newFilters);
+    fetchEvents({ ...filters, ...newFilters, offset: 0 });
+  }, [filters, setFilters, fetchEvents]);
 
-  const handleAttendToggle = (eventId: string) => {
-    setEvents(prev => prev.map(event => 
-      event.id === eventId 
-        ? { 
-            ...event, 
-            is_attending: !event.is_attending,
-            attendees_count: event.is_attending 
-              ? event.attendees_count - 1 
-              : event.attendees_count + 1
+  // Handle event registration
+  const handleRegisterForEvent = useCallback(async (event: Event) => {
+    if (event.is_attending) {
+      Alert.alert(
+        'Cancel Registration',
+        'Are you sure you want to cancel your registration for this event?',
+        [
+          { text: 'No', style: 'cancel' },
+          { 
+            text: 'Yes', 
+            style: 'destructive',
+            onPress: async () => {
+              const result = await registerForEvent(event.id);
+              if (!result.success) {
+                Alert.alert('Error', result.error || 'Failed to cancel registration');
+              }
+            }
           }
-        : event
-    ));
-  };
-
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'meetup': return theme.colors.primary;
-      case 'workshop': return theme.colors.success;
-      case 'sale': return theme.colors.warning;
-      case 'networking': return theme.colors.secondary;
-      default: return theme.colors.text.muted;
+        ]
+      );
+    } else {
+      const result = await registerForEvent(event.id);
+      if (!result.success) {
+        Alert.alert('Error', result.error || 'Failed to register for event');
+      }
     }
-  };
+  }, [registerForEvent]);
 
-  const getCategoryLabel = (category: string) => {
-    switch (category) {
-      case 'meetup': return 'Meetup';
-      case 'workshop': return 'Workshop';
-      case 'sale': return 'Sale Event';
-      case 'networking': return 'Networking';
-      default: return 'Event';
+  // Handle like event
+  const handleLikeEvent = useCallback(async (event: Event) => {
+    // TODO: Check if user has liked the event
+    const result = await likeEvent(event.id);
+    if (!result.success) {
+      Alert.alert('Error', result.error || 'Failed to like event');
     }
-  };
+  }, [likeEvent]);
 
-  const filteredEvents = events.filter(event => {
-    if (filter === 'attending') return event.is_attending;
-    if (filter === 'upcoming') return new Date(event.date) >= new Date();
-    return true;
-  });
+  // Handle share event
+  const handleShareEvent = useCallback(async (event: Event) => {
+    const result = await shareEvent(event.id, 'copy_link');
+    if (result.success) {
+      Alert.alert('Success', 'Event link copied to clipboard');
+    } else {
+      Alert.alert('Error', result.error || 'Failed to share event');
+    }
+  }, [shareEvent]);
+
+  // Navigate to event detail
+  const navigateToEventDetail = useCallback((event: Event) => {
+    router.push(`/(tabs)/community/events/${event.id}`);
+  }, []);
+
+  // Navigate to create event
+  const navigateToCreateEvent = useCallback(() => {
+    router.push('/(tabs)/community/events/create');
+  }, []);
+
+  // Get event type info
+  const getEventTypeInfo = useCallback((type: string) => {
+    return EVENT_TYPES.find(t => t.id === type);
+  }, []);
+
+  // Get event category info
+  const getEventCategoryInfo = useCallback((category: string) => {
+    return EVENT_CATEGORIES.find(c => c.id === category);
+  }, []);
+
+  // Format event date
+  const formatEventDate = useCallback((dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  }, []);
+
+  // Format event time
+  const formatEventTime = useCallback((dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }, []);
+
+  // Check if event is upcoming
+  const isEventUpcoming = useCallback((dateString: string) => {
+    return new Date(dateString) > new Date();
+  }, []);
+
+  // Filter events based on search query
+  const filteredEvents = events.filter(event =>
+    event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    event.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    event.location_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    event.city?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <SafeAreaWrapper>
       <AppHeader
-        title="Community Events"
-        showBackButton
-        onBackPress={() => router.back()}
+        title="Events"
+        showBackButton={false}
         rightActions={[
-          <Button
+          <TouchableOpacity
             key="create-event"
-            variant="icon"
-            icon={<Plus size={20} color={theme.colors.text.primary} />}
-            onPress={() => {
-              // TODO: Create event screen
-              console.log('Create event - Coming soon!');
+            onPress={navigateToCreateEvent}
+            style={{
+              backgroundColor: theme.colors.primary,
+              borderRadius: theme.borderRadius.full,
+              width: 40,
+              height: 40,
+              justifyContent: 'center',
+              alignItems: 'center',
             }}
-          />,
+          >
+            <Plus size={20} color="#FFF" />
+          </TouchableOpacity>
         ]}
       />
 
       <View style={{ flex: 1 }}>
-        {/* Filter Tabs */}
-        <View
-          style={{
-            flexDirection: 'row',
-            padding: theme.spacing.lg,
-            backgroundColor: theme.colors.surface,
-            borderBottomWidth: 1,
-            borderBottomColor: theme.colors.border,
-          }}
-        >
-          {[
-            { key: 'upcoming', label: 'Upcoming' },
-            { key: 'all', label: 'All Events' },
-            { key: 'attending', label: 'Attending' },
-          ].map((tab) => (
+        {/* Search and Filters */}
+        <View style={{ padding: theme.spacing.lg, paddingBottom: theme.spacing.md }}>
+          <SearchBar
+            placeholder="Search events..."
+            value={searchQuery}
+            onChangeText={handleSearch}
+            style={{ marginBottom: theme.spacing.md }}
+          />
+          
+          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
             <TouchableOpacity
-              key={tab.key}
-              onPress={() => setFilter(tab.key as any)}
+              onPress={() => setShowFilters(!showFilters)}
               style={{
-                flex: 1,
-                paddingVertical: theme.spacing.sm,
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: theme.colors.surface,
                 paddingHorizontal: theme.spacing.md,
+                paddingVertical: theme.spacing.sm,
                 borderRadius: theme.borderRadius.md,
-                backgroundColor: filter === tab.key ? theme.colors.primary : 'transparent',
-                marginHorizontal: theme.spacing.xs,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
               }}
             >
-              <Text
-                variant="body"
-                style={{
-                  fontWeight: '500',
-                  textAlign: 'center',
-                  color: filter === tab.key ? '#FFF' : theme.colors.text.primary,
-                }}
-              >
-                {tab.label}
+              <Filter size={16} color={theme.colors.text.primary} />
+              <Text variant="body" style={{ marginLeft: theme.spacing.xs }}>
+                Filters
               </Text>
             </TouchableOpacity>
-          ))}
+
+            {/* Quick filter buttons */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+                {['All', 'Online', 'Free', 'This Week', 'Near Me'].map((filter) => (
+                  <TouchableOpacity
+                    key={filter}
+                    style={{
+                      backgroundColor: theme.colors.surface,
+                      paddingHorizontal: theme.spacing.md,
+                      paddingVertical: theme.spacing.sm,
+                      borderRadius: theme.borderRadius.md,
+                      borderWidth: 1,
+                      borderColor: theme.colors.border,
+                    }}
+                  >
+                    <Text variant="body">{filter}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
         </View>
 
-        {loading ? (
+        {/* Events List */}
+        {loading && !refreshing ? (
           <ScrollView
             contentContainerStyle={{
               padding: theme.spacing.lg,
             }}
           >
-            {Array.from({ length: 3 }).map((_, index) => (
+            {Array.from({ length: 5 }).map((_, index) => (
               <LoadingSkeleton
                 key={index}
                 width="100%"
-                height={180}
+                height={200}
                 borderRadius={theme.borderRadius.lg}
                 style={{ marginBottom: theme.spacing.lg }}
               />
             ))}
           </ScrollView>
-        ) : filteredEvents.length > 0 ? (
+        ) : error ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: theme.spacing.lg }}>
+            <Calendar size={64} color={theme.colors.text.muted} />
+            <Text variant="h4" weight="semibold" style={{ marginTop: theme.spacing.md, textAlign: 'center' }}>
+              Error Loading Events
+            </Text>
+            <Text variant="body" color="muted" style={{ marginTop: theme.spacing.sm, textAlign: 'center' }}>
+              {error}
+            </Text>
+            <Button
+              variant="primary"
+              size="sm"
+              style={{ marginTop: theme.spacing.lg }}
+              onPress={() => {
+                clearError();
+                fetchEvents();
+              }}
+            >
+              Try Again
+            </Button>
+          </View>
+        ) : filteredEvents.length === 0 ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: theme.spacing.lg }}>
+            <EmptyState
+              icon={<Calendar size={64} color={theme.colors.text.muted} />}
+              title="No Events Found"
+              description={
+                searchQuery 
+                  ? "No events match your search criteria. Try adjusting your search or filters."
+                  : "No events available at the moment. Be the first to create an event!"
+              }
+              action={{
+                text: 'Create Event',
+                onPress: navigateToCreateEvent,
+              }}
+            />
+          </View>
+        ) : (
           <ScrollView
             contentContainerStyle={{
               padding: theme.spacing.lg,
@@ -235,109 +316,152 @@ export default function CommunityEventsScreen() {
               />
             }
           >
-            {filteredEvents.map((event) => (
-              <View
-                key={event.id}
-                style={{
-                  backgroundColor: theme.colors.surface,
-                  borderRadius: theme.borderRadius.lg,
-                  padding: theme.spacing.lg,
-                  marginBottom: theme.spacing.lg,
-                  borderWidth: 1,
-                  borderColor: theme.colors.border,
-                }}
-              >
-                {/* Category Badge */}
-                <View
+            {filteredEvents.map((event) => {
+              const eventTypeInfo = getEventTypeInfo(event.event_type);
+              const eventCategoryInfo = getEventCategoryInfo(event.category);
+              const isUpcoming = isEventUpcoming(event.start_date);
+
+              return (
+                <TouchableOpacity
+                  key={event.id}
                   style={{
-                    position: 'absolute',
-                    top: theme.spacing.md,
-                    right: theme.spacing.md,
-                    backgroundColor: getCategoryColor(event.category),
-                    borderRadius: theme.borderRadius.sm,
-                    paddingHorizontal: theme.spacing.sm,
-                    paddingVertical: theme.spacing.xs,
+                    backgroundColor: theme.colors.surface,
+                    borderRadius: theme.borderRadius.lg,
+                    padding: theme.spacing.lg,
+                    marginBottom: theme.spacing.lg,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
                   }}
+                  onPress={() => navigateToEventDetail(event)}
+                  activeOpacity={0.7}
                 >
-                  <Text variant="caption" style={{ color: '#FFF', fontSize: 10 }}>
-                    {getCategoryLabel(event.category)}
-                  </Text>
-                </View>
-
-                {/* Event Title */}
-                <Text variant="h4" style={{ marginBottom: theme.spacing.sm, marginRight: 80, fontWeight: '600' }}>
-                  {event.title}
-                </Text>
-
-                {/* Event Description */}
-                <Text variant="body" color="muted" style={{ marginBottom: theme.spacing.md }}>
-                  {event.description}
-                </Text>
-
-                {/* Event Details */}
-                <View style={{ gap: theme.spacing.sm, marginBottom: theme.spacing.md }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Calendar size={16} color={theme.colors.text.muted} />
-                    <Text variant="body" style={{ marginLeft: theme.spacing.sm }}>
-                      {new Date(event.date).toLocaleDateString()} at {event.time}
-                    </Text>
+                  {/* Event Header */}
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: theme.spacing.md }}>
+                    <View style={{ flex: 1 }}>
+                      <Text variant="h4" weight="semibold" style={{ marginBottom: theme.spacing.xs }}>
+                        {event.title}
+                      </Text>
+                      <Text variant="body" color="muted" numberOfLines={2}>
+                        {event.description}
+                      </Text>
+                    </View>
+                    
+                    {/* Event Type Badge */}
+                    {eventTypeInfo && (
+                      <View
+                        style={{
+                          backgroundColor: eventTypeInfo.color + '20',
+                          paddingHorizontal: theme.spacing.sm,
+                          paddingVertical: theme.spacing.xs,
+                          borderRadius: theme.borderRadius.sm,
+                          marginLeft: theme.spacing.sm,
+                        }}
+                      >
+                        <Text variant="caption" style={{ color: eventTypeInfo.color }}>
+                          {eventTypeInfo.name}
+                        </Text>
+                      </View>
+                    )}
                   </View>
-                  
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <MapPin size={16} color={theme.colors.text.muted} />
-                    <Text variant="body" style={{ marginLeft: theme.spacing.sm }}>
-                      {event.location}
-                    </Text>
-                  </View>
-                  
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Users size={16} color={theme.colors.text.muted} />
-                    <Text variant="body" style={{ marginLeft: theme.spacing.sm }}>
-                      {event.attendees_count} attending
-                      {event.max_attendees ? ` • ${event.max_attendees - event.attendees_count} spots left` : ''}
-                    </Text>
-                  </View>
-                </View>
 
-                {/* Organizer */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
-                  <Text variant="caption" color="muted">
-                    Organized by {event.organizer.name}
-                  </Text>
-                </View>
+                  {/* Event Details */}
+                  <View style={{ marginBottom: theme.spacing.md }}>
+                    {/* Date and Time */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.xs }}>
+                      <Calendar size={16} color={theme.colors.text.muted} />
+                      <Text variant="body" style={{ marginLeft: theme.spacing.xs }}>
+                        {formatEventDate(event.start_date)} at {formatEventTime(event.start_date)}
+                      </Text>
+                    </View>
 
-                {/* Action Button */}
-                <Button
-                  variant={event.is_attending ? "tertiary" : "primary"}
-                  size="sm"
-                  onPress={() => handleAttendToggle(event.id)}
-                  style={{ alignSelf: 'flex-start' }}
-                >
-                  {event.is_attending ? 'Cancel Attendance' : 'Attend Event'}
-                </Button>
-              </View>
-            ))}
+                    {/* Location */}
+                    {event.is_online ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.xs }}>
+                        <Wifi size={16} color={theme.colors.primary} />
+                        <Text variant="body" style={{ marginLeft: theme.spacing.xs, color: theme.colors.primary }}>
+                          Online Event
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.xs }}>
+                        <MapPin size={16} color={theme.colors.text.muted} />
+                        <Text variant="body" style={{ marginLeft: theme.spacing.xs }}>
+                          {event.location_name || event.city || 'Location TBD'}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Attendees */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.xs }}>
+                      <Users size={16} color={theme.colors.text.muted} />
+                      <Text variant="body" style={{ marginLeft: theme.spacing.xs }}>
+                        {event.current_attendees} attending
+                        {event.max_attendees && ` / ${event.max_attendees} max`}
+                      </Text>
+                    </View>
+
+                    {/* Price */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text variant="body" style={{ color: event.is_free ? theme.colors.success : theme.colors.text.primary }}>
+                        {formatTicketPrice(event.ticket_price, event.currency)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Event Actions */}
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
+                      <TouchableOpacity
+                        onPress={() => handleLikeEvent(event)}
+                        style={{ flexDirection: 'row', alignItems: 'center' }}
+                      >
+                        <Heart size={16} color={theme.colors.text.muted} />
+                        <Text variant="caption" style={{ marginLeft: theme.spacing.xs }}>
+                          {event.likes_count}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={{ flexDirection: 'row', alignItems: 'center' }}
+                      >
+                        <MessageCircle size={16} color={theme.colors.text.muted} />
+                        <Text variant="caption" style={{ marginLeft: theme.spacing.xs }}>
+                          {event.comments_count}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        onPress={() => handleShareEvent(event)}
+                        style={{ flexDirection: 'row', alignItems: 'center' }}
+                      >
+                        <Share2 size={16} color={theme.colors.text.muted} />
+                        <Text variant="caption" style={{ marginLeft: theme.spacing.xs }}>
+                          {event.shares_count}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Register Button */}
+                    {isUpcoming && (
+                      <TouchableOpacity
+                        onPress={() => handleRegisterForEvent(event)}
+                        style={{
+                          backgroundColor: event.is_attending ? theme.colors.error : theme.colors.primary,
+                          paddingHorizontal: theme.spacing.md,
+                          paddingVertical: theme.spacing.sm,
+                          borderRadius: theme.borderRadius.md,
+                        }}
+                      >
+                        <Text variant="body" style={{ color: '#FFF', fontWeight: '600' }}>
+                          {event.is_attending ? 'Cancel' : 'Register'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
-        ) : (
-          <EmptyState
-            icon={<Calendar size={64} color={theme.colors.text.muted} />}
-            title={filter === 'attending' ? 'No Events Attending' : 'No Events Found'}
-            description={
-              filter === 'attending' 
-                ? 'You haven\'t signed up for any events yet. Explore upcoming events!'
-                : 'No community events scheduled at the moment. Check back soon!'
-            }
-            action={{
-              text: filter === 'attending' ? 'Browse Events' : 'Create Event',
-              onPress: () => {
-                if (filter === 'attending') {
-                  setFilter('upcoming');
-                } else {
-                  console.log('Create event - Coming soon!');
-                }
-              },
-            }}
-          />
         )}
       </View>
     </SafeAreaWrapper>

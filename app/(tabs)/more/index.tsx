@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, Alert, RefreshControl } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
@@ -47,6 +48,7 @@ export default function MoreScreen() {
   // Use selective subscriptions to prevent unnecessary re-renders
   const balance = useMonetizationStore(state => state.balance);
   const currentPlan = useMonetizationStore(state => state.currentPlan);
+  const transactions = useMonetizationStore(state => state.transactions);
   const refreshCredits = useMonetizationStore(state => state.refreshCredits);
   const refreshSubscription = useMonetizationStore(state => state.refreshSubscription);
   const hasBusinessPlan = useMonetizationStore(state => state.hasBusinessPlan);
@@ -66,7 +68,6 @@ export default function MoreScreen() {
 
   
   const [profile, setProfile] = useState<any>(null);
-  const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showToast, setShowToast] = useState(false);
@@ -83,6 +84,16 @@ export default function MoreScreen() {
     }
   }, [user, balance, refreshCredits, refreshSubscription]);
 
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user) {
+        fetchUserData();
+        refreshCredits(); // This will update the transaction count
+      }
+    }, [user, refreshCredits])
+  );
+
   const fetchUserData = async () => {
     if (!user) return;
 
@@ -94,18 +105,6 @@ export default function MoreScreen() {
       if (profileData) {
         setProfile(profileData);
       }
-
-      // Fetch recent transactions
-      const { data: transactionData } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-      
-      if (transactionData) {
-        setTransactions(transactionData);
-      }
     } catch (error) {
       console.error('Failed to fetch user data:', error);
     } finally {
@@ -115,7 +114,11 @@ export default function MoreScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchUserData();
+    await Promise.all([
+      fetchUserData(),
+      refreshCredits(),
+      refreshSubscription()
+    ]);
     setRefreshing(false);
   };
 
@@ -172,12 +175,12 @@ export default function MoreScreen() {
     {
       title: 'Account',
       items: [
-        {
+       /*  {
           title: 'My Profile',
           subtitle: 'View your public profile',
           icon: <User size={20} color={theme.colors.text.primary} />,
           onPress: () => router.push(`/profile/${user?.id}`),
-        },
+        }, */
         {
           title: 'Edit Profile',
           subtitle: 'Update your profile and business information',

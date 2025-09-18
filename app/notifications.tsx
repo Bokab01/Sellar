@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, ScrollView, TouchableOpacity, RefreshControl, Alert, Animated } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { router } from 'expo-router';
@@ -16,7 +16,7 @@ import {
   LoadingSkeleton,
   Toast,
 } from '@/components';
-import { Bell, MessageCircle, DollarSign, Heart, MessageSquare, UserPlus2, Star, Package, CircleAlert as AlertCircle, CircleCheck as CheckCircle2, Trash2 } from 'lucide-react-native';
+import { Bell, MessageCircle, DollarSign, Heart, MessageSquare, UserPlus2, Star, Package, CircleAlert as AlertCircle, CircleCheck as CheckCircle2, Trash2, ChevronRight, CheckSquare, Square, MailOpen, Mail } from 'lucide-react-native';
 
 export default function NotificationsScreen() {
   const { theme } = useTheme();
@@ -27,6 +27,8 @@ export default function NotificationsScreen() {
     unreadCount,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
+    deleteAllNotifications,
     refresh,
     fetchNotifications
   } = useNotificationStore();
@@ -51,6 +53,50 @@ export default function NotificationsScreen() {
     await markAllAsRead();
     setToastMessage('All notifications marked as read');
     setShowToast(true);
+  };
+
+  const handleDeleteNotification = async (notificationId: string) => {
+    Alert.alert(
+      'Delete Notification',
+      'Are you sure you want to delete this notification?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteNotification(notificationId);
+            setToastMessage('Notification deleted');
+            setShowToast(true);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteAllNotifications = async () => {
+    Alert.alert(
+      'Delete All Notifications',
+      'Are you sure you want to delete all notifications? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete All',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteAllNotifications();
+            setToastMessage('All notifications deleted');
+            setShowToast(true);
+          },
+        },
+      ]
+    );
   };
 
   const getNotificationIcon = (type: string) => {
@@ -266,14 +312,23 @@ export default function NotificationsScreen() {
         title="Notifications"
         showBackButton
         onBackPress={() => router.back()}
-        rightActions={unreadCount > 0 ? [
+        rightActions={notifications.length > 0 ? [
           <Button
             key="mark-all-read"
             variant="ghost"
             onPress={handleMarkAllRead}
             size="sm"
+            style={{ marginRight: theme.spacing.sm }}
           >
             Mark All Read
+          </Button>,
+          <Button
+            key="delete-all"
+            variant="ghost"
+            onPress={handleDeleteAllNotifications}
+            size="sm"
+          >
+            Delete All
           </Button>,
         ] : []}
       />
@@ -326,19 +381,14 @@ export default function NotificationsScreen() {
                 const hasActionableContent = data.conversation_id || data.listing_id || data.post_id || data.user_id;
                 
                 return (
-                  <ListItem
+                  <View
                     key={notification.id}
-                    title={notification.title}
-                    description={notification.body}
-                    timestamp={new Date(notification.created_at).toLocaleString()}
-                    rightIcon={getNotificationIcon(notification.type)}
-                    onPress={() => handleNotificationPress(notification)}
                     style={{
                       borderBottomWidth: index < notifications.length - 1 ? 1 : 0,
+                      borderBottomColor: theme.colors.border,
                       backgroundColor: notification.is_read 
                         ? 'transparent' 
                         : theme.colors.primary + '05',
-                      paddingVertical: theme.spacing.lg,
                       // Add subtle visual cue for clickable notifications
                       ...(hasActionableContent && {
                         borderLeftWidth: 3,
@@ -347,9 +397,93 @@ export default function NotificationsScreen() {
                           : theme.colors.primary,
                       }),
                     }}
-                    // Add chevron for actionable notifications
-                    showChevron={hasActionableContent}
-                  />
+                  >
+                    <TouchableOpacity
+                      onPress={() => handleNotificationPress(notification)}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingVertical: theme.spacing.lg,
+                        paddingHorizontal: theme.spacing.lg,
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      {/* Left Icon */}
+                      <View style={{ marginRight: theme.spacing.md }}>
+                        {getNotificationIcon(notification.type)}
+                      </View>
+
+                      {/* Content */}
+                      <View style={{ flex: 1 }}>
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginBottom: theme.spacing.xs,
+                          }}
+                        >
+                          <Text
+                            variant="body"
+                            numberOfLines={1}
+                            style={{
+                              flex: 1,
+                              fontWeight: notification.is_read ? '500' : '600',
+                              marginRight: theme.spacing.sm,
+                            }}
+                          >
+                            {notification.title}
+                          </Text>
+
+                          <Text
+                            variant="caption"
+                            color="muted"
+                            style={{ fontSize: 11 }}
+                          >
+                            {new Date(notification.created_at).toLocaleString()}
+                          </Text>
+                        </View>
+
+                        <Text
+                          variant="bodySmall"
+                          color="muted"
+                          numberOfLines={2}
+                          style={{ lineHeight: 18 }}
+                        >
+                          {notification.body}
+                        </Text>
+                      </View>
+
+                      {/* Right Side */}
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: theme.spacing.sm,
+                        }}
+                      >
+                        {hasActionableContent && (
+                          <ChevronRight
+                            size={16}
+                            color={theme.colors.text.muted}
+                          />
+                        )}
+                        
+                        {/* Delete Button */}
+                        <TouchableOpacity
+                          onPress={() => handleDeleteNotification(notification.id)}
+                          style={{
+                            padding: theme.spacing.sm,
+                            borderRadius: theme.borderRadius.sm,
+                            backgroundColor: theme.colors.error + '10',
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Trash2 size={16} color={theme.colors.error} />
+                        </TouchableOpacity>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
                 );
               })}
             </View>

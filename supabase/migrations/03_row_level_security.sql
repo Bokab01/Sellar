@@ -542,6 +542,10 @@ CREATE POLICY "Service role can insert notifications" ON notifications
 CREATE POLICY "Users can update their own notifications" ON notifications
     FOR UPDATE USING (auth.uid() = user_id);
 
+-- Users can delete their own notifications
+CREATE POLICY "Users can delete their own notifications" ON notifications
+    FOR DELETE USING (auth.uid() = user_id);
+
 -- =============================================
 -- USER SETTINGS POLICIES
 -- =============================================

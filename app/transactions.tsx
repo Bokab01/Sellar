@@ -92,7 +92,7 @@ export default function TransactionsScreen() {
               <CreditCard size={24} color={theme.colors.primary} />
             </View>
             <Text variant="h2" style={{ marginBottom: theme.spacing.xs }}>
-              {summary.total_transactions}
+              {summary.transactions.total_count}
             </Text>
             <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
               Total Transactions
@@ -113,7 +113,7 @@ export default function TransactionsScreen() {
               <ArrowDownLeft size={24} color={theme.colors.success} />
             </View>
             <Text variant="h2" style={{ marginBottom: theme.spacing.xs }}>
-              {(summary.total_credits || 0).toLocaleString()}
+              {(summary.transactions.total_earned_amount || 0).toLocaleString()}
             </Text>
             <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
               Credits Purchased
@@ -134,7 +134,7 @@ export default function TransactionsScreen() {
               <ArrowUpRight size={24} color={theme.colors.error} />
             </View>
             <Text variant="h2" style={{ marginBottom: theme.spacing.xs }}>
-              {(summary.total_amount || 0).toLocaleString()}
+              {(summary.transactions.total_spent_amount || 0).toLocaleString()}
             </Text>
             <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
               Credits Used

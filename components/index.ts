@@ -132,6 +132,12 @@ export { SmartSearchFilters } from './SearchFilters/SearchFilters';
 export { SearchResults } from './SearchResults/SearchResults';
 export { QuickSearch } from './QuickSearch/QuickSearch';
 
+// Testing & Development
+export { NotificationTester } from './NotificationTester';
+
+// Community
+export { CommunityFilters } from './CommunityFilters/CommunityFilters';
+
 // Categories & Location
 export { CategoryCard } from './CategoryCard/CategoryCard';
 export { CategoryPicker } from './CategoryPicker/CategoryPicker';

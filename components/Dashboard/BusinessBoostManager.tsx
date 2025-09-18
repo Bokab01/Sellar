@@ -37,7 +37,7 @@ interface BusinessBoostManagerProps {
 
 export const BusinessBoostManager: React.FC<BusinessBoostManagerProps> = ({ onTabChange }) => {
   const { theme } = useTheme();
-  const { credits, refreshCredits } = useMonetizationStore();
+  const { balance: credits, refreshCredits } = useMonetizationStore();
   const [activeBoosts, setActiveBoosts] = useState<ActiveBoost[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -72,8 +72,8 @@ export const BusinessBoostManager: React.FC<BusinessBoostManagerProps> = ({ onTa
         listing_id: boost.listing_id,
         feature_name: boost.feature_name,
         expires_at: boost.expires_at,
-        listing_title: boost.listings.title,
-        listing_image: boost.listings.images?.[0],
+        listing_title: boost.listings?.[0]?.title,
+        listing_image: boost.listings?.[0]?.images?.[0],
       })) || [];
 
       setActiveBoosts(boosts);
@@ -86,7 +86,7 @@ export const BusinessBoostManager: React.FC<BusinessBoostManagerProps> = ({ onTa
 
   const handleApplyBoost = () => {
     // Navigate to business-specific boost application
-    router.push('/business-boost-features');
+    router.push('/feature-marketplace');
   };
 
   const handleManageBoost = (boostId: string) => {
@@ -99,7 +99,7 @@ export const BusinessBoostManager: React.FC<BusinessBoostManagerProps> = ({ onTa
           text: 'Extend Duration', 
           onPress: () => {
             // Navigate to extend boost
-            router.push(`/business-boost-features?extend=${boostId}`);
+            router.push(`/feature-marketplace?extend=${boostId}`);
           }
         },
         { 

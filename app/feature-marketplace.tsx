@@ -4,7 +4,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useListings } from '@/hooks/useListings';
-import { FEATURE_CATALOG, getFeatureByKey } from '@/constants/monetization';
+import { FEATURE_CATALOG, getFeatureByKey, getFeatureCost, calculateCreditValue } from '@/constants/monetization';
 import { router } from 'expo-router';
 import {
   Text,
@@ -34,6 +34,7 @@ function CombinedFeatureModal({
   balance,
   onActivate,
   onCancel,
+  hasBusinessPlan,
 }: {
   feature: any;
   userListings: any[];
@@ -42,13 +43,16 @@ function CombinedFeatureModal({
   balance: number;
   onActivate: () => void;
   onCancel: () => void;
+  hasBusinessPlan: () => boolean;
 }) {
   const { theme } = useTheme();
   
   if (!feature) return null;
 
   const requiresListing = ['pulse_boost_24h', 'mega_pulse_7d', 'category_spotlight_3d', 'ad_refresh', 'listing_highlight', 'urgent_badge'].includes(feature.key);
-  const canAfford = balance >= feature.credits;
+  const isBusinessUser = hasBusinessPlan();
+  const featureCost = getFeatureCost(feature.key, isBusinessUser);
+  const canAfford = balance >= featureCost;
   
   // Check if selected listing has active boosts
   const selectedListingData = selectedListing ? userListings.find(l => l.id === selectedListing) : null;
@@ -189,7 +193,7 @@ function CombinedFeatureModal({
           {/* Cost & Balance */}
           <View style={{ alignItems: 'flex-end' }}>
             <Text variant="body" color="primary" style={{ fontWeight: '700' }}>
-              {feature.credits} credits
+              {featureCost} credits
             </Text>
             <View style={{ 
               flexDirection: 'row', 
@@ -376,10 +380,10 @@ function CombinedFeatureModal({
             opacity: canActivate ? 1 : 0.5,
           }}
         >
-          {!canAfford ? `Need ${feature.credits - balance} more credits` : 
+          {!canAfford ? `Need ${featureCost - balance} more credits` : 
            requiresListing && !selectedListing ? 'Select a listing first' :
            hasActiveBoost ? 'Listing already has an active boost' :
-           `Activate for ${feature.credits} credits`}
+           `Activate for ${featureCost} credits`}
         </Button>
         
         <Button variant="tertiary" onPress={onCancel}>
@@ -399,6 +403,7 @@ export default function FeatureMarketplaceScreen() {
     refreshCredits, 
     purchaseFeature,
     hasFeatureAccess,
+    hasBusinessPlan,
   } = useMonetizationStore();
   
   const { listings: userListings, loading: listingsLoading, refresh: refreshListings } = useListings({ userId: user?.id });
@@ -601,7 +606,9 @@ export default function FeatureMarketplaceScreen() {
                 const feature = getFeatureByKey(featureKey);
                 if (!feature) return null;
 
-                const canAfford = balance >= (feature as any).credits;
+                const isBusinessUser = hasBusinessPlan();
+                const featureCost = getFeatureCost(featureKey, isBusinessUser);
+                const canAfford = balance >= featureCost;
                 const hasAccess = hasFeatureAccess(featureKey);
 
                 return (
@@ -650,12 +657,12 @@ export default function FeatureMarketplaceScreen() {
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
                         <Badge
-                          text={`${(feature as any).credits} Credits`}
+                          text={`${featureCost} Credits`}
                           variant={canAfford ? 'success' : 'error'}
                         />
                         
                         <Text variant="caption" color="muted">
-                          ≈ GHS {((feature as any).credits * 0.167).toFixed(2)}
+                          ≈ GHS {calculateCreditValue(featureCost).toFixed(2)}
                         </Text>
                       </View>
 
@@ -723,6 +730,7 @@ export default function FeatureMarketplaceScreen() {
            selectedListing={selectedListing}
            onListingSelect={handleListingSelection}
            balance={balance}
+           hasBusinessPlan={hasBusinessPlan}
            onActivate={async () => {
              if (!selectedFeature || !user) return;
 
@@ -734,7 +742,9 @@ export default function FeatureMarketplaceScreen() {
              }
 
              try {
-               const result = await purchaseFeature(selectedFeature.key, selectedFeature.credits, { listing_id: selectedListing });
+               const isBusinessUser = hasBusinessPlan();
+               const featureCost = getFeatureCost(selectedFeature.key, isBusinessUser);
+               const result = await purchaseFeature(selectedFeature.key, featureCost, { listing_id: selectedListing });
                
                if (result.success) {
                  setShowFeatureModal(false);

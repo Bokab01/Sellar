@@ -225,7 +225,16 @@ export function PremiumProductCard({
     if (!seller.isBusinessUser || !premiumBadgeConfig) return null;
 
     return (
-      <View style={premiumBadgeConfig.style}>
+      <View style={{
+        backgroundColor: theme.colors.primary,
+        paddingHorizontal: theme.spacing.xs,
+        paddingVertical: 2,
+        borderRadius: theme.borderRadius.sm,
+        position: 'absolute',
+        top: theme.spacing.sm,
+        right: theme.spacing.sm,
+        zIndex: 10,
+      }}>
         <Text
           variant="caption"
           style={{
