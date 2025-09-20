@@ -141,7 +141,7 @@ BEGIN
         JOIN subscription_plans sp ON us.plan_id = sp.id
         WHERE us.user_id = p_user_id 
         AND us.status = 'active'
-        AND sp.name = 'Sellar Business'
+        AND sp.name = 'Sellar Pro'
         AND us.current_period_end > NOW()
     ) INTO is_business_user;
 
@@ -181,7 +181,7 @@ BEGIN
         JOIN subscription_plans sp ON us.plan_id = sp.id
         WHERE us.user_id = p_user_id 
         AND us.status = 'active'
-        AND sp.name = 'Sellar Business'
+        AND sp.name = 'Sellar Pro'
         AND us.current_period_end > NOW()
     ) INTO is_business_user;
 
@@ -361,6 +361,7 @@ BEGIN
             WHEN p_feature_key = 'pulse_boost_24h' THEN NOW() + INTERVAL '24 hours'
             WHEN p_feature_key = 'mega_pulse_7d' THEN NOW() + INTERVAL '7 days'
             WHEN p_feature_key = 'category_spotlight_3d' THEN NOW() + INTERVAL '3 days'
+            WHEN p_feature_key = 'ad_refresh' THEN NOW() + INTERVAL '1 minute'  -- FIXED: Truly instant
             WHEN p_feature_key = 'listing_highlight' THEN NOW() + INTERVAL '7 days'
             WHEN p_feature_key = 'urgent_badge' THEN NOW() + INTERVAL '3 days'
             ELSE NOW() + INTERVAL '1 day'

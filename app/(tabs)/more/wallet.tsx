@@ -461,7 +461,7 @@ export default function WalletScreen() {
                     Sellar Pro
                   </Text>
                   <Text variant="bodySmall" color="muted">
-                    120 credits monthly • Unlimited listings • Premium features
+                    Auto-refresh every 2h • Unlimited listings • Premium features
                   </Text>
                 </View>
                 <PriceDisplay amount={400} currency="GHS" size="lg" />

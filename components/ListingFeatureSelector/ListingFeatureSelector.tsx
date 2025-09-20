@@ -7,7 +7,7 @@ import { Button } from '@/components/Button/Button';
 import { Badge } from '@/components/Badge/Badge';
 import { AppModal } from '@/components/Modal/Modal';
 import { PriceDisplay } from '@/components/PriceDisplay/PriceDisplay';
-import { FEATURE_CATALOG, getFeatureByKey, getFeatureCost, getBusinessDiscount, BUSINESS_PLANS } from '@/constants/monetization';
+import { FEATURE_CATALOG, getFeatureByKey, getFeatureCost, getProBenefit, BUSINESS_PLANS } from '@/constants/monetization';
 import { 
   Zap, 
   Rocket, 
@@ -81,20 +81,19 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
     
     const benefits = baseBenefits[key as keyof typeof baseBenefits] || ['Enhanced visibility', 'Better performance', 'More engagement'];
     
-    // Add business-specific benefits
+    // Add Pro-specific benefits
     if (isBusinessPlan) {
-      if (key === 'ad_refresh') {
-        return [...benefits, 'FREE auto-refresh every 2 hours!'];
+      const proBenefit = getProBenefit(key);
+      if (proBenefit) {
+        return [...benefits, `✨ ${proBenefit} (Sellar Pro)`];
       }
-      return [...benefits, `${getBusinessDiscount(key)}% discount for business users!`];
     }
     
     return benefits;
   };
 
   const credits = getFeatureCost(featureKey, isBusinessPlan);
-  const regularCredits = (feature as any).regularCredits || 0;
-  const discount = getBusinessDiscount(featureKey);
+  const proBenefit = getProBenefit(featureKey);
 
   return (
     <TouchableOpacity
@@ -132,34 +131,12 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
           </Text>
           
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.sm, flexWrap: 'wrap', gap: theme.spacing.sm }}>
-            {/* Pricing with business discount */}
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              {isBusinessPlan && regularCredits > credits && (
-                <Badge 
-                  text={`${regularCredits} credits`} 
-                  variant="neutral" 
-                  size="sm"
-                  style={{ 
-                    marginRight: theme.spacing.xs,
-                    textDecorationLine: 'line-through',
-                    opacity: 0.6
-                  }}
-                />
-              )}
-              <Badge 
-                text={credits === 0 ? 'FREE' : `${credits} credits`} 
-                variant={credits === 0 ? "success" : "primary"} 
-                size="sm"
-              />
-              {isBusinessPlan && discount > 0 && (
-                <Badge 
-                  text={`${discount}% OFF`} 
-                  variant="success" 
-                  size="sm"
-                  style={{ marginLeft: theme.spacing.xs }}
-                />
-              )}
-            </View>
+            {/* Pricing - same for all users */}
+            <Badge 
+              text={`${credits} credits`} 
+              variant="primary" 
+              size="sm"
+            />
             
             <Badge 
               text={feature.duration} 
@@ -168,9 +145,10 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
               leftIcon={<Clock size={12} color={theme.colors.text.secondary} />}
             />
             
-            {isBusinessPlan && featureKey === 'ad_refresh' && (
+            {/* Pro benefit badge */}
+            {isBusinessPlan && proBenefit && (
               <Badge 
-                text="Auto-refresh 2h" 
+                text="Pro Benefit" 
                 variant="success" 
                 size="sm"
               />

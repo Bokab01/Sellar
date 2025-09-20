@@ -8,7 +8,8 @@ import {
   BarChart3, 
   Zap, 
   HeadphonesIcon,
-  TrendingUp
+  TrendingUp,
+  RefreshCw
 } from 'lucide-react-native';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { useAuth } from '@/hooks/useAuth';
@@ -20,8 +21,9 @@ import {
   BusinessBoostManager, 
   BusinessAnalytics, 
   BusinessSupport, 
-  FreeUserDashboard 
+  FreeUserDashboard
 } from '@/components/Dashboard';
+import AutoBoostDashboard from '@/components/AutoBoostDashboard/AutoBoostDashboard';
 
 type DashboardTab = 'overview' | 'boost' | 'analytics' | 'support';
 
@@ -73,8 +75,8 @@ export default function BusinessDashboardScreen() {
       },
       {
         id: 'boost',
-        label: 'Boost',
-        icon: (color: string) => <Zap size={18} color={color} />,
+        label: 'Auto-Refresh',
+        icon: (color: string) => <RefreshCw size={18} color={color} />,
       },
       {
         id: 'analytics',
@@ -214,9 +216,7 @@ export default function BusinessDashboardScreen() {
         );
       case 'boost':
         return (
-          <BusinessBoostManager
-            onTabChange={handleTabChange}
-          />
+          <AutoBoostDashboard />
         );
       case 'analytics':
         return (
@@ -247,7 +247,7 @@ export default function BusinessDashboardScreen() {
     return (
       <SafeAreaWrapper>
         <View style={{ flex: 1, marginTop: theme.spacing.md }}>
-          <AppHeader title="Dashboard" />
+          <AppHeader title="Sellar Pro Dashboard" />
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
             <Text variant="body" color="secondary">Loading subscription data...</Text>
           </View>
@@ -261,7 +261,7 @@ export default function BusinessDashboardScreen() {
     return (
       <SafeAreaWrapper>
         <View style={{ flex: 1, marginTop: theme.spacing.md }}>
-          <AppHeader title="Dashboard" />
+          <AppHeader title="Sellar Pro Dashboard" />
           <FreeUserDashboard
             loading={loading}
             quickStats={quickStats}
@@ -276,6 +276,13 @@ export default function BusinessDashboardScreen() {
     <SafeAreaWrapper>
       <View style={{ flex: 1, marginTop: theme.spacing.md }}>
         {renderTabBar}
+        {activeTab === 'boost' ? (
+          // Use View for boost tab to avoid nested virtualized lists
+          <View style={{ flex: 1 }}>
+            {renderTabContent}
+          </View>
+        ) : (
+          // Use ScrollView for other tabs
         <ScrollView
           style={{ flex: 1 }}
           refreshControl={
@@ -284,6 +291,7 @@ export default function BusinessDashboardScreen() {
         >
           {renderTabContent}
         </ScrollView>
+        )}
       </View>
     </SafeAreaWrapper>
   );

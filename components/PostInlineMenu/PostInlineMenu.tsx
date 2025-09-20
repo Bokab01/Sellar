@@ -7,7 +7,7 @@ import {
   MoreHorizontal, 
   Copy, 
   Share2, 
-  Flag, 
+  Flag,
   Trash2, 
   Edit3,
   ExternalLink,
@@ -145,37 +145,6 @@ export function PostInlineMenu({
     );
   };
 
-  const handleReport = () => {
-    setShowMenu(false);
-    Alert.alert(
-      'Report Post',
-      'Why are you reporting this post?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Spam',
-          onPress: () => {
-            onReport?.();
-            Alert.alert('Report Submitted', 'Thank you for reporting this post. We will review it shortly.');
-          },
-        },
-        {
-          text: 'Inappropriate Content',
-          onPress: () => {
-            onReport?.();
-            Alert.alert('Report Submitted', 'Thank you for reporting this post. We will review it shortly.');
-          },
-        },
-        {
-          text: 'Harassment',
-          onPress: () => {
-            onReport?.();
-            Alert.alert('Report Submitted', 'Thank you for reporting this post. We will review it shortly.');
-          },
-        },
-      ]
-    );
-  };
 
   const handleHide = () => {
     setShowMenu(false);
@@ -205,6 +174,11 @@ export function PostInlineMenu({
   const handleViewPost = () => {
     setShowMenu(false);
     onViewPost?.();
+  };
+
+  const handleReport = () => {
+    setShowMenu(false);
+    onReport?.();
   };
 
   const menuItems = [
@@ -240,7 +214,7 @@ export function PostInlineMenu({
     },
     {
       icon: Flag,
-      title: 'Report Post',
+      title: 'Report',
       onPress: handleReport,
       show: !isOwnPost,
       destructive: true,

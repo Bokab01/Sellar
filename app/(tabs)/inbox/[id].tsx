@@ -91,21 +91,24 @@ export default function ChatScreen() {
   }, [conversationId]);
 
   useEffect(() => {
-    // Load draft message
-    const draft = draftMessages[conversationId!] || '';
-    setMessageText(draft);
-  }, [conversationId, draftMessages]);
+    // Load draft message only when conversation changes, not when draftMessages changes
+    if (conversationId) {
+      const draft = draftMessages[conversationId] || '';
+      setMessageText(draft);
+    }
+  }, [conversationId]); // Removed draftMessages from dependencies to prevent conflicts
 
   useEffect(() => {
     // Save draft message with debouncing to prevent excessive updates
     if (conversationId && messageText !== draftMessages[conversationId]) {
       const timeoutId = setTimeout(() => {
+        // Only save if the current messageText hasn't changed during the debounce period
         setDraftMessage(conversationId, messageText);
-      }, 300); // Debounce for 300ms
+      }, 500); // Increased debounce to 500ms to reduce conflicts
       
       return () => clearTimeout(timeoutId);
     }
-  }, [messageText, conversationId, draftMessages, setDraftMessage]);
+  }, [messageText, conversationId, setDraftMessage]); // Removed draftMessages from dependencies to prevent loops
 
   useEffect(() => {
     // Auto-scroll to bottom when new messages arrive
@@ -758,7 +761,6 @@ export default function ChatScreen() {
             otherUser={otherUser}
             conversation={conversation}
             onBlock={() => console.log('Block user')}
-            onReport={() => console.log('Report user')}
             onDelete={() => console.log('Delete conversation')}
             onArchive={() => console.log('Archive conversation')}
             onMute={() => console.log('Mute conversation')}

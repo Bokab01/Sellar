@@ -58,7 +58,7 @@ class AnalyticsService {
   /**
    * Get comprehensive analytics data for business users
    */
-  async getBusinessAnalytics(userId: string): Promise<AnalyticsData> {
+  async getBusinessAnalytics(userId: string, timeRange: '7d' | '30d' | '90d' = '30d'): Promise<AnalyticsData> {
     try {
       // Get all analytics data in parallel
       const [
@@ -71,11 +71,11 @@ class AnalyticsService {
         categoryData
       ] = await Promise.all([
         this.getListingsAnalytics(userId),
-        this.getViewsAnalytics(userId),
-        this.getMessagesAnalytics(userId),
+        this.getViewsAnalytics(userId, timeRange),
+        this.getMessagesAnalytics(userId, timeRange),
         this.getOffersAnalytics(userId),
         this.getReviewsAnalytics(userId),
-        this.getTrendsAnalytics(userId),
+        this.getTrendsAnalytics(userId, timeRange),
         this.getCategoryAnalytics(userId)
       ]);
 
@@ -172,7 +172,7 @@ class AnalyticsService {
     return { total, active, topPerforming };
   }
 
-  private async getViewsAnalytics(userId: string) {
+  private async getViewsAnalytics(userId: string, timeRange: '7d' | '30d' | '90d' = '30d') {
     // Get user's listing IDs first
     const { data: userListings, error: listingsError } = await supabase
       .from('listings')
@@ -191,39 +191,41 @@ class AnalyticsService {
 
     if (totalError) throw totalError;
 
-    // Get views this week
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    // Calculate time periods based on timeRange
+    const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
+    const currentPeriodStart = new Date();
+    currentPeriodStart.setDate(currentPeriodStart.getDate() - days);
     
-    const { data: thisWeekViews, error: weekError } = await supabase
+    const previousPeriodStart = new Date();
+    previousPeriodStart.setDate(previousPeriodStart.getDate() - (days * 2));
+    
+    // Get views for current period
+    const { data: currentPeriodViews, error: currentError } = await supabase
       .from('listing_views')
       .select('id', { count: 'exact' })
       .in('listing_id', listingIds)
-      .gte('created_at', oneWeekAgo.toISOString());
+      .gte('created_at', currentPeriodStart.toISOString());
 
-    if (weekError) throw weekError;
+    if (currentError) throw currentError;
 
-    // Get views last week
-    const twoWeeksAgo = new Date();
-    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-    
-    const { data: lastWeekViews, error: lastWeekError } = await supabase
+    // Get views for previous period
+    const { data: previousPeriodViews, error: previousError } = await supabase
       .from('listing_views')
       .select('id', { count: 'exact' })
       .in('listing_id', listingIds)
-      .gte('created_at', twoWeeksAgo.toISOString())
-      .lt('created_at', oneWeekAgo.toISOString());
+      .gte('created_at', previousPeriodStart.toISOString())
+      .lt('created_at', currentPeriodStart.toISOString());
 
-    if (lastWeekError) throw lastWeekError;
+    if (previousError) throw previousError;
 
     return {
       total: totalViews?.length || 0,
-      thisWeek: thisWeekViews?.length || 0,
-      lastWeek: lastWeekViews?.length || 0,
+      thisWeek: currentPeriodViews?.length || 0,
+      lastWeek: previousPeriodViews?.length || 0,
     };
   }
 
-  private async getMessagesAnalytics(userId: string) {
+  private async getMessagesAnalytics(userId: string, timeRange: '7d' | '30d' | '90d' = '30d') {
     // Get total messages for user's listings
     const { data: messages, error } = await supabase
       .from('messages')
@@ -241,20 +243,21 @@ class AnalyticsService {
 
     const total = messages?.length || 0;
     
-    // Calculate this week vs last week
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    // Calculate current period vs previous period based on timeRange
+    const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
+    const currentPeriodStart = new Date();
+    currentPeriodStart.setDate(currentPeriodStart.getDate() - days);
+    
+    const previousPeriodStart = new Date();
+    previousPeriodStart.setDate(previousPeriodStart.getDate() - (days * 2));
     
     const thisWeek = messages?.filter(m => 
-      new Date(m.created_at) >= oneWeekAgo
+      new Date(m.created_at) >= currentPeriodStart
     ).length || 0;
-    
-    const twoWeeksAgo = new Date();
-    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
     
     const lastWeek = messages?.filter(m => {
       const date = new Date(m.created_at);
-      return date >= twoWeeksAgo && date < oneWeekAgo;
+      return date >= previousPeriodStart && date < currentPeriodStart;
     }).length || 0;
 
     // Calculate response rate (simplified - messages from seller)
@@ -300,7 +303,7 @@ class AnalyticsService {
     return { total, averageRating };
   }
 
-  private async getTrendsAnalytics(userId: string) {
+  private async getTrendsAnalytics(userId: string, timeRange: '7d' | '30d' | '90d' = '30d') {
     // Get user's listing IDs first
     const { data: userListings, error: listingsError } = await supabase
       .from('listings')
@@ -311,9 +314,10 @@ class AnalyticsService {
 
     const listingIds = userListings?.map(l => l.id) || [];
 
-    // Get daily views for the last 7 days
+    // Get daily views for the selected time range
+    const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
     const trends = [];
-    for (let i = 6; i >= 0; i--) {
+    for (let i = days - 1; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
       const dateStr = date.toISOString().split('T')[0];
@@ -414,9 +418,9 @@ export function useAnalytics(userId?: string) {
   const { user } = useAuthStore();
   const actualUserId = userId || user?.id;
 
-  const getBusinessAnalytics = useCallback(async () => {
+  const getBusinessAnalytics = useCallback(async (timeRange: '7d' | '30d' | '90d' = '30d') => {
     if (!actualUserId) throw new Error('User ID required');
-    return await analyticsService.getBusinessAnalytics(actualUserId);
+    return await analyticsService.getBusinessAnalytics(actualUserId, timeRange);
   }, [actualUserId]);
 
   const getQuickStats = useCallback(async () => {

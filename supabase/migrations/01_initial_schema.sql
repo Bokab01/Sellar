@@ -105,7 +105,7 @@ CREATE TABLE listings (
     location VARCHAR(255) NOT NULL,
     images JSONB DEFAULT '[]',
     accept_offers BOOLEAN DEFAULT true,
-    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'sold', 'draft', 'expired', 'suspended', 'pending', 'reserved')),
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'sold', 'draft', 'expired', 'suspended', 'pending', 'reserved', 'hidden')),
     views_count INTEGER DEFAULT 0,
     favorites_count INTEGER DEFAULT 0,
     boost_until TIMESTAMP WITH TIME ZONE,
@@ -126,7 +126,7 @@ CREATE TABLE listings (
 );
 
 -- Add comment to document the listings status column
-COMMENT ON COLUMN listings.status IS 'Listing status: active (available), sold (completed), draft (not published), expired (time expired), suspended (moderated), pending (awaiting approval), reserved (temporarily held during offer process)';
+COMMENT ON COLUMN listings.status IS 'Listing status: active (available), sold (completed), draft (not published), expired (time expired), suspended (moderated), pending (awaiting approval), reserved (temporarily held during offer process), hidden (hidden by moderation)';
 
 -- Listing views tracking
 CREATE TABLE listing_views (
@@ -226,9 +226,13 @@ CREATE TABLE posts (
     shares_count INTEGER DEFAULT 0,
     is_pinned BOOLEAN DEFAULT false,
     type VARCHAR(20) DEFAULT 'general' CHECK (type IN ('general', 'listing', 'review', 'announcement', 'showcase', 'question', 'tips', 'event', 'collaboration')),
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'hidden', 'suspended', 'deleted')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Add comment to document the posts status column
+COMMENT ON COLUMN posts.status IS 'Post status: active (visible), hidden (hidden by moderation), suspended (temporarily hidden), deleted (soft deleted)';
 
 -- Comments on posts
 CREATE TABLE comments (
@@ -238,9 +242,13 @@ CREATE TABLE comments (
     content TEXT NOT NULL,
     parent_id UUID REFERENCES comments(id) ON DELETE CASCADE,
     likes_count INTEGER DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'hidden', 'suspended', 'deleted')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Add comment to document the comments status column
+COMMENT ON COLUMN comments.status IS 'Comment status: active (visible), hidden (hidden by moderation), suspended (temporarily hidden), deleted (soft deleted)';
 
 -- Likes (for posts and comments)
 CREATE TABLE likes (
@@ -546,7 +554,7 @@ CREATE TABLE notifications (
     user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
     type VARCHAR(50) NOT NULL,
     title VARCHAR(255) NOT NULL,
-    body TEXT NOT NULL,
+    body TEXT,
     data JSONB DEFAULT '{}',
     is_read BOOLEAN DEFAULT false,
     read_at TIMESTAMP WITH TIME ZONE,
@@ -637,8 +645,15 @@ CREATE TABLE reports (
     message_id UUID REFERENCES messages(id) ON DELETE SET NULL,
     reason VARCHAR(100) NOT NULL,
     description TEXT,
+    category VARCHAR(50) DEFAULT 'other',
+    priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
+    evidence_urls JSONB DEFAULT '[]',
+    moderator_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+    resolution_notes TEXT,
     status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'investigating', 'resolved', 'dismissed')),
+    resolved_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     CHECK (
         (reported_user_id IS NOT NULL) OR 
         (listing_id IS NOT NULL) OR 
@@ -646,6 +661,47 @@ CREATE TABLE reports (
         (comment_id IS NOT NULL) OR 
         (message_id IS NOT NULL)
     )
+);
+
+-- Moderation categories
+CREATE TABLE moderation_categories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(50) UNIQUE NOT NULL,
+    display_name VARCHAR(100) NOT NULL,
+    description TEXT,
+    priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
+    auto_action VARCHAR(50), -- 'none', 'hide', 'suspend', 'ban'
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- User reputation system
+CREATE TABLE user_reputation (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    reputation_score INTEGER DEFAULT 0,
+    positive_reports INTEGER DEFAULT 0,
+    negative_reports INTEGER DEFAULT 0,
+    violations_count INTEGER DEFAULT 0,
+    last_violation_at TIMESTAMP WITH TIME ZONE,
+    status VARCHAR(20) DEFAULT 'good' CHECK (status IN ('good', 'warning', 'suspended', 'banned')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id)
+);
+
+-- Content moderation actions
+CREATE TABLE moderation_actions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    report_id UUID NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
+    moderator_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+    action_type VARCHAR(50) NOT NULL CHECK (action_type IN ('hide', 'unhide', 'suspend', 'unsuspend', 'ban', 'unban', 'warn', 'dismiss')),
+    target_type VARCHAR(20) NOT NULL CHECK (target_type IN ('listing', 'post', 'comment', 'message', 'user')),
+    target_id UUID NOT NULL,
+    reason TEXT,
+    duration_hours INTEGER, -- For temporary actions
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Blocked users
@@ -1025,6 +1081,23 @@ CREATE INDEX idx_search_analytics_search_type ON search_analytics(search_type);
 CREATE INDEX idx_search_analytics_created_at ON search_analytics(created_at);
 CREATE INDEX idx_search_analytics_clicked_listing_id ON search_analytics(clicked_listing_id);
 
+-- Reports and moderation indexes
+CREATE INDEX idx_reports_status ON reports(status);
+CREATE INDEX idx_reports_priority ON reports(priority);
+CREATE INDEX idx_reports_created_at ON reports(created_at);
+CREATE INDEX idx_reports_reporter_id ON reports(reporter_id);
+CREATE INDEX idx_reports_reported_user_id ON reports(reported_user_id);
+CREATE INDEX idx_reports_category ON reports(category);
+
+-- User reputation indexes
+CREATE INDEX idx_user_reputation_score ON user_reputation(reputation_score);
+CREATE INDEX idx_user_reputation_status ON user_reputation(status);
+
+-- Moderation actions indexes
+CREATE INDEX idx_moderation_actions_report_id ON moderation_actions(report_id);
+CREATE INDEX idx_moderation_actions_moderator_id ON moderation_actions(moderator_id);
+CREATE INDEX idx_moderation_actions_target ON moderation_actions(target_type, target_id);
+
 -- Subscription change log indexes
 CREATE INDEX idx_subscription_change_log_user_id ON subscription_change_log(user_id);
 CREATE INDEX idx_subscription_change_log_subscription_id ON subscription_change_log(subscription_id);
@@ -1060,6 +1133,209 @@ CREATE INDEX idx_faq_items_order_index ON faq_items(order_index);
 CREATE INDEX idx_data_deletion_requests_user_id ON data_deletion_requests(user_id);
 CREATE INDEX idx_data_deletion_requests_status ON data_deletion_requests(status);
 CREATE INDEX idx_data_deletion_requests_scheduled_for ON data_deletion_requests(scheduled_for);
+
+-- =============================================
+-- SEED DATA FOR MODERATION CATEGORIES
+-- =============================================
+
+INSERT INTO moderation_categories (name, display_name, description, priority, auto_action) VALUES
+('spam', 'Spam', 'Repetitive, unwanted, or promotional content', 'high', 'hide'),
+('harassment', 'Harassment', 'Bullying, threats, or abusive behavior', 'urgent', 'suspend'),
+('inappropriate', 'Inappropriate Content', 'Offensive, explicit, or inappropriate material', 'high', 'hide'),
+('fraud', 'Fraud/Scam', 'Deceptive practices, fake listings, or scams', 'urgent', 'ban'),
+('copyright', 'Copyright Violation', 'Unauthorized use of copyrighted material', 'medium', 'hide'),
+('violence', 'Violence/Threats', 'Content promoting violence or making threats', 'urgent', 'ban'),
+('hate_speech', 'Hate Speech', 'Content promoting hatred or discrimination', 'urgent', 'ban'),
+('fake_listing', 'Fake Listing', 'Misleading or fraudulent product listings', 'high', 'hide'),
+('price_manipulation', 'Price Manipulation', 'Artificially inflated or misleading prices', 'medium', 'hide'),
+('other', 'Other', 'Other violations not covered above', 'low', 'none')
+ON CONFLICT (name) DO NOTHING;
+
+-- =============================================
+-- REPORTING SYSTEM FUNCTIONS
+-- =============================================
+
+-- Function to submit a report
+CREATE OR REPLACE FUNCTION submit_report(
+    p_reporter_id UUID,
+    p_target_type VARCHAR(20),
+    p_target_id UUID,
+    p_category VARCHAR(50),
+    p_reason TEXT,
+    p_description TEXT DEFAULT NULL,
+    p_evidence_urls JSONB DEFAULT '[]'::jsonb
+)
+RETURNS TABLE (success BOOLEAN, report_id UUID, error TEXT) AS $$
+DECLARE
+    v_report_id UUID;
+    v_reported_user_id UUID;
+    v_priority VARCHAR(20);
+    v_auto_action VARCHAR(50);
+    v_category_id UUID;
+BEGIN
+    -- Validate target type
+    IF p_target_type NOT IN ('listing', 'post', 'comment', 'message', 'user') THEN
+        RETURN QUERY SELECT false, NULL::UUID, 'Invalid target type'::TEXT;
+        RETURN;
+    END IF;
+
+    -- Get category information
+    SELECT id, priority, auto_action INTO v_category_id, v_priority, v_auto_action
+    FROM moderation_categories 
+    WHERE name = p_category AND is_active = true;
+
+    IF v_category_id IS NULL THEN
+        RETURN QUERY SELECT false, NULL::UUID, 'Invalid category'::TEXT;
+        RETURN;
+    END IF;
+
+    -- Get reported user ID based on target type
+    CASE p_target_type
+        WHEN 'listing' THEN
+            SELECT user_id INTO v_reported_user_id FROM listings WHERE id = p_target_id;
+        WHEN 'post' THEN
+            SELECT user_id INTO v_reported_user_id FROM posts WHERE id = p_target_id;
+        WHEN 'comment' THEN
+            SELECT user_id INTO v_reported_user_id FROM comments WHERE id = p_target_id;
+        WHEN 'message' THEN
+            SELECT sender_id INTO v_reported_user_id FROM messages WHERE id = p_target_id;
+        WHEN 'user' THEN
+            v_reported_user_id := p_target_id;
+    END CASE;
+
+    -- Prevent self-reporting
+    IF v_reported_user_id = p_reporter_id THEN
+        RETURN QUERY SELECT false, NULL::UUID, 'Cannot report yourself'::TEXT;
+        RETURN;
+    END IF;
+
+    -- Create the report
+    INSERT INTO reports (
+        reporter_id,
+        reported_user_id,
+        listing_id,
+        post_id,
+        comment_id,
+        message_id,
+        category,
+        reason,
+        description,
+        evidence_urls,
+        priority
+    ) VALUES (
+        p_reporter_id,
+        v_reported_user_id,
+        CASE WHEN p_target_type = 'listing' THEN p_target_id ELSE NULL END,
+        CASE WHEN p_target_type = 'post' THEN p_target_id ELSE NULL END,
+        CASE WHEN p_target_type = 'comment' THEN p_target_id ELSE NULL END,
+        CASE WHEN p_target_type = 'message' THEN p_target_id ELSE NULL END,
+        p_category,
+        p_reason,
+        p_description,
+        p_evidence_urls,
+        v_priority
+    ) RETURNING id INTO v_report_id;
+
+    -- Update user reputation
+    UPDATE user_reputation 
+    SET 
+        negative_reports = negative_reports + 1,
+        reputation_score = reputation_score - 1,
+        updated_at = NOW()
+    WHERE user_id = v_reported_user_id;
+
+    -- Insert if user doesn't have reputation record
+    INSERT INTO user_reputation (user_id, negative_reports, reputation_score)
+    SELECT v_reported_user_id, 1, -1
+    WHERE NOT EXISTS (SELECT 1 FROM user_reputation WHERE user_id = v_reported_user_id);
+
+    -- Handle automatic actions
+    IF v_auto_action != 'none' THEN
+        PERFORM handle_automatic_moderation(v_report_id, v_auto_action, p_target_type, p_target_id);
+    END IF;
+
+    RETURN QUERY SELECT true, v_report_id, NULL::TEXT;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to handle automatic moderation
+CREATE OR REPLACE FUNCTION handle_automatic_moderation(
+    p_report_id UUID,
+    p_action VARCHAR(50),
+    p_target_type VARCHAR(20),
+    p_target_id UUID
+)
+RETURNS BOOLEAN AS $$
+DECLARE
+    v_reported_user_id UUID;
+BEGIN
+    -- Get reported user ID
+    SELECT reported_user_id INTO v_reported_user_id FROM reports WHERE id = p_report_id;
+
+    -- Apply automatic action
+    CASE p_action
+        WHEN 'hide' THEN
+            CASE p_target_type
+                WHEN 'listing' THEN
+                    UPDATE listings SET status = 'hidden' WHERE id = p_target_id;
+                WHEN 'post' THEN
+                    UPDATE posts SET status = 'hidden' WHERE id = p_target_id;
+                WHEN 'comment' THEN
+                    UPDATE comments SET status = 'hidden' WHERE id = p_target_id;
+            END CASE;
+        WHEN 'suspend' THEN
+            UPDATE user_reputation 
+            SET status = 'suspended', updated_at = NOW() 
+            WHERE user_id = v_reported_user_id;
+        WHEN 'ban' THEN
+            UPDATE user_reputation 
+            SET status = 'banned', updated_at = NOW() 
+            WHERE user_id = v_reported_user_id;
+    END CASE;
+
+    -- Record the action
+    INSERT INTO moderation_actions (
+        report_id,
+        moderator_id,
+        action_type,
+        target_type,
+        target_id,
+        reason
+    ) VALUES (
+        p_report_id,
+        NULL, -- System action
+        p_action,
+        p_target_type,
+        p_target_id,
+        'Automatic action based on report category'
+    );
+
+    -- Update report status
+    UPDATE reports 
+    SET 
+        status = 'resolved',
+        resolved_at = NOW(),
+        updated_at = NOW()
+    WHERE id = p_report_id;
+
+    RETURN true;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger to update reports updated_at
+CREATE OR REPLACE FUNCTION update_reports_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_update_reports_updated_at ON reports;
+CREATE TRIGGER trigger_update_reports_updated_at
+    BEFORE UPDATE ON reports
+    FOR EACH ROW
+    EXECUTE FUNCTION update_reports_updated_at();
 
 -- =============================================
 -- STORAGE BUCKETS SETUP

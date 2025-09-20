@@ -21,7 +21,6 @@ export interface PlanEntitlements {
   
   // Credits
   monthlyCredits: number;
-  boostCredits: number;
   
   // Features
   businessBadge: boolean;
@@ -100,8 +99,7 @@ class SubscriptionEntitlementsService {
     const baseEntitlements: PlanEntitlements = {
       maxListings: plan.maxListings,
       freeListings: 5, // All plans get 5 free listings
-      monthlyCredits: plan.boostCredits,
-      boostCredits: plan.boostCredits,
+      monthlyCredits: 0, // No boost credits needed with auto-refresh
       businessBadge: plan.badges.includes('business'),
       prioritySellerBadge: plan.badges.includes('priority_seller'),
       premiumBadge: plan.badges.includes('premium'),
@@ -128,7 +126,6 @@ class SubscriptionEntitlementsService {
       maxListings: 5,
       freeListings: 5,
       monthlyCredits: 0,
-      boostCredits: 0,
       businessBadge: false,
       prioritySellerBadge: false,
       premiumBadge: false,
@@ -237,13 +234,14 @@ class SubscriptionEntitlementsService {
     prioritySeller: boolean;
     premium: boolean;
     verified: boolean;
+    businessVerified: boolean;
   }> {
     const entitlements = await this.getUserEntitlements(userId);
     
     // Get user verification status
     const { data: profile } = await supabase
       .from('profiles')
-      .select('is_verified')
+      .select('is_verified, verification_level')
       .eq('id', userId)
       .single();
 
@@ -252,6 +250,7 @@ class SubscriptionEntitlementsService {
       prioritySeller: entitlements.prioritySellerBadge,
       premium: entitlements.premiumBadge,
       verified: profile?.is_verified || false,
+      businessVerified: profile?.verification_level === 'business',
     };
   }
 

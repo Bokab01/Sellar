@@ -25,10 +25,10 @@ import {
   Toast,
   Grid,
   Chip,
-  FullUserBadges,
   UserDisplayName,
   EnhancedReviewCard,
 } from '@/components';
+import { FullUserBadges } from '@/components/UserBadges/UserBadges';
 import { 
   MessageCircle, 
   Phone, 
@@ -40,8 +40,10 @@ import {
   Package,
   Users,
   MessageSquare,
-  Info
+  Info,
+  MoreVertical
 } from 'lucide-react-native';
+import { ReportButton } from '@/components/ReportButton/ReportButton';
 
 // Helper function to format response time expectation
 const formatResponseTime = (responseTime: string): string => {
@@ -754,6 +756,33 @@ export default function UserProfileScreen() {
                       borderColor: theme.colors.primary,
                     }}
                   />
+                )}
+
+                {/* Report button - only show if not own profile */}
+                {!isOwnProfile && (
+                  <View style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: theme.borderRadius.lg,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                    backgroundColor: theme.colors.surface,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}>
+                    <ReportButton
+                      targetType="user"
+                      targetId={profileId!}
+                      targetUser={{
+                        id: profileId!,
+                        name: `${profile.first_name} ${profile.last_name}`,
+                        avatar: profile.avatar_url
+                      }}
+                      variant="icon"
+                      size="md"
+                      style={{ padding: 0 }}
+                    />
+                  </View>
                 )}
               </View>
             )}

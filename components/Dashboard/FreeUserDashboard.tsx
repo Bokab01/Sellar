@@ -71,7 +71,7 @@ export const FreeUserDashboard: React.FC<FreeUserDashboardProps> = ({
                 Unlock Business Power
               </Text>
               <Text variant="body" color="secondary" style={{ lineHeight: 22 }}>
-                Get comprehensive analytics, auto-boost features, and priority support to grow your business faster.
+                Get comprehensive analytics, auto-refresh every 2 hours, and priority support to grow your business faster.
               </Text>
             </View>
           </View>
@@ -359,7 +359,7 @@ export const FreeUserDashboard: React.FC<FreeUserDashboardProps> = ({
               { 
                 icon: TrendingUp, 
                 title: 'Growth Tools', 
-                description: 'Auto-boost features and advanced listing management',
+                description: 'Auto-refresh every 2 hours and advanced listing management',
                 color: theme.colors.info 
               },
             ].map((benefit, index) => (

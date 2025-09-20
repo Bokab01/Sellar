@@ -17,6 +17,7 @@ import {
   Toast,
   LinearProgress,
   PaymentModal,
+  BusinessBadge,
 } from '@/components';
 import type { PaymentRequest } from '@/components';
 import { Building, Star, Crown, Check, Zap, ChartBar as BarChart, Headphones, Award } from 'lucide-react-native';
@@ -196,7 +197,7 @@ export default function SubscriptionPlansScreen() {
     return (
       <SafeAreaWrapper>
         <AppHeader
-          title="Business Plans"
+          title="Sellar Pro Plan"
           showBackButton
           onBackPress={() => router.back()}
         />
@@ -216,7 +217,7 @@ export default function SubscriptionPlansScreen() {
   return (
     <SafeAreaWrapper>
       <AppHeader
-        title="Business Plan"
+        title="Sellar Pro Plan"
         showBackButton
         onBackPress={() => router.back()}
       />
@@ -298,49 +299,61 @@ export default function SubscriptionPlansScreen() {
                   ...theme.shadows.lg,
                 }}
               >
-                {/* Popular Badge */}
-                {plan.popular && (
-                  <View
-                    style={{
-                      backgroundColor: theme.colors.primary,
-                      paddingVertical: theme.spacing.sm,
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Text
-                      variant="caption"
-                      style={{
-                        color: theme.colors.primaryForeground,
-                        fontWeight: '600',
-                        textTransform: 'uppercase',
-                      }}
-                    >
-                      Recommended
-                    </Text>
-                  </View>
-                )}
+                {/* Dynamic Badges */}
+                {(() => {
+                  const hasCurrentPlan = !!currentPlan;
+                  const isCurrentUserPlan = isCurrentPlan(plan.id);
+                  const shouldShowRecommended = plan.popular && !hasCurrentPlan;
+                  const shouldShowCurrentPlan = isCurrentUserPlan;
 
-                {/* Current Plan Badge */}
-                {isCurrentPlan(plan.id) && (
-                  <View
-                    style={{
-                      backgroundColor: theme.colors.success,
-                      paddingVertical: theme.spacing.sm,
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Text
-                      variant="caption"
-                      style={{
-                        color: theme.colors.successForeground,
-                        fontWeight: '600',
-                        textTransform: 'uppercase',
-                      }}
-                    >
-                      Current Plan
-                    </Text>
-                  </View>
-                )}
+                  if (shouldShowCurrentPlan) {
+                    return (
+                      <View
+                        style={{
+                          backgroundColor: theme.colors.success,
+                          paddingVertical: theme.spacing.sm,
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text
+                          variant="caption"
+                          style={{
+                            color: theme.colors.successForeground,
+                            fontWeight: '600',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          Current Plan
+                        </Text>
+                      </View>
+                    );
+                  }
+
+                  if (shouldShowRecommended) {
+                    return (
+                      <View
+                        style={{
+                          backgroundColor: theme.colors.primary,
+                          paddingVertical: theme.spacing.sm,
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text
+                          variant="caption"
+                          style={{
+                            color: theme.colors.primaryForeground,
+                            fontWeight: '600',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          Recommended
+                        </Text>
+                      </View>
+                    );
+                  }
+
+                  return null;
+                })()}
 
                 <View style={{ padding: theme.spacing.xl }}>
                   {/* Plan Header */}
@@ -387,11 +400,13 @@ export default function SubscriptionPlansScreen() {
                   {/* Badges */}
                   <View style={{ flexDirection: 'row', gap: theme.spacing.sm, marginBottom: theme.spacing.xl, flexWrap: 'wrap' }}>
                     {plan.badges.map((badge) => (
-                      <Badge
+                      <BusinessBadge
                         key={badge}
-                        text={badge.replace('_', ' ').toUpperCase()}
-                        variant="info"
-                        size="sm"
+                        type={badge as 'business' | 'priority_seller' | 'premium' | 'verified' | 'boosted'}
+                        size="small"
+                        variant="compact"
+                        showIcon={true}
+                        showText={true}
                       />
                     ))}
                   </View>
@@ -488,10 +503,10 @@ export default function SubscriptionPlansScreen() {
               
               <View>
                 <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.sm }}>
-                  What happens to my boost credits?
+                  How does auto-refresh work?
                 </Text>
                 <Text variant="bodySmall" color="secondary">
-                  Boost credits are added to your account each month and don&apos;t expire. You can use them anytime, even after cancelling.
+                  Your listings automatically refresh every 2 hours, keeping them at the top of search results. No manual intervention needed!
                 </Text>
               </View>
               

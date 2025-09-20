@@ -16,6 +16,7 @@ import { useImageViewer } from '@/hooks/useImageViewer';
 import { PostImage, ThumbnailImage } from '@/components/ResponsiveImage/ResponsiveImage';
 import { PostInlineMenu } from '@/components/PostInlineMenu/PostInlineMenu';
 import { useFollowFeedback } from '@/hooks/useFollowFeedback';
+import { UniversalReportModal } from '@/components/ReportModal/UniversalReportModal';
 import { 
   Heart, 
   MessageCircle, 
@@ -99,9 +100,6 @@ export function PostCard({
   const { theme } = useTheme();
   const { user } = useAuthStore();
   const [showReportModal, setShowReportModal] = useState(false);
-  const [reportReason, setReportReason] = useState('');
-  const [reportDescription, setReportDescription] = useState('');
-  const [submittingReport, setSubmittingReport] = useState(false);
   
   // Local state for like functionality
   const [isLiked, setIsLiked] = useState(post.isLiked);
@@ -221,39 +219,6 @@ export function PostCard({
 
   const postTypeConfig = getPostTypeConfig(post.type);
 
-  const reportReasons = [
-    { value: 'spam', label: 'Spam or unwanted content' },
-    { value: 'harassment', label: 'Harassment or bullying' },
-    { value: 'inappropriate_content', label: 'Inappropriate content' },
-    { value: 'fake_listing', label: 'Fake or misleading listing' },
-    { value: 'scam', label: 'Scam or fraud' },
-    { value: 'violence', label: 'Violence or threats' },
-    { value: 'hate_speech', label: 'Hate speech' },
-    { value: 'copyright', label: 'Copyright violation' },
-    { value: 'other', label: 'Other' },
-  ];
-
-  const handleReport = async () => {
-    if (!reportReason) {
-      Alert.alert('Error', 'Please select a reason for reporting');
-      return;
-    }
-
-    setSubmittingReport(true);
-    try {
-      // TODO: Implement report submission to database
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      
-      setShowReportModal(false);
-      setReportReason('');
-      setReportDescription('');
-      Alert.alert('Report Submitted', 'Thank you for helping keep our community safe. We will review this report.');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to submit report. Please try again.');
-    } finally {
-      setSubmittingReport(false);
-    }
-  };
 
 
   const handleFollowToggle = () => {
@@ -298,6 +263,10 @@ export function PostCard({
     } catch (error) {
       console.error('Failed to share post:', error);
     }
+  };
+
+  const handleReport = () => {
+    setShowReportModal(true);
   };
 
   return (
@@ -364,9 +333,7 @@ export function PostCard({
             postContent={post.content}
             onDelete={onDelete}
             onEdit={onEdit}
-            onReport={() => {
-              setShowReportModal(true);
-            }}
+            onReport={handleReport}
             onShare={handleShare}
             onViewPost={() => {
               router.push(`/(tabs)/community/${post.id}`);
@@ -736,103 +703,6 @@ export function PostCard({
       </View>
 
 
-      {/* Report Modal */}
-      <AppModal
-        visible={showReportModal}
-        onClose={() => setShowReportModal(false)}
-        title="Report Post"
-        primaryAction={{
-          text: 'Submit Report',
-          onPress: handleReport,
-          loading: submittingReport,
-        }}
-        secondaryAction={{
-          text: 'Cancel',
-          onPress: () => setShowReportModal(false),
-        }}
-      >
-        <View style={{ gap: theme.spacing.lg }}>
-          <Text variant="body" color="secondary">
-            Help us understand what&apos;s wrong with this post
-          </Text>
-
-          <View>
-            <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.md }}>
-              Reason for reporting
-            </Text>
-            <View style={{ gap: theme.spacing.sm }}>
-              {reportReasons.map((reason) => (
-                <TouchableOpacity
-                  key={reason.value}
-                  onPress={() => setReportReason(reason.value)}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    paddingVertical: theme.spacing.md,
-                    paddingHorizontal: theme.spacing.lg,
-                    borderRadius: theme.borderRadius.md,
-                    backgroundColor: reportReason === reason.value 
-                      ? theme.colors.primary + '10' 
-                      : theme.colors.surfaceVariant,
-                    borderWidth: 1,
-                    borderColor: reportReason === reason.value 
-                      ? theme.colors.primary 
-                      : theme.colors.border,
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View
-                    style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: 10,
-                      borderWidth: 2,
-                      borderColor: reportReason === reason.value 
-                        ? theme.colors.primary 
-                        : theme.colors.border,
-                      backgroundColor: reportReason === reason.value 
-                        ? theme.colors.primary 
-                        : 'transparent',
-                      marginRight: theme.spacing.md,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
-                  >
-                    {reportReason === reason.value && (
-                      <View
-                        style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: 4,
-                          backgroundColor: theme.colors.primaryForeground,
-                        }}
-                      />
-                    )}
-                  </View>
-                  <Text
-                    variant="body"
-                    style={{
-                      color: reportReason === reason.value 
-                        ? theme.colors.primary 
-                        : theme.colors.text.primary,
-                    }}
-                  >
-                    {reason.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <Input
-            variant="multiline"
-            label="Additional Details (Optional)"
-            placeholder="Provide more context about why you're reporting this post..."
-            value={reportDescription}
-            onChangeText={setReportDescription}
-          />
-        </View>
-      </AppModal>
 
       {/* Image Viewer */}
       <ImageViewer
@@ -840,6 +710,15 @@ export function PostCard({
         images={postImages}
         initialIndex={imageViewerIndex}
         onClose={closeImageViewer}
+      />
+
+      {/* Report Modal */}
+      <UniversalReportModal
+        visible={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        targetType="post"
+        targetId={post.id}
+        targetTitle={post.content}
       />
     </View>
   );

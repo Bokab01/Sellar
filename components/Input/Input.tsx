@@ -43,7 +43,7 @@ export function Input({
   containerStyle,
   style,
   autoExpand = false,
-  minHeight = 80,
+  minHeight = 52,
   maxHeight = 200,
   ...props
 }: InputProps) {
@@ -58,10 +58,11 @@ export function Input({
   const hasError = state === 'error' || !!error;
   const currentState = hasError ? 'error' : isFocused ? 'focus' : state;
   const isMultiline = variant === 'multiline' || props.multiline || autoExpand;
+  const shouldAutoExpand = variant === 'multiline' || autoExpand;
 
   // Handle auto-expand functionality
   const handleContentSizeChange = (event: any) => {
-    if (autoExpand) {
+    if (shouldAutoExpand) {
       const newHeight = Math.max(minHeight, Math.min(maxHeight, event.nativeEvent.contentSize.height + 20));
       setInputHeight(newHeight);
     }
@@ -101,7 +102,7 @@ export function Input({
     backgroundColor: getBackgroundColor(),
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.xs, // Add vertical padding for better alignment
-    minHeight: isMultiline ? (autoExpand ? inputHeight : 80) : 52, // Use dynamic height for auto-expand
+    minHeight: isMultiline ? (shouldAutoExpand ? inputHeight : 52) : 52, // Use search-like height for multiline
     ...(variant === 'search' && {
       paddingLeft: theme.spacing.sm,
     }),
@@ -117,7 +118,7 @@ export function Input({
     paddingHorizontal: 0, // Remove horizontal padding to prevent alignment issues
     includeFontPadding: false, // Android: Remove extra font padding
     textAlignVertical: isMultiline ? ('top' as const) : ('center' as const),
-    height: isMultiline ? (autoExpand ? inputHeight - 20 : 60) : 40, // Dynamic height for multiline
+    height: isMultiline ? (shouldAutoExpand ? inputHeight - 20 : 40) : 40, // Dynamic height for multiline
   };
 
   const renderLeftIcon = () => {
@@ -143,9 +144,9 @@ export function Input({
           marginRight: theme.spacing.sm,
           alignItems: 'center',
           justifyContent: 'center',
-          height: isMultiline ? 60 : 40, // Match input height
+          height: 40, // Match input height
           width: 24, // Fixed width for consistent alignment
-          paddingTop: isMultiline ? theme.spacing.md : 0,
+          paddingTop: 0,
         }}>
           {leftIcon}
         </View>
@@ -183,9 +184,9 @@ export function Input({
           marginLeft: theme.spacing.sm,
           alignItems: 'center',
           justifyContent: 'center',
-          height: isMultiline ? 60 : 40, // Match input height
+          height: 40, // Match input height
           width: 24, // Fixed width for consistent alignment
-          paddingTop: isMultiline ? theme.spacing.md : 0,
+          paddingTop: 0,
         }}>
           {rightIcon}
         </View>
@@ -218,9 +219,9 @@ export function Input({
           cursorColor={theme.colors.primary}
           secureTextEntry={variant === 'password' && !showPassword}
           multiline={isMultiline}
-          numberOfLines={isMultiline ? (autoExpand ? undefined : props.numberOfLines || 4) : 1}
+          numberOfLines={isMultiline ? (shouldAutoExpand ? undefined : props.numberOfLines || 4) : 1}
           editable={!isDisabled}
-          onContentSizeChange={autoExpand ? handleContentSizeChange : props.onContentSizeChange}
+          onContentSizeChange={shouldAutoExpand ? handleContentSizeChange : props.onContentSizeChange}
           onFocus={(e) => {
             setIsFocused(true);
             if (inputRef.current && focusContext) {

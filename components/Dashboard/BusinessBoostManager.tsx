@@ -20,7 +20,7 @@ import { Badge } from '@/components/Badge/Badge';
 import { EmptyState } from '@/components/EmptyState/EmptyState';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { supabase } from '@/lib/supabase';
-import { calculateBusinessCreditValue, getBusinessDiscount } from '@/constants/monetization';
+import { calculateCreditValue } from '@/constants/monetization';
 
 interface ActiveBoost {
   id: string;
@@ -190,10 +190,10 @@ export const BusinessBoostManager: React.FC<BusinessBoostManagerProps> = ({ onTa
             </View>
             <View style={{ flex: 1 }}>
               <Text variant="h3" style={{ marginBottom: theme.spacing.xs, color: theme.colors.warning }}>
-                Business Boost Credits
+                Auto-Refresh System
               </Text>
             <Text variant="body" color="secondary">
-              Massive discounts + auto-refresh! Only boosted listings get auto-refresh
+              Your listings automatically refresh every 2 hours to stay at the top
             </Text>
             </View>
           </View>
@@ -205,34 +205,34 @@ export const BusinessBoostManager: React.FC<BusinessBoostManagerProps> = ({ onTa
             marginBottom: theme.spacing.lg,
           }}>
             <View style={{ alignItems: 'center' }}>
-              <Text variant="h2" style={{ color: theme.colors.warning, fontWeight: '700' }}>
-                {credits || 0}
+              <Text variant="h4" style={{ color: theme.colors.success, fontWeight: '700' }}>
+                Active
               </Text>
               <Text variant="caption" color="secondary" style={{ fontWeight: '600' }}>
-                Available Credits
+                Auto-Refresh Status
               </Text>
             </View>
             
             <View style={{ alignItems: 'center' }}>
-              <Text variant="h2" style={{ color: theme.colors.success, fontWeight: '700' }}>
-                {activeBoosts.length}
+              <Text variant="h4" style={{ color: theme.colors.primary, fontWeight: '700' }}>
+                Every 2h
               </Text>
               <Text variant="caption" color="secondary" style={{ fontWeight: '600' }}>
-                Active Boosts
+                Refresh Interval
               </Text>
             </View>
             
             <View style={{ alignItems: 'center' }}>
-              <Text variant="h2" style={{ color: theme.colors.primary, fontWeight: '700' }}>
-                120
+              <Text variant="h4" style={{ color: theme.colors.warning, fontWeight: '700' }}>
+                12/day
               </Text>
               <Text variant="caption" color="secondary" style={{ fontWeight: '600' }}>
-                Monthly Allowance
+                Top Placements
               </Text>
             </View>
           </View>
 
-          {/* Business Credit Value Showcase */}
+          {/* Auto-Refresh Benefits */}
           <View style={{
             backgroundColor: theme.colors.success + '10',
             borderRadius: theme.borderRadius.lg,
@@ -242,20 +242,20 @@ export const BusinessBoostManager: React.FC<BusinessBoostManagerProps> = ({ onTa
             borderColor: theme.colors.success + '20',
           }}>
             <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.sm, textAlign: 'center' }}>
-              Your 120 Business Credits Can Get You:
+              Auto-Refresh Benefits:
             </Text>
             <View style={{ gap: theme.spacing.xs }}>
               <Text variant="caption" style={{ textAlign: 'center' }}>
-                🚀 <Text style={{ fontWeight: '600' }}>40 Mega Pulses</Text> (280 days + auto-refresh) - 94% OFF!
+                🔄 <Text style={{ fontWeight: '600' }}>Continuous Top Placement</Text> - Your listings stay at the top
               </Text>
               <Text variant="caption" style={{ textAlign: 'center' }}>
-                🎯 <Text style={{ fontWeight: '600' }}>60 Category Spotlights</Text> (180 days + auto-refresh) - 94% OFF!
+                ⚡ <Text style={{ fontWeight: '600' }}>12 Top Placements Daily</Text> - Every 2 hours automatically
               </Text>
               <Text variant="caption" style={{ textAlign: 'center' }}>
-                ⚡ <Text style={{ fontWeight: '600' }}>120 Pulse Boosts</Text> (2,880 hours + auto-refresh) - 93% OFF!
+                🎯 <Text style={{ fontWeight: '600' }}>360 Top Placements Monthly</Text> - Maximum visibility
               </Text>
               <Text variant="caption" style={{ textAlign: 'center' }}>
-                🔄 <Text style={{ fontWeight: '600' }}>FREE Ad Refresh</Text> + auto-refresh every 2h!
+                🚀 <Text style={{ fontWeight: '600' }}>No Manual Work</Text> - Fully automated system
               </Text>
             </View>
             <Text variant="caption" style={{ 
@@ -264,30 +264,30 @@ export const BusinessBoostManager: React.FC<BusinessBoostManagerProps> = ({ onTa
               color: theme.colors.success,
               fontWeight: '700'
             }}>
-              Worth GHS 5,900+ in regular credits + exclusive auto-refresh!
+              Your listings get maximum visibility without any effort!
             </Text>
           </View>
 
           <Button
             variant="primary"
-            onPress={handleApplyBoost}
+            onPress={() => router.push('/feature-marketplace')}
             style={{ 
               width: '100%',
-              backgroundColor: theme.colors.warning,
+              backgroundColor: theme.colors.primary,
             }}
           >
-            <Plus size={18} color="#FFFFFF" />
+            <Settings size={18} color="#FFFFFF" />
             <Text variant="body" style={{ 
               color: '#FFFFFF', 
               marginLeft: theme.spacing.sm,
               fontWeight: '700',
             }}>
-              Apply Boost (Massive Discounts!)
+              Manage Auto-Refresh Settings
             </Text>
           </Button>
         </View>
 
-        {/* Active Boosts */}
+        {/* Auto-Refresh Status */}
         <View style={{
           backgroundColor: theme.colors.surface,
           borderRadius: theme.borderRadius.lg,
@@ -297,78 +297,58 @@ export const BusinessBoostManager: React.FC<BusinessBoostManagerProps> = ({ onTa
           borderColor: theme.colors.border,
         }}>
           <Text variant="h4" style={{ marginBottom: theme.spacing.lg }}>
-            Active Boosts ({activeBoosts.length})
+            Auto-Refresh Status
           </Text>
           
           {loading ? (
             <View style={{ padding: theme.spacing.xl, alignItems: 'center' }}>
-              <Text variant="body" color="secondary">Loading active boosts...</Text>
+              <Text variant="body" color="secondary">Loading auto-refresh status...</Text>
             </View>
-          ) : activeBoosts.length === 0 ? (
-            <EmptyState
-              icon={<Zap size={48} color={theme.colors.text.secondary} />}
-              title="No Active Boosts"
-              description="Apply boost features to your listings to increase visibility and engagement."
-              action={{
-                text: 'Apply Boost',
-                onPress: handleApplyBoost,
-              }}
-            />
           ) : (
             <View style={{ gap: theme.spacing.md }}>
-              {activeBoosts.map((boost) => {
-                const daysRemaining = getDaysRemaining(boost.expires_at);
-                const isExpiringSoon = daysRemaining <= 2;
+              {/* Auto-Refresh Status Card */}
+              <View style={{
+                backgroundColor: theme.colors.background,
+                borderRadius: theme.borderRadius.lg,
+                padding: theme.spacing.md,
+                borderWidth: 1,
+                borderColor: theme.colors.success,
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.sm }}>
+                  <CheckCircle size={20} color={theme.colors.success} />
+                  <Text variant="body" style={{ fontWeight: '600', marginLeft: theme.spacing.sm, flex: 1 }}>
+                    Auto-Refresh Active
+                  </Text>
+                  <Badge 
+                    text="Active" 
+                    variant="success" 
+                  />
+                </View>
                 
-                return (
-                  <TouchableOpacity
-                    key={boost.id}
-                    onPress={() => handleManageBoost(boost.id)}
-                    style={{
-                      backgroundColor: theme.colors.background,
-                      borderRadius: theme.borderRadius.lg,
-                      padding: theme.spacing.md,
-                      borderWidth: 1,
-                      borderColor: isExpiringSoon ? theme.colors.warning : theme.colors.border,
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.sm }}>
-                      {getBoostIcon(boost.feature_name)}
-                      <Text variant="body" style={{ fontWeight: '600', marginLeft: theme.spacing.sm, flex: 1 }}>
-                        {getBoostDisplayName(boost.feature_name)}
-                      </Text>
-                      <Badge 
-                        text={`${daysRemaining}d left`} 
-                        variant={isExpiringSoon ? "warning" : "success"} 
-                      />
-                    </View>
-                    
-                    <Text variant="body" style={{ marginBottom: theme.spacing.xs }}>
-                      {boost.listing_title}
+                <Text variant="body" style={{ marginBottom: theme.spacing.xs }}>
+                  All your listings are automatically refreshed every 2 hours
+                </Text>
+                
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Clock size={14} color={theme.colors.text.muted} />
+                    <Text variant="caption" color="muted" style={{ marginLeft: theme.spacing.xs }}>
+                      Next refresh in 1h 23m
                     </Text>
-                    
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Text variant="caption" color="secondary">
-                        Expires: {new Date(boost.expires_at).toLocaleDateString()}
-                      </Text>
-                      
-                      {isExpiringSoon && (
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <AlertCircle size={14} color={theme.colors.warning} />
-                          <Text variant="caption" style={{ color: theme.colors.warning, marginLeft: theme.spacing.xs }}>
-                            Expiring Soon
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <CheckCircle size={14} color={theme.colors.success} />
+                    <Text variant="caption" style={{ color: theme.colors.success, marginLeft: theme.spacing.xs }}>
+                      Running Smoothly
+                    </Text>
+                  </View>
+                </View>
+              </View>
             </View>
           )}
         </View>
 
-        {/* Boost Performance */}
+        {/* Auto-Refresh Performance */}
         <View style={{
           backgroundColor: theme.colors.surface,
           borderRadius: theme.borderRadius.lg,
@@ -378,7 +358,7 @@ export const BusinessBoostManager: React.FC<BusinessBoostManagerProps> = ({ onTa
           borderColor: theme.colors.border,
         }}>
           <Text variant="h4" style={{ marginBottom: theme.spacing.lg }}>
-            Boost Performance
+            Auto-Refresh Performance
           </Text>
           
           <View style={{
@@ -392,26 +372,11 @@ export const BusinessBoostManager: React.FC<BusinessBoostManagerProps> = ({ onTa
               padding: theme.spacing.md,
               alignItems: 'center',
             }}>
-              <Text variant="h3" style={{ color: theme.colors.warning, fontWeight: '700' }}>
-                {activeBoosts.length}
-              </Text>
-              <Text variant="caption" color="secondary" style={{ fontWeight: '600' }}>
-                Active Boosts
-              </Text>
-            </View>
-            
-            <View style={{
-              flex: 1,
-              backgroundColor: theme.colors.background,
-              borderRadius: theme.borderRadius.lg,
-              padding: theme.spacing.md,
-              alignItems: 'center',
-            }}>
               <Text variant="h3" style={{ color: theme.colors.success, fontWeight: '700' }}>
-                +{activeBoosts.length * 25}%
+                12
               </Text>
               <Text variant="caption" color="secondary" style={{ fontWeight: '600' }}>
-                Est. Visibility
+                Refreshes Today
               </Text>
             </View>
             
@@ -423,10 +388,25 @@ export const BusinessBoostManager: React.FC<BusinessBoostManagerProps> = ({ onTa
               alignItems: 'center',
             }}>
               <Text variant="h3" style={{ color: theme.colors.primary, fontWeight: '700' }}>
-                {120 - (credits || 0)}
+                360
               </Text>
               <Text variant="caption" color="secondary" style={{ fontWeight: '600' }}>
-                Credits Used
+                This Month
+              </Text>
+            </View>
+            
+            <View style={{
+              flex: 1,
+              backgroundColor: theme.colors.background,
+              borderRadius: theme.borderRadius.lg,
+              padding: theme.spacing.md,
+              alignItems: 'center',
+            }}>
+              <Text variant="h3" style={{ color: theme.colors.warning, fontWeight: '700' }}>
+                100%
+              </Text>
+              <Text variant="caption" color="secondary" style={{ fontWeight: '600' }}>
+                Uptime
               </Text>
             </View>
           </View>
@@ -446,7 +426,7 @@ export const BusinessBoostManager: React.FC<BusinessBoostManagerProps> = ({ onTa
           
           <View style={{ gap: theme.spacing.md }}>
             <TouchableOpacity
-              onPress={handleApplyBoost}
+              onPress={() => router.push('/feature-marketplace')}
               style={{
                 backgroundColor: theme.colors.background,
                 borderRadius: theme.borderRadius.lg,
@@ -461,13 +441,13 @@ export const BusinessBoostManager: React.FC<BusinessBoostManagerProps> = ({ onTa
                 alignItems: 'center',
               }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Plus size={20} color={theme.colors.warning} />
+                  <Settings size={20} color={theme.colors.primary} />
                   <Text variant="body" style={{ fontWeight: '600', marginLeft: theme.spacing.sm }}>
-                    Apply New Boost
+                    Manage Auto-Refresh
                   </Text>
                 </View>
-                <Text variant="caption" style={{ color: theme.colors.warning }}>
-                  {credits || 0} credits available
+                <Text variant="caption" style={{ color: theme.colors.primary }}>
+                  Configure settings
                 </Text>
               </View>
             </TouchableOpacity>

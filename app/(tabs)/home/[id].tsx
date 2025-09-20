@@ -31,8 +31,9 @@ import {
 } from '@/components';
 import { useImageViewer } from '@/hooks/useImageViewer';
 import { useListingStats } from '@/hooks/useListingStats';
-import { Heart, Share, MessageCircle, Phone, PhoneCall, DollarSign, ArrowLeft, Package } from 'lucide-react-native';
+import { Heart, Share, MessageCircle, Phone, PhoneCall, DollarSign, ArrowLeft, Package, MoreVertical } from 'lucide-react-native';
 import { getDisplayName } from '@/hooks/useDisplayName';
+import { ReportButton } from '@/components/ReportButton/ReportButton';
 
 export default function ListingDetailScreen() {
   const { theme } = useTheme();
@@ -876,6 +877,32 @@ export default function ListingDetailScreen() {
           >
             <Share size={20} color="white" />
           </TouchableOpacity>
+
+          {/* Report button - only show if user doesn't own the listing */}
+          {listing && listing.user_id !== user?.id && (
+            <View style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              justifyContent: 'center',
+              alignItems: 'center',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 4,
+              elevation: 5,
+            }}>
+              <ReportButton
+                targetType="listing"
+                targetId={listingId!}
+                targetTitle={listing.title}
+                variant="icon"
+                size="md"
+                style={{ padding: 0 }}
+              />
+            </View>
+          )}
         </View>
       </View>
 

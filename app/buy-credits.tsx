@@ -433,12 +433,12 @@ export default function BuyCreditsScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, marginBottom: theme.spacing.md }}>
               <Crown size={24} color={theme.colors.primary} />
               <Text variant="h4" style={{ color: theme.colors.primary, fontWeight: '600' }}>
-                Business Plan Available
+                Seller Pro Plan Available
               </Text>
             </View>
             
             <Text variant="body" color="secondary" style={{ marginBottom: theme.spacing.lg }}>
-              Got {(2798).toLocaleString()} credits? Upgrade to Sellar Pro and get unlimited listings, 120 monthly boost credits, and premium features!
+              Got {(2798).toLocaleString()} credits? Upgrade to Sellar Pro and get unlimited listings, auto-refresh every 2 hours, and premium features!
             </Text>
             
             <Button
@@ -447,7 +447,7 @@ export default function BuyCreditsScreen() {
               size="md"
               style={{ alignSelf: 'flex-start' }}
             >
-              View Business Plans
+              View Seller Pro Plans
             </Button>
           </View>
         </Container>

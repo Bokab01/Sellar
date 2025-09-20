@@ -11,7 +11,8 @@ import { ListingImage } from '@/components/OptimizedImage/OptimizedImage';
 import { useMemoryManager } from '@/utils/memoryManager';
 import { ImageViewer } from '@/components/ImageViewer/ImageViewer';
 import { useImageViewer } from '@/hooks/useImageViewer';
-import { Heart, Eye } from 'lucide-react-native';
+import { Heart, Eye, MoreVertical } from 'lucide-react-native';
+import { ReportButton } from '@/components/ReportButton/ReportButton';
 
 interface ProductCardProps {
   image: ImageSourcePropType | string | string[];
@@ -45,6 +46,9 @@ interface ProductCardProps {
   onViewPress?: () => void;
   // Premium feature props
   isHighlighted?: boolean;
+  // Report props
+  showReportButton?: boolean;
+  currentUserId?: string;
 }
 
 export function ProductCard({
@@ -71,6 +75,9 @@ export function ProductCard({
   onViewPress,
   // Premium feature props
   isHighlighted = false,
+  // Report props
+  showReportButton = false,
+  currentUserId,
 }: ProductCardProps) {
   const { theme } = useTheme();
   const { shouldLoadHeavyComponent } = useMemoryManager();
@@ -197,6 +204,30 @@ export function ProductCard({
               fill={isFavorited ? '#ff4757' : 'transparent'}
             />
           </TouchableOpacity>
+        )}
+
+        {/* Report Button */}
+        {showReportButton && listingId && currentUserId && seller.id && currentUserId !== seller.id && (
+          <View style={{
+            position: 'absolute',
+            top: theme.spacing.xs,
+            right: onFavoritePress ? (isGridLayout ? 50 : 60) : theme.spacing.xs,
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            borderRadius: isGridLayout ? 16 : 20,
+            padding: isGridLayout ? 6 : 8,
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1,
+          }}>
+            <ReportButton
+              targetType="listing"
+              targetId={listingId}
+              targetTitle={title}
+              variant="icon"
+              size="sm"
+              style={{ padding: 0 }}
+            />
+          </View>
         )}
 
         {/* View Count */}

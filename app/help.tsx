@@ -78,15 +78,15 @@ export default function HelpScreen() {
       ],
     },
     {
-      title: 'Credits & Business Plans',
+      title: 'Credits & Sellar Pro Plans',
       items: [
         {
           question: 'What can I do with credits?',
           answer: 'Credits unlock premium features like boosting listings for better visibility, creating additional listings beyond the free limit, and accessing business tools.',
         },
         {
-          question: 'What are Business Plans?',
-          answer: 'Monthly subscriptions that include boost credits, unlimited listings, business badges, analytics, and priority support for serious sellers.',
+          question: 'What are Sellar Pro Plans?',
+          answer: 'Monthly subscriptions that include auto-refresh every 2 hours, unlimited listings, pro badges, analytics, and priority support for serious and even business sellers.',
         },
         {
           question: 'Can I get a refund?',
@@ -121,7 +121,7 @@ export default function HelpScreen() {
       badge: hasPrioritySupport() ? { text: 'Active', variant: 'success' as const } : { text: 'Upgrade', variant: 'warning' as const },
       onPress: () => {
         if (hasPrioritySupport()) {
-          Linking.openURL('https://wa.me/233123456789?text=Hello, I need help with my Sellar account');
+          Linking.openURL('https://wa.me/233244857777?text=Hello, I need help with my Sellar account');
         } else {
           Alert.alert(
             'Priority Support',

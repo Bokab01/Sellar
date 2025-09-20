@@ -309,9 +309,9 @@ export function MarketplaceSidebar({ isVisible, onClose }: MarketplaceSidebarPro
 
             <View style={{ marginBottom: theme.spacing.sm, alignItems: 'center' }}>
               <DarkThemeUserBadges
-                isBusinessUser={profile?.is_business_user}
+                isBusinessUser={profile?.is_business}
                 isVerified={profile?.is_verified}
-                isBusinessVerified={profile?.is_business_verified}
+                isBusinessVerified={profile?.verification_level === 'business'}
               />
             </View>
 

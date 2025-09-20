@@ -397,7 +397,7 @@ export const useMonetizationStore = create<MonetizationState>()(
       const { data: plan, error: planError } = await supabase
         .from('subscription_plans')
         .select('*')
-        .eq('name', 'Sellar Business')
+        .eq('name', 'Sellar Pro')
         .single();
 
       if (planError) throw planError;
@@ -454,7 +454,7 @@ export const useMonetizationStore = create<MonetizationState>()(
         p_description: 'Business Plan Monthly Allocation',
         p_metadata: {
           subscription_id: (subscription as any).id,
-          plan_name: 'Sellar Business',
+          plan_name: 'Sellar Pro',
         },
       } as any);
 
@@ -607,8 +607,8 @@ export const useMonetizationStore = create<MonetizationState>()(
     // Check entitlements for business features
     const hasBusinessFeatures = entitlements.business_features === true || entitlements.business_badge === true || entitlements.max_listings > 5;
     
-    // Additional fallback: check if user has boost credits (business plan feature)
-    if (entitlements.boost_credits > 0) {
+    // Additional fallback: check if user has auto-refresh feature (business plan feature)
+    if (entitlements.auto_refresh_2h === true) {
       return true;
     }
     

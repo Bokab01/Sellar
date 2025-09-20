@@ -133,7 +133,7 @@ const CONDITIONS = [
 export default function CreateListingScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
-  const { balance, getMaxListings, spendCredits, hasUnlimitedListings, refreshCredits } = useMonetizationStore();
+  const { balance, getMaxListings, spendCredits, hasUnlimitedListings, refreshCredits, hasBusinessPlan } = useMonetizationStore();
   
   // Form state
   const [currentStep, setCurrentStep] = useState(0);
@@ -1389,90 +1389,173 @@ export default function CreateListingScreen() {
         </View>
       </View>
 
-      {/* Feature Boost Section */}
-      <View style={{
-        backgroundColor: theme.colors.primary + '10',
-        borderRadius: theme.borderRadius.lg,
-        padding: theme.spacing.lg,
-        borderWidth: 1,
-        borderColor: theme.colors.primary + '30',
-      }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
-          <View style={{
-            width: 40,
-            height: 40,
-            borderRadius: 20,
-            backgroundColor: theme.colors.primary,
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginRight: theme.spacing.md,
-          }}>
-            <Text style={{ fontSize: 20 }}>🚀</Text>
+      {/* Smart Feature Boost Section */}
+      {hasBusinessPlan() ? (
+        // Sellar Pro Users - Auto-refresh benefits
+        <View style={{
+          backgroundColor: theme.colors.success + '10',
+          borderRadius: theme.borderRadius.lg,
+          padding: theme.spacing.lg,
+          borderWidth: 1,
+          borderColor: theme.colors.success + '30',
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
+            <View style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              backgroundColor: theme.colors.success,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: theme.spacing.md,
+            }}>
+              <Text style={{ fontSize: 20 }}>✨</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text variant="h4" style={{ marginBottom: theme.spacing.xs, color: theme.colors.success }}>
+                Sellar Pro Auto-Boost
+              </Text>
+              <Text variant="body" color="secondary">
+                Your listing will automatically stay at the top
+              </Text>
+            </View>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text variant="h4" style={{ marginBottom: theme.spacing.xs }}>
-              Boost Your Listing
+
+          <View style={{
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.borderRadius.md,
+            padding: theme.spacing.md,
+            marginBottom: theme.spacing.md,
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.sm }}>
+              <Text style={{ fontSize: 16, marginRight: theme.spacing.sm }}>🔄</Text>
+              <Text variant="body" style={{ fontWeight: '600' }}>
+                Auto-Refresh Every 2 Hours
+              </Text>
+            </View>
+            <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.xs }}>
+              • Your listing automatically moves to the top every 2 hours
             </Text>
-            <Text variant="body" color="secondary">
-              Get more views and sell faster with premium features
+            <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.xs }}>
+              • Maximum visibility without manual intervention
+            </Text>
+            <Text variant="bodySmall" color="secondary">
+              • Works 24/7 to keep your listing prominent
+            </Text>
+          </View>
+
+          <View style={{
+            backgroundColor: theme.colors.success + '20',
+            borderRadius: theme.borderRadius.md,
+            padding: theme.spacing.md,
+            borderWidth: 1,
+            borderColor: theme.colors.success + '40',
+          }}>
+            <Text variant="bodySmall" style={{ color: theme.colors.success, textAlign: 'center', fontWeight: '600' }}>
+              🎉 Your listing will automatically stay at the top - no manual boosting needed!
             </Text>
           </View>
         </View>
+      ) : (
+        // Free Users - Manual feature selection
+        <View style={{
+          backgroundColor: theme.colors.primary + '10',
+          borderRadius: theme.borderRadius.lg,
+          padding: theme.spacing.lg,
+          borderWidth: 1,
+          borderColor: theme.colors.primary + '30',
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
+            <View style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              backgroundColor: theme.colors.primary,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: theme.spacing.md,
+            }}>
+              <Text style={{ fontSize: 20 }}>🚀</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text variant="h4" style={{ marginBottom: theme.spacing.xs }}>
+                Boost Your Listing
+              </Text>
+              <Text variant="body" color="secondary">
+                Get more views and sell faster with premium features
+              </Text>
+            </View>
+          </View>
 
-        {selectedFeatures.length > 0 ? (
-          <View>
-            <Text variant="body" style={{ marginBottom: theme.spacing.sm, color: theme.colors.success }}>
-              ✅ {selectedFeatures.length} feature{selectedFeatures.length > 1 ? 's' : ''} selected
-            </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs, marginBottom: theme.spacing.md }}>
-              {selectedFeatures.map((feature) => (
-                <Badge 
-                  key={feature.key}
-                  text={`${feature.name} (${feature.credits} credits)`}
-                  variant="primary"
+          {selectedFeatures.length > 0 ? (
+            <View>
+              <Text variant="body" style={{ marginBottom: theme.spacing.sm, color: theme.colors.success }}>
+                ✅ {selectedFeatures.length} feature{selectedFeatures.length > 1 ? 's' : ''} selected
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs, marginBottom: theme.spacing.md }}>
+                {selectedFeatures.map((feature) => (
+                  <Badge 
+                    key={feature.key}
+                    text={`${feature.name} (${feature.credits} credits)`}
+                    variant="primary"
+                    size="sm"
+                  />
+                ))}
+              </View>
+              <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+                <Button
+                  variant="secondary"
                   size="sm"
-                />
-              ))}
+                  onPress={() => setShowFeatureSelector(true)}
+                  style={{ flex: 1 }}
+                >
+                  Modify Features
+                </Button>
+                <Button
+                  variant="tertiary"
+                  size="sm"
+                  onPress={() => setSelectedFeatures([])}
+                  style={{ flex: 1 }}
+                >
+                  Remove All
+                </Button>
+              </View>
             </View>
-            <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+          ) : (
+            <View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
+                <Text variant="body" color="secondary" style={{ flex: 1 }}>
+                  Available Credits: 
+                </Text>
+                <Text variant="h4" color="primary">
+                  {balance.toLocaleString()}
+                </Text>
+              </View>
+              
+              <View style={{
+                backgroundColor: theme.colors.warning + '10',
+                borderRadius: theme.borderRadius.md,
+                padding: theme.spacing.sm,
+                marginBottom: theme.spacing.md,
+                borderWidth: 1,
+                borderColor: theme.colors.warning + '30',
+              }}>
+                <Text variant="bodySmall" style={{ color: theme.colors.warning, textAlign: 'center' }}>
+                  💡 Upgrade to Sellar Pro for automatic listing refresh every 2 hours!
+                </Text>
+              </View>
+              
               <Button
-                variant="secondary"
-                size="sm"
+                variant="primary"
                 onPress={() => setShowFeatureSelector(true)}
-                style={{ flex: 1 }}
+                leftIcon={<Text style={{ fontSize: 16 }}>⚡</Text>}
               >
-                Modify Features
-              </Button>
-              <Button
-                variant="tertiary"
-                size="sm"
-                onPress={() => setSelectedFeatures([])}
-                style={{ flex: 1 }}
-              >
-                Remove All
+                Add Features to Boost Visibility
               </Button>
             </View>
-          </View>
-        ) : (
-          <View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
-              <Text variant="body" color="secondary" style={{ flex: 1 }}>
-                Available Credits: 
-              </Text>
-              <Text variant="h4" color="primary">
-                {balance.toLocaleString()}
-              </Text>
-            </View>
-            <Button
-              variant="primary"
-              onPress={() => setShowFeatureSelector(true)}
-              leftIcon={<Text style={{ fontSize: 16 }}>⚡</Text>}
-            >
-              Add Features to Boost Visibility
-            </Button>
-          </View>
-        )}
-      </View>
+          )}
+        </View>
+      )}
 
       {/* Listing Limit Warning */}
       {!hasUnlimitedListings() && userListingsCount >= getMaxListings() && (
@@ -1489,9 +1572,20 @@ export default function CreateListingScreen() {
           <Text variant="body" color="secondary" style={{ marginBottom: theme.spacing.md }}>
             You&apos;ve reached your limit of {getMaxListings()} active listings. Additional listings cost 10 credits each.
           </Text>
-          <Text variant="bodySmall" style={{ color: theme.colors.warning }}>
+          <Text variant="bodySmall" style={{ color: theme.colors.warning, marginBottom: theme.spacing.sm }}>
             Your balance: {balance} credits
           </Text>
+          <View style={{
+            backgroundColor: theme.colors.primary + '10',
+            borderRadius: theme.borderRadius.md,
+            padding: theme.spacing.md,
+            borderWidth: 1,
+            borderColor: theme.colors.primary + '30',
+          }}>
+            <Text variant="bodySmall" style={{ color: theme.colors.primary, textAlign: 'center', fontWeight: '600' }}>
+              💡 Upgrade to Sellar Pro for unlimited listings + auto-refresh every 2 hours!
+            </Text>
+          </View>
         </View>
       )}
     </View>
@@ -1664,15 +1758,15 @@ export default function CreateListingScreen() {
           loading: false,
         }}
         secondaryAction={{
-          text: 'Buy Credits',
-                  onPress: () => {
-          setShowPaymentModal(false);
-          try {
-            router.push('/buy-credits');
-          } catch (e) {
-            console.log('Navigation error:', e);
-          }
-        },
+          text: 'Upgrade to Sellar Pro',
+          onPress: () => {
+            setShowPaymentModal(false);
+            try {
+              router.push('/subscription-plans');
+            } catch (e) {
+              console.log('Navigation error:', e);
+            }
+          },
         }}
       >
         <View style={{ gap: theme.spacing.lg }}>
@@ -1733,9 +1827,20 @@ export default function CreateListingScreen() {
               borderRadius: theme.borderRadius.md,
               padding: theme.spacing.md,
             }}>
-              <Text variant="bodySmall" style={{ color: theme.colors.error, textAlign: 'center' }}>
+              <Text variant="bodySmall" style={{ color: theme.colors.error, textAlign: 'center', marginBottom: theme.spacing.sm }}>
                 ⚠️ You need {10 - balance} more credits to create this listing
               </Text>
+              <View style={{
+                backgroundColor: theme.colors.primary + '10',
+                borderRadius: theme.borderRadius.sm,
+                padding: theme.spacing.sm,
+                borderWidth: 1,
+                borderColor: theme.colors.primary + '30',
+              }}>
+                <Text variant="bodySmall" style={{ color: theme.colors.primary, textAlign: 'center', fontWeight: '600' }}>
+                  💡 Or upgrade to Sellar Pro for unlimited listings + auto-refresh every 2 hours!
+                </Text>
+              </View>
             </View>
           )}
         </View>

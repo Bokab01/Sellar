@@ -90,7 +90,7 @@ export { UserDisplayName, useUserDisplayText } from './UserDisplayName/UserDispl
 
 // Business Dashboard Components
 export { AnalyticsDashboard } from './AnalyticsDashboard/AnalyticsDashboard';
-export { AutoBoostDashboard } from './AutoBoostDashboard/AutoBoostDashboard';
+export { default as AutoBoostDashboard } from './AutoBoostDashboard/AutoBoostDashboard';
 export { PrioritySupportDashboard } from './PrioritySupportDashboard/PrioritySupportDashboard';
 export { PremiumFeaturesDashboard } from './PremiumFeaturesDashboard/PremiumFeaturesDashboard';
 export { PostCard } from './PostCard/PostCard';
@@ -178,7 +178,7 @@ export { PaymentModal, formatAmount, validateMobileMoneyNumber } from './Payment
 export type { PaymentRequest } from './PaymentModal/PaymentModal';
 
 // Feature & Subscription Components
-export { UserBadges, CompactUserBadges, FullUserBadges, BadgeChecker } from './UserBadges/UserBadges';
+export { UserBadges, BadgeChecker } from './UserBadges/UserBadges';
 export { FeatureActivationModal } from './FeatureActivationModal/FeatureActivationModal';
 
 // Diagnostic Components

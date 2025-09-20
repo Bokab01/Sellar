@@ -38,60 +38,54 @@ export const CREDIT_PACKAGES = [
   },
 ] as const;
 
-// Streamlined feature catalog with dual pricing (regular vs business credits)
+// Feature catalog - Sellar Pro users get auto-refresh every 2 hours instead of discounted pricing
 export const FEATURE_CATALOG = {
-  // Core visibility features with massive business discounts
+  // Core visibility features - same pricing for all users, Pro users get auto-refresh
   pulse_boost_24h: {
     name: 'Pulse Boost',
-    description: '24-hour visibility boost + auto-refresh every 2h',
-    regularCredits: 15,
-    businessCredits: 1,     // 93% discount for business users!
+    description: '24-hour visibility boost',
+    credits: 15,
     duration: '24 hours',
     icon: '⚡',
-    businessAutoRefresh: '2 hours', // Auto-refresh every 2 hours for business users
+    proBenefit: 'Auto-refresh every 2 hours', // Sellar Pro users get this benefit
   },
   mega_pulse_7d: {
     name: 'Mega Pulse',
-    description: '7-day mega visibility boost + auto-refresh every 2h',
-    regularCredits: 50,
-    businessCredits: 3,     // 94% discount for business users!
+    description: '7-day mega visibility boost',
+    credits: 50,
     duration: '7 days',
     icon: '🚀',
-    businessAutoRefresh: '2 hours', // Auto-refresh every 2 hours for business users
+    proBenefit: 'Auto-refresh every 2 hours', // Sellar Pro users get this benefit
   },
   category_spotlight_3d: {
     name: 'Category Spotlight',
-    description: '3-day category spotlight + auto-refresh every 2h',
-    regularCredits: 35,
-    businessCredits: 2,     // 94% discount for business users!
+    description: '3-day category spotlight',
+    credits: 35,
     duration: '3 days',
     icon: '🎯',
-    businessAutoRefresh: '2 hours', // Auto-refresh every 2 hours for business users
+    proBenefit: 'Auto-refresh every 2 hours', // Sellar Pro users get this benefit
   },
   ad_refresh: {
     name: 'Ad Refresh',
-    description: 'Refresh listing to top + auto-refresh every 2h',
-    regularCredits: 5,
-    businessCredits: 0,     // FREE for business users + auto-refresh every 2h
+    description: 'Instantly move listing to top of search results',
+    credits: 5,
     duration: 'instant',
     icon: '🔄',
-    businessAutoRefresh: '2 hours', // Auto-refresh every 2 hours for business users
+    proBenefit: 'Auto-refresh every 2 hours', // Sellar Pro users get this benefit
   },
   
-  // Value-added features with business discounts
+  // Value-added features - same pricing for all users
   listing_highlight: {
     name: 'Listing Highlight',
     description: 'Highlight listing with colored border',
-    regularCredits: 10,
-    businessCredits: 1,     // 90% discount for business users
+    credits: 10,
     duration: '7 days',
     icon: '✨',
   },
   urgent_badge: {
     name: 'Urgent Badge',
     description: 'Add "Urgent Sale" badge to listing',
-    regularCredits: 8,
-    businessCredits: 1,     // 87% discount for business users
+    credits: 8,
     duration: '3 days',
     icon: '🔥',
   },
@@ -105,7 +99,6 @@ export const BUSINESS_PLANS = [
     priceGHS: 400,
     priceMonthly: 400,
     billingPeriod: 'monthly',
-    boostCredits: 120, // Generous monthly allocation
     maxListings: null, // unlimited
     features: {
       analytics: 'comprehensive', // Single comprehensive analytics suite
@@ -120,11 +113,10 @@ export const BUSINESS_PLANS = [
       accountManager: false, // Removed complex feature
     },
     badges: ['business', 'priority_seller', 'premium'],
-    description: 'Complete business solution for serious sellers',
+    description: 'Complete solution for serious and business sellers',
     highlights: [
-      '120 boost credits monthly',
+      'Auto-refresh every 2 hours (stays at top)',
       'Unlimited listings',
-      'Auto-boost your listings',
       'Comprehensive analytics dashboard',
       'Priority support',
       'Homepage placement',
@@ -146,50 +138,38 @@ export function getFeatureByKey(key: string) {
   return FEATURE_CATALOG[key as keyof typeof FEATURE_CATALOG] || null;
 }
 
-// Get feature cost based on user type
+// Get feature cost - Pro users get features for free (auto-refresh benefit)
 export function getFeatureCost(featureKey: string, isBusinessUser: boolean = false): number {
   const feature = getFeatureByKey(featureKey);
   if (!feature) return 0;
   
-  if (isBusinessUser) {
-    return (feature as any).businessCredits ?? (feature as any).regularCredits ?? 0;
-  }
+  // Pro users get features for free (auto-refresh benefit)
+  if (isBusinessUser) return 0;
   
-  return (feature as any).regularCredits ?? 0;
+  // Regular users pay standard price
+  return (feature as any).credits ?? 0;
 }
 
-// Calculate discount percentage for business users
-export function getBusinessDiscount(featureKey: string): number {
+// Get Pro benefit for a feature
+export function getProBenefit(featureKey: string): string | null {
   const feature = getFeatureByKey(featureKey);
-  if (!feature) return 0;
+  if (!feature) return null;
   
-  const businessCredits = (feature as any).businessCredits;
-  const regularCredits = (feature as any).regularCredits;
-  
-  if (!businessCredits || !regularCredits || businessCredits >= regularCredits) return 0;
-  
-  return Math.round((1 - businessCredits / regularCredits) * 100);
+  return (feature as any).proBenefit || null;
 }
 
-// Calculate total value of business plan credits
-export function calculateBusinessCreditValue(credits: number = 120): {
-  pulseBoosts: number;
-  categorySpotlights: number; 
-  megaPulses: number;
-  totalRegularValue: number;
+// Calculate Sellar Pro value proposition
+export function calculateSellarProValue(): {
+  autoRefreshBenefit: string;
+  unlimitedListings: boolean;
+  prioritySupport: boolean;
+  comprehensiveAnalytics: boolean;
 } {
-  const pulseBoosts = Math.floor(credits / 1);      // 120 possible
-  const categorySpotlights = Math.floor(credits / 2); // 60 possible  
-  const megaPulses = Math.floor(credits / 3);       // 40 possible
-  
-  // Calculate what this would cost in regular credits
-  const totalRegularValue = (pulseBoosts * 15) + (categorySpotlights * 35) + (megaPulses * 50);
-  
   return {
-    pulseBoosts,
-    categorySpotlights,
-    megaPulses,
-    totalRegularValue
+    autoRefreshBenefit: 'Auto-refresh every 2 hours (stays at top)',
+    unlimitedListings: true,
+    prioritySupport: true,
+    comprehensiveAnalytics: true,
   };
 }
 

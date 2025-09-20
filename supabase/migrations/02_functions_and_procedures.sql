@@ -846,7 +846,6 @@ BEGIN
     IF user_subscription IS NULL THEN
         entitlements := jsonb_build_object(
             'max_listings', 5,
-            'boost_credits', 0,
             'analytics_level', 'none',
             'priority_support', false,
             'business_badge', false,
@@ -860,7 +859,6 @@ BEGIN
             -- New array format - map to entitlements object
             entitlements := jsonb_build_object(
                 'max_listings', CASE WHEN user_subscription.features ? 'unlimited_listings' THEN 999999 ELSE 5 END,
-                'boost_credits', CASE WHEN user_subscription.features ? '120_boost_credits_monthly' THEN 120 ELSE 0 END,
                 'analytics_level', CASE 
                     WHEN user_subscription.features ? 'comprehensive_analytics' THEN 'full'
                     WHEN user_subscription.features ? 'basic_analytics' THEN 'basic'

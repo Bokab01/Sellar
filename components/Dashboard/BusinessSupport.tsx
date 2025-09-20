@@ -70,20 +70,28 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
   };
 
   const handleCreateTicket = () => {
-    router.push('/(tabs)/more/settings'); // Navigate to support section
+    router.push('/support-tickets'); // Navigate to support section
   };
 
   const handleContactSupport = (method: 'phone' | 'email' | 'chat') => {
     switch (method) {
       case 'phone':
-        Linking.openURL('tel:+1-800-SELLAR-1');
+        Linking.openURL('tel:+233243887777');
         break;
       case 'email':
-        Linking.openURL('mailto:business@sellar.app?subject=Business Support Request');
+        Linking.openURL('mailto:prosupport@sellarghana.com?subject=Sellar Pro Support Request');
         break;
       case 'chat':
-        // Navigate to live chat
-        router.push('/support-tickets');
+        // Open WhatsApp
+        const phoneNumber = '233244857777'; // Ghana number without + sign
+        const message = 'Hello! I need help with my Sellar Pro account.';
+        const whatsappUrl = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
+        
+        Linking.openURL(whatsappUrl).catch(() => {
+          // Fallback to web WhatsApp if app is not installed
+          const webWhatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+          Linking.openURL(webWhatsappUrl);
+        });
         break;
     }
   };
@@ -141,7 +149,7 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
             </View>
             <View style={{ flex: 1 }}>
               <Text variant="h3" style={{ marginBottom: theme.spacing.xs, color: theme.colors.success }}>
-                Priority Business Support
+                Priority Sellar Pro Support
               </Text>
               <Text variant="body" color="secondary">
                 Get expert help with faster response times and dedicated support
@@ -155,7 +163,7 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
             marginBottom: theme.spacing.lg,
           }}>
             <View style={{ alignItems: 'center' }}>
-              <Text variant="h3" style={{ color: theme.colors.success, fontWeight: '700' }}>
+              <Text variant="body" style={{ color: theme.colors.success, fontWeight: '700' }}>
                 &lt; 2h
               </Text>
               <Text variant="caption" color="secondary" style={{ fontWeight: '600' }}>
@@ -164,34 +172,36 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
             </View>
             
             <View style={{ alignItems: 'center' }}>
-              <Text variant="h3" style={{ color: theme.colors.primary, fontWeight: '700' }}>
-                24/7
+              <Text variant="body" style={{ color: theme.colors.primary, fontWeight: '700' }}>
+                08:00 - 20:00
               </Text>
               <Text variant="caption" color="secondary" style={{ fontWeight: '600' }}>
-                Availability
+                Working Hours
               </Text>
             </View>
             
             <View style={{ alignItems: 'center' }}>
-              <Text variant="h3" style={{ color: theme.colors.warning, fontWeight: '700' }}>
-                Expert
+              <Text variant="body" style={{ color: theme.colors.warning, fontWeight: '700' }}>
+                Support Team  
               </Text>
               <Text variant="caption" color="secondary" style={{ fontWeight: '600' }}>
-                Specialists
+                Support
               </Text>
             </View>
           </View>
 
-          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+          <View style={{ flexDirection: 'row', gap: theme.spacing.sm, justifyContent: 'center', alignItems: 'center' }}>
             <Button
               variant="secondary"
               onPress={() => handleContactSupport('chat')}
               style={{ flex: 1 }}
             >
-              <MessageCircle size={18} color={theme.colors.success} />
-              <Text variant="body" style={{ color: theme.colors.success, marginLeft: theme.spacing.sm, fontWeight: '600' }}>
-                Live Chat
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                <MessageCircle size={16} color={theme.colors.success} />
+                <Text variant="body" style={{ color: theme.colors.success, marginLeft: theme.spacing.sm, fontWeight: '600' }}>
+                  Live Chat
+                </Text>
+              </View>
             </Button>
             
             <Button
@@ -199,10 +209,12 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
               onPress={() => handleContactSupport('phone')}
               style={{ flex: 1 }}
             >
-              <Phone size={18} color={theme.colors.text.secondary} />
-              <Text variant="body" style={{ color: theme.colors.text.secondary, marginLeft: theme.spacing.sm, fontWeight: '600' }}>
-                Call Now
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                <Phone size={16} color={theme.colors.text.secondary} />
+                <Text variant="body" style={{ color: theme.colors.text.secondary, marginLeft: theme.spacing.sm, fontWeight: '600' }}>
+                  Call Now
+                </Text>
+              </View>
             </Button>
           </View>
         </View>
@@ -243,7 +255,7 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
                       Live Chat Support
                     </Text>
                     <Text variant="caption" color="secondary">
-                      Instant help from our experts
+                      Instant help via WhatsApp
                     </Text>
                   </View>
                 </View>
@@ -273,7 +285,7 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
                       Phone Support
                     </Text>
                     <Text variant="caption" color="secondary">
-                      +1-800-SELLAR-1 (24/7)
+                      0243887777 (08:00 - 20:00)
                     </Text>
                   </View>
                 </View>
@@ -303,7 +315,7 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
                       Email Support
                     </Text>
                     <Text variant="caption" color="secondary">
-                      business@sellar.app
+                      prosupport@sellarghana.com
                     </Text>
                   </View>
                 </View>
@@ -356,7 +368,7 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
         }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.lg }}>
             <Text variant="h4">Recent Support Tickets</Text>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/more/settings')}>
+            <TouchableOpacity onPress={handleCreateTicket}>
               <Text variant="body" style={{ color: theme.colors.primary, fontWeight: '600' }}>
                 View All
               </Text>
@@ -430,12 +442,27 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
           borderColor: theme.colors.border,
         }}>
           <Text variant="h4" style={{ marginBottom: theme.spacing.lg }}>
-            Business Resources
+            Sellar Pro Resources
           </Text>
           
           <View style={{ gap: theme.spacing.md }}>
             <TouchableOpacity
-              onPress={() => Linking.openURL('https://sellar.app/business-guide')}
+              onPress={() => {
+                Alert.alert(
+                  'Sellar Pro Success Guide',
+                  'This comprehensive guide will open in your browser. It contains detailed strategies, tips, and best practices to maximize your Pro plan benefits.',
+                  [
+                    {
+                      text: 'Open Guide',
+                      onPress: () => Linking.openURL('https://sellarghana.com/pro-success-guide'),
+                    },
+                    {
+                      text: 'Cancel',
+                      style: 'cancel',
+                    },
+                  ]
+                );
+              }}
               style={{
                 backgroundColor: theme.colors.background,
                 borderRadius: theme.borderRadius.lg,
@@ -453,10 +480,10 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
                   <BookOpen size={20} color={theme.colors.primary} />
                   <View style={{ marginLeft: theme.spacing.sm }}>
                     <Text variant="body" style={{ fontWeight: '600' }}>
-                      Business Success Guide
+                      Sellar Pro Success Guide
                     </Text>
                     <Text variant="caption" color="secondary">
-                      Tips and strategies for growth
+                      Complete guide to maximizing your Pro benefits
                     </Text>
                   </View>
                 </View>
@@ -465,7 +492,7 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => Linking.openURL('https://sellar.app/webinars')}
+              onPress={() => Alert.alert('Sellar Pro Webinars', 'No webinars scheduled at the moment. Check back later for updates.')}
               style={{
                 backgroundColor: theme.colors.background,
                 borderRadius: theme.borderRadius.lg,
@@ -483,7 +510,7 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
                   <Video size={20} color={theme.colors.success} />
                   <View style={{ marginLeft: theme.spacing.sm }}>
                     <Text variant="body" style={{ fontWeight: '600' }}>
-                      Business Webinars
+                      Sellar Pro Webinars
                     </Text>
                     <Text variant="caption" color="secondary">
                       Weekly training sessions
@@ -495,7 +522,7 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => Linking.openURL('https://sellar.app/community')}
+              onPress={() => router.push('/community')}
               style={{
                 backgroundColor: theme.colors.background,
                 borderRadius: theme.borderRadius.lg,
@@ -513,7 +540,7 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
                   <Users size={20} color={theme.colors.info} />
                   <View style={{ marginLeft: theme.spacing.sm }}>
                     <Text variant="body" style={{ fontWeight: '600' }}>
-                      Business Community
+                      Sellar Pro Community
                     </Text>
                     <Text variant="caption" color="secondary">
                       Connect with other sellers
@@ -526,8 +553,9 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => Linking.openURL('https://calendly.com/sellar-business')}
+            {/* TODO: Later, we will add a 1-on-1 consultation booking feature */}
+            {/* <TouchableOpacity
+              onPress={() => Linking.openURL('https://calendly.com/sellar-pro')}
               style={{
                 backgroundColor: theme.colors.background,
                 borderRadius: theme.borderRadius.lg,
@@ -554,7 +582,7 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
                 </View>
                 <Badge text="Free" variant="success" />
               </View>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
         </View>
 
@@ -590,7 +618,7 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
               <Text style={{ fontWeight: '600' }}>Excellent Support Rating</Text>
             </Text>
             <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
-              Based on 2,847 business customer reviews
+              Based on 2,847 Sellar Pro customer reviews
             </Text>
           </View>
         </View>

@@ -43,10 +43,10 @@ export function CommentCard({
   const { user } = useAuthStore();
 
   const depth = comment.depth || 0;
-  const canReply = depth < maxDepth;
+  const canReply = depth === 0; // Only allow replies to top-level comments (depth 0)
   const isOwnComment = user?.id === comment.author.id;
 
-  const leftMargin = depth * theme.spacing.xl;
+  const leftMargin = depth * theme.spacing.lg; // Reduced from xl to lg
 
   return (
     <View style={style}>
@@ -54,9 +54,9 @@ export function CommentCard({
         style={{
           marginLeft: leftMargin,
           backgroundColor: depth > 0 ? theme.colors.surfaceVariant : theme.colors.surface,
-          borderRadius: theme.borderRadius.md,
-          padding: theme.spacing.md,
-          borderLeftWidth: depth > 0 ? 3 : 0,
+          borderRadius: theme.borderRadius.sm, // Reduced from md to sm
+          padding: theme.spacing.sm, // Reduced from md to sm
+          borderLeftWidth: depth > 0 ? 2 : 0, // Reduced from 3 to 2
           borderLeftColor: theme.colors.primary + '30',
         }}
       >
@@ -66,7 +66,7 @@ export function CommentCard({
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
-            marginBottom: theme.spacing.sm,
+            marginBottom: theme.spacing.xs, // Reduced from sm to xs
           }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
@@ -78,7 +78,7 @@ export function CommentCard({
                 source={comment.author.avatar}
                 name={comment.author.name}
                 size="xs"
-                style={{ marginRight: theme.spacing.sm }}
+                style={{ marginRight: theme.spacing.xs }} // Reduced from sm to xs
               />
             </TouchableOpacity>
             
@@ -112,11 +112,11 @@ export function CommentCard({
 
         {/* Comment Content */}
         <Text
-          variant="body"
+          variant="bodySmall" // Changed from body to bodySmall
           style={{
-            lineHeight: 20,
-            marginBottom: theme.spacing.md,
-            marginLeft: 32, // Align with avatar
+            lineHeight: 18, // Reduced from 20 to 18
+            marginBottom: theme.spacing.sm, // Reduced from md to sm
+            marginLeft: 28, // Reduced from 32 to 28 to align with smaller avatar
           }}
         >
           {comment.content}
@@ -127,8 +127,8 @@ export function CommentCard({
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            gap: theme.spacing.lg,
-            marginLeft: 32, // Align with avatar
+            gap: theme.spacing.md, // Reduced from lg to md
+            marginLeft: 28, // Reduced from 32 to 28 to align with smaller avatar
           }}
         >
           <TouchableOpacity
@@ -168,7 +168,7 @@ export function CommentCard({
 
       {/* Nested Replies */}
       {comment.replies && comment.replies.length > 0 && (
-        <View style={{ marginTop: theme.spacing.sm }}>
+        <View style={{ marginTop: theme.spacing.xs }}> {/* Reduced from sm to xs */}
           {comment.replies.map((reply) => (
             <CommentCard
               key={reply.id}

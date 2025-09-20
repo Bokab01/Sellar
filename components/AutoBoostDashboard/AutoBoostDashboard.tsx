@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, ScrollView, Alert } from 'react-native';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { View, Alert, FlatList, RefreshControl } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
@@ -16,121 +16,377 @@ import {
   Calendar,
   CheckCircle,
   AlertCircle,
-  Info
+  Info,
+  RefreshCw,
+  BarChart3
 } from 'lucide-react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { useBusinessFeatures } from '@/hooks/useBusinessFeatures';
 import { supabase } from '@/lib/supabase';
+import { router } from 'expo-router';
 
-interface AutoBoostSettings {
+interface UserListing {
+  id: string;
+  title: string;
+  status: string;
+  boost_until?: string;
+  updated_at: string;
+}
+
+interface AutoRefreshSettings {
   enabled: boolean;
-  boostDuration: number; // in days
-  maxBoostsPerMonth: number;
-  boostCreditsUsed: number;
-  nextBoostDate?: string;
-  activeBoosts: Array<{
+  autoRefreshEnabled: boolean;
+  activeListings: Array<{
     listingId: string;
     listingTitle: string;
-    startDate: string;
-    endDate: string;
-    creditsUsed: number;
+    lastRefresh: string;
+    nextRefresh: string;
+    boostUntil?: string;
+    isBoosted: boolean;
+    hasAutoRefresh: boolean;
   }>;
 }
 
-export function AutoBoostDashboard() {
+// ListingItem component defined outside to avoid hooks issues
+const ListingItem = React.memo(({ 
+  listing, 
+  index, 
+  theme, 
+  settings, 
+  userListings, 
+  toggleAutoRefreshForListing, 
+  updating, 
+  formatNextRefresh, 
+  formatTimeRemaining 
+}: { 
+  listing: UserListing; 
+  index: number;
+  theme: any;
+  settings: AutoRefreshSettings;
+  userListings: UserListing[];
+  toggleAutoRefreshForListing: (id: string) => void;
+  updating: boolean;
+  formatNextRefresh: (date: string) => string;
+  formatTimeRemaining: (date: string) => string;
+}) => {
+  const isBoosted = !!listing.boost_until && new Date(listing.boost_until) > new Date();
+  const autoRefreshItem = settings.activeListings.find(item => item.listingId === listing.id);
+  const hasAutoRefresh = autoRefreshItem?.hasAutoRefresh || false;
+  const nextRefresh = autoRefreshItem?.nextRefresh;
+  
+  return (
+    <View
+      style={{
+        backgroundColor: theme.colors.surfaceVariant,
+        borderRadius: theme.borderRadius.lg,
+        padding: theme.spacing.lg,
+        borderWidth: 1,
+        borderColor: hasAutoRefresh ? theme.colors.success + '20' : theme.colors.border,
+        marginBottom: index < userListings.length - 1 ? theme.spacing.md : 0,
+      }}
+    >
+      <View style={{
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginBottom: theme.spacing.md,
+      }}>
+        <View style={{
+          backgroundColor: hasAutoRefresh ? theme.colors.success + '15' : theme.colors.border + '15',
+          borderRadius: theme.borderRadius.lg,
+          padding: theme.spacing.md,
+          marginRight: theme.spacing.md,
+          borderWidth: 1,
+          borderColor: hasAutoRefresh ? theme.colors.success + '30' : theme.colors.border,
+        }}>
+          <RefreshCw size={20} color={hasAutoRefresh ? theme.colors.success : theme.colors.border} />
+        </View>
+        
+        <View style={{ flex: 1 }}>
+          <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.sm }}>
+            {listing.title}
+          </Text>
+          
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: theme.spacing.lg,
+            marginBottom: theme.spacing.sm,
+          }}>
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.borderRadius.md,
+              paddingHorizontal: theme.spacing.sm,
+              paddingVertical: theme.spacing.xs,
+            }}>
+              <Clock size={14} color={theme.colors.primary} />
+              <Text variant="caption" color="secondary" style={{ marginLeft: theme.spacing.xs }}>
+                {hasAutoRefresh ? `Next: ${formatNextRefresh(nextRefresh || '')}` : 'Disabled'}
+              </Text>
+            </View>
+            
+            {isBoosted && listing.boost_until && (
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: theme.colors.warning + '10',
+                borderRadius: theme.borderRadius.md,
+                paddingHorizontal: theme.spacing.sm,
+                paddingVertical: theme.spacing.xs,
+                borderWidth: 1,
+                borderColor: theme.colors.warning + '20',
+              }}>
+                <Zap size={14} color={theme.colors.warning} />
+                <Text variant="caption" color="secondary" style={{ marginLeft: theme.spacing.xs }}>
+                  {formatTimeRemaining(listing.boost_until)}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+      
+      <View style={{
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+      }}>
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+        }}>
+          <View style={{
+            backgroundColor: hasAutoRefresh ? theme.colors.success + '10' : theme.colors.border + '10',
+            borderRadius: theme.borderRadius.md,
+            paddingHorizontal: theme.spacing.md,
+            paddingVertical: theme.spacing.sm,
+            borderWidth: 1,
+            borderColor: hasAutoRefresh ? theme.colors.success + '20' : theme.colors.border,
+          }}>
+            <Text variant="caption" style={{
+              color: hasAutoRefresh ? theme.colors.success : theme.colors.border,
+              fontWeight: '600',
+            }}>
+              {hasAutoRefresh ? '✓ Auto-Refreshing' : '○ Disabled'}
+            </Text>
+          </View>
+        </View>
+        
+        <Button
+          variant={hasAutoRefresh ? 'tertiary' : 'primary'}
+          size="sm"
+          onPress={() => toggleAutoRefreshForListing(listing.id)}
+          style={{
+            minWidth: 80,
+          }}
+          disabled={updating}
+        >
+          <Text variant="caption" style={{
+            color: hasAutoRefresh ? theme.colors.primary : theme.colors.surface,
+            fontWeight: '600',
+          }}>
+            {hasAutoRefresh ? 'Disable' : 'Enable'}
+          </Text>
+        </Button>
+      </View>
+    </View>
+  );
+});
+
+export default function AutoBoostDashboard() {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { creditBalance } = useMonetizationStore();
+  const { hasBusinessPlan } = useMonetizationStore();
   const businessFeatures = useBusinessFeatures();
   
-  const [settings, setSettings] = useState<AutoBoostSettings>({
+  const [settings, setSettings] = useState<AutoRefreshSettings>({
     enabled: false,
-    boostDuration: 3,
-    maxBoostsPerMonth: 10,
-    boostCreditsUsed: 0,
-    activeBoosts: [],
+    autoRefreshEnabled: true,
+    activeListings: [],
   });
   
+  const [userListings, setUserListings] = useState<UserListing[]>([]);
+  const [allListings, setAllListings] = useState<UserListing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMoreData, setHasMoreData] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  
+  const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
-    fetchAutoBoostSettings();
+    fetchAutoRefreshSettings();
   }, []);
 
-  const fetchAutoBoostSettings = async () => {
+  const fetchAutoRefreshSettings = async (page = 1, isRefresh = false) => {
     if (!user) return;
-
-    setLoading(true);
+    
+    if (isRefresh) {
+      setRefreshing(true);
+    } else if (page === 1) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+    
     try {
-      // Fetch auto-boost settings for unified business plan
-      const mockSettings: AutoBoostSettings = {
-        enabled: businessFeatures.hasAutoBoost,
-        boostDuration: 3, // Unified plan gets 3-day boosts
-        maxBoostsPerMonth: Math.floor(120 / 15), // 120 credits / 15 credits per boost = 8 boosts
-        boostCreditsUsed: Math.floor(Math.random() * 50),
-        nextBoostDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-        activeBoosts: [
-          {
-            listingId: '1',
-            listingTitle: 'iPhone 13 Pro Max',
-            startDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-            endDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-            creditsUsed: 15,
-          },
-          {
-            listingId: '2',
-            listingTitle: 'MacBook Air M2',
-            startDate: new Date(Date.now() - 0.5 * 24 * 60 * 60 * 1000).toISOString(),
-            endDate: new Date(Date.now() + 2.5 * 24 * 60 * 60 * 1000).toISOString(),
-            creditsUsed: 15,
-          },
-        ],
+      const from = (page - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+      
+      const { data: listings, error: listingsError } = await supabase
+        .from('listings')
+        .select('id, title, status, boost_until, updated_at')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('updated_at', { ascending: false })
+        .range(from, to);
+
+      if (listingsError) {
+        console.error('Error fetching listings:', listingsError);
+      } else {
+        const newListings = listings || [];
+        
+        if (page === 1 || isRefresh) {
+          setUserListings(newListings);
+          setAllListings(newListings);
+        } else {
+          setUserListings(prev => [...prev, ...newListings]);
+          setAllListings(prev => [...prev, ...newListings]);
+        }
+        
+        setHasMoreData(newListings.length === ITEMS_PER_PAGE);
+        setCurrentPage(page);
+      }
+
+      const { data: autoRefreshData, error: autoRefreshError } = await supabase
+        .from('business_auto_refresh')
+        .select(`
+          *,
+          listings!inner(id, title, status, boost_until, updated_at)
+        `)
+        .eq('user_id', user.id)
+        .eq('is_active', true);
+
+      if (autoRefreshError) {
+        console.error('Error fetching auto-refresh settings:', autoRefreshError);
+      }
+
+      const activeListings = (listings || []).map(listing => {
+        const isBoosted = !!listing.boost_until && new Date(listing.boost_until) > new Date();
+        const autoRefreshItem = autoRefreshData?.find(item => item.listing_id === listing.id);
+        const hasAutoRefresh = !!autoRefreshItem && autoRefreshItem.is_active;
+        
+        return {
+          listingId: listing.id,
+          listingTitle: listing.title,
+          lastRefresh: autoRefreshItem?.last_refresh_at || autoRefreshItem?.created_at || listing.updated_at,
+          nextRefresh: autoRefreshItem?.next_refresh_at || (hasAutoRefresh ? new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() : ''),
+          boostUntil: listing.boost_until,
+          isBoosted,
+          hasAutoRefresh,
+        };
+      });
+
+      const settings: AutoRefreshSettings = {
+        enabled: true,
+        autoRefreshEnabled: true,
+        activeListings,
       };
 
-      setSettings(mockSettings);
+      setSettings(settings);
     } catch (error) {
-      console.error('Error fetching auto-boost settings:', error);
+      console.error('Error fetching auto-refresh settings:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
+      setLoadingMore(false);
     }
   };
 
-  const toggleAutoBoost = async () => {
+  const loadMoreListings = useCallback(() => {
+    if (!loadingMore && hasMoreData) {
+      fetchAutoRefreshSettings(currentPage + 1);
+    }
+  }, [currentPage, loadingMore, hasMoreData]);
+
+  const onRefresh = useCallback(() => {
+    setCurrentPage(1);
+    setHasMoreData(true);
+    fetchAutoRefreshSettings(1, true);
+  }, []);
+
+  const toggleAutoRefreshForListing = useCallback(async (listingId: string) => {
+    if (!user) return;
+    
     setUpdating(true);
     try {
-      const newEnabled = !settings.enabled;
-      
-      // Update settings
-      setSettings(prev => ({ ...prev, enabled: newEnabled }));
-      
-      // In a real implementation, you would update the database here
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      
-      Alert.alert(
-        'Auto-boost Updated',
-        `Auto-boost has been ${newEnabled ? 'enabled' : 'disabled'}.`,
-        [{ text: 'OK' }]
+      const existingAutoRefresh = settings.activeListings.find(
+        listing => listing.listingId === listingId && listing.hasAutoRefresh
       );
+      
+      if (existingAutoRefresh) {
+        const { error } = await supabase
+          .from('business_auto_refresh')
+          .update({ is_active: false })
+          .eq('user_id', user.id)
+          .eq('listing_id', listingId);
+
+        if (error) {
+          console.error('Error disabling auto-refresh:', error);
+          Alert.alert('Error', 'Failed to disable auto-refresh for this listing.');
+        } else {
+          setSettings(prev => ({
+            ...prev,
+            activeListings: prev.activeListings.map(listing => 
+              listing.listingId === listingId 
+                ? { ...listing, hasAutoRefresh: false }
+                : listing
+            )
+          }));
+        }
+      } else {
+        const { error } = await supabase
+          .from('business_auto_refresh')
+          .insert({
+            user_id: user.id,
+            listing_id: listingId,
+            refresh_interval_hours: 2,
+            next_refresh_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+          });
+
+        if (error) {
+          console.error('Error enabling auto-refresh:', error);
+          Alert.alert('Error', 'Failed to enable auto-refresh for this listing.');
+        } else {
+          setSettings(prev => ({
+            ...prev,
+            activeListings: prev.activeListings.map(listing => 
+              listing.listingId === listingId 
+                ? { ...listing, hasAutoRefresh: true }
+                : listing
+            )
+          }));
+        }
+      }
     } catch (error) {
-      Alert.alert('Error', 'Failed to update auto-boost settings.');
+      console.error('Error toggling auto-refresh:', error);
+      Alert.alert('Error', 'Failed to update auto-refresh for this listing.');
     } finally {
       setUpdating(false);
     }
-  };
+  }, [user, settings.activeListings]);
 
-  const updateBoostDuration = (duration: number) => {
-    setSettings(prev => ({ ...prev, boostDuration: duration }));
-  };
+  const getActiveListingsCount = useMemo(() => {
+    return settings.activeListings.filter(listing => listing.hasAutoRefresh).length;
+  }, [settings.activeListings]);
 
-  const getRemainingCredits = () => {
-    return Math.max(0, 120 - settings.boostCreditsUsed); // Unified plan has 120 monthly credits
-  };
-
-  const getEstimatedBoosts = () => {
-    return Math.floor(getRemainingCredits() / 15); // 15 credits per boost
-  };
+  const getTotalListingsCount = useMemo(() => {
+    return allListings.length;
+  }, [allListings]);
 
   const formatTimeRemaining = (endDate: string) => {
     const now = new Date();
@@ -145,281 +401,455 @@ export function AutoBoostDashboard() {
     return `${diffDays}d remaining`;
   };
 
+  const formatNextRefresh = (nextRefreshDate: string) => {
+    const now = new Date();
+    const next = new Date(nextRefreshDate);
+    const diffMs = next.getTime() - now.getTime();
+    const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
+    
+    if (diffHours <= 0) return 'Due now';
+    if (diffHours < 24) return `In ${diffHours}h`;
+    
+    const diffDays = Math.ceil(diffHours / 24);
+    return `In ${diffDays}d`;
+  };
+
+  const renderItem = useCallback(({ item }: { item: any }) => {
+    if (item.type === 'header') {
+      return (
+        <View style={{ padding: theme.spacing.md }}>
+          {/* Auto-Refresh Status Card */}
+          <View style={{
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.borderRadius.md,
+            padding: theme.spacing.md,
+            marginBottom: theme.spacing.xl,
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+            ...theme.shadows.sm,
+          }}>
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: theme.spacing.xl,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{
+                  backgroundColor: theme.colors.primary + '10',
+                  borderRadius: theme.borderRadius.lg,
+                  padding: theme.spacing.md,
+                  marginRight: theme.spacing.lg,
+                  borderWidth: 2,
+                  borderColor: theme.colors.primary + '20',
+                }}>
+                  <RefreshCw size={24} color={theme.colors.primary} />
+                </View>
+                <View>
+                  <Text variant="h4" style={{ fontWeight: '700', marginBottom: theme.spacing.xs }}>
+                    Auto-Refresh System
+                  </Text>
+                  <Text variant="body" color="secondary" style={{ lineHeight: 20 }}>
+                    Your listings go top every 2 hours
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              gap: theme.spacing.sm,
+            }}>
+              <View style={{
+                flex: 1,
+                backgroundColor: theme.colors.surfaceVariant,
+                borderRadius: theme.borderRadius.md,
+                padding: theme.spacing.md,
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                minWidth: 0,
+              }}>
+                <View style={{
+                  backgroundColor: theme.colors.success + '15',
+                  borderRadius: theme.borderRadius.full,
+                  padding: theme.spacing.xs,
+                  marginBottom: theme.spacing.xs,
+                }}>
+                  <CheckCircle size={16} color={theme.colors.success} />
+                </View>
+                <Text variant="body" style={{ fontWeight: '600', color: theme.colors.success, marginBottom: theme.spacing.xs }}>
+                  Active
+                </Text>
+                <Text variant="caption" color="muted" style={{ textAlign: 'center', fontSize: 10 }}>
+                  Status
+                </Text>
+              </View>
+              
+              <View style={{
+                flex: 1,
+                backgroundColor: theme.colors.surfaceVariant,
+                borderRadius: theme.borderRadius.md,
+                padding: theme.spacing.md,
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                minWidth: 0,
+              }}>
+                <View style={{
+                  backgroundColor: theme.colors.primary + '15',
+                  borderRadius: theme.borderRadius.full,
+                  padding: theme.spacing.xs,
+                  marginBottom: theme.spacing.xs,
+                }}>
+                  <Clock size={16} color={theme.colors.primary} />
+                </View>
+                <Text variant="body" style={{ fontWeight: '600', color: theme.colors.primary, marginBottom: theme.spacing.xs }}>
+                  2h
+                </Text>
+                <Text variant="caption" color="muted" style={{ textAlign: 'center', fontSize: 10 }}>
+                  Interval
+                </Text>
+              </View>
+              
+              <View style={{
+                flex: 1,
+                backgroundColor: theme.colors.surfaceVariant,
+                borderRadius: theme.borderRadius.md,
+                padding: theme.spacing.md,
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                minWidth: 0,
+              }}>
+                <View style={{
+                  backgroundColor: theme.colors.warning + '15',
+                  borderRadius: theme.borderRadius.full,
+                  padding: theme.spacing.xs,
+                  marginBottom: theme.spacing.xs,
+                }}>
+                  <RefreshCw size={16} color={theme.colors.warning} />
+                </View>
+                <Text variant="body" style={{ fontWeight: '600', color: theme.colors.warning, marginBottom: theme.spacing.xs }}>
+                  {getActiveListingsCount}
+                </Text>
+                <Text variant="caption" color="muted" style={{ textAlign: 'center', fontSize: 10 }}>
+                  Refreshing
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Auto-Refresh Info */}
+          <View style={{
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.borderRadius.md,
+            padding: theme.spacing.xl,
+            marginBottom: theme.spacing.xl,
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+            ...theme.shadows.sm,
+          }}>
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginBottom: theme.spacing.lg,
+            }}>
+              <View style={{
+                backgroundColor: theme.colors.primary + '10',
+                borderRadius: theme.borderRadius.lg,
+                padding: theme.spacing.md,
+                marginRight: theme.spacing.md,
+              }}>
+                <Info size={24} color={theme.colors.primary} />
+              </View>
+              <Text variant="h4" style={{ fontWeight: '700' }}>
+                How Auto-Refresh Works
+              </Text>
+            </View>
+
+            <View style={{
+              backgroundColor: theme.colors.primary + '05',
+              borderRadius: theme.borderRadius.lg,
+              padding: theme.spacing.lg,
+              borderWidth: 1,
+              borderColor: theme.colors.primary + '10',
+            }}>
+              <Text variant="body" color="secondary" style={{ 
+                lineHeight: 24,
+                marginBottom: theme.spacing.md,
+              }}>
+                Auto-refresh automatically updates your listings every 2 hours to keep them at the top of search results. 
+                You can enable or disable auto-refresh for individual listings.
+              </Text>
+              
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.sm,
+              }}>
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  flex: 1,
+                  minWidth: 0,
+                }}>
+                  <View style={{
+                    backgroundColor: theme.colors.success + '15',
+                    borderRadius: theme.borderRadius.sm,
+                    padding: theme.spacing.xs,
+                    marginRight: theme.spacing.xs,
+                  }}>
+                    <CheckCircle size={14} color={theme.colors.success} />
+                  </View>
+                  <Text variant="caption" color="secondary" style={{ fontSize: 11 }}>
+                    Auto every 2h
+                  </Text>
+                </View>
+                
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  flex: 1,
+                  minWidth: 0,
+                }}>
+                  <View style={{
+                    backgroundColor: theme.colors.primary + '15',
+                    borderRadius: theme.borderRadius.sm,
+                    padding: theme.spacing.xs,
+                    marginRight: theme.spacing.xs,
+                  }}>
+                    <Settings size={14} color={theme.colors.primary} />
+                  </View>
+                  <Text variant="caption" color="secondary" style={{ fontSize: 11 }}>
+                    Per-listing
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Listings Section */}
+          <View style={{
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.borderRadius.md,
+            padding: theme.spacing.xl,
+            marginBottom: theme.spacing.xl,
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+            ...theme.shadows.sm,
+          }}>
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginBottom: theme.spacing.xl,
+            }}>
+              <View style={{
+                backgroundColor: theme.colors.warning + '10',
+                borderRadius: theme.borderRadius.lg,
+                padding: theme.spacing.md,
+                marginRight: theme.spacing.md,
+              }}>
+                <TrendingUp size={24} color={theme.colors.warning} />
+              </View>
+              <View>
+                <Text variant="h4" style={{ fontWeight: '700', marginBottom: theme.spacing.xs }}>
+                  Your Listings
+                </Text>
+                <Text variant="body" color="secondary">
+                  Manage auto-refresh for each listing
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    if (item.type === 'footer') {
+      return (
+        <View style={{ padding: theme.spacing.md }}>
+          {/* Auto-Refresh Summary */}
+          <View style={{
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.borderRadius.md,
+            padding: theme.spacing.xl,
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+            ...theme.shadows.sm,
+          }}>
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginBottom: theme.spacing.lg,
+            }}>
+              <View style={{
+                backgroundColor: theme.colors.primary + '10',
+                borderRadius: theme.borderRadius.lg,
+                padding: theme.spacing.md,
+                marginRight: theme.spacing.md,
+              }}>
+                <BarChart3 size={24} color={theme.colors.primary} />
+              </View>
+              <Text variant="h4" style={{ 
+                fontWeight: '700',
+              }}>
+                Performance Summary
+              </Text>
+            </View>
+            
+            <Text variant="body" color="secondary" style={{ 
+              marginBottom: theme.spacing.lg,
+              lineHeight: 22,
+            }}>
+              Your listings automatically refresh every 2 hours to stay at the top of search results.
+            </Text>
+            
+            <View style={{ 
+              flexDirection: 'row', 
+              gap: theme.spacing.sm,
+            }}>
+              <View style={{
+                flex: 1,
+                backgroundColor: theme.colors.surfaceVariant,
+                borderRadius: theme.borderRadius.md,
+                padding: theme.spacing.md,
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                minWidth: 0,
+              }}>
+                <View style={{
+                  backgroundColor: theme.colors.primary + '15',
+                  borderRadius: theme.borderRadius.full,
+                  padding: theme.spacing.xs,
+                  marginBottom: theme.spacing.xs,
+                }}>
+                  <TrendingUp size={16} color={theme.colors.primary} />
+                </View>
+                <Text variant="body" style={{ fontWeight: '600', color: theme.colors.primary, marginBottom: theme.spacing.xs }}>
+                  {getTotalListingsCount}
+                </Text>
+                <Text variant="caption" color="muted" style={{ textAlign: 'center', fontSize: 10 }}>
+                  Total
+                </Text>
+              </View>
+              
+              <View style={{
+                flex: 1,
+                backgroundColor: theme.colors.surfaceVariant,
+                borderRadius: theme.borderRadius.md,
+                padding: theme.spacing.md,
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                minWidth: 0,
+              }}>
+                <View style={{
+                  backgroundColor: theme.colors.success + '15',
+                  borderRadius: theme.borderRadius.full,
+                  padding: theme.spacing.xs,
+                  marginBottom: theme.spacing.xs,
+                }}>
+                  <RefreshCw size={16} color={theme.colors.success} />
+                </View>
+                <Text variant="body" style={{ fontWeight: '600', color: theme.colors.success, marginBottom: theme.spacing.xs }}>
+                  {getActiveListingsCount}
+                </Text>
+                <Text variant="caption" color="muted" style={{ textAlign: 'center', fontSize: 10 }}>
+                  Refreshing
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    if (item.type === 'listing') {
+      return (
+        <ListingItem 
+          listing={item} 
+          index={item.originalIndex}
+          theme={theme}
+          settings={settings}
+          userListings={userListings}
+          toggleAutoRefreshForListing={toggleAutoRefreshForListing}
+          updating={updating}
+          formatNextRefresh={formatNextRefresh}
+          formatTimeRemaining={formatTimeRemaining}
+        />
+      );
+    }
+
+    return null;
+  }, [theme, getActiveListingsCount, getTotalListingsCount, settings, userListings, toggleAutoRefreshForListing, updating, formatNextRefresh, formatTimeRemaining]);
+
+  const flatListData = useMemo(() => {
+    const data = [];
+    
+    data.push({ id: 'header', type: 'header' });
+    
+    userListings.forEach((listing, index) => {
+      data.push({ ...listing, type: 'listing', originalIndex: index });
+    });
+    
+    data.push({ id: 'footer', type: 'footer' });
+    
+    return data;
+  }, [userListings]);
+
   if (loading) {
     return (
-      <View style={{ padding: theme.spacing.lg, gap: theme.spacing.lg }}>
+      <View style={{ padding: theme.spacing.md, gap: theme.spacing.md }}>
         <LoadingSkeleton count={3} height={120} />
       </View>
     );
   }
 
   return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: theme.spacing.lg }}>
-      {/* Auto-boost Status Card */}
-      <View style={{
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.borderRadius.lg,
-        padding: theme.spacing.lg,
-        marginBottom: theme.spacing.lg,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-      }}>
-        <View style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: theme.spacing.lg,
-        }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{
-              backgroundColor: settings.enabled ? theme.colors.success + '15' : theme.colors.error + '15',
-              borderRadius: theme.borderRadius.md,
-              padding: theme.spacing.sm,
-              marginRight: theme.spacing.md,
-            }}>
-              <Zap size={24} color={settings.enabled ? theme.colors.success : theme.colors.error} />
-            </View>
-            <View>
-              <Text variant="h4">Auto-boost</Text>
-              <Text variant="bodySmall" color="muted">
-                Automatically boost your listings
+    <FlatList
+      data={flatListData}
+      keyExtractor={(item) => item.id || item.type}
+      renderItem={renderItem}
+      onEndReached={loadMoreListings}
+      onEndReachedThreshold={0.5}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={[theme.colors.primary]}
+          tintColor={theme.colors.primary}
+        />
+      }
+      ListFooterComponent={() => (
+        loadingMore ? (
+          <View style={{ 
+            padding: theme.spacing.lg, 
+            alignItems: 'center' 
+          }}>
+            <LoadingSkeleton count={1} height={120} />
+          </View>
+        ) : hasMoreData ? (
+          <View style={{ 
+            padding: theme.spacing.lg, 
+            alignItems: 'center' 
+          }}>
+            <Button
+              variant="tertiary"
+              onPress={loadMoreListings}
+              style={{ minWidth: 120 }}
+            >
+              <Text variant="body" style={{ color: theme.colors.primary }}>
+                Load More
               </Text>
-            </View>
+            </Button>
           </View>
-          
-          <Badge 
-            text={settings.enabled ? 'Active' : 'Inactive'}
-            variant={settings.enabled ? 'success' : 'error'}
-          />
-        </View>
-
-        <View style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          marginBottom: theme.spacing.lg,
-        }}>
-          <View>
-            <Text variant="bodySmall" color="muted">Credits Used This Month</Text>
-            <Text variant="h4" style={{ fontWeight: '600' }}>
-              {settings.boostCreditsUsed} / 120
-            </Text>
-          </View>
-          
-          <View>
-            <Text variant="bodySmall" color="muted">Estimated Boosts Left</Text>
-            <Text variant="h4" style={{ fontWeight: '600' }}>
-              {getEstimatedBoosts()}
-            </Text>
-          </View>
-          
-          <View>
-            <Text variant="bodySmall" color="muted">Boost Duration</Text>
-            <Text variant="h4" style={{ fontWeight: '600' }}>
-              {settings.boostDuration} days
-            </Text>
-          </View>
-        </View>
-
-        <Button
-                          variant={settings.enabled ? 'tertiary' : 'primary'}
-          onPress={toggleAutoBoost}
-          loading={updating}
-          style={{ width: '100%' }}
-        >
-          {settings.enabled ? <Pause size={18} color={theme.colors.primary} /> : <Play size={18} color={theme.colors.surface} />}
-          <Text variant="body" style={{ 
-            color: settings.enabled ? theme.colors.primary : theme.colors.surface,
-            marginLeft: theme.spacing.sm,
-          }}>
-            {settings.enabled ? 'Pause Auto-boost' : 'Enable Auto-boost'}
-          </Text>
-        </Button>
-      </View>
-
-      {/* Auto-boost Settings */}
-      <View style={{
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.borderRadius.lg,
-        padding: theme.spacing.lg,
-        marginBottom: theme.spacing.lg,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-      }}>
-        <Text variant="h4" style={{ marginBottom: theme.spacing.lg }}>
-          Settings
-        </Text>
-
-        <View style={{ gap: theme.spacing.md }}>
-          <View style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            paddingVertical: theme.spacing.sm,
-          }}>
-            <View>
-              <Text variant="body">Boost Duration</Text>
-              <Text variant="bodySmall" color="muted">
-                How long each boost lasts
-              </Text>
-            </View>
-            
-            <View style={{ flexDirection: 'row', gap: theme.spacing.xs }}>
-              {[1, 3, 7].map((days) => (
-                <Button
-                  key={days}
-                  variant={settings.boostDuration === days ? 'primary' : 'tertiary'}
-                  size="small"
-                  onPress={() => updateBoostDuration(days)}
-                >
-                  <Text variant="bodySmall" style={{
-                    color: settings.boostDuration === days ? theme.colors.surface : theme.colors.primary,
-                  }}>
-                    {days}d
-                  </Text>
-                </Button>
-              ))}
-            </View>
-          </View>
-
-          <View style={{
-            backgroundColor: theme.colors.surfaceVariant,
-            borderRadius: theme.borderRadius.md,
-            padding: theme.spacing.md,
-            flexDirection: 'row',
-            alignItems: 'center',
-          }}>
-            <Info size={16} color={theme.colors.primary} />
-            <Text variant="bodySmall" color="secondary" style={{ 
-              marginLeft: theme.spacing.sm,
-              flex: 1,
-              lineHeight: 18,
-            }}>
-              Auto-boost will automatically boost your newest listings when they&apos;re created. 
-              Each boost costs 15 credits.
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Active Boosts */}
-      <View style={{
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.borderRadius.lg,
-        padding: theme.spacing.lg,
-        marginBottom: theme.spacing.lg,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-      }}>
-        <Text variant="h4" style={{ marginBottom: theme.spacing.lg }}>
-          Active Boosts
-        </Text>
-
-        {settings.activeBoosts.length > 0 ? (
-          <View style={{ gap: theme.spacing.md }}>
-            {settings.activeBoosts.map((boost, index) => (
-              <View
-                key={boost.listingId}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingVertical: theme.spacing.sm,
-                  borderBottomWidth: index < settings.activeBoosts.length - 1 ? 1 : 0,
-                  borderBottomColor: theme.colors.border,
-                }}
-              >
-                <View style={{
-                  backgroundColor: theme.colors.warning + '15',
-                  borderRadius: theme.borderRadius.md,
-                  padding: theme.spacing.sm,
-                  marginRight: theme.spacing.md,
-                }}>
-                  <TrendingUp size={20} color={theme.colors.warning} />
-                </View>
-                
-                <View style={{ flex: 1 }}>
-                  <Text variant="body" style={{ fontWeight: '500' }}>
-                    {boost.listingTitle}
-                  </Text>
-                  <View style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: theme.spacing.md,
-                    marginTop: theme.spacing.xs,
-                  }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Clock size={14} color={theme.colors.text.muted} />
-                      <Text variant="caption" color="muted" style={{ marginLeft: theme.spacing.xs }}>
-                        {formatTimeRemaining(boost.endDate)}
-                      </Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Zap size={14} color={theme.colors.text.muted} />
-                      <Text variant="caption" color="muted" style={{ marginLeft: theme.spacing.xs }}>
-                        {boost.creditsUsed} credits
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-                
-                <Badge 
-                  text="Boosted" 
-                  variant="warning" 
-                  size="small"
-                />
-              </View>
-            ))}
-          </View>
-        ) : (
-          <View style={{
-            alignItems: 'center',
-            paddingVertical: theme.spacing.xl,
-          }}>
-            <Zap size={48} color={theme.colors.text.muted} style={{ marginBottom: theme.spacing.md }} />
-            <Text variant="body" color="muted" style={{ textAlign: 'center' }}>
-              No active boosts
-            </Text>
-            <Text variant="bodySmall" color="muted" style={{ textAlign: 'center', marginTop: theme.spacing.xs }}>
-              {settings.enabled 
-                ? 'Auto-boost will activate when you create new listings'
-                : 'Enable auto-boost to automatically boost your listings'
-              }
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Next Boost Schedule */}
-      {settings.enabled && settings.nextBoostDate && (
-        <View style={{
-          backgroundColor: theme.colors.primary + '10',
-          borderRadius: theme.borderRadius.lg,
-          padding: theme.spacing.lg,
-          borderWidth: 1,
-          borderColor: theme.colors.primary + '30',
-        }}>
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            marginBottom: theme.spacing.md,
-          }}>
-            <Calendar size={20} color={theme.colors.primary} />
-            <Text variant="h4" style={{ 
-              marginLeft: theme.spacing.sm,
-              color: theme.colors.primary,
-            }}>
-              Next Auto-boost
-            </Text>
-          </View>
-          
-          <Text variant="body" color="secondary">
-            Your next listing will be automatically boosted when created.
-          </Text>
-          
-          <Text variant="bodySmall" color="muted" style={{ marginTop: theme.spacing.sm }}>
-            Estimated cost: 15 credits • Duration: {settings.boostDuration} days
-          </Text>
-        </View>
+        ) : null
       )}
-    </ScrollView>
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: theme.spacing.lg }}
+    />
   );
 }

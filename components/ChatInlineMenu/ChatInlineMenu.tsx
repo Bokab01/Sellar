@@ -3,6 +3,7 @@ import { View, TouchableOpacity, Alert, Animated, Modal } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { router } from 'expo-router';
+import { UniversalReportModal } from '@/components/ReportModal/UniversalReportModal';
 import { 
   EllipsisVertical, 
   User, 
@@ -21,7 +22,6 @@ interface ChatInlineMenuProps {
   otherUser: any;
   conversation?: any;
   onBlock?: () => void;
-  onReport?: () => void;
   onDelete?: () => void;
   onArchive?: () => void;
   onMute?: () => void;
@@ -35,7 +35,6 @@ export function ChatInlineMenu({
   otherUser,
   conversation,
   onBlock,
-  onReport,
   onDelete,
   onArchive,
   onMute,
@@ -45,6 +44,7 @@ export function ChatInlineMenu({
 }: ChatInlineMenuProps) {
   const { theme } = useTheme();
   const [showMenu, setShowMenu] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const menuAnimation = useRef(new Animated.Value(0)).current;
 
   const toggleMenu = () => {
@@ -109,24 +109,6 @@ export function ChatInlineMenu({
     );
   };
 
-  const handleReport = () => {
-    setShowMenu(false);
-    Alert.alert(
-      'Report User',
-      `Report ${otherUser?.first_name || 'this user'} for inappropriate behavior?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Report',
-          style: 'destructive',
-          onPress: () => {
-            onReport?.();
-            Alert.alert('User Reported', 'Thank you for your report. We will review it shortly.');
-          },
-        },
-      ]
-    );
-  };
 
   const handleDelete = () => {
     setShowMenu(false);
@@ -174,6 +156,11 @@ export function ChatInlineMenu({
       onMute?.();
       Alert.alert('Notifications Muted', 'You will no longer receive notifications for this chat.');
     }
+  };
+
+  const handleReport = () => {
+    setShowMenu(false);
+    setShowReportModal(true);
   };
 
   const menuItems = [
@@ -334,6 +321,20 @@ export function ChatInlineMenu({
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Report Modal */}
+      <UniversalReportModal
+        visible={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        targetType="user"
+        targetId={otherUser?.id}
+        targetTitle={`${otherUser?.first_name || 'User'} ${otherUser?.last_name || ''}`.trim()}
+        targetUser={{
+          id: otherUser?.id,
+          name: `${otherUser?.first_name || 'User'} ${otherUser?.last_name || ''}`.trim(),
+          avatar: otherUser?.avatar_url
+        }}
+      />
     </>
   );
 }

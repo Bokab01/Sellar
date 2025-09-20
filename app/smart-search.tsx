@@ -137,7 +137,7 @@ export default function SmartSearchScreen() {
       const trending = await fetchTrendingCategories();
 
       // Only show trending if we have categories with listings
-      const validTrending = trending.filter(t => t.count > 0);
+      const validTrending = trending.filter((t: any) => t.count > 0);
       
       setSuggestions([...recent, ...validTrending]);
       return;

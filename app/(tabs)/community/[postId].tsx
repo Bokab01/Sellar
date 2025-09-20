@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, RefreshControl, Alert, Platform, TouchableOpacity } from 'react-native';
+import { View, RefreshControl, Alert, Platform, TouchableOpacity, Keyboard } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -20,11 +21,13 @@ import {
   ErrorState,
   LoadingSkeleton,
   Toast,
+  MessageInput,
 } from '@/components';
-import { MessageCircle } from 'lucide-react-native';
+import { MessageCircle, MoreVertical } from 'lucide-react-native';
 
 export default function PostDetailScreen() {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const { postId } = useLocalSearchParams<{ postId: string }>();
   const { user } = useAuthStore();
   
@@ -41,6 +44,8 @@ export default function PostDetailScreen() {
   
   // Reply state
   const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
+  
+
 
   const fetchPost = useCallback(async () => {
     try {
@@ -267,20 +272,41 @@ export default function PostDetailScreen() {
   };
 
   const handleAddComment = async () => {
-    if (!commentText.trim() || !user) return;
+    if (!commentText.trim() || !user) {
+      console.log('Cannot add comment: missing text or user', { 
+        hasText: !!commentText.trim(), 
+        hasUser: !!user,
+        userId: user?.id 
+      });
+      return;
+    }
 
     setSubmittingComment(true);
     try {
-      const { error } = await supabase
+      console.log('Attempting to add comment:', {
+        postId,
+        userId: user.id,
+        content: commentText.trim(),
+        parentId: replyingTo?.id || null,
+        isReply: !!replyingTo
+      });
+
+      const { data, error } = await supabase
         .from('comments')
         .insert({
           post_id: postId!,
           user_id: user.id,
           content: commentText.trim(),
           parent_id: replyingTo?.id || null, // Add parent_id if replying
-        });
+        })
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      console.log('Comment added successfully:', data);
 
       setCommentText('');
       setReplyingTo(null); // Clear reply state
@@ -290,8 +316,11 @@ export default function PostDetailScreen() {
       // Refresh comments and post data to get updated counts from database
       await fetchComments();
       await fetchPost();
-    } catch {
-      Alert.alert('Error', replyingTo ? 'Failed to add reply' : 'Failed to add comment');
+    } catch (error) {
+      console.error('Failed to add comment:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      Alert.alert('Error', `${replyingTo ? 'Failed to add reply' : 'Failed to add comment'}: ${errorMessage}`);
+      setCommentText(commentText); // Restore comment text on error
     } finally {
       setSubmittingComment(false);
     }
@@ -500,14 +529,17 @@ export default function PostDetailScreen() {
 
       <KeyboardAwareScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: theme.spacing.md }}
+        contentContainerStyle={{ 
+          paddingBottom: theme.spacing.xl, // Extra padding to ensure content doesn't get hidden behind input
+          flexGrow: 1, // Ensure content fills available space
+        }}
+        keyboardShouldPersistTaps="handled"
         enableOnAndroid={true}
         enableAutomaticScroll={true}
         keyboardOpeningTime={250}
         extraScrollHeight={Platform.OS === 'ios' ? 20 : 50}
         extraHeight={Platform.OS === 'android' ? 20 : 0}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -524,18 +556,22 @@ export default function PostDetailScreen() {
               onLike={handleLikePost}
               onComment={() => {}}
               onShare={() => {}}
+              onReport={() => {
+                // The PostCard will handle the report modal internally
+              }}
             />
+            
           </View>
 
           {/* Comments Section */}
           <View style={{ paddingHorizontal: theme.spacing.lg }}>
-            <Text variant="h4" style={{ marginBottom: theme.spacing.lg }}>
+            <Text variant="h4" style={{ marginBottom: theme.spacing.md }}> {/* Reduced from lg to md */}
               Comments ({totalCommentsCount})
             </Text>
 
             {/* Comments List */}
             {transformedComments.length > 0 ? (
-              <View style={{ gap: theme.spacing.md, marginBottom: theme.spacing.xl }}>
+              <View style={{ gap: theme.spacing.sm, marginBottom: theme.spacing.lg }}> {/* Reduced gap and margin */}
                 {transformedComments.map((comment) => (
                   <CommentCard
                     key={comment.id}
@@ -554,93 +590,53 @@ export default function PostDetailScreen() {
               />
             )}
           </View>
-        {/* Fixed Comment Input at Bottom */}
-        <View
-          style={{
-            backgroundColor: theme.colors.background,
-            borderTopWidth: 1,
-            borderTopColor: theme.colors.border,
-            paddingHorizontal: theme.spacing.lg,
-            paddingVertical: theme.spacing.md,
-            paddingBottom: Platform.OS === 'ios' ? theme.spacing.lg : theme.spacing.md,
-          }}
-        >
-          {/* Reply indicator */}
-          {replyingTo && (
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              backgroundColor: theme.colors.surface,
-              paddingHorizontal: theme.spacing.md,
-              paddingVertical: theme.spacing.sm,
-              borderRadius: theme.borderRadius.md,
-              marginBottom: theme.spacing.sm,
-            }}>
-              <Text variant="bodySmall" color="muted">
-                Replying to {replyingTo.name}
-              </Text>
-              <TouchableOpacity
-                onPress={() => setReplyingTo(null)}
-                style={{ padding: theme.spacing.xs }}
-              >
-                <Text variant="bodySmall" color="primary" style={{ fontWeight: '600' }}>
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <View style={{ flexDirection: 'row', gap: theme.spacing.md, alignItems: 'flex-end' }}>
-            <Avatar
-              source={user?.user_metadata?.avatar_url}
-              name={(() => {
-                const firstName = user?.user_metadata?.first_name || '';
-                const lastName = user?.user_metadata?.last_name || '';
-                if (firstName && lastName) {
-                  return `${firstName} ${lastName}`.trim();
-                } else if (firstName) {
-                  return firstName.trim();
-                } else if (lastName) {
-                  return lastName.trim();
-                } else {
-                  return user?.email?.split('@')[0] || 'User';
-                }
-              })()}
-              size="sm"
-            />
-            <View style={{ flex: 1 }}>
-              <Input
-                variant="multiline"
-                placeholder={replyingTo ? `Reply to ${replyingTo.name}...` : "Write a comment..."}
-                value={commentText}
-                onChangeText={setCommentText}
-                style={{ 
-                  minHeight: 36,
-                  maxHeight: 100,
-                  borderRadius: theme.borderRadius.lg,
-                  paddingHorizontal: theme.spacing.md,
-                  paddingVertical: theme.spacing.sm,
-                }}
-              />
-            </View>
-            <Button
-              variant="primary"
-              onPress={handleAddComment}
-              loading={submittingComment}
-              disabled={!commentText.trim() || submittingComment}
-              size="sm"
-              style={{ 
-                borderRadius: theme.borderRadius.full,
-                minWidth: 60,
-                height: 36,
-              }}
-            >
-              {submittingComment ? '...' : 'Send'}
-            </Button>
-          </View>
-        </View>
       </KeyboardAwareScrollView>
+
+      {/* Reply indicator */}
+      {replyingTo && (
+        <View style={{
+          position: 'absolute',
+          bottom: 80, // Position above the MessageInput
+          left: theme.spacing.lg,
+          right: theme.spacing.lg,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          backgroundColor: theme.colors.surface,
+          paddingHorizontal: theme.spacing.md,
+          paddingVertical: theme.spacing.sm,
+          borderRadius: theme.borderRadius.md,
+          borderWidth: 1,
+          borderColor: theme.colors.border,
+          ...theme.shadows.sm,
+          zIndex: 1000,
+        }}>
+          <Text variant="bodySmall" color="muted">
+            Replying to {replyingTo.name}
+          </Text>
+          <TouchableOpacity
+            onPress={() => setReplyingTo(null)}
+            style={{ padding: theme.spacing.xs }}
+          >
+            <Text variant="bodySmall" color="primary" style={{ fontWeight: '600' }}>
+              Cancel
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Comment Input - Using MessageInput component */}
+      <MessageInput
+        value={commentText}
+        onChangeText={setCommentText}
+        onSend={handleAddComment}
+        placeholder={replyingTo ? `Reply to ${replyingTo.name}...` : "Write a comment..."}
+        disabled={submittingComment}
+        style={{
+          borderTopWidth: 1,
+          borderTopColor: theme.colors.border,
+        }}
+      />
 
       {/* Toast */}
       <Toast

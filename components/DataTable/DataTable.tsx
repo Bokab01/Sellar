@@ -254,7 +254,7 @@ export function ItemDetailsTable({
       
       data.push({
         label: key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        value: formatAttributeValue(value),
+        value: formatAttributeValue(typeof value === 'string' || Array.isArray(value) ? value : ''),
         icon: <Text style={{ fontSize: 16 }}>{getAttributeIcon(key)}</Text>,
       });
     });

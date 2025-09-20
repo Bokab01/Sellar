@@ -37,11 +37,13 @@ export function MessageInput({
   const { setTypingStatus } = usePresence();
   const [isFocused, setIsFocused] = useState(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const textInputRef = useRef<TextInput>(null);
 
   const canSend = value.trim().length > 0 && !disabled;
 
   // Handle typing indicators
   const handleTextChange = (text: string) => {
+    // Always call onChangeText first to ensure state is updated immediately
     onChangeText(text);
 
     if (!conversationId) return;
@@ -184,6 +186,7 @@ export function MessageInput({
           )}
           
           <TextInput
+            ref={textInputRef}
             value={value}
             onChangeText={handleTextChange}
             placeholder=""
@@ -209,6 +212,9 @@ export function MessageInput({
             returnKeyType="send"
             onSubmitEditing={handleSend}
             blurOnSubmit={false}
+            autoCorrect={true}
+            autoCapitalize="sentences"
+            textContentType="none"
           />
         </View>
 

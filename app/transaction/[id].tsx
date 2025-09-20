@@ -12,6 +12,7 @@ import {
   Badge,
 } from '@/components';
 import { useFinancialTransactions } from '@/hooks/useTransactions';
+import { TransactionType } from '@/hooks/useFinancialTransactions';
 import { 
   formatTransactionType, 
   formatTransactionStatus, 
@@ -89,9 +90,9 @@ export default function TransactionDetailsScreen() {
     );
   }
 
-  const typeInfo = getTransactionTypeInfo(transaction.transaction_type);
-  const isIncoming = isIncomingTransaction(transaction.transaction_type);
-  const statusColor = getTransactionStatusColor(transaction.status);
+  const typeInfo = getTransactionTypeInfo((transaction.transaction_type || 'credit_purchase') as TransactionType);
+  const isIncoming = isIncomingTransaction((transaction.transaction_type || 'credit_purchase') as TransactionType);
+  const statusColor = getTransactionStatusColor(transaction.status || 'pending');
 
   const getStatusIcon = () => {
     const iconProps = { size: 24, color: statusColor };
@@ -101,14 +102,10 @@ export default function TransactionDetailsScreen() {
         return <CheckCircle {...iconProps} color={theme.colors.success} />;
       case 'pending':
         return <Clock {...iconProps} color={theme.colors.warning} />;
-      case 'processing':
-        return <RefreshCw {...iconProps} color={theme.colors.primary} />;
       case 'failed':
         return <XCircle {...iconProps} color={theme.colors.error} />;
       case 'cancelled':
         return <XCircle {...iconProps} color={theme.colors.text.secondary} />;
-      case 'refunded':
-        return <RefreshCw {...iconProps} color={theme.colors.purple} />;
       default:
         return <AlertTriangle {...iconProps} />;
     }
@@ -118,9 +115,9 @@ export default function TransactionDetailsScreen() {
     try {
       const message = `Transaction Details\n\n` +
         `Title: ${transaction.title}\n` +
-        `Type: ${formatTransactionType(transaction.transaction_type)}\n` +
+        `Type: ${formatTransactionType((transaction.transaction_type || 'credit_purchase') as TransactionType)}\n` +
         `Amount: ${formatAmount(Math.abs(transaction.amount), transaction.currency)}\n` +
-        `Status: ${formatTransactionStatus(transaction.status)}\n` +
+        `Status: ${formatTransactionStatus(transaction.status || 'pending')}\n` +
         `Date: ${new Date(transaction.created_at).toLocaleString()}\n` +
         `Reference: ${transaction.id}`;
 
@@ -245,7 +242,7 @@ export default function TransactionDetailsScreen() {
                   color: statusColor,
                 }}
               >
-                {formatTransactionStatus(transaction.status)}
+                {formatTransactionStatus(transaction.status || 'pending')}
               </Text>
             </View>
           </View>
@@ -273,7 +270,7 @@ export default function TransactionDetailsScreen() {
               <FileText size={20} color={theme.colors.text.secondary} />
               <View style={{ marginLeft: theme.spacing.md, flex: 1 }}>
                 <Text variant="bodySmall" color="secondary">Transaction Type</Text>
-                <Text variant="body">{formatTransactionType(transaction.transaction_type)}</Text>
+                <Text variant="body">{formatTransactionType((transaction.transaction_type || 'credit_purchase') as TransactionType)}</Text>
               </View>
             </View>
 

@@ -45,8 +45,8 @@ export const BusinessOverview: React.FC<BusinessOverviewProps> = ({
     refreshSubscription 
   } = useMonetizationStore();
 
-  const planName = currentSubscription?.subscription_plans?.name || 'Business Plan';
-  const planPrice = currentSubscription?.subscription_plans?.price || 0;
+  const planName = currentSubscription?.subscription_plans?.name || 'Sellar Pro Plan';
+  const planPrice = currentSubscription?.subscription_plans?.price || 400;
   const billingCycle = currentSubscription?.subscription_plans?.billing_cycle || 'monthly';
   const nextBillingDate = currentSubscription?.next_billing_date;
 
@@ -55,8 +55,8 @@ export const BusinessOverview: React.FC<BusinessOverviewProps> = ({
     router.push('/subscription-plans?action=manage');
   };
 
-  const handleUseCredits = () => {
-    // Navigate to business credit usage (not the marketplace for free users)
+  const handleAutoRefresh = () => {
+    // Navigate to auto-refresh management
     router.push('/feature-marketplace');
   };
 
@@ -107,7 +107,7 @@ export const BusinessOverview: React.FC<BusinessOverviewProps> = ({
               <Text variant="body" color="secondary" style={{ lineHeight: 24 }}>
                 {currentSubscription?.status === 'cancelled' 
                   ? 'Your subscription is cancelled but remains active until the end of your billing period.'
-                  : 'Your business plan is active and performing well!'
+                  : 'Your Sellar Pro plan is active and performing well!'
                 }
               </Text>
             </View>
@@ -120,8 +120,8 @@ export const BusinessOverview: React.FC<BusinessOverviewProps> = ({
             marginBottom: theme.spacing.lg,
           }}>
             <View style={{ alignItems: 'center' }}>
-              <Text variant="h3" style={{ color: theme.colors.success, fontWeight: '700' }}>
-                ${planPrice}
+              <Text variant="body" style={{ color: theme.colors.success, fontWeight: '700' }}>
+                GH₵ {planPrice}
               </Text>
               <Text variant="caption" color="secondary" style={{ fontWeight: '600' }}>
                 per {billingCycle}
@@ -129,17 +129,17 @@ export const BusinessOverview: React.FC<BusinessOverviewProps> = ({
             </View>
             
             <View style={{ alignItems: 'center' }}>
-              <Text variant="h3" style={{ color: theme.colors.primary, fontWeight: '700' }}>
-                {balance || 0}
+              <Text variant="body" style={{ color: theme.colors.primary, fontWeight: '700' }}>
+                Every 2 hours
               </Text>
               <Text variant="caption" color="secondary" style={{ fontWeight: '600' }}>
-                Boost Credits
+                Auto-Refresh
               </Text>
             </View>
             
             <View style={{ alignItems: 'center' }}>
-              <Text variant="h3" style={{ color: theme.colors.warning, fontWeight: '700' }}>
-                ∞
+              <Text variant="body" style={{ color: theme.colors.warning, fontWeight: '700' }}>
+                Unlimited
               </Text>
               <Text variant="caption" color="secondary" style={{ fontWeight: '600' }}>
                 Listings
@@ -151,12 +151,12 @@ export const BusinessOverview: React.FC<BusinessOverviewProps> = ({
           <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
             <Button
               variant="secondary"
-              onPress={handleUseCredits}
+              onPress={handleAutoRefresh}
               style={{ flex: 1 }}
             >
               <Zap size={18} color={theme.colors.warning} />
               <Text variant="body" style={{ color: theme.colors.warning, marginLeft: theme.spacing.sm, fontWeight: '600' }}>
-                Use Credits
+                Auto-Refresh
               </Text>
             </Button>
             
@@ -293,10 +293,10 @@ export const BusinessOverview: React.FC<BusinessOverviewProps> = ({
               <Zap size={24} color={theme.colors.warning} />
             </View>
             <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
-              Boost Management
+              Auto-Refresh
             </Text>
             <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
-              Use your {balance || 0} credits
+              Manage auto-refresh settings
             </Text>
           </TouchableOpacity>
 
@@ -403,8 +403,9 @@ export const BusinessOverview: React.FC<BusinessOverviewProps> = ({
           </TouchableOpacity>
         </View>
 
+        {/* Redundant as in the hero section */}
         {/* Subscription Details */}
-        <View style={{
+        {/* <View style={{
           backgroundColor: theme.colors.surface,
           borderRadius: theme.borderRadius.lg,
           padding: theme.spacing.lg,
@@ -461,13 +462,13 @@ export const BusinessOverview: React.FC<BusinessOverviewProps> = ({
               alignItems: 'center',
               paddingVertical: theme.spacing.sm,
             }}>
-              <Text variant="body" color="secondary">Monthly Credits</Text>
-              <Text variant="body" style={{ fontWeight: '600', color: theme.colors.warning }}>
-                120 credits
+              <Text variant="body" color="secondary">Auto-Refresh</Text>
+              <Text variant="body" style={{ fontWeight: '600', color: theme.colors.success }}>
+                Every 2 hours
               </Text>
             </View>
           </View>
-        </View>
+        </View> */}
 
         {/* Business Insights Preview */}
         {analyticsData && (

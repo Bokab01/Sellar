@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
+import { View, TouchableOpacity, ScrollView, Dimensions, Alert } from 'react-native';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -25,6 +25,7 @@ import { Button } from '@/components/Button/Button';
 import { Badge } from '@/components/Badge/Badge';
 import { EmptyState } from '@/components/EmptyState/EmptyState';
 import { useAnalytics, type AnalyticsData } from '@/lib/analyticsService';
+import { exportService } from '@/lib/exportService';
 
 interface BusinessAnalyticsProps {
   onTabChange: (tab: 'overview' | 'boost' | 'analytics' | 'support') => void;
@@ -37,6 +38,7 @@ export const BusinessAnalytics: React.FC<BusinessAnalyticsProps> = ({ onTabChang
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
   const [refreshing, setRefreshing] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     loadAnalytics();
@@ -45,7 +47,7 @@ export const BusinessAnalytics: React.FC<BusinessAnalyticsProps> = ({ onTabChang
   const loadAnalytics = async () => {
     try {
       setLoading(true);
-      const data = await getBusinessAnalytics();
+      const data = await getBusinessAnalytics(timeRange);
       setAnalyticsData(data);
     } catch (error) {
       console.error('Error loading analytics:', error);
@@ -56,8 +58,34 @@ export const BusinessAnalytics: React.FC<BusinessAnalyticsProps> = ({ onTabChang
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadAnalytics();
-    setRefreshing(false);
+    try {
+      const data = await getBusinessAnalytics(timeRange);
+      setAnalyticsData(data);
+    } catch (error) {
+      console.error('Error refreshing analytics:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleExport = async (format: 'csv' | 'pdf') => {
+    if (!analyticsData) {
+      Alert.alert('No Data', 'Please wait for analytics data to load before exporting.');
+      return;
+    }
+
+    setExporting(true);
+    try {
+      await exportService.exportAnalytics(analyticsData, {
+        format,
+        timeRange,
+        includeCharts: true,
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+    } finally {
+      setExporting(false);
+    }
   };
 
   const getGrowthPercentage = (current: number, previous: number) => {
@@ -484,12 +512,12 @@ export const BusinessAnalytics: React.FC<BusinessAnalyticsProps> = ({ onTabChang
           borderColor: theme.colors.border,
         }}>
           <Text variant="h4" style={{ marginBottom: theme.spacing.lg }}>
-            Weekly Engagement Trends
+            {timeRange === '7d' ? 'Daily' : timeRange === '30d' ? 'Daily' : 'Daily'} Engagement Trends
           </Text>
           
           {analyticsData?.dailyViews?.length ? (
             <View style={{ gap: theme.spacing.sm }}>
-              {analyticsData.dailyViews.slice(-7).map((day, index) => {
+              {analyticsData.dailyViews.slice(-(timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90)).map((day, index) => {
                 const maxViews = Math.max(...analyticsData.dailyViews.map(d => d.views));
                 const viewsPercentage = maxViews > 0 ? (day.views / maxViews) * 100 : 0;
                 const messagesPercentage = maxViews > 0 ? (day.messages / maxViews) * 100 : 0;
@@ -569,15 +597,33 @@ export const BusinessAnalytics: React.FC<BusinessAnalyticsProps> = ({ onTabChang
           <View style={{ gap: theme.spacing.md }}>
             <TouchableOpacity
               onPress={() => {
-                // TODO: Implement export functionality
-                console.log('Export analytics data');
+                Alert.alert(
+                  'Export Analytics Report',
+                  'Choose the format for your analytics report:',
+                  [
+                    {
+                      text: 'CSV',
+                      onPress: () => handleExport('csv'),
+                    },
+                    {
+                      text: 'PDF (HTML)',
+                      onPress: () => handleExport('pdf'),
+                    },
+                    {
+                      text: 'Cancel',
+                      style: 'cancel',
+                    },
+                  ]
+                );
               }}
+              disabled={exporting}
               style={{
                 backgroundColor: theme.colors.background,
                 borderRadius: theme.borderRadius.lg,
                 padding: theme.spacing.md,
                 borderWidth: 1,
                 borderColor: theme.colors.border,
+                opacity: exporting ? 0.6 : 1,
               }}
             >
               <View style={{
@@ -586,9 +632,13 @@ export const BusinessAnalytics: React.FC<BusinessAnalyticsProps> = ({ onTabChang
                 alignItems: 'center',
               }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Download size={20} color={theme.colors.primary} />
-                  <Text variant="body" style={{ fontWeight: '600', marginLeft: theme.spacing.sm }}>
-                    Export Analytics Report
+                  <Download size={20} color={exporting ? theme.colors.text.secondary : theme.colors.primary} />
+                  <Text variant="body" style={{ 
+                    fontWeight: '600', 
+                    marginLeft: theme.spacing.sm,
+                    color: exporting ? theme.colors.text.secondary : theme.colors.text.primary,
+                  }}>
+                    {exporting ? 'Exporting...' : 'Export Analytics Report'}
                   </Text>
                 </View>
                 <Text variant="caption" color="secondary">
@@ -613,13 +663,13 @@ export const BusinessAnalytics: React.FC<BusinessAnalyticsProps> = ({ onTabChang
                 alignItems: 'center',
               }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Zap size={20} color={theme.colors.warning} />
+                  <Zap size={20} color={theme.colors.success} />
                   <Text variant="body" style={{ fontWeight: '600', marginLeft: theme.spacing.sm }}>
-                    Boost Low Performers
+                    Auto-Refresh Settings
                   </Text>
                 </View>
                 <Text variant="caption" color="secondary">
-                  Improve visibility
+                  Manage auto-refresh
                 </Text>
               </View>
             </TouchableOpacity>

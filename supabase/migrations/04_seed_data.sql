@@ -69,7 +69,7 @@ INSERT INTO subscription_plans (id, name, description, price_ghs, billing_cycle,
 ('a0000000-0000-4000-8000-000000000001', 'Sellar Pro', 'Complete business solution for serious sellers', 400.00, 'monthly', 
 '[
   "unlimited_listings",
-  "120_boost_credits_monthly",
+  "auto_refresh_2h",
   "auto_boost_listings",
   "comprehensive_analytics",
   "priority_support",

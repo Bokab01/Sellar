@@ -536,42 +536,64 @@ export default function FeatureMarketplaceScreen() {
               🔄
             </Text>
           </TouchableOpacity>,
-          <View
-            key="credits-display"
-            style={{
-              backgroundColor: theme.colors.primary,
-              borderRadius: theme.borderRadius.full,
-              paddingHorizontal: theme.spacing.md,
-              paddingVertical: theme.spacing.sm,
-            }}
-          >
-           <Text
-             variant="caption"
-             style={{
-               color: theme.colors.primaryForeground,
-               fontWeight: '600',
-             }}
-           >
-             {loading ? 'Loading...' : `${balance} Credits`}
-           </Text>
-          </View>,
+          hasBusinessPlan() ? (
+            <View
+              key="auto-refresh-display"
+              style={{
+                backgroundColor: theme.colors.success,
+                borderRadius: theme.borderRadius.full,
+                paddingHorizontal: theme.spacing.md,
+                paddingVertical: theme.spacing.sm,
+              }}
+            >
+              <Text
+                variant="caption"
+                style={{
+                  color: theme.colors.primaryForeground,
+                  fontWeight: '600',
+                }}
+              >
+                Auto-Refresh Active
+              </Text>
+            </View>
+          ) : (
+            <View
+              key="credits-display"
+              style={{
+                backgroundColor: theme.colors.primary,
+                borderRadius: theme.borderRadius.full,
+                paddingHorizontal: theme.spacing.md,
+                paddingVertical: theme.spacing.sm,
+              }}
+            >
+              <Text
+                variant="caption"
+                style={{
+                  color: theme.colors.primaryForeground,
+                  fontWeight: '600',
+                }}
+              >
+               {loading ? 'Loading...' : `${balance} Credits`}
+              </Text>
+            </View>
+          ),
         ]}
       />
 
-      <ScrollView contentContainerStyle={{ paddingBottom: theme.spacing.xl }}>
-        <Container>
+        <ScrollView contentContainerStyle={{ paddingBottom: theme.spacing.xl }}>
+          <Container>
           {/* Header Section */}
-          <View
-            style={{
-              backgroundColor: theme.colors.primary + '10',
-              borderRadius: theme.borderRadius.lg,
-              padding: theme.spacing.lg,
-              marginBottom: theme.spacing.xl,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: theme.spacing.md,
-            }}
-          >
+              <View
+                style={{
+                  backgroundColor: theme.colors.primary + '10',
+                  borderRadius: theme.borderRadius.lg,
+                  padding: theme.spacing.lg,
+                  marginBottom: theme.spacing.xl,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: theme.spacing.md,
+                }}
+              >
             <View
               style={{
                 backgroundColor: theme.colors.primary + '20',
@@ -584,25 +606,86 @@ export default function FeatureMarketplaceScreen() {
             >
               <Text style={{ fontSize: 24 }}>⚡</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text variant="h4" style={{ marginBottom: theme.spacing.sm }}>
-                Premium Features
-              </Text>
-              <Text variant="bodySmall" color="secondary">
-                Boost your listings and increase sales with powerful features
+                <View style={{ flex: 1 }}>
+                  <Text variant="h4" style={{ marginBottom: theme.spacing.sm }}>
+                {hasBusinessPlan() ? 'Sellar Pro Features' : 'Premium Features'}
+                  </Text>
+                  <Text variant="bodySmall" color="secondary">
+                {hasBusinessPlan() 
+                  ? 'Your listings auto-refresh every 2 hours for maximum visibility'
+                  : 'Boost your listings and increase sales with powerful features'
+                }
               </Text>
               {/* Debug info - remove in production */}
               {__DEV__ && (
                 <Text variant="caption" color="muted" style={{ marginTop: theme.spacing.xs }}>
                   Debug: {userListings.length} listings found, Loading: {listingsLoading ? 'Yes' : 'No'}
-                </Text>
+                  </Text>
               )}
-            </View>
-          </View>
+                </View>
+              </View>
 
-          {/* Features Grid */}
-          <View style={{ gap: theme.spacing.lg }}>
-            {allFeatures.map((featureKey) => {
+            {/* Features Grid */}
+            <View style={{ gap: theme.spacing.lg }}>
+            {hasBusinessPlan() ? (
+              // Sellar Pro users see auto-refresh status instead of boost features
+              <View
+                style={{
+                  backgroundColor: theme.colors.surface,
+                  borderRadius: theme.borderRadius.lg,
+                  padding: theme.spacing.lg,
+                  borderWidth: 1,
+                  borderColor: theme.colors.success + '30',
+                  ...theme.shadows.sm,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.lg, marginBottom: theme.spacing.lg }}>
+                  <View
+                    style={{
+                      backgroundColor: theme.colors.success + '15',
+                      borderRadius: theme.borderRadius.lg,
+                      width: 60,
+                      height: 60,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ fontSize: 28 }}>🔄</Text>
+                  </View>
+                  
+                  <View style={{ flex: 1 }}>
+                    <Text variant="h4" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
+                      Auto-Refresh System
+                    </Text>
+                    <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.sm }}>
+                      Your listings automatically refresh every 2 hours to stay at the top
+                    </Text>
+                    <Text variant="caption" color="muted">
+                      Continuous top placement
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+                    <Badge
+                      text="Active"
+                      variant="success"
+                      style={{ paddingHorizontal: theme.spacing.sm, paddingVertical: theme.spacing.xs }}
+                    />
+                    
+                    <Text variant="caption" color="muted">
+                      12 top placements daily
+                    </Text>
+                  </View>
+
+                  <Badge 
+                  text="Included in Pro" variant="success" style={{ paddingHorizontal: theme.spacing.sm, paddingVertical: theme.spacing.xs, marginLeft: theme.spacing.sm }} />
+                </View>
+              </View>
+            ) : (
+              // Regular users see boost features
+              allFeatures.map((featureKey) => {
                 const feature = getFeatureByKey(featureKey);
                 if (!feature) return null;
 
@@ -678,11 +761,12 @@ export default function FeatureMarketplaceScreen() {
                     </View>
                   </TouchableOpacity>
                 );
-              })}
+              })
+            )}
             </View>
 
-            {/* Low Credits Warning */}
-            {balance < 15 && (
+            {/* Low Credits Warning - Only show for non-Pro users */}
+            {!hasBusinessPlan() && balance < 15 && (
               <View
                 style={{
                   backgroundColor: theme.colors.warning + '10',
@@ -709,17 +793,46 @@ export default function FeatureMarketplaceScreen() {
                 </Button>
               </View>
             )}
-        </Container>
-      </ScrollView>
+
+            {/* Sellar Pro Success Message */}
+            {hasBusinessPlan() && (
+              <View
+                style={{
+                  backgroundColor: theme.colors.success + '10',
+                  borderColor: theme.colors.success,
+                  borderWidth: 1,
+                  borderRadius: theme.borderRadius.lg,
+                  padding: theme.spacing.lg,
+                  marginTop: theme.spacing.xl,
+                  alignItems: 'center',
+                }}
+              >
+                <Text variant="h4" style={{ color: theme.colors.success, marginBottom: theme.spacing.md }}>
+                  ✅ Sellar Pro Active
+                </Text>
+                <Text variant="body" color="secondary" style={{ textAlign: 'center', marginBottom: theme.spacing.lg }}>
+                  Your listings automatically refresh every 2 hours for maximum visibility. No manual boosting needed!
+                </Text>
+                <Button
+                  variant="secondary"
+                  onPress={() => router.push('/(tabs)/more/dashboard')}
+                  icon={<CheckCircle size={18} color={theme.colors.success} />}
+                >
+                  View Dashboard
+                </Button>
+              </View>
+            )}
+          </Container>
+        </ScrollView>
 
        {/* Combined Feature & Listing Selection Modal */}
        <AppModal
          visible={showFeatureModal}
-         onClose={() => {
+        onClose={() => {
            setShowFeatureModal(false);
-           setSelectedFeature(null);
-           setSelectedListing(null);
-         }}
+          setSelectedFeature(null);
+          setSelectedListing(null);
+        }}
          title={selectedFeature?.name || 'Feature'}
          size="lg"
          position='bottom'
@@ -751,8 +864,8 @@ export default function FeatureMarketplaceScreen() {
                  setSelectedFeature(null);
                  setSelectedListing(null);
                  setToastMessage(`${selectedFeature.name} activated successfully!`);
-                 setToastVariant('success');
-                 setShowToast(true);
+          setToastVariant('success');
+          setShowToast(true);
                  // No need to call refreshCredits() here - the purchaseFeature function handles it
                } else {
                  Alert.alert('Activation Failed', result.error || 'Failed to activate feature');
