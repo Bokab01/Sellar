@@ -4,6 +4,7 @@ import 'react-native-get-random-values'; // Must be imported before any crypto o
 
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
@@ -20,6 +21,8 @@ import { offlineStorage } from '@/lib/offlineStorage';
 import { memoryManager } from '@/utils/memoryManager';
 import { recoverFromCorruptedSession } from '@/utils/authErrorHandler';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
+import { initializeWebOptimizations } from '@/lib/webOptimizations';
+import { useRefreshTokenError } from '@/hooks/useRefreshTokenError';
 import * as Sentry from '@sentry/react-native';
 
 Sentry.init({
@@ -51,6 +54,9 @@ function AppContent() {
   // Initialize performance monitoring
   const { startTimer, endTimer } = usePerformanceMonitor();
   const { isOnline, pendingChanges } = useOfflineSync();
+  
+  // Handle refresh token errors globally
+  useRefreshTokenError();
   
   // Splash screen management
   const { isAppReady, showCustomSplash, handleAppReady, handleAnimationComplete } = useSplashScreen();
@@ -97,6 +103,14 @@ function AppContent() {
           console.log('Memory manager initialized');
         } catch (error) {
           console.error('Failed to initialize memory manager:', error);
+        }
+
+        // Initialize web optimizations
+        try {
+          initializeWebOptimizations();
+          console.log('Web optimizations initialized successfully');
+        } catch (error) {
+          console.error('Failed to initialize web optimizations:', error);
         }
 
         // Initialize monetization data (credits and subscription)
@@ -195,8 +209,10 @@ function AppContent() {
 
 export default Sentry.wrap(function RootLayout() {
   return (
-    <ThemeProvider>
-      <AppContent />
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 });

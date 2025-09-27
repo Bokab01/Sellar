@@ -1,7 +1,9 @@
 import React from 'react';
 import { View } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { Text, Badge, BusinessBadge, Avatar, CompactUserBadges } from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { Avatar } from '@/components/Avatar/Avatar';
+import { CompactUserBadges } from '@/components/UserBadgeSystem/UserBadgeSystem';
 import { useDisplayName } from '@/hooks/useDisplayName';
 import { UserProfile } from '@/hooks/useProfile';
 

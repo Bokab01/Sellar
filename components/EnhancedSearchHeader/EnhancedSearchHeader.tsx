@@ -6,7 +6,8 @@ import { useProfile } from '@/hooks/useProfile';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { useFavoritesCount } from '@/hooks/useFavoritesCount';
 import { router } from 'expo-router';
-import { Text, Avatar } from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { Avatar } from '@/components/Avatar/Avatar';
 import { Filter, Bell, Heart, ListFilter, ListFilterPlusIcon, LucideListFilterPlus, ListFilterPlus } from 'lucide-react-native';
 
 interface EnhancedSearchHeaderProps {

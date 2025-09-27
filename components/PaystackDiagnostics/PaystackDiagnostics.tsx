@@ -3,13 +3,11 @@ import { View, ScrollView, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { diagnosePaystackIntegration, type DiagnosticResult } from '@/utils/paystackDiagnostics';
-import {
-  Text,
-  Button,
-  Badge,
-  LoadingSkeleton,
-  AppModal,
-} from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { Button } from '@/components/Button/Button';
+import { Badge } from '@/components/Badge/Badge';
+import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
+import { AppModal } from '@/components/Modal/Modal';
 import { CheckCircle, AlertCircle, XCircle, Play } from 'lucide-react-native';
 
 interface PaystackDiagnosticsProps {

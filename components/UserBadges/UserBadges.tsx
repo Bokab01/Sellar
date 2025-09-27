@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { getUserSubscriptionBadges } from '@/lib/subscriptionEntitlements';
-import { Badge } from '@/components';
+import { Badge } from '@/components/Badge/Badge';
 import { Building, Star, Crown, CheckCircle } from 'lucide-react-native';
 
 interface UserBadgesProps {

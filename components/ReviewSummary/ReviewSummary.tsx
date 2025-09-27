@@ -19,7 +19,7 @@ export function ReviewSummary({
   style 
 }: ReviewSummaryProps) {
   const { theme } = useTheme();
-  const { stats, loading, error } = useReviewStats(userId);
+  const { stats, loading, error, refresh } = useReviewStats(userId);
 
   if (loading) {
     return (

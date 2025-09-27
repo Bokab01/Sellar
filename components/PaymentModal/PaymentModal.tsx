@@ -4,13 +4,11 @@ import { WebView } from 'react-native-webview';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase } from '@/lib/supabase';
-import {
-  Text,
-  Button,
-  LoadingSkeleton,
-  AppHeader,
-  SafeAreaWrapper,
-} from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { Button } from '@/components/Button/Button';
+import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
+import { AppHeader } from '@/components/AppHeader/AppHeader';
+import { SafeAreaWrapper } from '@/components/Layout';
 import { X, CreditCard, Smartphone } from 'lucide-react-native';
 
 export interface PaymentRequest {

@@ -10,6 +10,8 @@ import { AppHeader } from '@/components/AppHeader/AppHeader';
 import { supabase } from '@/lib/supabase';
 import { Search, Clock, TrendingUp, X, ArrowUpRight } from 'lucide-react-native';
 import { router } from 'expo-router';
+import { useRecommendations } from '@/hooks/useRecommendations';
+import { EnhancedSearchBar } from '@/components/Search/EnhancedSearchBar';
 
 interface SearchSuggestion {
   id: string;
@@ -25,6 +27,7 @@ const MAX_RECENT_SEARCHES = 10;
 
 export default function SmartSearchScreen() {
   const { theme } = useTheme();
+  const { recordSearchHistory } = useRecommendations();
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
@@ -232,6 +235,12 @@ export default function SmartSearchScreen() {
     // Add to recent searches with AsyncStorage persistence
     await addToRecentSearches(query);
 
+    // Record search history in recommendation system
+    await recordSearchHistory(query, {
+      suggestionType: suggestion.type,
+      suggestionId: suggestion.id
+    });
+
     // Navigate to search results with different parameters based on suggestion type
     if (suggestion.type === 'category') {
       // For category suggestions, pass the category ID and name (NO search query)
@@ -327,21 +336,26 @@ export default function SmartSearchScreen() {
           borderBottomColor: theme.colors.border,
           backgroundColor: theme.colors.surface,
         }}>
-          <Input
-            variant="search"
+          <EnhancedSearchBar
             placeholder="Search for anything..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoFocus
-            returnKeyType="search"
-            onSubmitEditing={async () => {
-              if (searchQuery.trim()) {
-                await handleSuggestionPress({
-                  id: 'manual-search',
-                  type: 'listing',
-                  title: searchQuery,
+            onSearch={async (query, filters) => {
+              if (query.trim()) {
+                // Record search history
+                await recordSearchHistory(query, filters);
+                
+                // Navigate to search results
+                router.push({
+                  pathname: '/search',
+                  params: { q: query }
                 });
               }
+            }}
+            onSuggestionPress={(suggestion) => {
+              handleSuggestionPress({
+                id: 'search-suggestion',
+                type: 'listing',
+                title: suggestion
+              });
             }}
           />
         </View>

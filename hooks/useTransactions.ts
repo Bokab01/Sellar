@@ -4,16 +4,20 @@ import { supabase } from '@/lib/supabase-client';
 
 // Re-export financial transaction types and functions
 export {
+  useFinancialTransactions,
+  useTransactionSummary,
+  useTransactionAnalytics,
+  useTransactionCategories
+} from './useFinancialTransactions';
+
+// Re-export types from the financial transactions module
+export type {
   TransactionType,
   TransactionStatus,
   FinancialTransaction,
   TransactionFilters,
   TransactionSummary,
   TransactionAnalytics,
-  useFinancialTransactions,
-  useTransactionSummary,
-  useTransactionAnalytics,
-  useTransactionCategories
 } from './useFinancialTransactions';
 
 export interface Transaction {

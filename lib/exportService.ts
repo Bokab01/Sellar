@@ -43,26 +43,11 @@ export class ExportService {
     // Generate CSV content
     const csvContent = this.generateCSVContent(data, options);
     
-    // Save file
-    const fileUri = `${FileSystem.documentDirectory}${filename}`;
-    await FileSystem.writeAsStringAsync(fileUri, csvContent, {
-      encoding: FileSystem.EncodingType.UTF8,
+    // Fallback to native share (FileSystem API changed in newer Expo)
+    await Share.share({
+      message: csvContent,
+      title: 'Analytics Report',
     });
-
-    // Share the file
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(fileUri, {
-        mimeType: 'text/csv',
-        dialogTitle: 'Export Analytics Report',
-      });
-    } else {
-      // Fallback to system share
-      await Share.share({
-        url: fileUri,
-        title: 'Analytics Report',
-        message: `Sellar Analytics Report - ${options.timeRange}`,
-      });
-    }
 
     Alert.alert(
       'Export Successful',
@@ -81,26 +66,11 @@ export class ExportService {
     // Generate PDF content (simplified HTML that can be converted to PDF)
     const htmlContent = this.generateHTMLContent(data, options);
     
-    // For now, we'll create an HTML file that can be opened in browser
-    // In a full implementation, you'd use a library like react-native-pdf-lib
-    const fileUri = `${FileSystem.documentDirectory}${filename.replace('.pdf', '.html')}`;
-    await FileSystem.writeAsStringAsync(fileUri, htmlContent, {
-      encoding: FileSystem.EncodingType.UTF8,
+    // Fallback to native share (FileSystem API changed in newer Expo)
+    await Share.share({
+      message: htmlContent,
+      title: 'Analytics Report (HTML)',
     });
-
-    // Share the HTML file
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(fileUri, {
-        mimeType: 'text/html',
-        dialogTitle: 'Export Analytics Report',
-      });
-    } else {
-      await Share.share({
-        url: fileUri,
-        title: 'Analytics Report',
-        message: `Sellar Analytics Report - ${options.timeRange}`,
-      });
-    }
 
     Alert.alert(
       'Export Successful',

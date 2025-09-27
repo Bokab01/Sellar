@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { View, TouchableOpacity, Alert, Platform } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { Text, Button, LoadingSkeleton } from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { Button } from '@/components/Button/Button';
+import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
 import { 
   Upload, 
   File, 

@@ -240,7 +240,7 @@ export const storageHelpers = {
           console.log('Trying base64 upload method...');
           
           const base64 = await FileSystem.readAsStringAsync(fileUri, {
-            encoding: FileSystem.EncodingType.Base64,
+            encoding: 'base64',
           });
           
           const buffer = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
@@ -287,7 +287,7 @@ export const storageHelpers = {
           
           // Read file as base64 and convert to Uint8Array
           const base64Data = await FileSystem.readAsStringAsync(manipulatedImage.uri, {
-            encoding: FileSystem.EncodingType.Base64,
+            encoding: 'base64',
           });
           
           // Convert base64 to Uint8Array

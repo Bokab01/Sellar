@@ -76,7 +76,8 @@ export {
   CompactTransactionCard, 
   TransactionListItem 
 } from './TransactionCard/TransactionCard';
-export { TransactionFilters, TransactionFiltersState } from './TransactionFilters/TransactionFilters';
+export { TransactionFilters } from './TransactionFilters/TransactionFilters';
+export type { TransactionFiltersState } from './TransactionFilters/TransactionFilters';
 
 // Rewards System Components
 export { RewardNotification, CompactRewardNotification } from './RewardNotification/RewardNotification';
@@ -120,7 +121,7 @@ export { Grid } from './Grid/Grid';
 export { Alert } from './Alert/Alert';
 
 // Auth Error Boundary
-export { AuthErrorBoundary, useAuthErrorRecovery } from './AuthErrorBoundary/AuthErrorBoundary';
+export { AuthErrorBoundary } from './AuthErrorBoundary/AuthErrorBoundary';
 
 // Link Button
 export { LinkButton } from './LinkButton/LinkButton';
@@ -235,7 +236,7 @@ export {
 export { PerformanceDashboard, usePerformanceDashboard } from './PerformanceDashboard/PerformanceDashboard';
 
 // Chat Components
-export { ReadReceipt } from './ReadReceipt/ReadReceipt';
+export { ReadReceipt } from '../ReadReceipt/ReadReceipt';
 export { DateSeparator } from './DateSeparator/DateSeparator';
 export { ChatImagePicker } from './ChatImagePicker/ChatImagePicker';
 export { ChatMenu } from './ChatMenu/ChatMenu';

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, TouchableOpacity, Image } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
-import { ReadReceipt } from '@/components/ReadReceipt/ReadReceipt';
+import { ReadReceipt } from '@/ReadReceipt/ReadReceipt';
 import { ImageViewer } from '@/components/ImageViewer/ImageViewer';
 import { useImageViewer } from '@/hooks/useImageViewer';
 

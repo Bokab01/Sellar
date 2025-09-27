@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { View, ScrollView, TouchableOpacity, Dimensions, Animated, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -6,14 +6,12 @@ import { useProfile } from '@/hooks/useProfile';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
-import {
-  Text,
-  Avatar,
-  Button,
-  LoadingSkeleton,
-  Badge,
-  DarkThemeUserBadges,
-} from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { Avatar } from '@/components/Avatar/Avatar';
+import { Button } from '@/components/Button/Button';
+import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
+import { Badge } from '@/components/Badge/Badge';
+import { DarkThemeUserBadges } from '@/components/UserBadgeSystem';
 import { 
   ShoppingBag, 
   Package, 

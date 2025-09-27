@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { View, ScrollView, Pressable } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { Text, Button, AppModal } from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { Button } from '@/components/Button/Button';
+import { AppModal } from '@/components/Modal/Modal';
 import { ChevronRight, ArrowLeft, Check } from 'lucide-react-native';
 import { Category, COMPREHENSIVE_CATEGORIES, findCategoryById, getCategoryPath } from '@/constants/categories';
 

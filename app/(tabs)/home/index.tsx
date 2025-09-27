@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl, Alert, Animated, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -32,11 +32,11 @@ import {
   // ProductVirtualizedList,
   // LazyComponent,
 } from '@/components';
-import { FeaturedListings } from '@/components/FeaturedListings/FeaturedListings';
-import { SimpleFeaturedListings } from '@/components/FeaturedListings/SimpleFeaturedListings';
-import { FixedFeaturedListings } from '@/components/FeaturedListings/FixedFeaturedListings';
-import { PremiumProductCard } from '@/components/PremiumProductCard/PremiumProductCard';
-import { MinimalPremiumProductCard } from '@/components/PremiumProductCard/MinimalPremiumProductCard';
+// Advanced code splitting for better performance
+import { CodeSplitting } from '@/lib/codeSplitting';
+import { usePerformanceOptimization } from '@/hooks/usePerformanceOptimization';
+import { useRecommendations } from '@/hooks/useRecommendations';
+import { navigation } from '@/lib/navigation';
 // Removed SmartSearchModal import - now using dedicated screen
 import { 
   Bell, 
@@ -68,6 +68,8 @@ export default function HomeScreen() {
   const { user } = useAuthStore();
   const { profile } = useProfile();
   const insets = useSafeAreaInsets();
+  const { trackInteraction } = useRecommendations();
+  const { preloadComponents, trackComponentLoad } = usePerformanceOptimization();
   const { 
     currentLocation, 
     // setCurrentLocation,
@@ -146,6 +148,18 @@ export default function HomeScreen() {
     if (mainScrollViewRef.current) {
       mainScrollViewRef.current.scrollTo({ y: 0, animated: true });
     }
+  };
+
+  // Handle listing press with interaction tracking
+  const handleListingPress = async (listingId: string) => {
+    if (user) {
+      // Track view interaction
+      await trackInteraction(listingId, 'view', {
+        source: 'home',
+        timeSpent: 0
+      });
+    }
+    router.push(`/(tabs)/home/${listingId}`);
   };
 
   // Handle scroll animations
@@ -945,13 +959,27 @@ export default function HomeScreen() {
               </View>
 
               {/* Featured Business Listings - USING WORKING MINIMAL VERSION */}
-              <FixedFeaturedListings
-                maxItems={10}
-                layout="horizontal"
-                onViewAll={() => {
-                  router.push('/(tabs)/home/business-listings');
-                }}
-              />
+              <Suspense fallback={<LoadingSkeleton width="100%" height={200} />}>
+                <CodeSplitting.FixedFeaturedListings
+                  maxItems={10}
+                  layout="horizontal"
+                  onViewAll={() => {
+                    navigation.home.goToBusinessListings();
+                  }}
+                />
+              </Suspense>
+
+              {/* Recommendation Feed */}
+              {user && (
+                <Suspense fallback={<LoadingSkeleton width="100%" height={300} />}>
+                  <CodeSplitting.RecommendationFeed
+                    onListingPress={handleListingPress}
+                  onViewAllPersonalized={() => navigation.recommendations.goToPersonalized()}
+                  onViewAllTrending={() => navigation.recommendations.goToTrending()}
+                  onViewAllRecentlyViewed={() => navigation.recommendations.goToRecent()}
+                  />
+                </Suspense>
+              )}
 
               {/* Enhanced ProductCard Grid with Professional Badges */}
               <Grid columns={2} spacing={4}>
@@ -970,7 +998,7 @@ export default function HomeScreen() {
                       isFavorited={favorites[product.id] || false}
                       viewCount={viewCounts[product.id] || 0}
                       isHighlighted={product.isHighlighted}
-                      onPress={() => router.push(`/(tabs)/home/${product.id}`)}
+                      onPress={() => handleListingPress(product.id)}
                       onFavoritePress={user?.id !== product.seller.id ? () => {
                         // Handle favorite toggle - only show for other users' listings
                         import('@/lib/favoritesAndViews').then(({ toggleFavorite }) => {

@@ -1,12 +1,10 @@
 import React from 'react';
 import { View, ScrollView } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import {
-  Text,
-  Button,
-  Modal,
-  LinkButton,
-} from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { Button } from '@/components/Button/Button';
+import { Modal } from '@/components/Modal/Modal';
+import { LinkButton } from '@/components/LinkButton/LinkButton';
 import { AlertTriangle, Shield, HelpCircle } from 'lucide-react-native';
 import { getModerationErrorMessage } from '@/hooks/useContentModeration';
 

@@ -2,12 +2,10 @@ import React, { useState } from 'react';
 import { View, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
-import { 
-  Text, 
-  Button, 
-  AppModal, 
-  Toast 
-} from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { Button } from '@/components/Button/Button';
+import { AppModal } from '@/components/Modal/Modal';
+import { Toast } from '@/components/Toast/Toast';
 import { supabase, dbHelpers } from '@/lib/supabase';
 import { router } from 'expo-router';
 import { PhoneCall, CheckCircle } from 'lucide-react-native';

@@ -59,86 +59,92 @@ const ReviewsScreen = () => {
       />
 
       <View style={{ flex: 1 }}>
-        <Container>
-          {/* Review Summary - Only show for received reviews and when there are reviews */}
-          {activeTab === 'received' && reviewStats && reviewStats.total_reviews > 0 && (
-            <View style={{ marginBottom: theme.spacing.lg }}>
-              <ReviewSummary 
-                userId={user.id} 
-              />
-            </View>
-          )}
-
-          {/* Tab Navigation - Fixed position */}
-          <View
-            style={{
-              flexDirection: 'row',
-              backgroundColor: theme.colors.surface,
-              borderRadius: theme.borderRadius.lg,
-              padding: theme.spacing.xs,
-              marginBottom: theme.spacing.lg,
-            }}
-          >
-            {tabs.map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <TouchableOpacity
-                  key={tab.id}
-                  onPress={() => setActiveTab(tab.id)}
+        {/* Tab Navigation - Prominent at the top */}
+        <View
+          style={{
+            flexDirection: 'row',
+            backgroundColor: theme.colors.surface,
+            marginHorizontal: theme.spacing.lg,
+            marginTop: theme.spacing.md,
+            marginBottom: theme.spacing.lg,
+            borderRadius: theme.borderRadius.lg,
+            padding: theme.spacing.xs,
+            ...theme.shadows.sm,
+          }}
+        >
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <TouchableOpacity
+                key={tab.id}
+                onPress={() => setActiveTab(tab.id)}
+                style={{
+                  flex: 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: theme.spacing.lg,
+                  paddingHorizontal: theme.spacing.md,
+                  backgroundColor: isActive ? theme.colors.primary : 'transparent',
+                  borderRadius: theme.borderRadius.md,
+                  gap: theme.spacing.sm,
+                  minHeight: 56,
+                }}
+                activeOpacity={0.7}
+              >
+                {React.cloneElement(tab.icon, {
+                  size: 20,
+                  color: isActive ? theme.colors.primaryForeground : theme.colors.text.primary,
+                })}
+                <Text
+                  variant="body"
                   style={{
-                    flex: 1,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    paddingVertical: theme.spacing.md,
-                    paddingHorizontal: theme.spacing.sm,
-                    backgroundColor: isActive ? theme.colors.primary : 'transparent',
-                    borderRadius: theme.borderRadius.md,
-                    gap: theme.spacing.xs,
+                    color: isActive ? theme.colors.primaryForeground : theme.colors.text.primary,
+                    fontWeight: isActive ? '700' : '500',
+                    fontSize: 16,
                   }}
                 >
-                  {React.cloneElement(tab.icon, {
-                    color: isActive ? theme.colors.primaryForeground : theme.colors.text.primary,
-                  })}
-                  <Text
-                    variant="bodySmall"
-                    style={{
-                      color: isActive ? theme.colors.primaryForeground : theme.colors.text.primary,
-                      fontWeight: isActive ? '600' : '400',
-                    }}
-                  >
-                    {tab.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </Container>
-
-        {/* Tab Content - Scrollable area */}
-        <View style={{ flex: 1 }}>
-          <ScrollView 
-            contentContainerStyle={{ 
-              paddingBottom: theme.spacing.xl
-            }}
-          >
-            <Container>
-              {activeTab === 'received' ? (
-                <ReviewsList
-                  userId={user.id}
-                  showWriteReview={false}
-                  reviewedUserName={`${(user as any).first_name} ${(user as any).last_name}`}
-                />
-              ) : (
-                <ReviewsList
-                  reviewerId={user.id}
-                  showWriteReview={false}
-                  reviewedUserName="Reviews you've written"
-                />
-              )}
-            </Container>
-          </ScrollView>
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
+
+        {/* Tab Content - Everything renders below tabs */}
+        <ScrollView 
+          style={{ flex: 1 }}
+          contentContainerStyle={{ 
+            paddingBottom: theme.spacing.xl
+          }}
+          showsVerticalScrollIndicator={false}
+        >
+          <Container>
+            {/* Review Summary - Only show for received reviews and when there are reviews */}
+            {activeTab === 'received' && reviewStats && reviewStats.total_reviews > 0 && (
+              <View style={{ marginBottom: theme.spacing.xl }}>
+                <ReviewSummary 
+                  userId={user.id} 
+                />
+              </View>
+            )}
+
+            {/* Reviews Content */}
+            {activeTab === 'received' ? (
+              <ReviewsList
+                userId={user.id}
+                showWriteReview={false}
+                reviewedUserName={`${(user as any).first_name} ${(user as any).last_name}`}
+              />
+            ) : (
+              <ReviewsList
+                reviewerId={user.id}
+                showWriteReview={false}
+                reviewedUserName="Reviews you've written"
+              />
+            )}
+          </Container>
+        </ScrollView>
       </View>
     </SafeAreaWrapper>
   );

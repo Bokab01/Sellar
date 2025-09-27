@@ -291,7 +291,8 @@ class AnalyticsService {
     const { data: reviews, error } = await supabase
       .from('reviews')
       .select('rating')
-      .eq('reviewed_user_id', userId);
+      .eq('reviewed_user_id', userId)
+      .eq('status', 'published');
 
     if (error) throw error;
 

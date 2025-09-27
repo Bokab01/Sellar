@@ -2,15 +2,12 @@ import React, { useState } from 'react';
 import { View, TouchableOpacity, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
-import { 
-  Text, 
-  Avatar, 
-  Rating, 
-  Badge, 
-  Button,
-  UserDisplayName,
-  VerificationBadge
-} from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { Avatar } from '@/components/Avatar/Avatar';
+import { Rating } from '@/components/Rating/Rating';
+import { Badge } from '@/components/Badge/Badge';
+import { Button } from '@/components/Button/Button';
+import { UserDisplayName } from '@/components/UserDisplayName/UserDisplayName';
 import { 
   CheckCircle, 
   Shield, 

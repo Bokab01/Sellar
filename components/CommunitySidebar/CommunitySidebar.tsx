@@ -6,14 +6,12 @@ import { useProfile } from '@/hooks/useProfile';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
-import {
-  Text,
-  Avatar,
-  Button,
-  LoadingSkeleton,
-  Badge,
-  CompactUserBadges,
-} from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { Avatar } from '@/components/Avatar/Avatar';
+import { Button } from '@/components/Button/Button';
+import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
+import { Badge } from '@/components/Badge/Badge';
+import { CompactUserBadges } from '@/components/UserBadgeSystem';
 import { 
   Users, 
   UserPlus2, 

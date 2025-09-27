@@ -1,12 +1,9 @@
 import React from 'react';
 import { View } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { 
-  Text, 
-  Badge, 
-  Rating,
-  VerificationBadge
-} from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { Badge } from '@/components/Badge/Badge';
+import { Rating } from '@/components/Rating/Rating';
 import { 
   Shield, 
   CheckCircle, 

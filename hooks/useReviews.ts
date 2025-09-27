@@ -96,6 +96,7 @@ export function useReviews(options: {
             username
           )
         `)
+        .eq('status', 'published')
         .order('created_at', { ascending: false });
 
       // Apply filters
@@ -203,57 +204,85 @@ export function useReviewStats(userId: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  const fetchStats = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-        // Get all reviews for the user
-        const { data: reviews, error: fetchError } = await supabase
-          .from('reviews')
-          .select('rating')
-          .eq('reviewed_user_id', userId);
+      // Get all published reviews for the user
+      const { data: reviews, error: fetchError } = await supabase
+        .from('reviews')
+        .select('rating')
+        .eq('reviewed_user_id', userId)
+        .eq('status', 'published');
 
-        if (fetchError) throw fetchError;
+      if (fetchError) throw fetchError;
 
-        if (!reviews || reviews.length === 0) {
-          setStats({
-            total_reviews: 0,
-            average_rating: 0,
-            rating_distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
-          });
-          return;
-        }
-
-        // Calculate statistics
-        const total_reviews = reviews.length;
-        const average_rating = reviews.reduce((sum, r) => sum + r.rating, 0) / total_reviews;
-        
-        const rating_distribution = reviews.reduce((dist, r) => {
-          dist[r.rating as keyof typeof dist]++;
-          return dist;
-        }, { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 });
-
+      if (!reviews || reviews.length === 0) {
         setStats({
-          total_reviews,
-          average_rating: Math.round(average_rating * 10) / 10, // Round to 1 decimal
-          rating_distribution
+          total_reviews: 0,
+          average_rating: 0,
+          rating_distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
         });
-      } catch (err) {
-        console.error('Error fetching review stats:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch review stats');
-      } finally {
-        setLoading(false);
+        return;
       }
-    };
 
+      // Calculate statistics
+      const total_reviews = reviews.length;
+      const average_rating = reviews.reduce((sum, r) => sum + r.rating, 0) / total_reviews;
+      
+      const rating_distribution = reviews.reduce((dist, r) => {
+        dist[r.rating as keyof typeof dist]++;
+        return dist;
+      }, { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 });
+
+      setStats({
+        total_reviews,
+        average_rating: Math.round(average_rating * 10) / 10, // Round to 1 decimal
+        rating_distribution
+      });
+    } catch (err) {
+      console.error('Error fetching review stats:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch review stats');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     if (userId) {
       fetchStats();
     }
   }, [userId]);
 
-  return { stats, loading, error };
+  // Set up real-time subscription for review changes
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`review-stats-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'reviews',
+          filter: `reviewed_user_id=eq.${userId}`
+        },
+        () => {
+          // Refresh stats when reviews change
+          fetchStats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
+
+  // Return refresh function so components can manually refresh stats
+  return { stats, loading, error, refresh: fetchStats };
 }
 
 // Hook to create a new review

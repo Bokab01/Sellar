@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { View, ScrollView } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { Text, Button, StepIndicator } from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { Button } from '@/components/Button/Button';
+import { StepIndicator } from '@/components/StepIndicator/StepIndicator';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 
 export interface FormStep {

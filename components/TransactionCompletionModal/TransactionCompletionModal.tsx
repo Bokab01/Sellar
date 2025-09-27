@@ -2,15 +2,13 @@ import React, { useState } from 'react';
 import { View, Alert, ScrollView } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
-import {
-  Text,
-  AppModal,
-  Button,
-  Input,
-  Badge,
-  Avatar,
-  UserDisplayName
-} from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { AppModal } from '@/components/Modal/Modal';
+import { Button } from '@/components/Button/Button';
+import { Input } from '@/components/Input/Input';
+import { Badge } from '@/components/Badge/Badge';
+import { Avatar } from '@/components/Avatar/Avatar';
+import { UserDisplayName } from '@/components/UserDisplayName/UserDisplayName';
 import { 
   CheckCircle, 
   MapPin, 

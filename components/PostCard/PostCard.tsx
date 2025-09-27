@@ -613,9 +613,9 @@ export function PostCard({
               <TouchableOpacity
                 onPress={handleFollowToggle}
                 style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
                   justifyContent: 'center',
                   alignItems: 'center',
                   backgroundColor: isFollowing ? theme.colors.surfaceVariant : theme.colors.primary + '15',
@@ -625,9 +625,9 @@ export function PostCard({
                 activeOpacity={0.7}
               >
                 {isFollowing ? (
-                  <UserMinus size={20} color={theme.colors.text.primary} />
+                  <UserMinus size={16} color={theme.colors.text.primary} />
                 ) : (
-                  <UserPlus size={20} color={theme.colors.primary} />
+                  <UserPlus size={16} color={theme.colors.primary} />
                 )}
               </TouchableOpacity>
               

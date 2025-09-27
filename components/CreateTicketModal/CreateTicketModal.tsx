@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { View, ScrollView, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { Text, Input, Button, AppModal } from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { Input } from '@/components/Input/Input';
+import { Button } from '@/components/Button/Button';
+import { AppModal } from '@/components/Modal/Modal';
 import { Picker } from '@react-native-picker/picker';
 import { useCreateSupportTicket, SupportTicket } from '@/hooks/useSupport';
 import * as Device from 'expo-device';

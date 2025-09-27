@@ -1356,3 +1356,417 @@ CREATE TRIGGER trigger_update_reports_updated_at
 -- 3. community-images: Public read, authenticated write
 -- 4. chat-attachments: Private, only conversation participants can access
 -- 5. verification-documents: Private, only user and admins can access
+
+-- =============================================
+-- RECOMMENDATION SYSTEM SCHEMA
+-- =============================================
+
+-- User interactions tracking
+CREATE TABLE user_interactions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+    interaction_type VARCHAR(20) NOT NULL CHECK (interaction_type IN ('view', 'favorite', 'offer', 'purchase', 'share', 'contact')),
+    interaction_weight DECIMAL(3,2) DEFAULT 1.0, -- Weight for different interaction types
+    metadata JSONB DEFAULT '{}', -- Additional context (search query, time spent, etc.)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    
+    -- Note: One interaction per user-listing-type per day is enforced by application logic
+);
+
+-- User preferences and behavior patterns
+CREATE TABLE user_preferences (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    category_id UUID REFERENCES categories(id) ON DELETE CASCADE,
+    preference_score DECIMAL(5,2) DEFAULT 0.0, -- Calculated preference score
+    interaction_count INTEGER DEFAULT 0,
+    last_interaction TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    UNIQUE(user_id, category_id)
+);
+
+-- Listing popularity and trending scores
+CREATE TABLE listing_popularity (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+    popularity_score DECIMAL(10,2) DEFAULT 0.0,
+    trending_score DECIMAL(10,2) DEFAULT 0.0,
+    view_count INTEGER DEFAULT 0,
+    favorite_count INTEGER DEFAULT 0,
+    offer_count INTEGER DEFAULT 0,
+    purchase_count INTEGER DEFAULT 0,
+    share_count INTEGER DEFAULT 0,
+    contact_count INTEGER DEFAULT 0,
+    last_calculated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    UNIQUE(listing_id)
+);
+
+-- Collaborative filtering - co-interaction patterns
+CREATE TABLE listing_co_interactions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    primary_listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+    related_listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+    co_interaction_count INTEGER DEFAULT 0,
+    co_interaction_score DECIMAL(10,2) DEFAULT 0.0,
+    last_calculated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    UNIQUE(primary_listing_id, related_listing_id),
+    CHECK (primary_listing_id != related_listing_id)
+);
+
+-- Recently viewed items (for quick access)
+CREATE TABLE recently_viewed (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+    viewed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    view_duration INTEGER DEFAULT 0, -- Time spent viewing in seconds
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    UNIQUE(user_id, listing_id)
+);
+
+-- Boosted/sponsored listings
+CREATE TABLE boosted_listings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+    boost_type VARCHAR(20) NOT NULL CHECK (boost_type IN ('featured', 'trending', 'category_spotlight', 'search_boost')),
+    boost_weight DECIMAL(5,2) DEFAULT 1.0, -- Multiplier for ranking
+    boost_until TIMESTAMP WITH TIME ZONE NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    UNIQUE(listing_id, boost_type)
+);
+
+-- Search history for personalization
+CREATE TABLE search_history (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    search_query TEXT NOT NULL,
+    search_filters JSONB DEFAULT '{}',
+    results_count INTEGER DEFAULT 0,
+    clicked_listings JSONB DEFAULT '[]', -- Array of listing IDs that were clicked
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- =============================================
+-- RECOMMENDATION SYSTEM INDEXES
+-- =============================================
+
+-- User interactions indexes
+CREATE INDEX idx_user_interactions_user_id ON user_interactions(user_id);
+CREATE INDEX idx_user_interactions_listing_id ON user_interactions(listing_id);
+CREATE INDEX idx_user_interactions_type ON user_interactions(interaction_type);
+CREATE INDEX idx_user_interactions_created_at ON user_interactions(created_at);
+CREATE INDEX idx_user_interactions_user_listing ON user_interactions(user_id, listing_id);
+
+-- User preferences indexes
+CREATE INDEX idx_user_preferences_user_id ON user_preferences(user_id);
+CREATE INDEX idx_user_preferences_category ON user_preferences(category_id);
+CREATE INDEX idx_user_preferences_score ON user_preferences(preference_score DESC);
+
+-- Listing popularity indexes
+CREATE INDEX idx_listing_popularity_score ON listing_popularity(popularity_score DESC);
+CREATE INDEX idx_listing_popularity_trending ON listing_popularity(trending_score DESC);
+CREATE INDEX idx_listing_popularity_listing_id ON listing_popularity(listing_id);
+
+-- Co-interactions indexes
+CREATE INDEX idx_co_interactions_primary ON listing_co_interactions(primary_listing_id);
+CREATE INDEX idx_co_interactions_related ON listing_co_interactions(related_listing_id);
+CREATE INDEX idx_co_interactions_score ON listing_co_interactions(co_interaction_score DESC);
+
+-- Recently viewed indexes
+CREATE INDEX idx_recently_viewed_user_id ON recently_viewed(user_id);
+CREATE INDEX idx_recently_viewed_viewed_at ON recently_viewed(viewed_at DESC);
+CREATE INDEX idx_recently_viewed_user_viewed ON recently_viewed(user_id, viewed_at DESC);
+
+-- Boosted listings indexes
+CREATE INDEX idx_boosted_listings_active ON boosted_listings(is_active, boost_until);
+CREATE INDEX idx_boosted_listings_type ON boosted_listings(boost_type);
+CREATE INDEX idx_boosted_listings_weight ON boosted_listings(boost_weight DESC);
+
+-- Search history indexes
+CREATE INDEX idx_search_history_user_id ON search_history(user_id);
+CREATE INDEX idx_search_history_created_at ON search_history(created_at DESC);
+
+-- =============================================
+-- RECOMMENDATION SYSTEM TRIGGERS
+-- =============================================
+
+CREATE TRIGGER update_user_interactions_updated_at BEFORE UPDATE ON user_interactions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_user_preferences_updated_at BEFORE UPDATE ON user_preferences FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_listing_popularity_updated_at BEFORE UPDATE ON listing_popularity FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_listing_co_interactions_updated_at BEFORE UPDATE ON listing_co_interactions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_boosted_listings_updated_at BEFORE UPDATE ON boosted_listings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- =============================================
+-- RECOMMENDATION SYSTEM RLS POLICIES
+-- =============================================
+
+-- Enable RLS
+ALTER TABLE user_interactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE listing_popularity ENABLE ROW LEVEL SECURITY;
+ALTER TABLE listing_co_interactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE recently_viewed ENABLE ROW LEVEL SECURITY;
+ALTER TABLE boosted_listings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE search_history ENABLE ROW LEVEL SECURITY;
+
+-- User interactions policies (users can manage their own, functions can manage all)
+CREATE POLICY "Users can view their own interactions" ON user_interactions FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert their own interactions" ON user_interactions FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update their own interactions" ON user_interactions FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Functions can manage all interactions" ON user_interactions FOR ALL USING (true);
+
+-- User preferences policies (users can manage their own, functions can manage all)
+CREATE POLICY "Users can view their own preferences" ON user_preferences FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert their own preferences" ON user_preferences FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update their own preferences" ON user_preferences FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Functions can manage all preferences" ON user_preferences FOR ALL USING (true);
+
+-- Listing popularity policies (read-only for users, full access for functions)
+CREATE POLICY "Anyone can view listing popularity" ON listing_popularity FOR SELECT USING (true);
+CREATE POLICY "Functions can manage listing popularity" ON listing_popularity FOR ALL USING (true);
+
+-- Co-interactions policies (read-only for users, full access for functions)
+CREATE POLICY "Anyone can view co-interactions" ON listing_co_interactions FOR SELECT USING (true);
+CREATE POLICY "Functions can manage co-interactions" ON listing_co_interactions FOR ALL USING (true);
+
+-- Recently viewed policies (users can manage their own, functions can manage all)
+CREATE POLICY "Users can view their own recently viewed" ON recently_viewed FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert their own recently viewed" ON recently_viewed FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update their own recently viewed" ON recently_viewed FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete their own recently viewed" ON recently_viewed FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Functions can manage all recently viewed" ON recently_viewed FOR ALL USING (true);
+
+-- Boosted listings policies (read-only for users, full access for functions)
+CREATE POLICY "Anyone can view active boosted listings" ON boosted_listings FOR SELECT USING (is_active = true AND boost_until > NOW());
+CREATE POLICY "Functions can manage boosted listings" ON boosted_listings FOR ALL USING (true);
+
+-- Search history policies (users can manage their own, functions can manage all)
+CREATE POLICY "Users can view their own search history" ON search_history FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert their own search history" ON search_history FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can delete their own search history" ON search_history FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Functions can manage all search history" ON search_history FOR ALL USING (true);
+
+-- =============================================
+-- RECOMMENDATION SYSTEM COMMENTS
+-- =============================================
+
+COMMENT ON TABLE user_interactions IS 'Tracks all user interactions with listings for recommendation algorithms';
+COMMENT ON TABLE user_preferences IS 'Stores calculated user preferences based on interaction patterns';
+COMMENT ON TABLE listing_popularity IS 'Cached popularity and trending scores for listings';
+COMMENT ON TABLE listing_co_interactions IS 'Collaborative filtering data - which listings are often viewed together';
+COMMENT ON TABLE recently_viewed IS 'Quick access to recently viewed items for each user';
+COMMENT ON TABLE boosted_listings IS 'Sponsored/boosted listings with enhanced visibility';
+COMMENT ON TABLE search_history IS 'User search queries for personalization and analytics';
+
+-- =============================================
+-- REVIEW COUNT FIXES AND AUTOMATIC UPDATES
+-- =============================================
+
+-- Create a function to update user review statistics
+CREATE OR REPLACE FUNCTION update_user_review_stats(p_user_id UUID)
+RETURNS VOID AS $$
+DECLARE
+    v_total_reviews INTEGER;
+    v_average_rating DECIMAL(3,1);
+BEGIN
+    -- Get count of published reviews
+    SELECT COUNT(*) INTO v_total_reviews
+    FROM reviews 
+    WHERE reviewed_user_id = p_user_id 
+    AND status = 'published';
+    
+    -- Get average rating of published reviews
+    SELECT ROUND(AVG(rating)::numeric, 1) INTO v_average_rating
+    FROM reviews 
+    WHERE reviewed_user_id = p_user_id 
+    AND status = 'published';
+    
+    -- Update profile with new stats
+    UPDATE profiles 
+    SET 
+        total_reviews = v_total_reviews,
+        rating = COALESCE(v_average_rating, 0)
+    WHERE id = p_user_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger function to automatically update review stats
+CREATE OR REPLACE FUNCTION trigger_update_user_review_stats()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Update stats for the reviewed user
+    PERFORM update_user_review_stats(COALESCE(NEW.reviewed_user_id, OLD.reviewed_user_id));
+    
+    -- If this is an update that changes the status, also update the reviewer's stats
+    IF TG_OP = 'UPDATE' AND OLD.status IS DISTINCT FROM NEW.status THEN
+        PERFORM update_user_review_stats(COALESCE(NEW.reviewed_user_id, OLD.reviewed_user_id));
+    END IF;
+    
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger to automatically update review stats when reviews change
+CREATE TRIGGER trigger_reviews_update_user_stats
+    AFTER INSERT OR UPDATE OR DELETE ON reviews
+    FOR EACH ROW
+    EXECUTE FUNCTION trigger_update_user_review_stats();
+
+-- =============================================
+-- AUTO-REFRESH NOTIFICATION SPAM FIX
+-- =============================================
+
+-- Update the listing notification function to exclude auto-refresh updates
+CREATE OR REPLACE FUNCTION create_listing_notification()
+RETURNS TRIGGER AS $$
+DECLARE
+    seller_username TEXT;
+    seller_avatar TEXT;
+    listing_title TEXT;
+    is_auto_refresh BOOLEAN := FALSE;
+BEGIN
+    -- Check if this is an auto-refresh update using session variable
+    -- The auto-refresh function should set this variable
+    BEGIN
+        is_auto_refresh := COALESCE(current_setting('app.is_auto_refresh', true)::boolean, false);
+    EXCEPTION WHEN OTHERS THEN
+        is_auto_refresh := FALSE;
+    END;
+
+    -- Skip notification for auto-refresh updates
+    IF is_auto_refresh THEN
+        RETURN NEW;
+    END IF;
+
+    -- Get seller details
+    SELECT username, avatar_url INTO seller_username, seller_avatar
+    FROM profiles 
+    WHERE id = NEW.user_id;
+    
+    -- Get listing title
+    listing_title := NEW.title;
+    
+    -- Create notification for the seller (listing created/updated)
+    INSERT INTO notifications (user_id, type, title, body, data)
+    VALUES (
+        NEW.user_id,
+        'listing',
+        CASE 
+            WHEN TG_OP = 'INSERT' THEN 'Listing Created Successfully! 🎉'
+            WHEN TG_OP = 'UPDATE' THEN 'Listing Updated ✏️'
+            ELSE 'Listing ' || TG_OP
+        END,
+        CASE 
+            WHEN TG_OP = 'INSERT' THEN 'Your listing "' || listing_title || '" has been created and is now live!'
+            WHEN TG_OP = 'UPDATE' THEN 'Your listing "' || listing_title || '" has been updated successfully.'
+            ELSE 'Your listing "' || listing_title || '" was ' || TG_OP
+        END,
+        jsonb_build_object(
+            'listing_id', NEW.id,
+            'listing_title', listing_title,
+            'action', TG_OP,
+            'created_at', NEW.created_at,
+            'is_auto_refresh', is_auto_refresh
+        )
+    );
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Drop existing function first to avoid return type conflicts
+DROP FUNCTION IF EXISTS process_business_auto_refresh();
+
+-- Update the auto-refresh function to set the session variable
+CREATE OR REPLACE FUNCTION process_business_auto_refresh()
+RETURNS TABLE(
+    processed_count INTEGER,
+    error_count INTEGER,
+    deactivated_count INTEGER
+) AS $$
+DECLARE
+    refresh_record RECORD;
+    processed INTEGER := 0;
+    errors INTEGER := 0;
+    deactivated INTEGER := 0;
+    has_active_boost BOOLEAN;
+BEGIN
+    -- Set session variable to indicate we're doing auto-refresh
+    PERFORM set_config('app.is_auto_refresh', 'true', true);
+    
+    -- Process all due auto-refreshes, but only for listings with active boosts
+    FOR refresh_record IN 
+        SELECT bar.id, bar.user_id, bar.listing_id, bar.refresh_interval_hours
+        FROM business_auto_refresh bar
+        JOIN listings l ON bar.listing_id = l.id
+        WHERE bar.is_active = true 
+        AND bar.next_refresh_at <= NOW()
+        AND l.status = 'active'
+    LOOP
+        BEGIN
+            -- Check if listing has any active boost features
+            SELECT EXISTS(
+                SELECT 1 FROM feature_purchases fp
+                WHERE fp.listing_id = refresh_record.listing_id
+                AND fp.status = 'active'
+                AND fp.expires_at > NOW()
+                AND fp.feature_key IN ('pulse_boost_24h', 'mega_pulse_7d', 'category_spotlight_3d', 'ad_refresh')
+            ) INTO has_active_boost;
+
+            -- Only refresh if listing has active boost
+            IF has_active_boost THEN
+                -- Update listing's updated_at to refresh its position
+                UPDATE listings 
+                SET updated_at = NOW()
+                WHERE id = refresh_record.listing_id;
+
+                -- Update next refresh time
+                UPDATE business_auto_refresh
+                SET 
+                    last_refresh_at = NOW(),
+                    next_refresh_at = NOW() + (refresh_record.refresh_interval_hours || ' hours')::INTERVAL,
+                    updated_at = NOW()
+                WHERE id = refresh_record.id;
+
+                processed := processed + 1;
+                
+                -- Log successful refresh
+                RAISE NOTICE 'Auto-refreshed listing % for user %', refresh_record.listing_id, refresh_record.user_id;
+            ELSE
+                -- Deactivate auto-refresh for listings without active boosts
+                UPDATE business_auto_refresh
+                SET 
+                    is_active = false,
+                    updated_at = NOW()
+                WHERE id = refresh_record.id;
+                
+                deactivated := deactivated + 1;
+            END IF;
+
+        EXCEPTION WHEN OTHERS THEN
+            errors := errors + 1;
+            RAISE NOTICE 'Error processing auto-refresh for listing %: %', refresh_record.listing_id, SQLERRM;
+        END;
+    END LOOP;
+    
+    -- Clear the session variable
+    PERFORM set_config('app.is_auto_refresh', 'false', true);
+    
+    -- Return results
+    RETURN QUERY SELECT processed, errors, deactivated;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

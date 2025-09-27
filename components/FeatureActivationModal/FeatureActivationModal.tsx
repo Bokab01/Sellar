@@ -5,13 +5,11 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { activateListingFeature, activateUserFeature } from '@/lib/featureActivation';
 import { getFeatureByKey } from '@/constants/monetization';
-import {
-  Text,
-  AppModal,
-  Button,
-  Badge,
-  LoadingSkeleton,
-} from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { AppModal } from '@/components/Modal/Modal';
+import { Button } from '@/components/Button/Button';
+import { Badge } from '@/components/Badge/Badge';
+import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
 import { 
   Zap, 
   Target, 

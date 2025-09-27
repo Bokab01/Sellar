@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { View, ScrollView, Image, TouchableOpacity, Alert, Linking, Dimensions, StatusBar } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { dbHelpers, supabase } from '@/lib/supabase';
 import { checkOfferLimit, type OfferLimitResult } from '@/utils/offerLimits';
+import { useRecommendations } from '@/hooks/useRecommendations';
+import { ListingRecommendations } from '@/components/Recommendations';
 import {
   Text,
   SafeAreaWrapper,
@@ -25,10 +27,12 @@ import {
   Toast,
   Grid,
   ProductCard,
-  ImageViewer,
   ReviewsList,
   SimpleCallbackRequestButton,
 } from '@/components';
+
+// Lazy load heavy ImageViewer component
+const ImageViewer = lazy(() => import('@/components/ImageViewer/ImageViewer').then(module => ({ default: module.ImageViewer })));
 import { useImageViewer } from '@/hooks/useImageViewer';
 import { useListingStats } from '@/hooks/useListingStats';
 import { Heart, Share, MessageCircle, Phone, PhoneCall, DollarSign, ArrowLeft, Package, MoreVertical } from 'lucide-react-native';
@@ -39,6 +43,7 @@ export default function ListingDetailScreen() {
   const { theme } = useTheme();
   const { id: listingId } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuthStore();
+  const { trackInteraction } = useRecommendations();
   
   const [listing, setListing] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -106,6 +111,14 @@ export default function ListingDetailScreen() {
       checkCallbackStatus();
       checkPendingOffer();
       fetchRelatedItems();
+      
+      // Track view interaction
+      if (user) {
+        trackInteraction(listingId, 'view', {
+          source: 'listing_detail',
+          timeSpent: 0
+        });
+      }
     }
   }, [listingId]);
 
@@ -469,9 +482,28 @@ export default function ListingDetailScreen() {
         
         setIsFavorited(true);
         showSuccessToast('Added to favorites');
+        
+        // Track favorite interaction
+        if (listingId) {
+          await trackInteraction(listingId, 'favorite', {
+            source: 'listing_detail'
+          });
+        }
       }
     } catch (err) {
       showErrorToast('Failed to update favorites');
+    }
+  };
+
+  // Wrapper for toggleFavoriteStatus with interaction tracking
+  const handleToggleFavorite = async () => {
+    await toggleFavoriteStatus();
+    
+    // Track favorite interaction
+    if (listingId && user) {
+      await trackInteraction(listingId, 'favorite', {
+        source: 'listing_detail'
+      });
     }
   };
 
@@ -484,6 +516,14 @@ export default function ListingDetailScreen() {
     if (!messageText.trim()) {
       Alert.alert('Error', 'Please enter a message');
       return;
+    }
+
+    // Track contact interaction
+    if (listingId) {
+      await trackInteraction(listingId, 'contact', {
+        source: 'listing_detail',
+        contactType: 'message'
+      });
     }
 
     setSendingMessage(true);
@@ -834,7 +874,7 @@ export default function ListingDetailScreen() {
           {/* Only show favorite button if user doesn't own the listing */}
           {listing && listing.user_id !== user?.id && (
             <TouchableOpacity
-              onPress={toggleFavoriteStatus}
+              onPress={handleToggleFavorite}
               style={{
                 width: 40,
                 height: 40,
@@ -1499,6 +1539,16 @@ export default function ListingDetailScreen() {
             ) : null}
           </View>
         </View>
+
+        {/* Recommendation System */}
+        {listingId && (
+          <ListingRecommendations
+            listingId={listingId}
+            onListingPress={(id) => router.push(`/(tabs)/home/${id}`)}
+            onViewAllCategory={() => router.push('/(recommendations)/personalized' as any)}
+            onViewAllCollaborative={() => router.push('/(recommendations)/personalized' as any)}
+          />
+        )}
       </ScrollView>
 
       {/* Bottom Tab Actions */}
@@ -1795,12 +1845,16 @@ export default function ListingDetailScreen() {
       />
 
       {/* Image Viewer */}
-      <ImageViewer
-        visible={imageViewerVisible}
-        images={images}
-        initialIndex={imageViewerIndex}
-        onClose={closeImageViewer}
-      />
+      <Suspense fallback={<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Loading image viewer...</Text>
+      </View>}>
+        <ImageViewer
+          visible={imageViewerVisible}
+          images={images}
+          initialIndex={imageViewerIndex}
+          onClose={closeImageViewer}
+        />
+      </Suspense>
     </View>
   );
 }

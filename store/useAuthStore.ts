@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { supabase, dbHelpers } from '@/lib/supabase';
 import { handleAuthError, analyzeAuthError } from '@/utils/authErrorHandler';
 import { networkUtils } from '@/utils/networkRetry';
+import { RefreshTokenHandler } from '@/utils/refreshTokenHandler';
 import type { User, Session } from '@supabase/supabase-js';
 
 interface AuthState {

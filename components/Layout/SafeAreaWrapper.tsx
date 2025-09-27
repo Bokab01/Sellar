@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { SafeAreaView, View, ViewProps, Platform } from 'react-native';
+import { View, ViewProps, Platform } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
 
 interface SafeAreaWrapperProps extends ViewProps {
@@ -24,39 +25,16 @@ export function SafeAreaWrapper({
   const safeAreaStyle = useMemo(() => {
     const bgColor = backgroundColor || theme.colors.background;
 
-    // Platform-specific padding values
-    const getPlatformPadding = () => {
-      if (!includePlatformPadding) return {};
-      
-      return Platform.select({
-        ios: {
-          paddingTop: edges.includes('top') ? 0 : 20, // Status bar height when not using safe area
-          paddingBottom: edges.includes('bottom') ? 0 : 34, // Home indicator area
-        },
-        android: {
-          paddingTop: edges.includes('top') ? 0 : 24, // Status bar height
-          paddingBottom: 0, // Android handles bottom automatically
-        },
-        web: {
-          paddingTop: edges.includes('top') ? 0 : 0,
-          paddingBottom: 0,
-        },
-        default: {},
-      });
-    };
-
     return { 
       flex: 1, 
       backgroundColor: bgColor,
-      // Ensure consistent background during transitions
-      opacity: 1,
-      ...getPlatformPadding(),
     };
-  }, [theme, backgroundColor, edges, includePlatformPadding]);
+  }, [theme, backgroundColor]);
 
   return (
     <SafeAreaView 
       style={[safeAreaStyle, style]} 
+      edges={edges}
       {...props}
     >
       {children}

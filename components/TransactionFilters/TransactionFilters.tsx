@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { View, ScrollView } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { Text, Button, Input, AppModal } from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { Button } from '@/components/Button/Button';
+import { Input } from '@/components/Input/Input';
+import { AppModal } from '@/components/Modal/Modal';
 import { Filter, Calendar, Search, X } from 'lucide-react-native';
 import { TransactionType, TransactionStatus, useTransactionCategories } from '@/hooks/useTransactions';
 import { 

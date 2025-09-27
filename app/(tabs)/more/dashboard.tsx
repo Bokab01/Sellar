@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { View, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
@@ -14,16 +14,16 @@ import {
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { useAuth } from '@/hooks/useAuth';
 import { useAnalytics, type QuickStats, type AnalyticsData } from '@/lib/analyticsService';
+import { router } from 'expo-router';
+import { navigation } from '@/lib/navigation';
 
-// Import dashboard components
-import { 
-  BusinessOverview, 
-  BusinessBoostManager, 
-  BusinessAnalytics, 
-  BusinessSupport, 
-  FreeUserDashboard
-} from '@/components/Dashboard';
-import AutoBoostDashboard from '@/components/AutoBoostDashboard/AutoBoostDashboard';
+// Lazy load heavy dashboard components for better performance
+const BusinessOverview = lazy(() => import('@/components/Dashboard/BusinessOverview').then(module => ({ default: module.BusinessOverview })));
+const BusinessBoostManager = lazy(() => import('@/components/Dashboard/BusinessBoostManager').then(module => ({ default: module.BusinessBoostManager })));
+const BusinessAnalytics = lazy(() => import('@/components/Dashboard/BusinessAnalytics').then(module => ({ default: module.BusinessAnalytics })));
+const BusinessSupport = lazy(() => import('@/components/Dashboard/BusinessSupport').then(module => ({ default: module.BusinessSupport })));
+const FreeUserDashboard = lazy(() => import('@/components/Dashboard/FreeUserDashboard').then(module => ({ default: module.FreeUserDashboard })));
+const AutoBoostDashboard = lazy(() => import('@/components/AutoBoostDashboard/AutoBoostDashboard'));
 
 type DashboardTab = 'overview' | 'boost' | 'analytics' | 'support';
 
@@ -207,37 +207,45 @@ export default function BusinessDashboardScreen() {
     switch (activeTab) {
       case 'overview':
         return (
-          <BusinessOverview
-            loading={loading}
-            quickStats={quickStats}
-            analyticsData={analyticsData}
-            onTabChange={handleTabChange}
-          />
+          <Suspense fallback={<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+            <Text>Loading dashboard...</Text>
+          </View>}>
+            <BusinessOverview
+              loading={loading}
+              quickStats={quickStats}
+              analyticsData={analyticsData}
+              onTabChange={handleTabChange}
+            />
+          </Suspense>
         );
       case 'boost':
         return (
-          <AutoBoostDashboard />
+          <Suspense fallback={<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+            <Text>Loading auto-refresh settings...</Text>
+          </View>}>
+            <AutoBoostDashboard />
+          </Suspense>
         );
       case 'analytics':
-        return (
-          <BusinessAnalytics
-            onTabChange={handleTabChange}
-          />
-        );
+        // Redirect to dedicated analytics screen
+        navigation.business.goToAnalytics();
+        return null;
       case 'support':
-        return (
-          <BusinessSupport
-            onTabChange={handleTabChange}
-          />
-        );
+        // Redirect to dedicated support screen
+        navigation.business.goToSupport();
+        return null;
       default:
         return (
-          <BusinessOverview
-            loading={loading}
-            quickStats={quickStats}
-            analyticsData={analyticsData}
-            onTabChange={handleTabChange}
-          />
+          <Suspense fallback={<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+            <Text>Loading dashboard...</Text>
+          </View>}>
+            <BusinessOverview
+              loading={loading}
+              quickStats={quickStats}
+              analyticsData={analyticsData}
+              onTabChange={handleTabChange}
+            />
+          </Suspense>
         );
     }
   }, [activeTab, loading, quickStats, analyticsData, handleTabChange]);

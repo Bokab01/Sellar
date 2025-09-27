@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, TouchableOpacity } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { Text, Badge } from '@/components';
+import { Text } from '@/components/Typography/Text';
+import { Badge } from '@/components/Badge/Badge';
 import { 
   Clock, 
   MessageCircle, 

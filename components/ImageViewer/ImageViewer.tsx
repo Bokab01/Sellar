@@ -7,9 +7,9 @@ import {
   TouchableOpacity,
   Text,
   StyleSheet,
-  SafeAreaView,
   Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   PanGestureHandler,
   PinchGestureHandler,
@@ -21,7 +21,6 @@ import {
   TapGestureHandlerGestureEvent,
 } from 'react-native-gesture-handler';
 import Animated, {
-  useAnimatedGestureHandler,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -116,11 +115,11 @@ export function ImageViewer({
   }, [images.length, resetImagePosition]);
 
   // Pinch gesture handler
-  const pinchHandler = useAnimatedGestureHandler<PinchGestureHandlerGestureEvent>({
+  const pinchHandler = {
     onStart: () => {
       lastScale.value = scale.value;
     },
-    onActive: (event) => {
+    onActive: (event: any) => {
       scale.value = Math.max(0.5, Math.min(lastScale.value * event.scale, 5));
     },
     onEnd: () => {
@@ -133,16 +132,16 @@ export function ImageViewer({
       }
       lastScale.value = scale.value;
     },
-  });
+  };
 
   // Pan gesture handler
-  const panHandler = useAnimatedGestureHandler<PanGestureHandlerGestureEvent>({
+  const panHandler = {
     onStart: () => {
       lastTranslateX.value = translateX.value;
       lastTranslateY.value = translateY.value;
       lastImageTranslateX.value = imageTranslateX.value;
     },
-    onActive: (event) => {
+    onActive: (event: any) => {
       if (scale.value > 1) {
         // Pan when zoomed in
         const maxTranslateX = (screenWidth * (scale.value - 1)) / 2;
@@ -161,7 +160,7 @@ export function ImageViewer({
         imageTranslateX.value = lastImageTranslateX.value + event.translationX;
       }
     },
-    onEnd: (event) => {
+    onEnd: (event: any) => {
       if (scale.value <= 1) {
         // Handle image swiping
         const threshold = screenWidth * 0.3;
@@ -187,18 +186,18 @@ export function ImageViewer({
         }
       }
     },
-  });
+  };
 
   // Single tap handler
-  const tapHandler = useAnimatedGestureHandler<TapGestureHandlerGestureEvent>({
+  const tapHandler = {
     onEnd: () => {
       runOnJS(setControlsVisible)(!controlsVisible);
     },
-  });
+  };
 
   // Double tap handler
-  const doubleTapHandler = useAnimatedGestureHandler<TapGestureHandlerGestureEvent>({
-    onEnd: (event) => {
+  const doubleTapHandler = {
+    onEnd: (event: any) => {
       if (scale.value > 1) {
         // Zoom out
         scale.value = withSpring(1);
@@ -224,7 +223,7 @@ export function ImageViewer({
         lastTranslateY.value = translateY.value;
       }
     },
-  });
+  };
 
   // Animated styles
   const imageContainerStyle = useAnimatedStyle(() => {
@@ -285,7 +284,15 @@ export function ImageViewer({
         <View style={[styles.container, { backgroundColor }]}>
         <PanGestureHandler
           ref={panRef}
-          onGestureEvent={panHandler}
+          onGestureEvent={(event) => {
+            if (event.nativeEvent.state === State.BEGAN) {
+              panHandler.onStart();
+            } else if (event.nativeEvent.state === State.ACTIVE) {
+              panHandler.onActive(event.nativeEvent);
+            } else if (event.nativeEvent.state === State.END) {
+              panHandler.onEnd(event.nativeEvent);
+            }
+          }}
           simultaneousHandlers={[pinchRef]}
           minPointers={1}
           maxPointers={1}
@@ -293,20 +300,36 @@ export function ImageViewer({
           <Animated.View style={styles.gestureContainer}>
             <PinchGestureHandler
               ref={pinchRef}
-              onGestureEvent={pinchHandler}
+              onGestureEvent={(event) => {
+                if (event.nativeEvent.state === State.BEGAN) {
+                  pinchHandler.onStart();
+                } else if (event.nativeEvent.state === State.ACTIVE) {
+                  pinchHandler.onActive(event.nativeEvent);
+                } else if (event.nativeEvent.state === State.END) {
+                  pinchHandler.onEnd();
+                }
+              }}
               simultaneousHandlers={[panRef]}
             >
               <Animated.View style={styles.gestureContainer}>
                 <TapGestureHandler
                   ref={tapRef}
-                  onGestureEvent={tapHandler}
+                  onGestureEvent={(event) => {
+                    if (event.nativeEvent.state === State.END) {
+                      tapHandler.onEnd();
+                    }
+                  }}
                   waitFor={doubleTapRef}
                   numberOfTaps={1}
                 >
                   <Animated.View style={styles.gestureContainer}>
                     <TapGestureHandler
                       ref={doubleTapRef}
-                      onGestureEvent={doubleTapHandler}
+                      onGestureEvent={(event) => {
+                        if (event.nativeEvent.state === State.END) {
+                          doubleTapHandler.onEnd(event.nativeEvent);
+                        }
+                      }}
                       numberOfTaps={2}
                     >
                       <Animated.View style={styles.gestureContainer}>
