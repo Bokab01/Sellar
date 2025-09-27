@@ -832,7 +832,7 @@ export default function ListingDetailScreen() {
   const imageHeight = screenHeight * 0.6; // More than half of screen
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <SafeAreaWrapper>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       
       {/* Fixed Header Overlay */}
@@ -842,7 +842,7 @@ export default function ListingDetailScreen() {
           top: 0,
           left: 0,
           right: 0,
-          paddingTop: StatusBar.currentHeight || 44,
+          paddingTop: (StatusBar.currentHeight || 44) + theme.spacing.md,
           paddingHorizontal: theme.spacing.lg,
           paddingBottom: theme.spacing.md,
           flexDirection: 'row',
@@ -867,7 +867,7 @@ export default function ListingDetailScreen() {
             elevation: 5,
           }}
         >
-          <ArrowLeft size={20} color="white" />
+          <ArrowLeft size={20} color="white" strokeWidth={2} />
         </TouchableOpacity>
 
         <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
@@ -892,7 +892,8 @@ export default function ListingDetailScreen() {
               <Heart 
                 size={20} 
                 color={statsIsFavorited ? theme.colors.error : "white"} 
-                fill={statsIsFavorited ? theme.colors.error : 'none'} 
+                fill={statsIsFavorited ? theme.colors.error : 'none'}
+                strokeWidth={2}
               />
             </TouchableOpacity>
           )}
@@ -915,7 +916,7 @@ export default function ListingDetailScreen() {
               elevation: 5,
             }}
           >
-            <Share size={20} color="white" />
+            <Share size={20} color="white" strokeWidth={2} />
           </TouchableOpacity>
 
           {/* Report button - only show if user doesn't own the listing */}
@@ -1855,6 +1856,6 @@ export default function ListingDetailScreen() {
           onClose={closeImageViewer}
         />
       </Suspense>
-    </View>
+    </SafeAreaWrapper>
   );
 }

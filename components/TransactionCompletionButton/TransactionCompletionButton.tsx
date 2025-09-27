@@ -46,6 +46,20 @@ export function TransactionCompletionButton({
 
       // Both users confirmed - transaction is complete
       if (currentUserConfirmed && otherUserConfirmed) {
+        // Check if user has already left a review
+        const hasLeftReview = existingTransaction.reviews?.some((review: any) => 
+          review.reviewer_id === user?.id
+        );
+        
+        if (hasLeftReview) {
+          return {
+            text: 'Review Submitted',
+            variant: 'success' as const,
+            icon: <CheckCircle size={16} color={theme.colors.success} />,
+            showReviewButton: false,
+          };
+        }
+        
         return {
           text: 'Leave Review',
           variant: 'success' as const,
@@ -87,20 +101,26 @@ export function TransactionCompletionButton({
     if (statusInfo.showConfirmButton) {
       return (
         <>
-          <Button
-            variant="primary"
-            onPress={() => setShowModal(true)}
-            leftIcon={statusInfo.icon}
-            style={[
-              {
-                backgroundColor: theme.colors.warning,
-                borderColor: theme.colors.warning,
-              },
-              style,
-            ]}
-          >
-            {statusInfo.text}
-          </Button>
+          <View style={[{ 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            width: '100%'
+          }]}>
+            <Button
+              variant="primary"
+              onPress={() => setShowModal(true)}
+              leftIcon={statusInfo.icon}
+              style={[
+                {
+                  backgroundColor: theme.colors.warning,
+                  borderColor: theme.colors.warning,
+                },
+                style,
+              ]}
+            >
+              {statusInfo.text}
+            </Button>
+          </View>
 
           <TransactionCompletionModal
             visible={showModal}
@@ -118,43 +138,69 @@ export function TransactionCompletionButton({
       );
     }
 
-    // If transaction is completed, show review button
-    if (statusInfo.showReviewButton) {
+    // If transaction is completed, show review button or status
+    if (statusInfo.showReviewButton !== undefined) {
       return (
         <>
-          <Button
-            variant="primary"
-            onPress={() => setShowReviewForm(true)}
-            leftIcon={statusInfo.icon}
-            style={[
-              {
-                backgroundColor: theme.colors.success,
-                borderColor: theme.colors.success,
-              },
-              style,
-            ]}
-          >
-            {statusInfo.text}
-          </Button>
+          {statusInfo.showReviewButton ? (
+            <View style={[{ 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              width: '100%'
+            }]}>
+              <Button
+                variant="primary"
+                onPress={() => setShowReviewForm(true)}
+                leftIcon={statusInfo.icon}
+                style={[
+                  {
+                    backgroundColor: theme.colors.success,
+                    borderColor: theme.colors.success,
+                  },
+                  style,
+                ]}
+              >
+                {statusInfo.text}
+              </Button>
+            </View>
+          ) : (
+            <View style={[{ 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              width: '100%'
+            }, style]}>
+              <Badge
+                text={statusInfo.text}
+                variant={statusInfo.variant}
+                leftIcon={statusInfo.icon}
+              />
+            </View>
+          )}
 
-          <TransactionBasedReviewForm
-            visible={showReviewForm}
-            onClose={() => setShowReviewForm(false)}
-            transactionId={existingTransaction.id}
-            reviewedUserId={otherUser.id}
-            reviewedUserName={otherUser.full_name || otherUser.first_name + ' ' + otherUser.last_name}
-            onSuccess={() => {
-              setShowReviewForm(false);
-              // Refresh transaction data to update button state
-              onTransactionUpdated?.();
-            }}
-          />
+          {statusInfo.showReviewButton && (
+            <TransactionBasedReviewForm
+              visible={showReviewForm}
+              onClose={() => setShowReviewForm(false)}
+              transactionId={existingTransaction.id}
+              reviewedUserId={otherUser.id}
+              reviewedUserName={otherUser.full_name || otherUser.first_name + ' ' + otherUser.last_name}
+              onSuccess={() => {
+                setShowReviewForm(false);
+                // Refresh transaction data to update button state
+                onTransactionUpdated?.();
+              }}
+            />
+          )}
         </>
       );
     }
 
     return (
-      <View style={[{ alignItems: 'center' }, style]}>
+      <View style={[{ 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        width: '100%'
+      }, style]}>
         <Badge
           text={statusInfo.text}
           variant={statusInfo.variant}
@@ -166,20 +212,26 @@ export function TransactionCompletionButton({
 
   return (
     <>
-      <Button
-        variant="primary"
-        onPress={() => setShowModal(true)}
-        leftIcon={<CheckCircle size={16} color={theme.colors.primaryForeground} />}
-        style={[
-          {
-            backgroundColor: theme.colors.success,
-            borderColor: theme.colors.success,
-          },
-          style,
-        ]}
-      >
-        Mark as Completed
-      </Button>
+      <View style={[{ 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        width: '100%'
+      }]}>
+        <Button
+          variant="primary"
+          onPress={() => setShowModal(true)}
+          leftIcon={<CheckCircle size={16} color={theme.colors.primaryForeground} />}
+          style={[
+            {
+              backgroundColor: theme.colors.success,
+              borderColor: theme.colors.success,
+            },
+            style,
+          ]}
+        >
+          Mark as Completed
+        </Button>
+      </View>
 
       <TransactionCompletionModal
         visible={showModal}

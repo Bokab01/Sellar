@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl, Alert, Animated, Pressable } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useAppStore } from '@/store/useAppStore';
@@ -28,10 +27,12 @@ import {
   VerifiedBadge,
   MarketplaceSidebar,
   EnhancedSearchHeader,
+  SafeAreaWrapper,
   // Temporarily disabled performance components
   // ProductVirtualizedList,
   // LazyComponent,
 } from '@/components';
+import { HomeScreenSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
 // Advanced code splitting for better performance
 import { CodeSplitting } from '@/lib/codeSplitting';
 import { usePerformanceOptimization } from '@/hooks/usePerformanceOptimization';
@@ -57,7 +58,8 @@ import {
   Filter,
   ListFilterPlus,
   ChevronUp,
-  Grid2X2
+  Grid2X2,
+  House
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 
@@ -67,7 +69,6 @@ export default function HomeScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
   const { profile } = useProfile();
-  const insets = useSafeAreaInsets();
   const { trackInteraction } = useRecommendations();
   const { preloadComponents, trackComponentLoad } = usePerformanceOptimization();
   const { 
@@ -110,9 +111,10 @@ export default function HomeScreen() {
 
   // Category scroll indicator
   const categoryScrollRef = useRef<ScrollView>(null);
-  const [categoryScrollX, setCategoryScrollX] = useState(0);
   const [categoryContentWidth, setCategoryContentWidth] = useState(0);
   const [categoryScrollViewWidth, setCategoryScrollViewWidth] = useState(0);
+  const categoryScrollX = useRef(new Animated.Value(0)).current;
+  const scrollIndicatorOpacity = useRef(new Animated.Value(1)).current;
 
   // Scroll animation values
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -409,12 +411,12 @@ export default function HomeScreen() {
   // This will be handled after products is defined
 
   const categories = [
-    { 
+   /*  { 
       id: 'all', 
       label: 'All', 
       icon: <Grid3X3 size={24} color={theme.colors.primary} />, 
       count: categoryCounts.total || 0
-    },
+    }, */
     { 
       id: 'electronics', 
       label: 'Electronics', 
@@ -430,7 +432,7 @@ export default function HomeScreen() {
     { 
       id: 'home', 
       label: 'Home & Garden', 
-      icon: <HomeIcon size={24} color={theme.colors.primary} />, 
+      icon: <House size={24} color={theme.colors.primary} />, 
       count: categoryCounts.home || 0 
     },
     { 
@@ -465,20 +467,18 @@ export default function HomeScreen() {
     },
   ];
 
-  // Use real listings from database (after categoryIdMap is available)
-  const selectedCategoryId = selectedCategories.length > 0 && selectedCategories[0] !== 'all' 
-    ? categoryIdMap[selectedCategories[0]] // Use category ID instead of slug
-    : undefined;
+  // Home screen shows all listings without category filtering
+  // Category filtering is now handled by navigation to search screen
 
   // Memoize useListings options to prevent infinite re-renders
   const listingsOptions = useMemo(() => ({
     search: searchQuery,
-    category: selectedCategoryId,
+    // Remove category filtering - home screen shows all listings
     location: filters.location, // Only apply location filter if explicitly set by user
     priceMin: filters.priceRange.min,
     priceMax: filters.priceRange.max,
     condition: filters.condition,
-  }), [searchQuery, selectedCategoryId, filters.location, filters.priceRange.min, filters.priceRange.max, filters.condition]);
+  }), [searchQuery, filters.location, filters.priceRange.min, filters.priceRange.max, filters.condition]);
 
   const { 
     listings: products, 
@@ -568,16 +568,36 @@ export default function HomeScreen() {
 
   const handleCategoryToggle = (categoryId: string) => {
     if (categoryId === 'all') {
-      // If "All" is selected, clear all categories
+      // If "All" is selected, clear all categories and stay on home screen
       setSelectedCategories([]);
     } else {
-      const isSelected = selectedCategories.includes(categoryId);
-      if (isSelected) {
-        // Remove the category
-        setSelectedCategories(selectedCategories.filter(id => id !== categoryId));
-      } else {
-        // Replace current selection with new category (single selection mode)
-        setSelectedCategories([categoryId]);
+      // Navigate to search results screen with the selected category
+      const categoryName = categories.find(cat => cat.id === categoryId)?.label;
+      
+      // Map category slugs to actual database UUIDs
+      const categoryIdMap: Record<string, string> = {
+        'electronics': '00000000-0000-4000-8000-000000000001', // Electronics & Technology
+        'fashion': '00000000-0000-4000-8000-000000000002', // Fashion
+        'vehicles': '00000000-0000-4000-8000-000000000003', // Vehicles
+        'sports': '00000000-0000-4000-8000-000000000005', // Sports & Fitness
+        'books': '00000000-0000-4000-8000-000000000007', // Books & Media
+        'beauty': '00000000-0000-4000-8000-000000000012', // Beauty & Health
+        'health': '00000000-0000-4000-8000-000000000012', // Beauty & Health (same as beauty)
+        'home': '00000000-0000-4000-8000-000000000004', // Home & Garden
+        'services': '00000000-0000-4000-8000-000000000010', // Services
+        'other': '00000000-0000-4000-8000-000000000000' // Other
+      };
+      
+      const mappedCategoryId = categoryIdMap[categoryId];
+      
+      if (mappedCategoryId && categoryName) {
+        router.push({
+          pathname: '/search',
+          params: { 
+            category: mappedCategoryId,
+            categoryName: categoryName
+          }
+        });
       }
     }
   };
@@ -587,17 +607,14 @@ export default function HomeScreen() {
   const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
 
   return (
-    <View style={{ 
-      flex: 1, 
-      backgroundColor: theme.colors.background,
-    }}>
+    <SafeAreaWrapper>
       {/* Enhanced Search Header - Floating */}
       <Animated.View style={{ 
         position: 'absolute',
-        top: insets.top + theme.spacing.md,
+        top: theme.spacing['3xl'],
         left: 0,
         right: 0,
-        zIndex: 10,
+        zIndex: 12,
         transform: [{ translateY: floatingSearchTranslateY }],
         opacity: floatingSearchOpacity,
       }}>
@@ -614,10 +631,10 @@ export default function HomeScreen() {
    {/*    <Animated.View
         style={{
           position: 'absolute',
-          top: insets.top,
+          top: 0,
           left: 0,
           right: 0,
-          zIndex: 1000,
+          zIndex: 0,
           backgroundColor: 'transparent',
           paddingHorizontal: 0,
           paddingTop: theme.spacing.sm,
@@ -668,8 +685,6 @@ export default function HomeScreen() {
       {/* Main Content Container */}
       <View style={{ 
         flex: 1,
-        paddingLeft: insets.left,
-        paddingRight: insets.right,
       }}>
 
         {/* Main Content Area - Scrollable */}
@@ -686,18 +701,7 @@ export default function HomeScreen() {
               />
             </View>
           ) : loading ? (
-            <View style={{ paddingHorizontal: theme.spacing.lg }}>
-              <Grid columns={2}>
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <LoadingSkeleton
-                    key={index}
-                    width="100%"
-                    height={280}
-                    borderRadius={theme.borderRadius.lg}
-                  />
-                ))}
-              </Grid>
-            </View>
+            <HomeScreenSkeleton />
           ) : transformedProducts.length === 0 ? (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: theme.spacing.lg }}>
               <EmptyState
@@ -721,17 +725,32 @@ export default function HomeScreen() {
             <Animated.ScrollView
               ref={mainScrollViewRef}
               showsVerticalScrollIndicator={false}
+              style={{ zIndex: 10 }}
               contentContainerStyle={{
                 // Full-bleed implementation: no horizontal padding on container
                 paddingTop: 100, // Add top padding to account for floating search input
-                paddingBottom: Math.max(theme.spacing.xl, insets.bottom + theme.spacing.md),
+                paddingBottom: theme.spacing.xl,
               }}
               refreshControl={
                 <RefreshControl
                   refreshing={refreshing}
-                  onRefresh={refresh}
+                  onRefresh={async () => {
+                    console.log('🔄 Pull to refresh triggered');
+                    await refresh();
+                  }}
                   tintColor={theme.colors.primary}
                   colors={[theme.colors.primary]}
+                  progressBackgroundColor={theme.colors.background}
+                  style={{ 
+                    zIndex: 9999,
+                    elevation: 9999,
+                    backgroundColor: theme.colors.background,
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 60
+                  }}
                 />
               }
               onScroll={handleScroll}
@@ -806,7 +825,7 @@ export default function HomeScreen() {
               <View style={{ paddingVertical: theme.spacing.md, position: 'relative' }}>
                 {/* Professional Scroll Indicator - Top Right */}
                 {categoryContentWidth > categoryScrollViewWidth && (
-                  <View
+                  <Animated.View
                     style={{
                       position: 'absolute',
                       top: theme.spacing.sm,
@@ -817,9 +836,10 @@ export default function HomeScreen() {
                       borderRadius: 1.5,
                       overflow: 'hidden',
                       zIndex: 10,
+                      opacity: scrollIndicatorOpacity,
                     }}
                   >
-                    <View
+                    <Animated.View
                       style={{
                         height: '100%',
                         backgroundColor: theme.colors.primary,
@@ -827,29 +847,58 @@ export default function HomeScreen() {
                         width: `${Math.min(100, (categoryScrollViewWidth / categoryContentWidth) * 100)}%`,
                         transform: [
                           {
-                            translateX: (categoryScrollX / (categoryContentWidth - categoryScrollViewWidth)) * 
-                              ((screenWidth / 3) - ((screenWidth / 3) * (categoryScrollViewWidth / categoryContentWidth))),
+                            translateX: categoryScrollX.interpolate({
+                              inputRange: [0, Math.max(1, categoryContentWidth - categoryScrollViewWidth)],
+                              outputRange: [0, Math.max(0, (screenWidth / 3) - ((screenWidth / 3) * (categoryScrollViewWidth / categoryContentWidth)))],
+                              extrapolate: 'clamp',
+                            }),
                           },
                         ],
                       }}
                     />
-                  </View>
+                  </Animated.View>
                 )}
                 
                 <ScrollView
                   ref={categoryScrollRef}
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  onScroll={(event) => {
-                    setCategoryScrollX(event.nativeEvent.contentOffset.x);
+                  decelerationRate="fast"
+                  scrollEventThrottle={16}
+                  onScroll={Animated.event(
+                    [{ nativeEvent: { contentOffset: { x: categoryScrollX } } }],
+                    { useNativeDriver: false }
+                  )}
+                  onMomentumScrollEnd={() => {
+                    // Add subtle bounce effect when scroll ends
+                    Animated.sequence([
+                      Animated.timing(scrollIndicatorOpacity, {
+                        toValue: 0.7,
+                        duration: 100,
+                        useNativeDriver: true,
+                      }),
+                      Animated.timing(scrollIndicatorOpacity, {
+                        toValue: 1,
+                        duration: 200,
+                        useNativeDriver: true,
+                      }),
+                    ]).start();
                   }}
                   onContentSizeChange={(width) => {
                     setCategoryContentWidth(width);
+                    // Fade in scroll indicator when content is wider than view
+                    if (width > categoryScrollViewWidth) {
+                      Animated.spring(scrollIndicatorOpacity, {
+                        toValue: 1,
+                        useNativeDriver: true,
+                        tension: 100,
+                        friction: 8,
+                      }).start();
+                    }
                   }}
                   onLayout={(event) => {
                     setCategoryScrollViewWidth(event.nativeEvent.layout.width);
                   }}
-                  scrollEventThrottle={16}
                   contentContainerStyle={{
                     paddingHorizontal: theme.spacing.md,
                     marginVertical: theme.spacing.sm,
@@ -859,9 +908,7 @@ export default function HomeScreen() {
                   }}
                 >
                   {categories.map((category) => {
-                    const isSelected = category.id === 'all' 
-                      ? selectedCategories.length === 0 
-                      : selectedCategories.includes(category.id);
+                    // Remove selection state since we navigate to search screen
                     return (
                       <TouchableOpacity
                         key={category.id}
@@ -872,20 +919,16 @@ export default function HomeScreen() {
                           paddingHorizontal: theme.spacing.lg,
                           paddingVertical: theme.spacing.md,
                           borderRadius: theme.borderRadius.full,
-                          backgroundColor: isSelected 
-                            ? theme.colors.primary 
-                            : theme.colors.surface,
+                          backgroundColor: theme.colors.surface,
                           borderWidth: 1,
-                          borderColor: isSelected 
-                            ? theme.colors.primary 
-                            : theme.colors.border,
+                          borderColor: theme.colors.border,
                           gap: theme.spacing.sm,
                           minHeight: 48,
-                          shadowColor: isSelected ? theme.colors.primary : theme.colors.text.primary,
+                          shadowColor: theme.colors.text.primary,
                           shadowOffset: { width: 0, height: 2 },
-                          shadowOpacity: isSelected ? 0.3 : 0.1,
+                          shadowOpacity: 0.1,
                           shadowRadius: 4,
-                          elevation: isSelected ? 4 : 2,
+                          elevation: 2,
                         }}
                         activeOpacity={0.7}
                       >
@@ -898,9 +941,7 @@ export default function HomeScreen() {
                         }}>
                           {React.cloneElement(category.icon as React.ReactElement, {
                             size: 20,
-                            color: isSelected 
-                              ? theme.colors.primaryForeground 
-                              : theme.colors.primary,
+                            color: theme.colors.primary,
                           } as any)}
                         </View>
                         
@@ -908,10 +949,8 @@ export default function HomeScreen() {
                         <Text
                           variant="body"
                           style={{
-                            color: isSelected 
-                              ? theme.colors.primaryForeground 
-                              : theme.colors.text.primary,
-                            fontWeight: isSelected ? '600' : '700',
+                            color: theme.colors.text.primary,
+                            fontWeight: '700',
                             fontSize: 13,
                           }}
                         >
@@ -921,26 +960,20 @@ export default function HomeScreen() {
                         {/* Category Count Badge */}
                         <View
                           style={{
-                            backgroundColor: isSelected 
-                              ? theme.colors.primaryForeground + '25' 
-                              : theme.colors.primary + '15',
+                            backgroundColor: theme.colors.primary + '15',
                             borderRadius: theme.borderRadius.full,
                             paddingHorizontal: theme.spacing.sm,
                             paddingVertical: theme.spacing.xs,
                             minWidth: 24,
                             alignItems: 'center',
                             borderWidth: 1,
-                            borderColor: isSelected 
-                              ? theme.colors.primaryForeground + '30' 
-                              : theme.colors.primary + '20',
+                            borderColor: theme.colors.primary + '20',
                           }}
                         >
                           <Text
                             variant="caption"
                             style={{
-                              color: isSelected 
-                                ? theme.colors.primaryForeground 
-                                : theme.colors.primary,
+                              color: theme.colors.primary,
                               fontSize: 11,
                               fontWeight: '700',
                             }}
@@ -1071,7 +1104,7 @@ export default function HomeScreen() {
       <Animated.View
         style={{
           position: 'absolute',
-          bottom: insets.bottom + theme.spacing.xl,
+          bottom: theme.spacing.xl,
           right: theme.spacing.lg,
           zIndex: 1000,
           opacity: scrollToTopOpacity,
@@ -1095,6 +1128,6 @@ export default function HomeScreen() {
           <ChevronUp size={24} color={theme.colors.primaryForeground} />
         </TouchableOpacity>
       </Animated.View>
-    </View>
+    </SafeAreaWrapper>
   );
 }

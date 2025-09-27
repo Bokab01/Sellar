@@ -848,7 +848,15 @@ export const dbHelpers = {
       }
       
       if (options.search) {
-        query = query.or(`title.ilike.%${options.search}%,description.ilike.%${options.search}%`);
+        // Split search terms and create OR conditions for each term
+        const searchTerms = options.search.split(' ').filter((term: string) => term.trim());
+        if (searchTerms.length > 0) {
+          // Create OR conditions for each search term
+          const searchConditions = searchTerms.map((term: string) => 
+            `title.ilike.%${term}%,description.ilike.%${term}%`
+          ).join(',');
+          query = query.or(searchConditions);
+        }
       }
       
       if (options.priceMin !== undefined && options.priceMin > 0) {
@@ -892,7 +900,15 @@ export const dbHelpers = {
         }
         
         if (options.search) {
-          simpleQuery = simpleQuery.or(`title.ilike.%${options.search}%,description.ilike.%${options.search}%`);
+          // Split search terms and create OR conditions for each term
+          const searchTerms = options.search.split(' ').filter((term: string) => term.trim());
+          if (searchTerms.length > 0) {
+            // Create OR conditions for each search term
+            const searchConditions = searchTerms.map((term: string) => 
+              `title.ilike.%${term}%,description.ilike.%${term}%`
+            ).join(',');
+            simpleQuery = simpleQuery.or(searchConditions);
+          }
         }
         
         if (options.priceMin !== undefined && options.priceMin > 0) {

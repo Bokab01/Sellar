@@ -240,7 +240,7 @@ export default function BusinessDashboardScreen() {
             />
           );
         default:
-          return (
+      return (
             <BusinessOverview
               loading={loading}
               quickStats={quickStats}

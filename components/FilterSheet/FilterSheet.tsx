@@ -31,6 +31,7 @@ interface FilterSheetProps {
   filters: FilterOptions;
   onApplyFilters: (filters: FilterOptions) => void;
   onClearFilters: () => void;
+  currentCategory?: string; // Current category context
 }
 
 export function FilterSheet({
@@ -39,14 +40,68 @@ export function FilterSheet({
   filters,
   onApplyFilters,
   onClearFilters,
+  currentCategory,
 }: FilterSheetProps) {
   const { theme } = useTheme();
   const [localFilters, setLocalFilters] = useState<FilterOptions>(filters);
 
-  const categories = [
-    'Electronics', 'Fashion', 'Home & Garden', 'Vehicles',
-    'Books & Media', 'Sports', 'Services', 'Other'
-  ];
+  // Smart categories based on current category context
+  const getSmartCategories = () => {
+    if (!currentCategory) {
+      // Show all main categories when no specific category is selected
+      return [
+        'Electronics', 'Fashion', 'Home & Garden', 'Vehicles',
+        'Books & Media', 'Sports', 'Services', 'Other'
+      ];
+    }
+
+    // Show relevant subcategories or related categories based on current category
+    const categoryMap: Record<string, string[]> = {
+      'Electronics': [
+        'iPhone', 'Android', 'Samsung', 'Laptop', 'Computer', 'Gaming', 
+        'Headphones', 'Speaker', 'Camera', 'TV', 'Tablet'
+      ],
+      'Fashion': [
+        'Dress', 'Shirt', 'Jeans', 'Shoes', 'Bag', 'Watch', 
+        'Jewelry', 'Sunglasses', 'Hat', 'Jacket'
+      ],
+      'Vehicles': [
+        'Toyota', 'Honda', 'BMW', 'Mercedes', 'Motorcycle', 'Bike', 
+        'Truck', 'SUV', 'Car Parts', 'Tires'
+      ],
+      'Home & Garden': [
+        'Sofa', 'Chair', 'Table', 'Bed', 'Refrigerator', 'Microwave', 
+        'Garden', 'Plants', 'Tools', 'Decor'
+      ],
+      'Sports': [
+        'Football', 'Basketball', 'Gym', 'Fitness', 'Running', 'Swimming', 
+        'Tennis', 'Golf', 'Soccer', 'Equipment'
+      ],
+      'Books & Media': [
+        'Book', 'Novel', 'Textbook', 'Movie', 'Music', 'Game', 
+        'Magazine', 'DVD', 'CD', 'Educational'
+      ],
+      'Beauty & Health': [
+        'Makeup', 'Skincare', 'Perfume', 'Hair', 'Health', 'Vitamins', 
+        'Shampoo', 'Lotion', 'Cream', 'Medicine'
+      ],
+      'Services': [
+        'Cleaning', 'Repair', 'Tutoring', 'Photography', 'Design', 
+        'Consulting', 'Delivery', 'Maintenance', 'Installation', 'Support'
+      ],
+      'Other': [
+        'Vintage', 'Antique', 'Collectible', 'Art', 'Craft', 
+        'Gift', 'Tool', 'Miscellaneous', 'Rare', 'Unique'
+      ]
+    };
+
+    return categoryMap[currentCategory] || [
+      'Electronics', 'Fashion', 'Home & Garden', 'Vehicles',
+      'Books & Media', 'Sports', 'Services', 'Other'
+    ];
+  };
+
+  const categories = getSmartCategories();
 
   const conditions = [
     'Brand New', 'Like New', 'Good', 'Fair', 'For Parts'

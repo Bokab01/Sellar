@@ -162,7 +162,18 @@ export default function ChatScreen() {
     try {
       const { data: transaction, error } = await supabase
         .from('meetup_transactions')
-        .select('*')
+        .select(`
+          *,
+          reviews:reviews(
+            id,
+            reviewer_id,
+            reviewed_user_id,
+            rating,
+            comment,
+            status,
+            created_at
+          )
+        `)
         .eq('listing_id', listingId)
         .eq('conversation_id', conversationId)
         .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)

@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, RefreshControl } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { SafeAreaWrapper } from '@/components/Layout';
+import { AppHeader } from '@/components';
 import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
 import { EmptyState } from '@/components/EmptyState/EmptyState';
 import { BusinessProfile } from '@/components/BusinessProfile/BusinessProfile';
 import { BusinessListings } from '@/components/BusinessListings/BusinessListings';
 import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
-import { ArrowLeft, Building2 } from 'lucide-react-native';
-import { TouchableOpacity } from 'react-native';
+import { Building2 } from 'lucide-react-native';
 import { useDisplayName } from '@/hooks/useDisplayName';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -46,7 +45,6 @@ interface BusinessUser {
 
 export default function BusinessListingsScreen() {
   const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const [businessUsers, setBusinessUsers] = useState<BusinessUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -402,31 +400,12 @@ export default function BusinessListingsScreen() {
   if (loading) {
     return (
       <SafeAreaWrapper>
-        <View style={{ 
-          flex: 1, 
-          backgroundColor: theme.colors.background,
-          paddingTop: insets.top,
-        }}>
-          {/* Header */}
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: theme.spacing.lg,
-            paddingVertical: theme.spacing.md,
-            borderBottomWidth: 1,
-            borderBottomColor: theme.colors.border,
-          }}>
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={{
-                padding: theme.spacing.sm,
-                marginRight: theme.spacing.sm,
-              }}
-            >
-              <ArrowLeft size={24} color={theme.colors.text.primary} />
-            </TouchableOpacity>
-            <LoadingSkeleton width="60%" height={24} />
-          </View>
+        <AppHeader
+          title="Sellar Pro Listings"
+          subtitle="Loading..."
+          showBackButton={true}
+          onBackPress={() => router.back()}
+        />
 
           {/* Loading Content */}
           <ScrollView style={{ flex: 1 }}>
@@ -448,50 +427,21 @@ export default function BusinessListingsScreen() {
               </View>
             ))}
           </ScrollView>
-        </View>
       </SafeAreaWrapper>
     );
   }
 
   return (
     <SafeAreaWrapper>
-      <View style={{ 
-        flex: 1, 
-        backgroundColor: theme.colors.background,
-        paddingTop: insets.top,
-      }}>
-        {/* Header */}
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: theme.spacing.lg,
-          paddingVertical: theme.spacing.md,
-          borderBottomWidth: 1,
-          borderBottomColor: theme.colors.border,
-          backgroundColor: theme.colors.surface,
-        }}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={{
-              padding: theme.spacing.sm,
-              marginRight: theme.spacing.sm,
-            }}
-          >
-            <ArrowLeft size={24} color={theme.colors.text.primary} />
-          </TouchableOpacity>
-          
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-              <Building2 size={24} color={theme.colors.primary} />
-              <Text variant="h3">Sellar Pro Listings</Text>
-            </View>
-            <Text variant="caption" color="secondary" style={{ marginTop: 2 }}>
-              {businessUsers.length} Sellar Pro users with premium listings
-            </Text>
-          </View>
-        </View>
-
-         {error ? (
+      <AppHeader
+        title="Sellar Pro Listings"
+        subtitle={`${businessUsers.length} Sellar Pro users with premium listings`}
+        showBackButton={true}
+        onBackPress={() => router.back()}
+      />
+      
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        {error ? (
            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
              <EmptyState
                title="Failed to Load"

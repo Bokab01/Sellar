@@ -135,17 +135,13 @@ export default function MoreScreen() {
           onPress: async () => {
             try {
               await signOut();
-              setToastMessage('Signed out successfully');
-              setShowToast(true);
               
-              // Force navigation to auth screen
-              setTimeout(() => {
-                router.replace('/(auth)/onboarding');
-              }, 500); // Give time for toast to show
+              // Navigate to auth screen immediately
+              router.replace('/(auth)/onboarding');
             } catch (error) {
               console.error('Sign out error:', error);
-              setToastMessage('Failed to sign out');
-              setShowToast(true);
+              // Still navigate even if sign out fails
+              router.replace('/(auth)/onboarding');
             }
           },
         },

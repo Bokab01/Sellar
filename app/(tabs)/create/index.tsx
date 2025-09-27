@@ -94,14 +94,14 @@ const STEPS = [
   },
   {
     id: 'basic-info',
-    title: 'Basic Info',
+    title: 'Info',
     description: 'Title and description',
     icon: FileText,
     color: 'success',
   },
   {
     id: 'category',
-    title: 'Category & Location',
+    title: 'Category',
     description: 'What and where are you selling?',
     icon: Package,
     color: 'warning',
@@ -1689,12 +1689,12 @@ export default function CreateListingScreen() {
         }}>
           <StepIndicator
             steps={STEPS.map((step, index) => ({
-              title: '', // Remove labels
+              title: step.title,
               completed: index < currentStep,
               active: index === currentStep,
             }))}
             currentStep={currentStep}
-            showLabels={false}
+            showLabels={true}
           />
         </View>
 

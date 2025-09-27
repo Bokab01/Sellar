@@ -101,7 +101,7 @@ export { CommentCard } from './CommentCard/CommentCard';
 export { AppHeader } from './AppHeader/AppHeader';
 
 // Feedback & Status
-export { LoadingSkeleton, ProductCardSkeleton, ChatListSkeleton } from './LoadingSkeleton/LoadingSkeleton';
+export { LoadingSkeleton, ProductCardSkeleton, ChatListSkeleton, HomeScreenSkeleton } from './LoadingSkeleton/LoadingSkeleton';
 export { DashboardSkeleton } from './LoadingSkeleton/DashboardSkeleton';
 export { EmptyState } from './EmptyState/EmptyState';
 export { ErrorState } from './ErrorState/ErrorState';

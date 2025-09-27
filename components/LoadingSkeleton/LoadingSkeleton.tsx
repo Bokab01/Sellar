@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
+import { Grid } from '@/components/Grid/Grid';
 
 interface LoadingSkeletonProps {
   width?: number | string;
@@ -96,21 +97,21 @@ export function ProductCardSkeleton() {
         borderRadius: theme.borderRadius.lg,
         ...theme.shadows.md,
         overflow: 'hidden',
-        height: 320, // Match the new card height
+        height: 280, // Match the current card height
         marginBottom: theme.spacing.md,
       }}
     >
-      {/* Image skeleton - 70% of card height */}
+      {/* Image skeleton - 65% of card height */}
       <LoadingSkeleton
         width="100%"
-        height={224} // 70% of 320
+        height={182} // 65% of 280
         style={{ marginBottom: 0 }}
       />
 
-      {/* Content area - 30% of card height */}
-      <View style={{ padding: theme.spacing.sm, flex: 1, justifyContent: 'space-between' }}>
+      {/* Content area - 35% of card height */}
+      <View style={{ padding: theme.spacing.md, flex: 1, justifyContent: 'space-between' }}>
         <View>
-          {/* Title skeleton */}
+          {/* Title skeleton - 2 lines */}
           <LoadingSkeleton
             width="90%"
             height={14}
@@ -119,20 +120,66 @@ export function ProductCardSkeleton() {
           <LoadingSkeleton
             width="70%"
             height={14}
-            style={{ marginBottom: theme.spacing.xs }}
+            style={{ marginBottom: theme.spacing.sm }}
           />
 
           {/* Price skeleton */}
           <LoadingSkeleton
             width="50%"
             height={16}
-            style={{ marginBottom: theme.spacing.xs }}
+            style={{ marginBottom: theme.spacing.sm }}
+          />
+
+          {/* Location skeleton */}
+          <LoadingSkeleton
+            width="40%"
+            height={12}
+            style={{ marginBottom: theme.spacing.sm }}
           />
         </View>
 
-        {/* Seller name skeleton at bottom */}
-        <LoadingSkeleton width="60%" height={12} />
+        {/* Bottom row with seller and badges */}
+        <View style={{ 
+          flexDirection: 'row', 
+          justifyContent: 'space-between', 
+          alignItems: 'center' 
+        }}>
+          {/* Seller info skeleton */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <LoadingSkeleton
+              width={24}
+              height={24}
+              borderRadius={12}
+              style={{ marginRight: theme.spacing.xs }}
+            />
+            <LoadingSkeleton width="60%" height={12} />
+          </View>
+
+          {/* Action buttons skeleton */}
+          <View style={{ flexDirection: 'row', gap: theme.spacing.xs }}>
+            <LoadingSkeleton width={24} height={24} borderRadius={12} />
+            <LoadingSkeleton width={24} height={24} borderRadius={12} />
+          </View>
+        </View>
       </View>
+    </View>
+  );
+}
+
+// Home screen specific skeleton that matches the current UI
+export function HomeScreenSkeleton() {
+  const { theme } = useTheme();
+
+  return (
+    <View style={{ 
+      paddingHorizontal: theme.spacing.lg,
+      paddingTop: 120, // Account for floating search header space
+    }}>
+      <Grid columns={2}>
+        {Array.from({ length: 6 }).map((_, index) => (
+          <ProductCardSkeleton key={index} />
+        ))}
+      </Grid>
     </View>
   );
 }

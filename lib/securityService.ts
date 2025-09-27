@@ -446,7 +446,7 @@ class SecurityService {
         .from('device_tokens')
         .select('*')
         .eq('user_id', userId)
-        .order('last_used_at', { ascending: false });
+        .order('updated_at', { ascending: false });
 
       if (error) {
         console.error('SecurityService: Fallback query failed:', error);
@@ -457,7 +457,7 @@ class SecurityService {
         fingerprint: device.device_id || device.token.slice(-8), // Use device_id or last 8 chars of token as fingerprint
         name: device.device_name || `${device.platform} Device`,
         platform: device.platform || 'Unknown',
-        lastSeen: new Date(device.last_used_at || device.updated_at),
+        lastSeen: new Date(device.updated_at),
         isCurrentDevice: false, // We can't determine this from device_tokens alone
         isTrusted: device.is_active || false
       }));

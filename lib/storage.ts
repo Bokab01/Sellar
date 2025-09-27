@@ -366,15 +366,17 @@ export const storageHelpers = {
               throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
             }
             
-            const blob = await response.blob();
-            console.log('Image converted to blob, size:', blob.size);
+            // Convert response to array buffer for React Native compatibility
+            const arrayBuffer = await response.arrayBuffer();
+            const uint8Array = new Uint8Array(arrayBuffer);
+            console.log('Image converted to Uint8Array, size:', uint8Array.length);
             
-            // Validate blob size
-            if (blob.size === 0) {
+            // Validate array size
+            if (uint8Array.length === 0) {
               throw new Error('Image file is empty or corrupted');
             }
             
-            if (blob.size > 10 * 1024 * 1024) { // 10MB limit
+            if (uint8Array.length > 10 * 1024 * 1024) { // 10MB limit
               throw new Error('Image file is too large (max 10MB)');
             }
             
@@ -390,7 +392,7 @@ export const storageHelpers = {
                 
                 const { data: blobData, error: blobError } = await supabase.storage
                   .from(bucket)
-                  .upload(filename, blob, {
+                  .upload(filename, uint8Array, {
                     contentType: 'image/jpeg',
                     upsert: true,
                   });

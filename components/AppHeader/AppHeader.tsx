@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TouchableOpacity, Platform } from 'react-native';
+import { View, TouchableOpacity } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { ArrowLeft } from 'lucide-react-native';
@@ -29,16 +29,16 @@ export function AppHeader({
 }: AppHeaderProps) {
   const { theme } = useTheme();
 
-  const headerHeight = Platform.OS === 'ios' ? (subtitle ? 60 : 44) : (subtitle ? 72 : 56);
-  const statusBarHeight = Platform.OS === 'ios' ? 44 : 24;
+  // Only control base height, safe area is handled by your wrapper
+  const baseHeaderHeight = subtitle ? 60 : 44;
 
   return (
     <View
       style={[
         {
           backgroundColor: backgroundColor || theme.colors.surface,
-          paddingTop: statusBarHeight,
           borderBottomWidth: 1,
+          padding: theme.spacing.sm,
           borderBottomColor: theme.colors.border,
           ...theme.shadows.sm,
         },
@@ -47,7 +47,7 @@ export function AppHeader({
     >
       <View
         style={{
-          height: headerHeight,
+          height: baseHeaderHeight,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -71,16 +71,20 @@ export function AppHeader({
           )}
 
           {leftAction && (
-            <View style={{ marginRight: theme.spacing.md }}>
-              {leftAction}
-            </View>
+            <View style={{ marginRight: theme.spacing.md }}>{leftAction}</View>
           )}
 
           {(title || subtitle) && (
-            <View style={{ flex: 1, alignItems: showBackButton || leftAction ? 'flex-start' : 'center' }}>
+            <View
+              style={{
+                flex: 1,
+                alignItems:
+                  showBackButton || leftAction ? 'flex-start' : 'center',
+              }}
+            >
               {title && (
                 <Text
-                  variant="h3"
+                  variant="h4"
                   numberOfLines={1}
                   style={{
                     textAlign: showBackButton || leftAction ? 'left' : 'center',

@@ -28,9 +28,28 @@ export default function SearchResultsScreen() {
     filters,
     showFilters,
     setShowFilters,
+    setFilters,
     selectedCategories,
     setSelectedCategories,
   } = useAppStore();
+
+  // Combine search query with filter categories for better search
+  const combinedSearchQuery = React.useMemo(() => {
+    const searchTerms = [];
+    
+    // Add main search query if it exists
+    if (searchQuery && searchQuery.trim()) {
+      searchTerms.push(searchQuery.trim());
+    }
+    
+    // Add filter categories as additional search terms
+    if (filters.categories && filters.categories.length > 0) {
+      searchTerms.push(...filters.categories);
+    }
+    
+    // Return the combined search terms
+    return searchTerms.length > 0 ? searchTerms.join(' ') : '';
+  }, [searchQuery, filters.categories]);
 
   const { 
     listings: products, 
@@ -39,7 +58,7 @@ export default function SearchResultsScreen() {
     refreshing, 
     refresh 
   } = useListings({
-    search: categoryId ? undefined : searchQuery, // Only use search query if not filtering by category
+    search: combinedSearchQuery, // Combined search query with filter categories
     category: categoryId, // Add category filter
     location: filters.location,
     priceMin: filters.priceRange.min,
@@ -218,12 +237,21 @@ export default function SearchResultsScreen() {
         visible={showFilters}
         onClose={() => setShowFilters(false)}
         filters={filters}
+        currentCategory={categoryName} // Pass current category for smart filtering
         onApplyFilters={(newFilters) => {
-          // TODO: Update filters in app store
+          // Update filters in app store
+          setFilters(newFilters);
           setShowFilters(false);
         }}
         onClearFilters={() => {
-          // TODO: Clear filters in app store
+          // Clear filters in app store
+          setFilters({
+            priceRange: { min: undefined, max: undefined },
+            condition: [],
+            categories: [],
+            location: '',
+            sortBy: 'Newest First',
+          });
           setShowFilters(false);
         }}
       />

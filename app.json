@@ -7,6 +7,7 @@
     "icon": "./assets/icon/icon-light.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "scheme": "sellar",
     "splash": {
       "image": "./assets/splashscreen/splashscreen-light.png",
       "resizeMode": "contain",

@@ -4,7 +4,6 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { Button } from '@/components/Button/Button';
 import { AppModal } from '@/components/Modal/Modal';
-import { Toast } from '@/components/Toast/Toast';
 import { LinearProgress } from '@/components/ProgressIndicator/ProgressIndicator';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import * as ImagePicker from 'expo-image-picker';
@@ -53,8 +52,6 @@ export function CustomImagePicker({
   });
   const [showPicker, setShowPicker] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
 
 
   const showError = (message: string) => {
@@ -62,10 +59,6 @@ export function CustomImagePicker({
     setTimeout(() => setError(null), 4000);
   };
 
-  const showSuccess = (message: string) => {
-    setToastMessage(message);
-    setShowToast(true);
-  };
 
   const requestPermissions = async (type: 'camera' | 'library') => {
     try {
@@ -123,7 +116,7 @@ export function CustomImagePicker({
           await handleUpload([newImage]);
         }
         
-        showSuccess('Photo captured successfully!');
+        // Photo captured successfully
       }
     } catch (error) {
       showError('Failed to capture photo');
@@ -166,14 +159,14 @@ export function CustomImagePicker({
           }
           const imagesToAdd = newImages.slice(0, availableSlots);
           onChange([...value, ...imagesToAdd]);
-          showSuccess(`${imagesToAdd.length} image${imagesToAdd.length > 1 ? 's' : ''} added! (${newImages.length - imagesToAdd.length} more than limit were ignored)`);
+          // Images added successfully
           
           if (uploadImmediately && imagesToAdd.length > 0) {
             handleUpload(imagesToAdd);
           }
         } else {
           onChange([...value, ...newImages]);
-          showSuccess(`${newImages.length} image${newImages.length > 1 ? 's' : ''} added!`);
+          // Images added successfully
           
           if (uploadImmediately && newImages.length > 0) {
             handleUpload(newImages);
@@ -516,13 +509,6 @@ export function CustomImagePicker({
         </View>
       </AppModal>
 
-      {/* Success Toast */}
-      <Toast
-        visible={showToast}
-        message={toastMessage}
-        variant="success"
-        onHide={() => setShowToast(false)}
-      />
 
 
 

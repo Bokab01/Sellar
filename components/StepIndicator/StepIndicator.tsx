@@ -142,9 +142,9 @@ export function StepIndicator({
             {/* Step Circle */}
             <View
               style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
+                width: 38,
+                height: 38,
+                borderRadius: 19,
                 backgroundColor: getStepBackgroundColor(index, step),
                 borderWidth: 2,
                 borderColor: getStepColor(index, step),
@@ -189,16 +189,17 @@ export function StepIndicator({
         <View
           style={{
             flexDirection: 'row',
+            alignItems: 'flex-start',
             justifyContent: 'space-between',
+            paddingHorizontal: 0, // Account for step circle radius (32/2 = 16)
           }}
         >
           {steps.map((step, index) => (
             <View
               key={index}
               style={{
-                flex: 1,
+                width: 48, // Match step circle width
                 alignItems: 'center',
-                paddingHorizontal: theme.spacing.xs,
               }}
             >
               <Text
@@ -209,6 +210,8 @@ export function StepIndicator({
                     : theme.colors.text.muted,
                   fontWeight: (step.active || index === currentStep) ? '600' : '400',
                   textAlign: 'center',
+                  fontSize: 11,
+                  lineHeight: 14,
                 }}
                 numberOfLines={2}
               >
