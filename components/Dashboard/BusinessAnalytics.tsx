@@ -24,6 +24,7 @@ import { Container } from '@/components/Layout';
 import { Button } from '@/components/Button/Button';
 import { Badge } from '@/components/Badge/Badge';
 import { EmptyState } from '@/components/EmptyState/EmptyState';
+import { DashboardSkeleton } from '@/components/LoadingSkeleton/DashboardSkeleton';
 import { useAnalytics, type AnalyticsData } from '@/lib/analyticsService';
 import { exportService } from '@/lib/exportService';
 
@@ -100,16 +101,7 @@ export const BusinessAnalytics: React.FC<BusinessAnalyticsProps> = ({ onTabChang
   };
 
   if (loading && !analyticsData) {
-    return (
-      <Container style={{ paddingTop: theme.spacing.lg }}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <RefreshCw size={48} color={theme.colors.text.secondary} />
-          <Text variant="body" color="secondary" style={{ marginTop: theme.spacing.md }}>
-            Loading analytics...
-          </Text>
-        </View>
-      </Container>
-    );
+    return <DashboardSkeleton type="analytics" />;
   }
 
   return (

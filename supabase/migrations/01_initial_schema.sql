@@ -1770,3 +1770,101 @@ BEGIN
     RETURN QUERY SELECT processed, errors, deactivated;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =============================================
+-- AUTO-REFRESH CLEANUP AND SAFE FUNCTIONS
+-- =============================================
+
+-- Clean up duplicate auto-refresh entries
+WITH duplicates AS (
+  SELECT 
+    id,
+    ROW_NUMBER() OVER (
+      PARTITION BY user_id, listing_id 
+      ORDER BY created_at DESC
+    ) as rn
+  FROM business_auto_refresh
+)
+DELETE FROM business_auto_refresh 
+WHERE id IN (
+  SELECT id FROM duplicates WHERE rn > 1
+);
+
+-- Reset all auto-refresh settings to disabled state
+UPDATE business_auto_refresh 
+SET 
+  is_active = false,
+  updated_at = NOW()
+WHERE is_active = true;
+
+-- Clean up any orphaned auto-refresh entries for deleted listings
+DELETE FROM business_auto_refresh 
+WHERE listing_id NOT IN (
+  SELECT id FROM listings
+);
+
+-- Clean up any auto-refresh entries for users who no longer have active subscriptions
+DELETE FROM business_auto_refresh 
+WHERE user_id NOT IN (
+  SELECT user_id FROM user_subscriptions 
+  WHERE status = 'active' 
+  AND current_period_end > NOW()
+);
+
+-- Add a function to safely enable auto-refresh for a listing
+CREATE OR REPLACE FUNCTION enable_auto_refresh_safely(
+  p_user_id UUID,
+  p_listing_id UUID
+) RETURNS BOOLEAN AS $$
+BEGIN
+  -- First, remove any existing entries for this user/listing combination
+  DELETE FROM business_auto_refresh 
+  WHERE user_id = p_user_id AND listing_id = p_listing_id;
+  
+  -- Insert a new entry
+  INSERT INTO business_auto_refresh (
+    user_id,
+    listing_id,
+    is_active,
+    created_at,
+    updated_at
+  ) VALUES (
+    p_user_id,
+    p_listing_id,
+    true,
+    NOW(),
+    NOW()
+  );
+  
+  RETURN true;
+EXCEPTION
+  WHEN OTHERS THEN
+    -- If there's still a conflict, return false
+    RETURN false;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Add a function to safely disable auto-refresh for a listing
+CREATE OR REPLACE FUNCTION disable_auto_refresh_safely(
+  p_user_id UUID,
+  p_listing_id UUID
+) RETURNS BOOLEAN AS $$
+BEGIN
+  -- Update existing entries to disabled
+  UPDATE business_auto_refresh 
+  SET 
+    is_active = false,
+    updated_at = NOW()
+  WHERE user_id = p_user_id AND listing_id = p_listing_id;
+  
+  -- If no rows were updated, the entry didn't exist, which is fine
+  RETURN true;
+EXCEPTION
+  WHEN OTHERS THEN
+    RETURN false;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Grant execute permissions on the new functions
+GRANT EXECUTE ON FUNCTION enable_auto_refresh_safely(UUID, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION disable_auto_refresh_safely(UUID, UUID) TO authenticated;

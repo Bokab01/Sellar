@@ -16,12 +16,15 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAnalytics, type QuickStats, type AnalyticsData } from '@/lib/analyticsService';
 import { router } from 'expo-router';
 import { navigation } from '@/lib/navigation';
+import { DashboardSkeleton } from '@/components/LoadingSkeleton/DashboardSkeleton';
 
-// Lazy load heavy dashboard components for better performance
-const BusinessOverview = lazy(() => import('@/components/Dashboard/BusinessOverview').then(module => ({ default: module.BusinessOverview })));
+// Import components directly for faster loading
+import { BusinessOverview } from '@/components/Dashboard/BusinessOverview';
+import { BusinessAnalytics } from '@/components/Dashboard/BusinessAnalytics';
+import { BusinessSupport } from '@/components/Dashboard/BusinessSupport';
+
+// Lazy load only heavy components that are not frequently accessed
 const BusinessBoostManager = lazy(() => import('@/components/Dashboard/BusinessBoostManager').then(module => ({ default: module.BusinessBoostManager })));
-const BusinessAnalytics = lazy(() => import('@/components/Dashboard/BusinessAnalytics').then(module => ({ default: module.BusinessAnalytics })));
-const BusinessSupport = lazy(() => import('@/components/Dashboard/BusinessSupport').then(module => ({ default: module.BusinessSupport })));
 const FreeUserDashboard = lazy(() => import('@/components/Dashboard/FreeUserDashboard').then(module => ({ default: module.FreeUserDashboard })));
 const AutoBoostDashboard = lazy(() => import('@/components/AutoBoostDashboard/AutoBoostDashboard'));
 
@@ -218,35 +221,33 @@ export default function BusinessDashboardScreen() {
             />
           </Suspense>
         );
-      case 'boost':
-        return (
-          <Suspense fallback={<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-            <Text>Loading auto-refresh settings...</Text>
-          </View>}>
-            <AutoBoostDashboard />
-          </Suspense>
-        );
-      case 'analytics':
-        // Redirect to dedicated analytics screen
-        navigation.business.goToAnalytics();
-        return null;
-      case 'support':
-        // Redirect to dedicated support screen
-        navigation.business.goToSupport();
-        return null;
-      default:
-        return (
-          <Suspense fallback={<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-            <Text>Loading dashboard...</Text>
-          </View>}>
+        case 'boost':
+          return (
+            <Suspense fallback={<DashboardSkeleton type="auto-refresh" />}>
+              <AutoBoostDashboard />
+            </Suspense>
+          );
+        case 'analytics':
+          return (
+            <BusinessAnalytics
+              onTabChange={handleTabChange}
+            />
+          );
+        case 'support':
+          return (
+            <BusinessSupport
+              onTabChange={handleTabChange}
+            />
+          );
+        default:
+          return (
             <BusinessOverview
               loading={loading}
               quickStats={quickStats}
               analyticsData={analyticsData}
               onTabChange={handleTabChange}
             />
-          </Suspense>
-        );
+          );
     }
   }, [activeTab, loading, quickStats, analyticsData, handleTabChange]);
 
@@ -266,7 +267,7 @@ export default function BusinessDashboardScreen() {
 
   // Free user dashboard (single screen, no tabs)
   if (currentTier === 'free') {
-    return (
+      return (
       <SafeAreaWrapper>
         <View style={{ flex: 1, marginTop: theme.spacing.md }}>
           <AppHeader title="Sellar Pro Dashboard" />

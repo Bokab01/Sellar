@@ -557,24 +557,24 @@ export default function FeatureMarketplaceScreen() {
               </Text>
             </View>
           ) : (
-            <View
-              key="credits-display"
+          <View
+            key="credits-display"
+            style={{
+              backgroundColor: theme.colors.primary,
+              borderRadius: theme.borderRadius.full,
+              paddingHorizontal: theme.spacing.md,
+              paddingVertical: theme.spacing.sm,
+            }}
+          >
+            <Text
+              variant="caption"
               style={{
-                backgroundColor: theme.colors.primary,
-                borderRadius: theme.borderRadius.full,
-                paddingHorizontal: theme.spacing.md,
-                paddingVertical: theme.spacing.sm,
+                color: theme.colors.primaryForeground,
+                fontWeight: '600',
               }}
             >
-              <Text
-                variant="caption"
-                style={{
-                  color: theme.colors.primaryForeground,
-                  fontWeight: '600',
-                }}
-              >
                {loading ? 'Loading...' : `${balance} Credits`}
-              </Text>
+            </Text>
             </View>
           ),
         ]}

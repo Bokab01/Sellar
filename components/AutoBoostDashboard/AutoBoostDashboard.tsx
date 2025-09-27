@@ -3,6 +3,7 @@ import { View, Alert, FlatList, RefreshControl } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
+import { DashboardSkeleton } from '@/components/LoadingSkeleton/DashboardSkeleton';
 import { Button } from '@/components/Button/Button';
 import { Badge } from '@/components/Badge/Badge';
 import { ListItem } from '@/components/ListItem/ListItem';
@@ -268,8 +269,7 @@ export default function AutoBoostDashboard() {
           *,
           listings!inner(id, title, status, boost_until, updated_at)
         `)
-        .eq('user_id', user.id)
-        .eq('is_active', true);
+        .eq('user_id', user.id);
 
       if (autoRefreshError) {
         console.error('Error fetching auto-refresh settings:', autoRefreshError);
@@ -329,48 +329,59 @@ export default function AutoBoostDashboard() {
       );
       
       if (existingAutoRefresh) {
-        const { error } = await supabase
+        // Use direct database operation - actually delete the record
+        console.log('Disabling auto-refresh for listing:', listingId);
+        
+        const { error: deleteError } = await supabase
           .from('business_auto_refresh')
-          .update({ is_active: false })
+          .delete()
           .eq('user_id', user.id)
           .eq('listing_id', listingId);
 
-        if (error) {
-          console.error('Error disabling auto-refresh:', error);
-          Alert.alert('Error', 'Failed to disable auto-refresh for this listing.');
-        } else {
-          setSettings(prev => ({
-            ...prev,
-            activeListings: prev.activeListings.map(listing => 
-              listing.listingId === listingId 
-                ? { ...listing, hasAutoRefresh: false }
-                : listing
-            )
-          }));
+        if (deleteError) {
+          console.error('Error disabling auto-refresh:', deleteError);
+          Alert.alert('Error', `Failed to disable auto-refresh: ${deleteError.message}`);
+          return;
         }
+
+        setSettings(prev => ({
+          ...prev,
+          activeListings: prev.activeListings.map(listing => 
+            listing.listingId === listingId 
+              ? { ...listing, hasAutoRefresh: false }
+              : listing
+          )
+        }));
       } else {
-        const { error } = await supabase
+        // Use direct database operation with upsert to handle conflicts
+        console.log('Enabling auto-refresh for listing:', listingId);
+        
+        const { error: upsertError } = await supabase
           .from('business_auto_refresh')
-          .insert({
+          .upsert({
             user_id: user.id,
             listing_id: listingId,
-            refresh_interval_hours: 2,
+            is_active: true,
             next_refresh_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+            refresh_interval_hours: 2,
+          }, {
+            onConflict: 'user_id,listing_id'
           });
 
-        if (error) {
-          console.error('Error enabling auto-refresh:', error);
-          Alert.alert('Error', 'Failed to enable auto-refresh for this listing.');
-        } else {
-          setSettings(prev => ({
-            ...prev,
-            activeListings: prev.activeListings.map(listing => 
-              listing.listingId === listingId 
-                ? { ...listing, hasAutoRefresh: true }
-                : listing
-            )
-          }));
+        if (upsertError) {
+          console.error('Error enabling auto-refresh:', upsertError);
+          Alert.alert('Error', `Failed to enable auto-refresh: ${upsertError.message}`);
+          return;
         }
+
+        setSettings(prev => ({
+          ...prev,
+          activeListings: prev.activeListings.map(listing => 
+            listing.listingId === listingId 
+              ? { ...listing, hasAutoRefresh: true }
+              : listing
+          )
+        }));
       }
     } catch (error) {
       console.error('Error toggling auto-refresh:', error);
@@ -801,11 +812,7 @@ export default function AutoBoostDashboard() {
   }, [userListings]);
 
   if (loading) {
-    return (
-      <View style={{ padding: theme.spacing.md, gap: theme.spacing.md }}>
-        <LoadingSkeleton count={3} height={120} />
-      </View>
-    );
+    return <DashboardSkeleton type="auto-refresh" />;
   }
 
   return (

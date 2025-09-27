@@ -102,6 +102,7 @@ export { AppHeader } from './AppHeader/AppHeader';
 
 // Feedback & Status
 export { LoadingSkeleton, ProductCardSkeleton, ChatListSkeleton } from './LoadingSkeleton/LoadingSkeleton';
+export { DashboardSkeleton } from './LoadingSkeleton/DashboardSkeleton';
 export { EmptyState } from './EmptyState/EmptyState';
 export { ErrorState } from './ErrorState/ErrorState';
 export { LinearProgress, CircularProgress } from './ProgressIndicator/ProgressIndicator';
