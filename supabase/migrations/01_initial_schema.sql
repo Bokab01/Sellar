@@ -1968,7 +1968,7 @@ DECLARE
     liker_username TEXT;
     liker_avatar TEXT;
     post_author_id UUID;
-    post_title TEXT;
+    post_content TEXT;
 BEGIN
     -- Get liker details
     SELECT username, avatar_url INTO liker_username, liker_avatar
@@ -1976,7 +1976,7 @@ BEGIN
     WHERE id = NEW.user_id;
     
     -- Get post details
-    SELECT user_id, title INTO post_author_id, post_title
+    SELECT user_id, content INTO post_author_id, post_content
     FROM posts 
     WHERE id = NEW.post_id;
     
@@ -1991,13 +1991,13 @@ BEGIN
         post_author_id,
         'like',
         'Post Liked! ❤️',
-        COALESCE(liker_username, 'Someone') || ' liked your post "' || COALESCE(post_title, 'Untitled') || '"',
+        COALESCE(liker_username, 'Someone') || ' liked your post',
         jsonb_build_object(
             'liker_id', NEW.user_id,
             'liker_username', COALESCE(liker_username, 'Unknown User'),
             'liker_avatar', liker_avatar,
             'post_id', NEW.post_id,
-            'post_title', post_title,
+            'post_content', LEFT(post_content, 100),
             'liked_at', NEW.created_at
         )
     );
@@ -2013,7 +2013,7 @@ DECLARE
     commenter_username TEXT;
     commenter_avatar TEXT;
     post_author_id UUID;
-    post_title TEXT;
+    post_content TEXT;
 BEGIN
     -- Get commenter details
     SELECT username, avatar_url INTO commenter_username, commenter_avatar
@@ -2021,7 +2021,7 @@ BEGIN
     WHERE id = NEW.user_id;
     
     -- Get post details
-    SELECT user_id, title INTO post_author_id, post_title
+    SELECT user_id, content INTO post_author_id, post_content
     FROM posts 
     WHERE id = NEW.post_id;
     
@@ -2036,13 +2036,13 @@ BEGIN
         post_author_id,
         'comment',
         'New Comment! 💬',
-        COALESCE(commenter_username, 'Someone') || ' commented on your post "' || COALESCE(post_title, 'Untitled') || '"',
+        COALESCE(commenter_username, 'Someone') || ' commented on your post',
         jsonb_build_object(
             'commenter_id', NEW.user_id,
             'commenter_username', COALESCE(commenter_username, 'Unknown User'),
             'commenter_avatar', commenter_avatar,
             'post_id', NEW.post_id,
-            'post_title', post_title,
+            'post_content', LEFT(post_content, 100),
             'comment_id', NEW.id,
             'comment_content', LEFT(NEW.content, 100),
             'commented_at', NEW.created_at
@@ -2078,3 +2078,26 @@ CREATE TRIGGER trigger_create_listing_notification
     AFTER INSERT OR UPDATE ON listings
     FOR EACH ROW
     EXECUTE FUNCTION create_listing_notification();
+
+-- Helpful vote functions to replace supabase.raw usage
+-- These functions handle incrementing and decrementing helpful counts safely
+
+-- Function to increment review helpful count
+CREATE OR REPLACE FUNCTION increment_review_helpful_count(review_id UUID)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE reviews 
+    SET helpful_count = helpful_count + 1
+    WHERE id = review_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to decrement review helpful count
+CREATE OR REPLACE FUNCTION decrement_review_helpful_count(review_id UUID)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE reviews 
+    SET helpful_count = GREATEST(helpful_count - 1, 0)
+    WHERE id = review_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

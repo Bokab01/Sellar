@@ -100,7 +100,7 @@ export default function TrendingRecommendationsScreen() {
       <AppHeader 
         title="Trending Items" 
         showBackButton 
-        onBackPress={() => router.back()}
+        onBackPress={() => router.push('/(tabs)/home')}
       />
       
       <ScrollView

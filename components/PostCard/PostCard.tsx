@@ -81,6 +81,7 @@ interface PostCardProps {
   onFollow?: () => void;
   onUnfollow?: () => void;
   onReport?: () => void;
+  hideViewPost?: boolean; // Hide "View Post" option when already on detail screen
   style?: any;
 }
 
@@ -95,6 +96,7 @@ export function PostCard({
   onFollow,
   onUnfollow,
   onReport,
+  hideViewPost = false,
   style,
 }: PostCardProps) {
   const { theme } = useTheme();
@@ -335,7 +337,7 @@ export function PostCard({
             onEdit={onEdit}
             onReport={handleReport}
             onShare={handleShare}
-            onViewPost={() => {
+            onViewPost={hideViewPost ? undefined : () => {
               router.push(`/(tabs)/community/${post.id}`);
             }}
           />
@@ -351,8 +353,9 @@ export function PostCard({
         >
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', flex: 1 }}>
             <TouchableOpacity
-              onPress={() => router.push(`/profile/${post.author.id}` as any)}
-              activeOpacity={0.7}
+              onPress={() => !isOwnPost && router.push(`/profile/${post.author.id}` as any)}
+              activeOpacity={isOwnPost ? 1 : 0.7}
+              disabled={isOwnPost}
             >
               <Avatar
                 source={post.author.avatar}
@@ -364,8 +367,9 @@ export function PostCard({
             
             <View style={{ flex: 1 }}>
               <TouchableOpacity
-                onPress={() => router.push(`/profile/${post.author.id}` as any)}
-                activeOpacity={0.7}
+                onPress={() => !isOwnPost && router.push(`/profile/${post.author.id}` as any)}
+                activeOpacity={isOwnPost ? 1 : 0.7}
+                disabled={isOwnPost}
               >
                 <UserDisplayName
                   profile={post.author.profile}

@@ -83,6 +83,8 @@ export function ResponsiveImage({
     backgroundColor: backgroundColor || theme.colors.surfaceVariant,
     borderRadius: borderRadius || theme.borderRadius.sm,
     overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
     ...containerStyle,
   };
 
@@ -134,7 +136,7 @@ export function PostImage({
       source={source}
       aspectRatio={16/9}
       maxHeight={400}
-      resizeMode="contain"
+      resizeMode="cover"
       {...props}
     />
   );
@@ -181,7 +183,7 @@ export function ThumbnailImage({
       aspectRatio={1}
       maxHeight={size}
       maxWidth={size}
-      resizeMode="contain"
+      resizeMode="cover"
       style={{ width: size, height: size }}
       {...props}
     />

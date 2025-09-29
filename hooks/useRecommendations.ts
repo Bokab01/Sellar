@@ -23,6 +23,7 @@ export interface RecommendationListing {
   viewed_at?: string;
   boost_weight?: number;
   boost_type?: string;
+  favorites_count?: number;
 }
 
 export interface RecommendationOptions {
@@ -36,6 +37,7 @@ export function useRecommendations() {
   const { user } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Track user interaction
   const trackInteraction = useCallback(async (
@@ -298,9 +300,15 @@ export function useRecommendations() {
     }
   }, [user]);
 
+  // Refresh trigger function
+  const refreshRecommendations = useCallback(() => {
+    setRefreshTrigger(prev => prev + 1);
+  }, []);
+
   return {
     loading,
     error,
+    refreshTrigger,
     trackInteraction,
     getPersonalizedRecommendations,
     getTrendingNearUser,
@@ -309,6 +317,7 @@ export function useRecommendations() {
     getCollaborativeRecommendations,
     getBoostedListings,
     recordSearchHistory,
-    getSearchSuggestions
+    getSearchSuggestions,
+    refreshRecommendations
   };
 }

@@ -1,32 +1,50 @@
 import React, { useMemo } from 'react';
 import { Tabs } from 'expo-router';
-import { View, Text, Image } from 'react-native';
+import { View, Text, Image, Platform } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { MessageCircle, Plus, Users, EllipsisVertical, House, BadgePlus, CirclePlus } from 'lucide-react-native';
 import { useChatStore } from '@/store/useChatStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBottomTabBarSpacing } from '@/hooks/useBottomTabBarSpacing';
+import { usePathname } from 'expo-router';
 
 export default function TabLayout() {
   const { theme } = useTheme();
   const { unreadCounts } = useChatStore();
+  const insets = useSafeAreaInsets();
+  const { tabBarHeight, tabBarBottomPadding, contentBottomPadding } = useBottomTabBarSpacing();
+  const pathname = usePathname();
   
   // Calculate total unread count for inbox badge
   const totalUnreadCount = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
+  
+  // Check if we're on the post detail screen
+  const isPostDetailScreen = pathname.includes('/community/') && pathname.includes('/');
 
   // Memoize screen options to prevent unnecessary re-renders
   const screenOptions = useMemo(() => ({
     headerShown: false,
     // Add consistent background to prevent flashing
-    sceneContainerStyle: { backgroundColor: theme.colors.background },
-    tabBarStyle: {
+    sceneContainerStyle: { 
+      backgroundColor: theme.colors.background,
+      // Add bottom padding to prevent content from being hidden behind tab bar
+      paddingBottom: isPostDetailScreen ? 0 : contentBottomPadding,
+    },
+    tabBarStyle: isPostDetailScreen ? { display: 'none' as const } : {
       backgroundColor: theme.colors.surface,
       borderTopColor: theme.colors.border,
       borderTopWidth: 1,
-      paddingBottom: 8,
+      paddingBottom: tabBarBottomPadding,
       paddingTop: 8,
-      height: 70,
+      height: tabBarHeight,
       // Prevent tab bar flashing
       elevation: 0,
       shadowOpacity: 0,
+      // Ensure proper positioning on all devices
+      position: 'absolute' as const,
+      bottom: 0,
+      left: 0,
+      right: 0,
     },
     tabBarActiveTintColor: theme.colors.primary,
     tabBarInactiveTintColor: theme.colors.text.muted,
@@ -38,7 +56,7 @@ export default function TabLayout() {
     // Optimize animations
     animationEnabled: true,
     animationTypeForReplace: 'push',
-  }), [theme]);
+  }), [theme, tabBarHeight, tabBarBottomPadding, contentBottomPadding, isPostDetailScreen]);
 
   return (
     <Tabs screenOptions={screenOptions}>

@@ -1,13 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, TouchableOpacity, RefreshControl } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/theme/ThemeProvider';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useRecommendations, RecommendationListing } from '@/hooks/useRecommendations';
+import { useMultipleListingStats } from '@/hooks/useListingStats';
+import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { Text } from '@/components/Typography/Text';
 import { ProductCard } from '@/components/Card/Card';
 import { Grid } from '@/components/Grid/Grid';
 import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
 import { ErrorState } from '@/components/ErrorState/ErrorState';
 import { ChevronRight, TrendingUp, Heart, Eye, Star } from 'lucide-react-native';
+import { router } from 'expo-router';
 
 interface RecommendationSectionProps {
   title: string;
@@ -41,21 +46,35 @@ export function RecommendationSection({
   layout = 'horizontal'
 }: RecommendationSectionProps) {
   const { theme } = useTheme();
+  const { user } = useAuthStore();
   const {
     loading,
     error,
+    refreshTrigger,
     getPersonalizedRecommendations,
     getTrendingNearUser,
     getCategoryRecommendations,
     getRecentlyViewed,
     getCollaborativeRecommendations,
-    getBoostedListings
+    getBoostedListings,
+    trackInteraction
   } = useRecommendations();
 
   const [recommendations, setRecommendations] = useState<RecommendationListing[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Get listing IDs for stats
+  const listingIds = recommendations.map(item => item.listing_id).filter(Boolean);
+  
+  // Get favorites and view counts for all listings
+  const { favorites: hookFavorites, viewCounts, refreshStats } = useMultipleListingStats({ 
+    listingIds 
+  });
+  
+  // Get favorites count for header
+  const { incrementFavoritesCount, decrementFavoritesCount } = useFavoritesStore();
 
-  const loadRecommendations = async () => {
+  const loadRecommendations = useCallback(async () => {
     try {
       let data: RecommendationListing[] = [];
 
@@ -91,17 +110,58 @@ export function RecommendationSection({
     } catch (err) {
       console.error('Error loading recommendations:', err);
     }
-  };
+  }, [type, listingId, userLocation, boostType, limit, getPersonalizedRecommendations, getTrendingNearUser, getCategoryRecommendations, getRecentlyViewed, getCollaborativeRecommendations, getBoostedListings]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadRecommendations();
     setRefreshing(false);
-  };
+  }, [loadRecommendations]);
+
+  const handleFavoritePress = useCallback(async (listingId: string) => {
+    if (!user) return;
+    
+    try {
+      // Import and use the favorites function
+      const { toggleFavorite } = await import('@/lib/favoritesAndViews');
+      const result = await toggleFavorite(listingId);
+      
+      if (!result.error) {
+        // Update header favorites count
+        const currentFavorite = hookFavorites[listingId] || false;
+        if (currentFavorite) {
+          decrementFavoritesCount();
+        } else {
+          incrementFavoritesCount();
+        }
+        
+        // Refresh stats to get latest data
+        refreshStats();
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  }, [user, hookFavorites, decrementFavoritesCount, incrementFavoritesCount, refreshStats]);
+
+  const handleViewPress = useCallback((listingId: string) => {
+    // Navigate to listing detail to see more details
+    router.push(`/(tabs)/home/${listingId}`);
+  }, []);
 
   useEffect(() => {
     loadRecommendations();
-  }, [type, listingId, userLocation, boostType, limit]);
+  }, [loadRecommendations, refreshTrigger]);
+
+  // Refresh recommendations when screen comes into focus (e.g., returning from favorites screen)
+  useFocusEffect(
+    useCallback(() => {
+      // Refresh stats to get latest favorites data
+      refreshStats();
+      
+      // Reload recommendations to reflect any changes
+      loadRecommendations();
+    }, [refreshStats, loadRecommendations])
+  );
 
   const getDefaultIcon = () => {
     switch (type) {
@@ -219,23 +279,10 @@ export function RecommendationSection({
         </View>
         
         {showViewAll && onViewAll && recommendations.length > limit && (
-          <TouchableOpacity
-            onPress={onViewAll}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: theme.spacing.xs,
-              paddingHorizontal: theme.spacing.sm,
-              paddingVertical: theme.spacing.xs,
-              borderRadius: theme.borderRadius.sm,
-              backgroundColor: theme.colors.surfaceVariant,
-            }}
-            activeOpacity={0.7}
-          >
-            <Text variant="bodySmall" color="primary" style={{ fontWeight: '600' }}>
+          <TouchableOpacity onPress={onViewAll}>
+            <Text variant="button" color="primary">
               View All
             </Text>
-            <ChevronRight size={14} color={theme.colors.primary} />
           </TouchableOpacity>
         )}
       </View>
@@ -266,9 +313,14 @@ export function RecommendationSection({
                   layout="grid"
                   fullWidth={true}
                   listingId={item.listing_id}
+                  isFavorited={hookFavorites[item.listing_id] || false}
+                  viewCount={viewCounts[item.listing_id] || 0}
+                  favoritesCount={item.favorites_count || 0}
                   onPress={() => onListingPress?.(item.listing_id)}
+                  onFavoritePress={user?.id !== item.user_id ? () => handleFavoritePress(item.listing_id) : undefined}
+                  onViewPress={() => handleViewPress(item.listing_id)}
                   showReportButton={false}
-                  currentUserId=""
+                  currentUserId={user?.id || ""}
                 />
               </View>
             );
@@ -296,9 +348,15 @@ export function RecommendationSection({
                     rating: 0
                   }}
                   location={item.location || 'Unknown'}
+                  listingId={item.listing_id}
+                  isFavorited={hookFavorites[item.listing_id] || false}
+                  viewCount={viewCounts[item.listing_id] || 0}
+                  favoritesCount={item.favorites_count || 0}
                   onPress={() => onListingPress?.(item.listing_id)}
+                  onFavoritePress={user?.id !== item.user_id ? () => handleFavoritePress(item.listing_id) : undefined}
+                  onViewPress={() => handleViewPress(item.listing_id)}
                   showReportButton={false}
-                  currentUserId=""
+                  currentUserId={user?.id || ""}
                 />
             </View>
             );

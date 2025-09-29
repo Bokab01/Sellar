@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, ScrollView, TouchableOpacity, Dimensions, Animated, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useProfile } from '@/hooks/useProfile';
@@ -65,6 +66,7 @@ const SIDEBAR_WIDTH = Math.min(320, screenWidth * 0.85);
 
 export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const { profile } = useProfile();
   const { balance: creditBalance, lifetimeEarned, refreshCredits } = useMonetizationStore();
@@ -272,7 +274,9 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
       {/* Header */}
       <View
         style={{
-          padding: theme.spacing.lg,
+          paddingTop: insets.top + theme.spacing.lg,
+          paddingBottom: theme.spacing.lg,
+          paddingHorizontal: theme.spacing.lg,
           borderBottomWidth: 1,
           borderBottomColor: theme.colors.border,
           backgroundColor: theme.colors.surface,
@@ -283,9 +287,12 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
           <TouchableOpacity
             onPress={onClose}
             style={{
-              padding: theme.spacing.sm,
-              borderRadius: theme.borderRadius.full,
+              width: 32,
+              height: 32,
+              borderRadius: 16,
               backgroundColor: theme.colors.background,
+              justifyContent: 'center',
+              alignItems: 'center',
             }}
           >
             <Text variant="body" color="muted">✕</Text>

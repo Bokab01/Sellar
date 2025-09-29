@@ -287,18 +287,12 @@ export const useMonetizationStore = create<MonetizationState>()(
 
       if (subError) throw subError;
 
-      console.log('🔄 refreshSubscription - Found subscription:', subscription);
-
       // Get entitlements
       const { data: entitlements, error: entError } = await supabase.rpc('get_user_entitlements', {
         p_user_id: user.id,
       } as any);
 
-
       if (entError) throw entError;
-
-      console.log('🔄 refreshSubscription - Setting currentPlan to:', subscription);
-      console.log('🔄 refreshSubscription - Setting entitlements to:', entitlements);
 
       set({
         currentPlan: subscription,

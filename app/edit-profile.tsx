@@ -41,6 +41,7 @@ import {
 } from '@/hooks/useProfile';
 import { useAuth } from '@/hooks/useAuth';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
+import { useAppStore } from '@/store/useAppStore';
 import { BusinessProfileSetupModal } from '@/components/BusinessProfileSetupModal/BusinessProfileSetupModal';
 import { validateName, validateUsername } from '@/utils/validation';
 import { checkMultipleUniqueness } from '@/utils/uniquenessValidation';
@@ -54,6 +55,7 @@ export default function EditProfileScreen() {
   const { updateProfile, loading: updating } = useUpdateProfile();
   const { completion } = useProfileCompletion();
   const { hasBusinessPlan } = useMonetizationStore();
+  const { setCurrentLocation } = useAppStore();
 
   const [refreshing, setRefreshing] = useState(false);
   const [showToast, setShowToast] = useState(false);
@@ -246,6 +248,12 @@ export default function EditProfileScreen() {
       console.log('🔍 Business Name:', updateData.business_name);
       
       await updateProfile(updateData);
+      
+      // Update app store location if location was changed
+      if (formData.location.trim() && formData.location.trim() !== profile?.location) {
+        setCurrentLocation(formData.location.trim());
+      }
+      
       setToastMessage('Profile updated successfully!');
       setToastVariant('success');
       setShowToast(true);

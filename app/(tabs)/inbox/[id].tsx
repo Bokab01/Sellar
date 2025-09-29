@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Platform, Alert, TouchableOpacity, Linking, Image, Keyboard } from 'react-native';
+import { View, Platform, Alert, TouchableOpacity, Linking, Image, Keyboard, TouchableWithoutFeedback, KeyboardAvoidingView } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -144,10 +144,18 @@ export default function ChatScreen() {
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
       setIsKeyboardVisible(true);
+      // Scroll to bottom when keyboard appears
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd(true);
+      }, 100);
     });
     
     const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
       setIsKeyboardVisible(false);
+      // Scroll to bottom when keyboard disappears
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd(true);
+      }, 100);
     });
 
     return () => {
@@ -638,7 +646,7 @@ export default function ChatScreen() {
         <AppHeader
           title="Loading..."
           showBackButton
-          onBackPress={() => router.back()}
+          onBackPress={() => router.push('/(tabs)/inbox')}
         />
         <View style={{ flex: 1, padding: theme.spacing.lg }}>
           {Array.from({ length: 5 }).map((_, index) => (
@@ -664,7 +672,7 @@ export default function ChatScreen() {
         <AppHeader
           title="Chat"
           showBackButton
-          onBackPress={() => router.back()}
+          onBackPress={() => router.push('/(tabs)/inbox')}
         />
         <ErrorState
           message={error}
@@ -732,12 +740,17 @@ export default function ChatScreen() {
   };
 
   return (
-    <SafeAreaWrapper>
-      <AppHeader
+    <SafeAreaWrapper style={{ flex: 1 }}>
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        <AppHeader
         title={otherUser ? getDisplayName(otherUser, false).displayName : 'Chat'}
         subtitle={otherUser ? lastSeenText : ''}
         showBackButton
-        onBackPress={() => router.back()}
+        onBackPress={() => router.push('/(tabs)/inbox')}
         leftAction={
           otherUser ? (
             <Avatar
@@ -880,23 +893,67 @@ export default function ChatScreen() {
         </View>
       )}
 
-      <KeyboardAwareScrollView
-        ref={scrollViewRef}
-        style={{ flex: 1 }}
-        contentContainerStyle={{ 
+      {/* Transaction Buttons - Moved to top for better UX */}
+      {conversation?.listing && otherUser && !existingTransaction && (
+        <View style={{
+          paddingHorizontal: theme.spacing.lg,
           paddingVertical: theme.spacing.md,
-          paddingBottom: theme.spacing.xl, // Extra padding to ensure content doesn't get hidden behind input
-          flexGrow: 1, // Ensure content fills available space
-        }}
-        enableOnAndroid={true}
-        enableAutomaticScroll={true}
-        keyboardOpeningTime={250}
-        
-        extraHeight={Platform.OS === 'android' ? 20 : 0}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd(true)}
-      >
+          backgroundColor: theme.colors.surface,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.colors.border,
+        }}>
+          <TransactionCompletionButton
+            conversationId={conversationId!}
+            otherUser={otherUser}
+            listing={conversation.listing}
+            existingTransaction={existingTransaction}
+            onTransactionCreated={handleTransactionCreated}
+            onTransactionUpdated={handleTransactionUpdated}
+          />
+        </View>
+      )}
+
+      {/* Transaction Status Display */}
+      {existingTransaction && (
+        <View style={{
+          paddingHorizontal: theme.spacing.lg,
+          paddingVertical: theme.spacing.md,
+          backgroundColor: theme.colors.surface,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.colors.border,
+        }}>
+          <TransactionCompletionButton
+            conversationId={conversationId!}
+            otherUser={otherUser}
+            listing={conversation?.listing}
+            existingTransaction={existingTransaction}
+            onTransactionCreated={handleTransactionCreated}
+            onTransactionUpdated={handleTransactionUpdated}
+          />
+        </View>
+      )}
+
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <KeyboardAwareScrollView
+         /*  ref={scrollViewRef} */
+          style={{ flex: 1 }}
+          /* contentContainerStyle={{ 
+            paddingVertical: theme.spacing.md,
+            paddingBottom: isKeyboardVisible ? theme.spacing.xl : 0, // No padding when keyboard is hidden
+            flexGrow: isKeyboardVisible ? 1 : 0, // Only grow when keyboard is visible
+            minHeight: isKeyboardVisible ? 'auto' : 'auto', // Natural height when keyboard is hidden
+          }} */
+        /*   enableOnAndroid={true} */
+          enableAutomaticScroll={true}
+          keyboardOpeningTime={0}
+        /*   extraScrollHeight={Platform.OS === 'android' ? 0 : 0} // Reduced since we're using KeyboardAvoidingView
+          extraHeight={Platform.OS === 'android' ? 0 : 0} // Reduced since we're using KeyboardAvoidingView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd(true)}
+          resetScrollToCoords={{ x: 0, y: 0 }} */
+          scrollEventThrottle={16}
+        >
           {messages.length === 0 ? (
             <EmptyState
               title="Start the conversation"
@@ -1107,49 +1164,8 @@ export default function ChatScreen() {
               </View>
             </View>
           )}
-       
-
-      </KeyboardAwareScrollView>
-      
-       {/* Transaction Completion Button */}
-       {conversation?.listing && otherUser && !existingTransaction && (
-          <View style={{
-            paddingHorizontal: theme.spacing.lg,
-            paddingVertical: theme.spacing.md,
-            backgroundColor: theme.colors.surface,
-            borderTopWidth: 1,
-            borderTopColor: theme.colors.border,
-          }}>
-            <TransactionCompletionButton
-              conversationId={conversationId!}
-              otherUser={otherUser}
-              listing={conversation.listing}
-              existingTransaction={existingTransaction}
-              onTransactionCreated={handleTransactionCreated}
-              onTransactionUpdated={handleTransactionUpdated}
-            />
-          </View>
-        )}
-
-        {/* Transaction Status Display */}
-        {existingTransaction && (
-          <View style={{
-            paddingHorizontal: theme.spacing.lg,
-            paddingVertical: theme.spacing.md,
-            backgroundColor: theme.colors.surface,
-            borderTopWidth: 1,
-            borderTopColor: theme.colors.border,
-          }}>
-            <TransactionCompletionButton
-              conversationId={conversationId!}
-              otherUser={otherUser}
-              listing={conversation?.listing}
-              existingTransaction={existingTransaction}
-              onTransactionCreated={handleTransactionCreated}
-              onTransactionUpdated={handleTransactionUpdated}
-            />
-          </View>
-        )}
+        </KeyboardAwareScrollView>
+      </TouchableWithoutFeedback>
 
       {/* Message Input - Fixed at bottom */}
       <View
@@ -1160,8 +1176,8 @@ export default function ChatScreen() {
           borderTopWidth: 1,
           borderTopColor: theme.colors.border,
           paddingHorizontal: theme.spacing.lg,
-          paddingTop: theme.spacing.md,
-          paddingBottom: Platform.OS === 'android' ? Math.max(insets.bottom, theme.spacing.md) : theme.spacing.md,
+          paddingTop: theme.spacing.xs,
+          paddingBottom: Platform.OS === 'android' ? Math.max(insets.bottom, theme.spacing.sm) : theme.spacing.sm,
           gap: theme.spacing.xs,
         }}
       >
@@ -1312,7 +1328,7 @@ export default function ChatScreen() {
         variant={toastVariant}
         onHide={() => setShowToast(false)}
       />
-
+      </KeyboardAvoidingView>
     </SafeAreaWrapper>
   );
 }

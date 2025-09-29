@@ -382,22 +382,11 @@ CREATE POLICY "Trending topics are viewable by all users" ON trending_topics
     FOR SELECT USING (true);
 
 -- =============================================
--- SAMPLE DATA
+-- SAMPLE DATA REMOVED
 -- =============================================
 
--- Insert some sample hashtags to get started
-INSERT INTO hashtags (tag, category, posts_count, total_engagement) VALUES
-('GhanaDeals', 'general', 25, 150),
-('TechTuesday', 'electronics', 18, 120),
-('FashionFinds', 'fashion', 22, 95),
-('HomeDecor', 'home', 15, 80),
-('WeekendMarket', 'general', 30, 200),
-('BuyerTips', 'general', 12, 60),
-('SellerLife', 'business', 8, 45),
-('Electronics', 'electronics', 35, 180),
-('Fashion', 'fashion', 28, 140),
-('Home', 'home', 20, 100)
-ON CONFLICT (tag) DO NOTHING;
+-- Sample data has been removed to show only real user-generated content
+-- The trending system will now display authentic trending topics from actual posts
 
 -- =============================================
 -- COMPLETION MESSAGE
@@ -410,13 +399,13 @@ BEGIN
     RAISE NOTICE '⚙️ Functions created: extract_hashtags, process_post_hashtags, get_trending_hashtags, get_trending_posts';
     RAISE NOTICE '🔄 Triggers created: Automatic hashtag processing and engagement updates';
     RAISE NOTICE '🔒 RLS policies enabled for secure access';
-    RAISE NOTICE '🎯 Sample data inserted for testing';
+    RAISE NOTICE '🎯 Sample data removed - showing only real user content';
     RAISE NOTICE '🔧 Fixed: Ambiguous hashtag_id references resolved';
     RAISE NOTICE '🔧 Fixed: Type mismatches resolved for proper data flow';
     RAISE NOTICE '';
     RAISE NOTICE '🚀 Your trending system is now ready!';
-    RAISE NOTICE '   - Create posts with hashtags like #GhanaDeals #TechTuesday';
+    RAISE NOTICE '   - Create posts with hashtags to see them trend';
     RAISE NOTICE '   - Like and comment on posts to boost engagement';
-    RAISE NOTICE '   - Check the trending screen to see hashtags appear';
-    RAISE NOTICE '   - No more ambiguous column reference errors!';
+    RAISE NOTICE '   - Check the trending screen to see real trending topics';
+    RAISE NOTICE '   - No more dummy data - only authentic content!';
 END $$;

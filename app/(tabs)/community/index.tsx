@@ -9,6 +9,7 @@ import { useAppResume } from '@/hooks/useAppResume';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useFollowState } from '@/hooks/useFollowState';
+import { getDisplayName } from '@/hooks/useDisplayName';
 import {
   Text,
   SafeAreaWrapper,
@@ -185,19 +186,7 @@ export default function CommunityScreen() {
       user_id: post.user_id, // Preserve the original user_id for ownership checks
       author: {
         id: post.profiles?.id || 'unknown',
-        name: (() => {
-          const firstName = post.profiles?.first_name || '';
-          const lastName = post.profiles?.last_name || '';
-          if (firstName && lastName) {
-            return `${firstName} ${lastName}`.trim();
-          } else if (firstName) {
-            return firstName.trim();
-          } else if (lastName) {
-            return lastName.trim();
-          } else {
-            return 'User';
-          }
-        })(),
+        name: getDisplayName(post.profiles, false).displayName,
         avatar: post.profiles?.avatar_url || null,
         rating: Number(post.profiles?.rating) || 0,
         reviewCount: Number(post.profiles?.rating_count || post.profiles?.total_reviews) || 0,
@@ -237,7 +226,7 @@ export default function CommunityScreen() {
   return (
     <SafeAreaWrapper>
       <AppHeader
-        title="Community"
+        title="Sellar Community"
         leftAction={
           <SidebarToggle
             isOpen={sidebarVisible}

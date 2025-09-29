@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { View, ScrollView, TouchableOpacity, Modal } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Modal, TouchableWithoutFeedback, FlatList } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { Button } from '@/components/Button/Button';
 import { Badge } from '@/components/Badge/Badge';
-import { Filter, X, MapPin, Tag, ListFilterPlus } from 'lucide-react-native';
+import { Filter, X, MapPin, Tag, ListFilterPlus, ChevronDown } from 'lucide-react-native';
+import { GHANA_REGIONS } from '@/constants/ghana';
 
 export interface CommunityFilters {
   postType: string | null;
@@ -30,18 +32,6 @@ const POST_TYPES = [
   { value: 'collaboration', label: 'Collaboration', icon: '🤝' },
 ];
 
-const POPULAR_LOCATIONS = [
-  'Accra',
-  'Kumasi', 
-  'Tamale',
-  'Cape Coast',
-  'Koforidua',
-  'Sunyani',
-  'Ho',
-  'Bolgatanga',
-  'Wa',
-  'Techiman',
-];
 
 export function CommunityFilters({ 
   filters, 
@@ -49,8 +39,10 @@ export function CommunityFilters({
   availableLocations = [] 
 }: CommunityFiltersProps) {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const [showModal, setShowModal] = useState(false);
   const [tempFilters, setTempFilters] = useState<CommunityFilters>(filters);
+  const [showRegionModal, setShowRegionModal] = useState(false);
 
   const handleApplyFilters = () => {
     onFiltersChange(tempFilters);
@@ -164,7 +156,8 @@ export function CommunityFilters({
               alignItems: 'center',
               justifyContent: 'space-between',
               paddingHorizontal: theme.spacing.lg,
-              paddingVertical: theme.spacing.md,
+              paddingTop: insets.top + theme.spacing.md,
+              paddingBottom: theme.spacing.md,
               borderBottomWidth: 1,
               borderBottomColor: theme.colors.border,
               backgroundColor: theme.colors.surface,
@@ -185,7 +178,9 @@ export function CommunityFilters({
           <ScrollView
             style={{ flex: 1 }}
             contentContainerStyle={{ padding: theme.spacing.lg }}
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator={true}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled={true}
           >
             {/* Post Type Filter */}
             <View style={{ marginBottom: theme.spacing.xl }}>
@@ -236,87 +231,47 @@ export function CommunityFilters({
               </View>
             </View>
 
-            {/* Location Filter */}
+            {/* Region Filter */}
             <View style={{ marginBottom: theme.spacing.xl }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
                 <MapPin size={20} color={theme.colors.primary} />
                 <Text variant="h4" style={{ marginLeft: theme.spacing.sm }}>
-                  Location
+                  Region
                 </Text>
               </View>
               
-              {/* All Locations Option */}
+              {/* Region Selection Button */}
               <TouchableOpacity
-                onPress={() => setTempFilters(prev => ({ ...prev, location: null }))}
+                onPress={() => setShowRegionModal(true)}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
+                  justifyContent: 'space-between',
                   paddingHorizontal: theme.spacing.md,
-                  paddingVertical: theme.spacing.sm,
+                  paddingVertical: theme.spacing.md,
                   borderRadius: theme.borderRadius.lg,
                   borderWidth: 1,
-                  borderColor: tempFilters.location === null 
-                    ? theme.colors.primary 
-                    : theme.colors.border,
-                  backgroundColor: tempFilters.location === null 
-                    ? theme.colors.primary + '10' 
-                    : theme.colors.surface,
-                  marginBottom: theme.spacing.sm,
+                  borderColor: theme.colors.border,
+                  backgroundColor: theme.colors.surface,
                 }}
                 activeOpacity={0.7}
               >
-                <Text style={{ marginRight: theme.spacing.xs, fontSize: 16 }}>
-                  🌍
-                </Text>
                 <Text
                   variant="body"
                   style={{
-                    color: tempFilters.location === null 
-                      ? theme.colors.primary 
-                      : theme.colors.text.primary,
-                    fontWeight: tempFilters.location === null ? '600' : '400',
+                    color: tempFilters.location !== undefined
+                      ? theme.colors.text.primary 
+                      : theme.colors.text.muted,
+                    fontWeight: tempFilters.location !== undefined ? '500' : '400',
                   }}
                 >
-                  All Locations
+                  {tempFilters.location === null ? 'All Regions' : tempFilters.location || 'Select a region'}
                 </Text>
+                <ChevronDown 
+                  size={20} 
+                  color={theme.colors.text.muted}
+                />
               </TouchableOpacity>
-
-              {/* Popular Locations */}
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
-                {[...POPULAR_LOCATIONS, ...availableLocations]
-                  .filter((location, index, self) => self.indexOf(location) === index) // Remove duplicates
-                  .map((location) => (
-                    <TouchableOpacity
-                      key={location}
-                      onPress={() => setTempFilters(prev => ({ ...prev, location }))}
-                      style={{
-                        paddingHorizontal: theme.spacing.md,
-                        paddingVertical: theme.spacing.sm,
-                        borderRadius: theme.borderRadius.lg,
-                        borderWidth: 1,
-                        borderColor: tempFilters.location === location 
-                          ? theme.colors.primary 
-                          : theme.colors.border,
-                        backgroundColor: tempFilters.location === location 
-                          ? theme.colors.primary + '10' 
-                          : theme.colors.surface,
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        variant="body"
-                        style={{
-                          color: tempFilters.location === location 
-                            ? theme.colors.primary 
-                            : theme.colors.text.primary,
-                          fontWeight: tempFilters.location === location ? '600' : '400',
-                        }}
-                      >
-                        {location}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-              </View>
             </View>
           </ScrollView>
 
@@ -348,6 +303,142 @@ export function CommunityFilters({
             </Button>
           </View>
         </View>
+      </Modal>
+
+      {/* Region Selection Modal */}
+      <Modal
+        visible={showRegionModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowRegionModal(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowRegionModal(false)}>
+          <View style={{ 
+            flex: 1, 
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            justifyContent: 'flex-end'
+          }}>
+            <TouchableWithoutFeedback>
+              <View style={{ 
+                backgroundColor: theme.colors.background,
+                borderTopLeftRadius: theme.borderRadius.xl,
+                borderTopRightRadius: theme.borderRadius.xl,
+                maxHeight: '70%',
+                minHeight: '60%'
+              }}>
+          {/* Header */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: theme.spacing.lg,
+              paddingTop: theme.spacing.md,
+              paddingBottom: theme.spacing.md,
+              borderBottomWidth: 1,
+              borderBottomColor: theme.colors.border,
+              backgroundColor: theme.colors.surface,
+            }}
+          >
+            <Text variant="h3">Select Region</Text>
+            <TouchableOpacity
+              onPress={() => setShowRegionModal(false)}
+              style={{
+                padding: theme.spacing.sm,
+                borderRadius: theme.borderRadius.sm,
+              }}
+            >
+              <X size={24} color={theme.colors.text.primary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Region List */}
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ padding: theme.spacing.lg }}
+            showsVerticalScrollIndicator={true}
+          >
+            {/* All Regions Option */}
+            <TouchableOpacity
+              onPress={() => {
+                setTempFilters(prev => ({ ...prev, location: null }));
+                setShowRegionModal(false);
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: theme.spacing.md,
+                paddingVertical: theme.spacing.md,
+                borderRadius: theme.borderRadius.lg,
+                borderWidth: 1,
+                borderColor: tempFilters.location === null 
+                  ? theme.colors.primary 
+                  : theme.colors.border,
+                backgroundColor: tempFilters.location === null 
+                  ? theme.colors.primary + '10' 
+                  : theme.colors.surface,
+                marginBottom: theme.spacing.md,
+              }}
+              activeOpacity={0.7}
+            >
+              
+              <Text
+                variant="h4"
+                style={{
+                  color: tempFilters.location === null 
+                    ? theme.colors.primary 
+                    : theme.colors.text.primary,
+                  fontWeight: tempFilters.location === null ? '600' : '400',
+                }}
+              >
+                All Regions
+              </Text>
+            </TouchableOpacity>
+
+            {/* Region Options */}
+            <View style={{ gap: theme.spacing.xs }}>
+              {GHANA_REGIONS.map((region) => (
+                  <TouchableOpacity
+                    key={region}
+                    onPress={() => {
+                      setTempFilters(prev => ({ ...prev, location: region }));
+                      setShowRegionModal(false);
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: theme.spacing.md,
+                      paddingVertical: theme.spacing.sm,
+                      borderRadius: theme.borderRadius.lg,
+                      borderWidth: 1,
+                      borderColor: tempFilters.location === region 
+                        ? theme.colors.primary 
+                        : theme.colors.border,
+                      backgroundColor: tempFilters.location === region 
+                        ? theme.colors.primary + '10' 
+                        : theme.colors.surface,
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      variant="body"
+                      style={{
+                        color: tempFilters.location === region 
+                          ? theme.colors.primary 
+                          : theme.colors.text.primary,
+                        fontWeight: tempFilters.location === region ? '600' : '400',
+                      }}
+                    >
+                      {region}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+            </View>
+          </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
       </Modal>
     </>
   );

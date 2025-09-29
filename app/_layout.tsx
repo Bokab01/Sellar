@@ -5,6 +5,7 @@ import 'react-native-get-random-values'; // Must be imported before any crypto o
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
@@ -210,9 +211,11 @@ function AppContent() {
 export default Sentry.wrap(function RootLayout() {
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <AppContent />
-      </ThemeProvider>
+      <KeyboardProvider>
+        <ThemeProvider>
+          <AppContent />
+        </ThemeProvider>
+      </KeyboardProvider>
     </SafeAreaProvider>
   );
 });

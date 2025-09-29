@@ -4,7 +4,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useProfile } from '@/hooks/useProfile';
 import { useNotificationStore } from '@/store/useNotificationStore';
-import { useFavoritesCount } from '@/hooks/useFavoritesCount';
+import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { router } from 'expo-router';
 import { Text } from '@/components/Typography/Text';
 import { Avatar } from '@/components/Avatar/Avatar';
@@ -29,7 +29,7 @@ export function EnhancedSearchHeader({
   const { user } = useAuthStore();
   const { profile } = useProfile();
   const { unreadCount } = useNotificationStore();
-  const { favoritesCount } = useFavoritesCount();
+  const { favoritesCount } = useFavoritesStore();
 
   const firstName = profile?.first_name || user?.user_metadata?.first_name || 'User';
   const lastName = profile?.last_name || user?.user_metadata?.last_name || '';

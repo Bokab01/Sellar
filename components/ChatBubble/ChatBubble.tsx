@@ -246,7 +246,7 @@ export function ChatBubble({
             {isOwn && (
               <ReadReceipt
                 isRead={status === 'read'}
-                isDelivered={status !== 'sending' && status !== 'failed'}
+                isDelivered={status === 'delivered' || status === 'read'}
                 size={12}
                 style={{ marginLeft: theme.spacing.sm }}
               />

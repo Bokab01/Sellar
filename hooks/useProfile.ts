@@ -175,13 +175,6 @@ export function useProfile(userId?: string) {
           throw fetchError;
         }
       } else {
-        console.log('🔍 Profile Fetched:', {
-          id: data.id,
-          isBusiness: data.is_business,
-          businessName: data.business_name,
-          displayBusinessName: data.display_business_name,
-          businessNamePriority: data.business_name_priority,
-        });
         setProfile(data);
       }
     } catch (err) {

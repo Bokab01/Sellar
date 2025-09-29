@@ -53,11 +53,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         console.error('🔔 Error fetching notifications:', fetchError);
         set({ error: fetchError.message, loading: false });
       } else {
-        console.log('🔔 Raw notification data:', data);
         const notifications = (data || []).filter((n: any) => n && typeof n === 'object' && !n.error) as unknown as Notification[];
         const unreadCount = notifications.filter((n: any) => !n.is_read).length;
         
-        console.log('🔔 Processed notifications:', notifications.length, 'unread:', unreadCount);
         
         set({ 
           notifications, 

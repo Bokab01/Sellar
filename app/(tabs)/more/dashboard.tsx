@@ -3,6 +3,7 @@ import { View, ScrollView, TouchableOpacity, RefreshControl } from 'react-native
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { SafeAreaWrapper } from '@/components/Layout';
+import { useBottomTabBarSpacing } from '@/hooks/useBottomTabBarSpacing';
 import { AppHeader } from '@/components/AppHeader/AppHeader';
 import { 
   BarChart3, 
@@ -38,6 +39,7 @@ interface TabConfig {
 
 export default function BusinessDashboardScreen() {
   const { theme } = useTheme();
+  const { contentBottomPadding } = useBottomTabBarSpacing();
   const { user } = useAuth();
   const currentSubscription = useMonetizationStore(state => state.currentSubscription);
   const hasBusinessPlan = useMonetizationStore(state => state.hasBusinessPlan);
@@ -294,6 +296,7 @@ export default function BusinessDashboardScreen() {
           // Use ScrollView for other tabs
         <ScrollView
           style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: contentBottomPadding }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }

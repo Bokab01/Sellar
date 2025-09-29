@@ -1,18 +1,22 @@
 import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl, Alert, Animated, Pressable } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useAppStore } from '@/store/useAppStore';
+import { useBottomTabBarSpacing } from '@/hooks/useBottomTabBarSpacing';
 import { useListings } from '@/hooks/useListings';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { useProfile } from '@/hooks/useProfile';
 import { useMultipleListingStats } from '@/hooks/useListingStats';
 import { useAppResume } from '@/hooks/useAppResume';
+import { useFavoritesStore } from '@/store/useFavoritesStore';
 // Temporarily disabled performance hooks to debug infinite re-render
 // import { useOfflineListings, useOfflineSync } from '@/hooks/useOfflineSync';
 // import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 // import { useMemoryManager } from '@/utils/memoryManager';
 import { supabase } from '@/lib/supabase';
+import { getDisplayName } from '@/hooks/useDisplayName';
 import {
   Text,
   ProductCard,
@@ -25,7 +29,6 @@ import {
   ProfessionalBadge,
   BoostBadge,
   VerifiedBadge,
-  MarketplaceSidebar,
   EnhancedSearchHeader,
   SafeAreaWrapper,
   // Temporarily disabled performance components
@@ -71,9 +74,10 @@ export default function HomeScreen() {
   const { profile } = useProfile();
   const { trackInteraction } = useRecommendations();
   const { preloadComponents, trackComponentLoad } = usePerformanceOptimization();
+  const { contentBottomPadding } = useBottomTabBarSpacing();
   const { 
     currentLocation, 
-    // setCurrentLocation,
+    setCurrentLocation,
     searchQuery, 
     setSearchQuery,
     selectedCategories,
@@ -106,8 +110,6 @@ export default function HomeScreen() {
   const [userCredit, setUserCredit] = useState<number>(0);
   const [creditLoading, setCreditLoading] = useState(true);
   
-  // Sidebar state
-  const [sidebarVisible, setSidebarVisible] = useState(false);
 
   // Category scroll indicator
   const categoryScrollRef = useRef<ScrollView>(null);
@@ -321,6 +323,14 @@ export default function HomeScreen() {
     fetchUserCredit();
     fetchNotifications();
   }, [user?.id]); // Removed fetchNotifications from dependencies as Zustand functions are stable
+
+  // Sync location from profile to app store
+  useEffect(() => {
+    if (profile?.location && profile.location !== currentLocation) {
+      setCurrentLocation(profile.location);
+    }
+  }, [profile?.location, currentLocation, setCurrentLocation]);
+
 
   // Fetch category counts from database
   useEffect(() => {
@@ -537,7 +547,7 @@ export default function HomeScreen() {
       price: listing.price,
       seller: {
         id: seller?.id || listing.user_id,
-        name: seller ? `${seller.first_name || 'User'} ${seller.last_name || ''}`.trim() : 'Anonymous User',
+        name: seller ? getDisplayName(seller, false).displayName : 'Anonymous User',
         avatar: seller?.avatar_url || null,
         rating: seller?.rating || 0,
         badges: seller?.account_type === 'business' ? ['business'] : [],
@@ -562,9 +572,50 @@ export default function HomeScreen() {
   );
   
   // Get favorites and view counts for all listings
-  const { favorites, viewCounts, refreshStats } = useMultipleListingStats({ 
+  const { favorites: hookFavorites, viewCounts, refreshStats } = useMultipleListingStats({ 
     listingIds 
   });
+  
+  // Get favorites count for header
+  const { incrementFavoritesCount, decrementFavoritesCount, fetchFavoritesCount } = useFavoritesStore();
+  
+  // Local state for optimistic updates
+  const [optimisticFavorites, setOptimisticFavorites] = useState<Record<string, boolean>>({});
+  const [optimisticFavoritesCount, setOptimisticFavoritesCount] = useState<Record<string, number>>({});
+  
+  // Merge hook favorites with optimistic updates
+  const favorites = useMemo(() => ({
+    ...hookFavorites,
+    ...optimisticFavorites
+  }), [hookFavorites, optimisticFavorites]);
+  
+  // Update transformed products with optimistic favorites count
+  const transformedProductsWithOptimisticCounts = useMemo(() => {
+    return transformedProducts.map(product => ({
+      ...product,
+      favorites: optimisticFavoritesCount[product.id] !== undefined 
+        ? optimisticFavoritesCount[product.id] 
+        : product.favorites
+    }));
+  }, [transformedProducts, optimisticFavoritesCount]);
+
+  // Initialize favorites count when component mounts
+  useEffect(() => {
+    fetchFavoritesCount();
+  }, [fetchFavoritesCount]);
+
+  // Refresh data when screen comes into focus (e.g., returning from favorites screen)
+  useFocusEffect(
+    React.useCallback(() => {
+      // Clear any optimistic updates when returning to home screen
+      setOptimisticFavorites({});
+      setOptimisticFavoritesCount({});
+      
+      // Refresh stats to get latest data from database
+      refreshStats();
+      fetchFavoritesCount();
+    }, [refreshStats, fetchFavoritesCount])
+  );
 
   const handleCategoryToggle = (categoryId: string) => {
     if (categoryId === 'all') {
@@ -622,65 +673,10 @@ export default function HomeScreen() {
           searchQuery={searchQuery}
           onSearchPress={() => router.push('/smart-search')}
           onFilterPress={() => setShowFilters(true)}
-          onAvatarPress={() => setSidebarVisible(true)}
+          onAvatarPress={() => router.push('/(tabs)/more')}
           placeholder= 'Search here...'
         />
       </Animated.View>
-
-      {/* Sticky Search Bar - Appears when scrolling down */}
-   {/*    <Animated.View
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 0,
-          backgroundColor: 'transparent',
-          paddingHorizontal: 0,
-          paddingTop: theme.spacing.sm,
-          paddingBottom: theme.spacing.md,
-          borderWidth: 1,
-          borderColor: 'transparent',
-          opacity: searchBarOpacity,
-          transform: [{ translateY: searchBarTranslateY }],
-        }}
-      >
-        <TouchableOpacity
-          onPress={() => router.push('/smart-search')}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.borderRadius.lg,
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-            paddingHorizontal: theme.spacing.lg,
-            paddingVertical: theme.spacing.md,
-            marginHorizontal: theme.spacing.md,
-          }}
-          activeOpacity={0.7}
-        >
-          <Search size={20} color={theme.colors.text.secondary} />
-          <Text 
-            variant="body" 
-            color="muted" 
-            style={{ 
-              flex: 1, 
-              marginLeft: theme.spacing.md,
-            }}
-          >
-            {searchQuery || "Search for anything..."}
-          </Text>
-          <TouchableOpacity
-            onPress={() => setShowFilters(true)}
-            style={{
-              padding: theme.spacing.xs,
-            }}
-          >
-            <ListFilterPlus size={20} color={theme.colors.text.primary} />
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Animated.View> */}
 
       {/* Main Content Container */}
       <View style={{ 
@@ -729,7 +725,7 @@ export default function HomeScreen() {
               contentContainerStyle={{
                 // Full-bleed implementation: no horizontal padding on container
                 paddingTop: 100, // Add top padding to account for floating search input
-                paddingBottom: theme.spacing.xl,
+                paddingBottom: contentBottomPadding,
               }}
               refreshControl={
                 <RefreshControl
@@ -1016,7 +1012,7 @@ export default function HomeScreen() {
 
               {/* Enhanced ProductCard Grid with Professional Badges */}
               <Grid columns={2} spacing={4}>
-                {transformedProducts.map((product) => (
+                {transformedProductsWithOptimisticCounts.map((product) => (
                   <View key={product.id} style={{ position: 'relative' }}>
                     <ProductCard
                       image={product.image}
@@ -1030,14 +1026,59 @@ export default function HomeScreen() {
                       listingId={product.id}
                       isFavorited={favorites[product.id] || false}
                       viewCount={viewCounts[product.id] || 0}
+                      favoritesCount={product.favorites || 0}
                       isHighlighted={product.isHighlighted}
                       onPress={() => handleListingPress(product.id)}
                       onFavoritePress={user?.id !== product.seller.id ? () => {
                         // Handle favorite toggle - only show for other users' listings
                         import('@/lib/favoritesAndViews').then(({ toggleFavorite }) => {
+                          // Optimistic update - immediately update local state
+                          const currentFavorite = favorites[product.id] || false;
+                          const currentFavoritesCount = product.favorites || 0;
+                          const newFavoritesCount = currentFavorite 
+                            ? currentFavoritesCount - 1 
+                            : currentFavoritesCount + 1;
+                          
+                          // Update both favorite state and count optimistically
+                          setOptimisticFavorites(prev => ({
+                            ...prev,
+                            [product.id]: !currentFavorite
+                          }));
+                          
+                          setOptimisticFavoritesCount(prev => ({
+                            ...prev,
+                            [product.id]: newFavoritesCount
+                          }));
+                          
+                          // Update header favorites count
+                          if (currentFavorite) {
+                            decrementFavoritesCount();
+                          } else {
+                            incrementFavoritesCount();
+                          }
+                          
                           toggleFavorite(product.id).then((result) => {
-                            if (!result.error) {
-                              refreshStats(); // Refresh the stats
+                            if (result.error) {
+                              // Revert optimistic updates on error
+                              setOptimisticFavorites(prev => ({
+                                ...prev,
+                                [product.id]: currentFavorite
+                              }));
+                              setOptimisticFavoritesCount(prev => ({
+                                ...prev,
+                                [product.id]: currentFavoritesCount
+                              }));
+                              
+                              // Revert header favorites count
+                              if (currentFavorite) {
+                                incrementFavoritesCount();
+                              } else {
+                                decrementFavoritesCount();
+                              }
+                            } else {
+                              // Keep optimistic updates until next data refresh
+                              // The optimistic state will be cleared when the component re-renders with fresh data
+                              // No need to clear immediately as it causes flickering
                             }
                           });
                         });
@@ -1056,28 +1097,6 @@ export default function HomeScreen() {
 
       </View>
 
-      {/* Sidebar Overlay */}
-      {sidebarVisible && (
-        <TouchableOpacity
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            zIndex: 999,
-          }}
-          onPress={() => setSidebarVisible(false)}
-          activeOpacity={1}
-        />
-      )}
-
-      {/* Marketplace Sidebar */}
-      <MarketplaceSidebar
-        isVisible={sidebarVisible}
-        onClose={() => setSidebarVisible(false)}
-      />
 
       {/* Filter Sheet */}
       <FilterSheet

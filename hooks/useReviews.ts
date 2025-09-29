@@ -433,11 +433,9 @@ export function useReviewHelpfulVote() {
 
         if (deleteError) throw deleteError;
 
-        // Decrement helpful count
+        // Decrement helpful count using RPC function
         const { error: updateError } = await supabase
-          .from('reviews')
-          .update({ helpful_count: (supabase as any).raw('helpful_count - 1') })
-          .eq('id', reviewId);
+          .rpc('decrement_review_helpful_count', { review_id: reviewId });
 
         if (updateError) throw updateError;
 
@@ -453,11 +451,9 @@ export function useReviewHelpfulVote() {
 
         if (insertError) throw insertError;
 
-        // Increment helpful count
+        // Increment helpful count using RPC function
         const { error: updateError } = await supabase
-          .from('reviews')
-          .update({ helpful_count: (supabase as any).raw('helpful_count + 1') })
-          .eq('id', reviewId);
+          .rpc('increment_review_helpful_count', { review_id: reviewId });
 
         if (updateError) throw updateError;
 

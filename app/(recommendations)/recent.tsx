@@ -19,7 +19,8 @@ export default function RecentlyViewedScreen() {
   const { user } = useAuthStore();
   const { 
     getRecentlyViewed,
-    trackInteraction 
+    trackInteraction,
+    refreshRecommendations
   } = useRecommendations();
 
   const [recentlyViewed, setRecentlyViewed] = useState<any[]>([]);
@@ -62,6 +63,8 @@ export default function RecentlyViewedScreen() {
     try {
       await RecommendationService.clearRecentlyViewed(user.id);
       setRecentlyViewed([]);
+      // Trigger refresh for all recommendation sections
+      refreshRecommendations();
     } catch (error) {
       console.error('Error clearing recently viewed:', error);
     }
@@ -118,7 +121,7 @@ export default function RecentlyViewedScreen() {
       <AppHeader 
         title="Recently Viewed" 
         showBackButton 
-        onBackPress={() => router.back()}
+        onBackPress={() => router.push('/(tabs)/home')}
         rightActions={[
           <TouchableOpacity
             key="clear-history"

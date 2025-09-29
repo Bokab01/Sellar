@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, RefreshControl, Alert } from 'react-native';
+import { View, ScrollView, RefreshControl, Alert, TouchableOpacity } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase } from '@/lib/supabase';
@@ -256,26 +256,27 @@ export default function FavoritesScreen() {
                   />
 
                   {/* Heart/Favorite Icon */}
-                  <View
+                  <TouchableOpacity
+                    onPress={() => handleToggleFavorite(product.favoriteId, product.title)}
                     style={{
                       position: 'absolute',
-                      top: theme.spacing.sm,
-                      right: theme.spacing.sm,
+                      top: theme.spacing.xs,
+                      right: theme.spacing.xs,
+                      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                      borderRadius: 16,
+                      padding: 6,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      zIndex: 1,
                     }}
+                    activeOpacity={0.7}
                   >
-                    <Button
-                      variant="icon"
-                      icon={<Heart size={16} color="#ff4757" fill="#ff4757" />}
-                      onPress={() => handleToggleFavorite(product.favoriteId, product.title)}
-                      style={{
-                        width: 32,
-                        height: 32,
-                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                        borderRadius: 20,
-                        ...theme.shadows.md,
-                      }}
+                    <Heart 
+                      size={14}
+                      color="#ff4757" 
+                      fill="#ff4757"
                     />
-                  </View>
+                  </TouchableOpacity>
 
                   {/* Saved Date */}
                   <View

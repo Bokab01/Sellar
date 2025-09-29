@@ -11,6 +11,7 @@ import { Text } from '@/components/Typography/Text';
 import { Button } from '@/components/Button/Button';
 import { Input } from '@/components/Input/Input';
 import { Picker } from '@react-native-picker/picker';
+import { LocationPicker } from '@/components/LocationPicker/LocationPicker';
 import {
   Filter,
   X,
@@ -253,11 +254,10 @@ export function SmartSearchFilters({
         </Text>
       </View>
       
-      <Input
+      <LocationPicker
         value={localFilters.location || ''}
-        onChangeText={(text) => updateFilter('location', text || undefined)}
-        placeholder="Enter city, region, or area"
-        leftIcon={<MapPin size={16} color={theme.colors.secondary} />}
+        onLocationSelect={(location) => updateFilter('location', location || undefined)}
+        placeholder="Select city, region, or area"
       />
     </View>
   );

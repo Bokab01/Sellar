@@ -654,7 +654,7 @@ export default function CreateListingScreen() {
       
       const listingData = {
         user_id: user!.id,
-        title: seoTitle,
+        title: sanitizedTitle,
         description: sanitizedDescription,
         price: Number(formData.price),
         currency: 'GHS',

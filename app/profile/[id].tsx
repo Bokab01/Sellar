@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, dbHelpers } from '@/lib/supabase';
 import { useListings } from '@/hooks/useListings';
 import { useCommunityPosts } from '@/hooks/useCommunity';
+import { getDisplayName } from '@/hooks/useDisplayName';
 import {
   Text,
   SafeAreaWrapper,
@@ -299,7 +300,7 @@ export default function UserProfileScreen() {
   }
 
   const isOwnProfile = currentUser?.id === profileId;
-  const fullName = `${profile.first_name} ${profile.last_name}`;
+  const displayName = profile ? getDisplayName(profile, false).displayName : 'User';
 
   // Filter user's listings and posts
   const filteredListings = userListings.filter((listing: any) => listing.user_id === profileId);
@@ -311,7 +312,7 @@ export default function UserProfileScreen() {
     title: listing.title,
     price: listing.price,
     seller: {
-      name: fullName,
+      name: displayName,
       avatar: profile.avatar_url,
       rating: profile.rating || 0,
     },
@@ -366,20 +367,20 @@ export default function UserProfileScreen() {
             {/* Reviews List */}
             <ReviewsList
               userId={profileId}
-              showWriteReview={!isOwnProfile}
-              reviewedUserName={profile ? `${profile.first_name} ${profile.last_name}` : 'User'}
+              showWriteReview={false}
+              reviewedUserName={displayName}
             />
           </View>
         );
 
       case 'about':
         return (
-          <View style={{ gap: theme.spacing.lg }}>
+          <View style={{ gap: theme.spacing.md }}>
             {/* Professional About Section */}
             <View style={{
               backgroundColor: theme.colors.surface,
               borderRadius: theme.borderRadius.lg,
-              padding: theme.spacing.lg,
+              padding: theme.spacing.md,
               ...theme.shadows.sm,
             }}>
               {profile.bio ? (
@@ -622,32 +623,32 @@ export default function UserProfileScreen() {
         <View
           style={{
             backgroundColor: theme.colors.surface,
-            padding: theme.spacing.xl,
+            padding: theme.spacing.lg,
             borderBottomWidth: 1,
             borderBottomColor: theme.colors.border,
             ...theme.shadows.sm,
           }}
         >
           {/* Avatar and Basic Info */}
-          <View style={{ alignItems: 'center', marginBottom: theme.spacing.xl }}>
+          <View style={{ alignItems: 'center', marginBottom: theme.spacing.lg }}>
             <Avatar
               source={profile.avatar_url}
-              name={fullName}
+              name={displayName}
               size="xl"
               isOnline={profile.is_online}
               showBorder
-              style={{ marginBottom: theme.spacing.lg }}
+              style={{ marginBottom: theme.spacing.md }}
             />
 
-            <View style={{ alignItems: 'center', marginBottom: theme.spacing.lg }}>
+            <View style={{ alignItems: 'center', marginBottom: theme.spacing.md }}>
               {/* Name and Rating */}
-              <View style={{ alignItems: 'center', marginBottom: theme.spacing.md }}>
+              <View style={{ alignItems: 'center', marginBottom: theme.spacing.sm }}>
                 <UserDisplayName
                   profile={profile}
                   variant="full"
                   showBadge={true}
                   textVariant="h2"
-                  style={{ fontWeight: '600', marginBottom: theme.spacing.sm }}
+                  style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}
                 />
                 
                 {/* Rating */}
@@ -655,9 +656,24 @@ export default function UserProfileScreen() {
               </View>
 
               {/* User Badges */}
-              <View style={{ marginBottom: theme.spacing.sm }}>
+              <View style={{ marginBottom: theme.spacing.xs }}>
                 <FullUserBadges userId={profileId} />
               </View>
+
+              {/* Location */}
+              {profile.location && (
+                <View style={{ 
+                  flexDirection: 'row', 
+                  alignItems: 'center', 
+                  gap: theme.spacing.xs,
+                  marginBottom: theme.spacing.xs,
+                }}>
+                  <MapPin size={14} color={theme.colors.text.muted} />
+                  <Text variant="caption" color="muted">
+                    {profile.location}
+                  </Text>
+                </View>
+              )}
 
               {/* Last Seen */}
               {profile.last_seen && !profile.is_online && (
@@ -672,54 +688,14 @@ export default function UserProfileScreen() {
               )}
             </View>
 
-            {/* Stats */}
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-around',
-                width: '100%',
-                paddingVertical: theme.spacing.lg,
-                borderTopWidth: 1,
-                borderBottomWidth: 1,
-                borderColor: theme.colors.border,
-                marginBottom: theme.spacing.lg,
-                backgroundColor: theme.colors.surfaceVariant + '30',
-                borderRadius: theme.borderRadius.md,
-              }}
-            >
-              <View style={{ alignItems: 'center' }}>
-                <Text variant="h3" style={{ fontWeight: '700' }}>
-                  {profile.total_sales || 0}
-                </Text>
-                <Text variant="caption" color="muted">
-                  Sales
-                </Text>
-              </View>
-              <View style={{ alignItems: 'center' }}>
-                <Text variant="h3" style={{ fontWeight: '700' }}>
-                  {filteredListings.length}
-                </Text>
-                <Text variant="caption" color="muted">
-                  Listings
-                </Text>
-              </View>
-              <View style={{ alignItems: 'center' }}>
-                <Text variant="h3" style={{ fontWeight: '700' }}>
-                  {filteredPosts.length}
-                </Text>
-                <Text variant="caption" color="muted">
-                  Posts
-                </Text>
-              </View>
-            </View>
 
             {/* Action Buttons */}
             {!isOwnProfile && (
               <View style={{ 
                 flexDirection: 'row', 
-                gap: theme.spacing.md, 
+                gap: theme.spacing.sm, 
                 width: '100%',
-                paddingTop: theme.spacing.sm,
+                paddingTop: theme.spacing.xs,
               }}>
                 <Button
                   variant={isFollowing ? 'tertiary' : 'primary'}
@@ -775,7 +751,7 @@ export default function UserProfileScreen() {
                       targetId={profileId!}
                       targetUser={{
                         id: profileId!,
-                        name: `${profile.first_name} ${profile.last_name}`,
+                        name: displayName,
                         avatar: profile.avatar_url
                       }}
                       variant="icon"
@@ -857,7 +833,7 @@ export default function UserProfileScreen() {
         </View>
 
         {/* Tab Content */}
-        <View style={{ paddingTop: theme.spacing.lg, paddingBottom: theme.spacing.lg }}>
+        <View style={{ paddingTop: theme.spacing.md, paddingBottom: theme.spacing.md }}>
           {renderTabContent()}
         </View>
       </ScrollView>

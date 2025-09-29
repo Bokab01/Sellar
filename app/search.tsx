@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { View, ScrollView, RefreshControl } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useListings } from '@/hooks/useListings';
+import { useMultipleListingStats } from '@/hooks/useListingStats';
+import { useFavoritesStore } from '@/store/useFavoritesStore';
+import { getDisplayName } from '@/hooks/useDisplayName';
 import {
   Text,
   SafeAreaWrapper,
@@ -18,6 +22,7 @@ import { useAppStore } from '@/store/useAppStore';
 
 export default function SearchResultsScreen() {
   const { theme } = useTheme();
+  const { user } = useAuthStore();
   const { q: initialQuery, category: categoryId, categoryName } = useLocalSearchParams<{ 
     q: string; 
     category?: string; 
@@ -66,6 +71,46 @@ export default function SearchResultsScreen() {
     condition: filters.condition,
   });
 
+  // Get listing IDs for stats
+  const listingIds = products.map(product => product.id).filter(Boolean);
+  
+  // Get favorites and view counts for all listings
+  const { favorites: hookFavorites, viewCounts, refreshStats } = useMultipleListingStats({ 
+    listingIds 
+  });
+  
+  // Get favorites count for header
+  const { incrementFavoritesCount, decrementFavoritesCount } = useFavoritesStore();
+
+  const handleFavoritePress = async (listingId: string) => {
+    if (!user) return;
+    
+    try {
+      // Import and use the favorites function
+      const { toggleFavorite } = await import('@/lib/favoritesAndViews');
+      const result = await toggleFavorite(listingId);
+      
+      if (!result.error) {
+        // Update header favorites count
+        const currentFavorite = hookFavorites[listingId] || false;
+        if (currentFavorite) {
+          decrementFavoritesCount();
+        } else {
+          incrementFavoritesCount();
+        }
+        
+        // Refresh stats to get latest data
+        refreshStats();
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
+
+  const handleViewPress = (listingId: string) => {
+    // Navigate to listing detail to see more details
+    router.push(`/(tabs)/home/${listingId}`);
+  };
 
   // Update search when query param changes
   useEffect(() => {
@@ -101,7 +146,7 @@ export default function SearchResultsScreen() {
       price: listing.price,
       seller: {
         id: seller?.id || listing.user_id,
-        name: seller ? `${seller.first_name || 'User'} ${seller.last_name || ''}`.trim() : 'Anonymous User',
+        name: seller ? getDisplayName(seller, false).displayName : 'Anonymous User',
         avatar: seller?.avatar_url || null,
         rating: seller?.rating || 0,
         badges: seller?.account_type === 'business' ? ['business'] : [],
@@ -224,7 +269,14 @@ export default function SearchResultsScreen() {
                   location={product.location}
                   layout="grid"
                   fullWidth={true}
+                  listingId={product.id}
+                  isFavorited={hookFavorites[product.id] || false}
+                  viewCount={viewCounts[product.id] || 0}
+                  favoritesCount={product.favorites || 0}
                   onPress={() => router.push(`/(tabs)/home/${product.id}`)}
+                  onFavoritePress={user?.id !== product.seller.id ? () => handleFavoritePress(product.id) : undefined}
+                  onViewPress={() => handleViewPress(product.id)}
+                  currentUserId={user?.id || ""}
                 />
               ))}
             </Grid>

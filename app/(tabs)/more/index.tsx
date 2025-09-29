@@ -4,6 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
+import { useBottomTabBarSpacing } from '@/hooks/useBottomTabBarSpacing';
 import { dbHelpers, supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
 import {
@@ -46,6 +47,7 @@ import {
 export default function MoreScreen() {
   const { theme } = useTheme();
   const { user, signOut } = useAuthStore();
+  const { contentBottomPadding } = useBottomTabBarSpacing();
   // Use selective subscriptions to prevent unnecessary re-renders
   const balance = useMonetizationStore(state => state.balance);
   const currentPlan = useMonetizationStore(state => state.currentPlan);
@@ -318,7 +320,7 @@ export default function MoreScreen() {
     <SafeAreaWrapper>
 
       <ScrollView 
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: contentBottomPadding }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

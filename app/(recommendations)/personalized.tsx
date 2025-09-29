@@ -104,7 +104,7 @@ export default function PersonalizedRecommendationsScreen() {
       <AppHeader 
         title="Personalized Recommendations" 
         showBackButton 
-        onBackPress={() => router.back()}
+        onBackPress={() => router.push('/(tabs)/home')}
       />
       
       <ScrollView

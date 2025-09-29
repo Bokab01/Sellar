@@ -7,6 +7,7 @@ import { AppModal } from '@/components/Modal/Modal';
 import { Chip } from '@/components/Chip/Chip';
 import { Input } from '@/components/Input/Input';
 import { Stepper } from '@/components/Stepper/Stepper';
+import { LocationPicker } from '@/components/LocationPicker/LocationPicker';
 import { 
   Filter, 
   Tag, 
@@ -335,19 +336,13 @@ export function FilterSheet({
                 Location
               </Text>
             </View>
-            <View style={{
-              backgroundColor: theme.colors.surfaceVariant,
-              padding: theme.spacing.md,
-              borderRadius: theme.borderRadius.md,
-            }}>
-              <Input
-                placeholder="Enter city or region"
-                value={localFilters.location}
-                onChangeText={(text) => 
-                  setLocalFilters(prev => ({ ...prev, location: text }))
-                }
-              />
-            </View>
+            <LocationPicker
+              value={localFilters.location}
+              onLocationSelect={(location) => 
+                setLocalFilters(prev => ({ ...prev, location }))
+              }
+              placeholder="Select city or region"
+            />
           </View>
 
           {/* Sort By */}

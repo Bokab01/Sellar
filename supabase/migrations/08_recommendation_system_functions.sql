@@ -32,15 +32,9 @@ BEGIN
         ELSE 1.0
     END;
 
-    -- Check if interaction already exists today
-    IF EXISTS (
-        SELECT 1 FROM user_interactions 
-        WHERE user_id = p_user_id 
-        AND listing_id = p_listing_id 
-        AND interaction_type = p_interaction_type 
-        AND created_at::date = CURRENT_DATE
-    ) THEN
-        -- Update existing interaction with higher weight
+    -- Check if interaction already exists today and update or insert accordingly
+    BEGIN
+        -- Try to update existing interaction first
         UPDATE user_interactions 
         SET 
             interaction_weight = GREATEST(interaction_weight, v_weight),
@@ -50,11 +44,25 @@ BEGIN
         AND listing_id = p_listing_id 
         AND interaction_type = p_interaction_type 
         AND created_at::date = CURRENT_DATE;
-    ELSE
-        -- Insert new interaction
-        INSERT INTO user_interactions (user_id, listing_id, interaction_type, interaction_weight, metadata)
-        VALUES (p_user_id, p_listing_id, p_interaction_type, v_weight, p_metadata);
-    END IF;
+        
+        -- If no rows were updated, insert new interaction
+        IF NOT FOUND THEN
+            INSERT INTO user_interactions (user_id, listing_id, interaction_type, interaction_weight, metadata)
+            VALUES (p_user_id, p_listing_id, p_interaction_type, v_weight, p_metadata);
+        END IF;
+    EXCEPTION
+        WHEN unique_violation THEN
+            -- If there's still a unique violation, try to update again
+            UPDATE user_interactions 
+            SET 
+                interaction_weight = GREATEST(interaction_weight, v_weight),
+                metadata = p_metadata,
+                updated_at = NOW()
+            WHERE user_id = p_user_id 
+            AND listing_id = p_listing_id 
+            AND interaction_type = p_interaction_type 
+            AND created_at::date = CURRENT_DATE;
+    END;
 
     -- Update recently viewed if it's a view
     IF p_interaction_type = 'view' THEN
@@ -72,8 +80,8 @@ BEGIN
     -- Update listing popularity
     PERFORM update_listing_popularity(p_listing_id, p_interaction_type, v_weight);
     
-    -- Update co-interactions
-    PERFORM update_listing_co_interactions(p_user_id, p_listing_id, p_interaction_type);
+    -- Update co-interactions (temporarily disabled to prevent conflicts)
+    -- PERFORM update_listing_co_interactions(p_user_id, p_listing_id, p_interaction_type);
 END;
 $$ LANGUAGE plpgsql;
 

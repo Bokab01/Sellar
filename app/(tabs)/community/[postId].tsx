@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, RefreshControl, Alert, Platform, TouchableOpacity, Keyboard } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, RefreshControl, Alert, Platform, TouchableOpacity, Keyboard, TouchableWithoutFeedback, KeyboardAvoidingView } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useBottomTabBarSpacing } from '@/hooks/useBottomTabBarSpacing';
 import { supabase } from '@/lib/supabase';
 import { useRealtime } from '@/hooks/useRealtime';
 import { UserProfile } from '@/hooks/useProfile';
@@ -30,6 +31,7 @@ export default function PostDetailScreen() {
   const insets = useSafeAreaInsets();
   const { postId } = useLocalSearchParams<{ postId: string }>();
   const { user } = useAuthStore();
+  const { contentBottomPadding } = useBottomTabBarSpacing();
   
   const [post, setPost] = useState<any>(null);
   const [comments, setComments] = useState<any[]>([]);
@@ -41,9 +43,18 @@ export default function PostDetailScreen() {
   const [submittingComment, setSubmittingComment] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   
   // Reply state
   const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
+  
+  // Edit state
+  const [editingComment, setEditingComment] = useState<{ id: string; content: string } | null>(null);
+  
+  // Scroll ref for auto-scrolling to new comments
+  const scrollViewRef = useRef<KeyboardAwareScrollView>(null);
+  const isScrollingRef = useRef(false);
   
 
 
@@ -90,6 +101,39 @@ export default function PostDetailScreen() {
       setError('Failed to load post');
     }
   }, [postId]);
+
+  // Keyboard visibility listeners
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
+      setIsKeyboardVisible(true);
+    });
+    
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setIsKeyboardVisible(false);
+    });
+
+    return () => {
+      keyboardDidShowListener?.remove();
+      keyboardDidHideListener?.remove();
+    };
+  }, []);
+
+  // Auto-scroll to bottom when new comments arrive
+  useEffect(() => {
+    if (comments.length > 0 && !isKeyboardVisible && !isScrollingRef.current) {
+      isScrollingRef.current = true;
+      // Use requestAnimationFrame for smoother scrolling
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd(true);
+          // Reset scrolling flag after animation completes
+          setTimeout(() => {
+            isScrollingRef.current = false;
+          }, 300);
+        }, 150); // Slightly longer delay to allow layout to settle
+      });
+    }
+  }, [comments.length, isKeyboardVisible]);
 
   const fetchComments = async () => {
     try {
@@ -283,43 +327,70 @@ export default function PostDetailScreen() {
 
     setSubmittingComment(true);
     try {
-      console.log('Attempting to add comment:', {
-        postId,
-        userId: user.id,
-        content: commentText.trim(),
-        parentId: replyingTo?.id || null,
-        isReply: !!replyingTo
-      });
-
-      const { data, error } = await supabase
-        .from('comments')
-        .insert({
-          post_id: postId!,
-          user_id: user.id,
+      if (editingComment) {
+        // Edit existing comment
+        console.log('Attempting to edit comment:', {
+          commentId: editingComment.id,
           content: commentText.trim(),
-          parent_id: replyingTo?.id || null, // Add parent_id if replying
-        })
-        .select();
+        });
 
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
+        const { error } = await supabase
+          .from('comments')
+          .update({
+            content: commentText.trim(),
+          })
+          .eq('id', editingComment.id)
+          .eq('user_id', user.id); // Ensure user can only edit their own comments
+
+        if (error) {
+          console.error('Supabase error:', error);
+          throw error;
+        }
+
+        console.log('Comment edited successfully');
+        setEditingComment(null);
+        setCommentText('');
+        
+        // Refresh comments to get updated content
+        await fetchComments();
+      } else {
+        // Add new comment or reply
+        console.log('Attempting to add comment:', {
+          postId,
+          userId: user.id,
+          content: commentText.trim(),
+          parentId: replyingTo?.id || null,
+          isReply: !!replyingTo
+        });
+
+        const { data, error } = await supabase
+          .from('comments')
+          .insert({
+            post_id: postId!,
+            user_id: user.id,
+            content: commentText.trim(),
+            parent_id: replyingTo?.id || null, // Add parent_id if replying
+          })
+          .select();
+
+        if (error) {
+          console.error('Supabase error:', error);
+          throw error;
+        }
+
+        console.log('Comment added successfully:', data);
+        setCommentText('');
+        setReplyingTo(null); // Clear reply state
+        
+        // Refresh comments and post data to get updated counts from database
+        await fetchComments();
+        await fetchPost();
       }
-
-      console.log('Comment added successfully:', data);
-
-      setCommentText('');
-      setReplyingTo(null); // Clear reply state
-      setToastMessage(replyingTo ? 'Reply added successfully!' : 'Comment added successfully!');
-      setShowToast(true);
-      
-      // Refresh comments and post data to get updated counts from database
-      await fetchComments();
-      await fetchPost();
     } catch (error) {
-      console.error('Failed to add comment:', error);
+      console.error('Failed to add/edit comment:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      Alert.alert('Error', `${replyingTo ? 'Failed to add reply' : 'Failed to add comment'}: ${errorMessage}`);
+      const actionText = editingComment ? 'edit comment' : (replyingTo ? 'add reply' : 'add comment');
+      Alert.alert('Error', `Failed to ${actionText}: ${errorMessage}`);
       setCommentText(commentText); // Restore comment text on error
     } finally {
       setSubmittingComment(false);
@@ -330,6 +401,7 @@ export default function PostDetailScreen() {
     // Set reply state to focus the unified input
     setReplyingTo({ id: parentId, name: authorName });
     setCommentText(''); // Clear any existing text
+    setEditingComment(null); // Clear any edit state
   };
 
   const handleLikeComment = async (commentId: string) => {
@@ -365,6 +437,83 @@ export default function PostDetailScreen() {
     } catch (err) {
       console.error('Failed to toggle comment like:', err);
     }
+  };
+
+  const handleReportComment = async (commentId: string) => {
+    if (!user) return;
+
+    try {
+      // Use the proper submit_report function
+      const { data, error } = await supabase.rpc('submit_report', {
+        p_reporter_id: user.id,
+        p_target_type: 'comment',
+        p_target_id: commentId,
+        p_category: 'inappropriate',
+        p_reason: 'Inappropriate content reported',
+        p_description: null,
+        p_evidence_urls: JSON.stringify([])
+      });
+
+      if (error) throw error;
+
+      if (data && data.length > 0 && data[0].success) {
+        setToastMessage('Comment reported successfully');
+        setToastVariant('success');
+        setShowToast(true);
+      } else {
+        throw new Error(data?.[0]?.error || 'Failed to submit report');
+      }
+    } catch (error) {
+      console.error('Error reporting comment:', error);
+      setToastMessage('Failed to report comment');
+      setToastVariant('error');
+      setShowToast(true);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!user) return;
+
+    try {
+      // First, delete all replies to this comment
+      const { error: repliesError } = await supabase
+        .from('comments')
+        .delete()
+        .eq('parent_id', commentId);
+
+      if (repliesError) {
+        console.error('Error deleting replies:', repliesError);
+        // Continue with main comment deletion even if replies fail
+      }
+
+      // Then delete the main comment
+      const { error } = await supabase
+        .from('comments')
+        .delete()
+        .eq('id', commentId)
+        .eq('user_id', user.id); // Ensure user can only delete their own comments
+
+      if (error) throw error;
+
+      setToastMessage('Comment deleted successfully');
+      setToastVariant('success');
+      setShowToast(true);
+
+      // Refresh comments and post data to get updated counts
+      await fetchComments();
+      await fetchPost();
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      setToastMessage('Failed to delete comment');
+      setToastVariant('error');
+      setShowToast(true);
+    }
+  };
+
+  const handleEditComment = (commentId: string, content: string) => {
+    setEditingComment({ id: commentId, content });
+    setCommentText(content);
+    setReplyingTo(null); // Clear any reply state
   };
 
   // Fetch post and comments when component mounts or postId changes
@@ -497,7 +646,7 @@ export default function PostDetailScreen() {
       hour: '2-digit',
       minute: '2-digit',
     }),
-    likes_count: comment.likes_count || 0,
+    likes: comment.likes_count || 0,
     isLiked: false, // TODO: Check if current user liked this comment
     replies: comment.replies?.map((reply: any) => ({
       id: reply.id,
@@ -512,7 +661,7 @@ export default function PostDetailScreen() {
         hour: '2-digit',
         minute: '2-digit',
       }),
-      likes_count: reply.likes_count || 0,
+      likes: reply.likes_count || 0,
       isLiked: false,
       depth: 1,
     })) || [],
@@ -520,34 +669,41 @@ export default function PostDetailScreen() {
   }));
 
   return (
-    <SafeAreaWrapper>
-      <AppHeader
-        title="Post"
-        showBackButton
-        onBackPress={() => router.back()}
-      />
-
-      <KeyboardAwareScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ 
-          paddingBottom: theme.spacing.xl, // Extra padding to ensure content doesn't get hidden behind input
-          flexGrow: 1, // Ensure content fills available space
-        }}
-        keyboardShouldPersistTaps="handled"
-        enableOnAndroid={true}
-        enableAutomaticScroll={true}
-        keyboardOpeningTime={250}
-        extraScrollHeight={Platform.OS === 'ios' ? 20 : 50}
-        extraHeight={Platform.OS === 'android' ? 20 : 0}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={theme.colors.primary}
-          />
-        }
+    <SafeAreaWrapper style={{ flex: 1 }}>
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
+        <AppHeader
+          title="Post"
+          showBackButton
+          onBackPress={() => router.back()}
+        />
+
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <KeyboardAwareScrollView
+            ref={scrollViewRef}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ 
+              paddingBottom: isKeyboardVisible ? theme.spacing.xl : theme.spacing.sm, // Dynamic padding based on keyboard state
+              flexGrow: 1, // Ensure content fills available space
+            }}
+            keyboardShouldPersistTaps="handled"
+            enableOnAndroid={true}
+            enableAutomaticScroll={true}
+            keyboardOpeningTime={0}
+            extraScrollHeight={Platform.OS === 'android' ? 0 : 0} // Reduced since we're using KeyboardAvoidingView
+            extraHeight={Platform.OS === 'android' ? 0 : 0} // Reduced since we're using KeyboardAvoidingView
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor={theme.colors.primary}
+              />
+            }
+          >
           {/* Post */}
           <View style={{ marginBottom: theme.spacing.lg }}>
             <PostCard
@@ -559,6 +715,7 @@ export default function PostDetailScreen() {
               onReport={() => {
                 // The PostCard will handle the report modal internally
               }}
+              hideViewPost={true}
             />
             
           </View>
@@ -578,6 +735,9 @@ export default function PostDetailScreen() {
                     comment={comment}
                     onLike={() => handleLikeComment(comment.id)}
                     onReply={(commentId, authorName) => handleReplyToComment(commentId, authorName)}
+                    onReport={() => handleReportComment(comment.id)}
+                    onDelete={handleDeleteComment}
+                    onEdit={handleEditComment}
                   />
                 ))}
               </View>
@@ -590,13 +750,14 @@ export default function PostDetailScreen() {
               />
             )}
           </View>
-      </KeyboardAwareScrollView>
+          </KeyboardAwareScrollView>
+        </TouchableWithoutFeedback>
 
       {/* Reply indicator */}
       {replyingTo && (
         <View style={{
           position: 'absolute',
-          bottom: 80, // Position above the MessageInput
+          bottom: isKeyboardVisible ? 80 : 60, // Adjust based on keyboard state
           left: theme.spacing.lg,
           right: theme.spacing.lg,
           flexDirection: 'row',
@@ -625,12 +786,54 @@ export default function PostDetailScreen() {
         </View>
       )}
 
+      {/* Edit indicator */}
+      {editingComment && (
+        <View style={{
+          position: 'absolute',
+          bottom: isKeyboardVisible ? 80 : 60, // Adjust based on keyboard state
+          left: theme.spacing.lg,
+          right: theme.spacing.lg,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          backgroundColor: theme.colors.surface,
+          paddingHorizontal: theme.spacing.md,
+          paddingVertical: theme.spacing.sm,
+          borderRadius: theme.borderRadius.md,
+          borderWidth: 1,
+          borderColor: theme.colors.primary + '30',
+          ...theme.shadows.sm,
+          zIndex: 1000,
+        }}>
+          <Text variant="bodySmall" color="primary" style={{ fontWeight: '600' }}>
+            Editing comment
+          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              setEditingComment(null);
+              setCommentText('');
+            }}
+            style={{ padding: theme.spacing.xs }}
+          >
+            <Text variant="bodySmall" color="primary" style={{ fontWeight: '600' }}>
+              Cancel
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Comment Input - Using MessageInput component */}
       <MessageInput
         value={commentText}
         onChangeText={setCommentText}
         onSend={handleAddComment}
-        placeholder={replyingTo ? `Reply to ${replyingTo.name}...` : "Write a comment..."}
+        placeholder={
+          editingComment 
+            ? "Edit your comment..." 
+            : replyingTo 
+              ? `Reply to ${replyingTo.name}...` 
+              : "Write a comment..."
+        }
         disabled={submittingComment}
         style={{
           borderTopWidth: 1,
@@ -645,6 +848,7 @@ export default function PostDetailScreen() {
         variant="success"
         onHide={() => setShowToast(false)}
       />
+      </KeyboardAvoidingView>
     </SafeAreaWrapper>
   );
 }

@@ -42,6 +42,7 @@ interface ProductCardProps {
   listingId?: string;
   isFavorited?: boolean;
   viewCount?: number;
+  favoritesCount?: number;
   onFavoritePress?: () => void;
   onViewPress?: () => void;
   // Premium feature props
@@ -71,6 +72,7 @@ export function ProductCard({
   listingId,
   isFavorited = false,
   viewCount = 0,
+  favoritesCount = 0,
   onFavoritePress,
   onViewPress,
   // Premium feature props
@@ -260,6 +262,36 @@ export function ProductCard({
               {viewCount > 999 ? `${Math.floor(viewCount / 1000)}k` : viewCount.toString()}
             </Text>
           </TouchableOpacity>
+        )}
+
+        {/* Favorites Count */}
+        {favoritesCount > 0 && (
+          <View
+            style={{
+              position: 'absolute',
+              bottom: theme.spacing.xs,
+              left: theme.spacing.xs,
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              borderRadius: isGridLayout ? 8 : 12,
+              paddingHorizontal: isGridLayout ? 6 : 8,
+              paddingVertical: isGridLayout ? 2 : 4,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: isGridLayout ? 2 : 4,
+            }}
+          >
+            <Heart size={isGridLayout ? 10 : 12} color="#ff4757" />
+            <Text 
+              variant="caption" 
+              style={{ 
+                color: '#ffffff', 
+                fontSize: isGridLayout ? 9 : 11,
+                fontWeight: '600'
+              }}
+            >
+              {favoritesCount > 999 ? `${Math.floor(favoritesCount / 1000)}k` : favoritesCount.toString()}
+            </Text>
+          </View>
         )}
       </View>
 

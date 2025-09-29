@@ -3,6 +3,7 @@ import { View, ScrollView, Image, TouchableOpacity, Alert, Linking, Dimensions, 
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useBottomTabBarSpacing } from '@/hooks/useBottomTabBarSpacing';
 import { dbHelpers, supabase } from '@/lib/supabase';
 import { checkOfferLimit, type OfferLimitResult } from '@/utils/offerLimits';
 import { useRecommendations } from '@/hooks/useRecommendations';
@@ -27,7 +28,6 @@ import {
   Toast,
   Grid,
   ProductCard,
-  ReviewsList,
   SimpleCallbackRequestButton,
 } from '@/components';
 
@@ -44,6 +44,7 @@ export default function ListingDetailScreen() {
   const { id: listingId } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuthStore();
   const { trackInteraction } = useRecommendations();
+  const { contentBottomPadding } = useBottomTabBarSpacing();
   
   const [listing, setListing] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -87,7 +88,7 @@ export default function ListingDetailScreen() {
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
 
   // Related items state
-  const [activeRelatedTab, setActiveRelatedTab] = useState<'seller' | 'similar' | 'reviews'>('seller');
+  const [activeRelatedTab, setActiveRelatedTab] = useState<'seller' | 'similar'>('seller');
   const [sellerListings, setSellerListings] = useState<any[]>([]);
   const [similarListings, setSimilarListings] = useState<any[]>([]);
   const [sellerListingsLoading, setSellerListingsLoading] = useState(false);
@@ -1117,16 +1118,16 @@ export default function ListingDetailScreen() {
                   onPress={handleCall}
                   style={{
                     backgroundColor: theme.colors.primary,
-                    paddingHorizontal: theme.spacing.lg,
-                    paddingVertical: theme.spacing.md,
-                    borderRadius: theme.borderRadius.md,
+                    paddingHorizontal: theme.spacing.md,
+                    paddingVertical: theme.spacing.sm,
+                    borderRadius: theme.borderRadius.sm,
                     flexDirection: 'row',
                     alignItems: 'center',
-                    gap: theme.spacing.sm,
+                    gap: theme.spacing.xs,
                   }}
                 >
-                  <Phone size={16} color={theme.colors.primaryForeground} />
-                  <Text variant="button" style={{ color: theme.colors.primaryForeground }}>
+                  <Phone size={14} color={theme.colors.primaryForeground} />
+                  <Text variant="caption" style={{ color: theme.colors.primaryForeground, fontWeight: '600' }}>
                     Call seller
                   </Text>
                 </TouchableOpacity>
@@ -1387,28 +1388,6 @@ export default function ListingDetailScreen() {
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setActiveRelatedTab('reviews')}
-              style={{
-                flex: 1,
-                paddingVertical: theme.spacing.lg,
-                paddingHorizontal: theme.spacing.lg,
-                borderBottomWidth: 2,
-                borderBottomColor: activeRelatedTab === 'reviews' ? theme.colors.primary : 'transparent',
-                alignItems: 'center',
-              }}
-              activeOpacity={0.7}
-            >
-              <Text
-                variant="button"
-                style={{
-                  color: activeRelatedTab === 'reviews' ? theme.colors.primary : theme.colors.text.secondary,
-                  fontWeight: activeRelatedTab === 'reviews' ? '600' : '500',
-                }}
-              >
-                Reviews
-              </Text>
-            </TouchableOpacity>
           </View>
 
           {/* Tab Content */}
@@ -1526,17 +1505,6 @@ export default function ListingDetailScreen() {
                   </View>
                 )}
               </View>
-            ) : activeRelatedTab === 'reviews' ? (
-              <View style={{ paddingHorizontal: theme.spacing.lg }}>
-                <ReviewsList
-                  userId={listing?.profiles?.id}
-                  showWriteReview={true}
-                  reviewedUserName={getDisplayName(listing?.profiles, false).displayName}
-                  listingId={listingId}
-                  listingTitle={listing?.title}
-                  isVerifiedPurchase={false} // TODO: Check if user has purchased this item
-                />
-              </View>
             ) : null}
           </View>
         </View>
@@ -1563,15 +1531,15 @@ export default function ListingDetailScreen() {
             backgroundColor: theme.colors.surface,
             borderTopWidth: 1,
             borderTopColor: theme.colors.border,
-            paddingHorizontal: theme.spacing.lg,
-            paddingVertical: theme.spacing.lg,
-            paddingBottom: theme.spacing.lg + (StatusBar.currentHeight ? 0 : 20),
+            paddingHorizontal: theme.spacing.sm,
+            paddingVertical: theme.spacing.sm,
+            paddingBottom: contentBottomPadding + theme.spacing.sm,
             ...theme.shadows.lg,
           }}
         >
           <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
             {/* Make an Offer Button */}
-            {offerLimitStatus.canMakeOffer && !pendingOffer ? (
+            {canMakeOffer && offerLimitStatus.canMakeOffer && !pendingOffer ? (
               <TouchableOpacity
                 onPress={() => setShowOfferModal(true)}
                 style={{
@@ -1580,7 +1548,7 @@ export default function ListingDetailScreen() {
                   borderWidth: 1,
                   borderColor: theme.colors.primary,
                   borderRadius: theme.borderRadius.md,
-                  paddingVertical: theme.spacing.lg,
+                  paddingVertical: theme.spacing.md,
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1601,7 +1569,7 @@ export default function ListingDetailScreen() {
                   borderWidth: 1,
                   borderColor: theme.colors.border,
                   borderRadius: theme.borderRadius.md,
-                  paddingVertical: theme.spacing.lg,
+                  paddingVertical: theme.spacing.md,
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1623,7 +1591,7 @@ export default function ListingDetailScreen() {
                   borderWidth: 1,
                   borderColor: theme.colors.error + '30',
                   borderRadius: theme.borderRadius.md,
-                  paddingVertical: theme.spacing.lg,
+                  paddingVertical: theme.spacing.md,
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1645,7 +1613,7 @@ export default function ListingDetailScreen() {
                 flex: 1,
                 backgroundColor: theme.colors.primary,
                 borderRadius: theme.borderRadius.md,
-                paddingVertical: theme.spacing.lg,
+                paddingVertical: theme.spacing.md,
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1846,9 +1814,7 @@ export default function ListingDetailScreen() {
       />
 
       {/* Image Viewer */}
-      <Suspense fallback={<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Loading image viewer...</Text>
-      </View>}>
+      <Suspense fallback={null}>
         <ImageViewer
           visible={imageViewerVisible}
           images={images}

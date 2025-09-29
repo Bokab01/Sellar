@@ -3,6 +3,7 @@ import { View, ScrollView, RefreshControl } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { SafeAreaWrapper } from '@/components/Layout';
+import { useBottomTabBarSpacing } from '@/hooks/useBottomTabBarSpacing';
 import { AppHeader } from '@/components';
 import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
 import { EmptyState } from '@/components/EmptyState/EmptyState';
@@ -11,7 +12,7 @@ import { BusinessListings } from '@/components/BusinessListings/BusinessListings
 import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
 import { Building2 } from 'lucide-react-native';
-import { useDisplayName } from '@/hooks/useDisplayName';
+import { useDisplayName, getDisplayName } from '@/hooks/useDisplayName';
 import { useAuthStore } from '@/store/useAuthStore';
 
 interface BusinessListing {
@@ -46,31 +47,16 @@ interface BusinessUser {
 export default function BusinessListingsScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
+  const { contentBottomPadding } = useBottomTabBarSpacing();
   const [businessUsers, setBusinessUsers] = useState<BusinessUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
 
   // Helper function to get display name based on business settings
-  const getDisplayName = (profile: any) => {
+  const getBusinessDisplayName = (profile: any) => {
     if (!profile) return 'Business User';
-    
-    const hasBusinessName = profile.is_business && profile.business_name;
-    const canDisplayBusinessName = hasBusinessName && profile.display_business_name;
-    
-    if (canDisplayBusinessName) {
-      switch (profile.business_name_priority) {
-        case 'primary':
-          return profile.business_name;
-        case 'secondary':
-          return `${profile.full_name || `${profile.first_name} ${profile.last_name}`.trim()} • ${profile.business_name}`;
-        case 'hidden':
-        default:
-          return profile.full_name || `${profile.first_name} ${profile.last_name}`.trim() || 'Business User';
-      }
-    }
-    
-    return profile.full_name || `${profile.first_name} ${profile.last_name}`.trim() || 'Business User';
+    return getDisplayName(profile, false).displayName;
   };
   const [error, setError] = useState<string | null>(null);
 
@@ -269,7 +255,7 @@ export default function BusinessListingsScreen() {
             location: listing.location || '',
             seller: {
               id: (profile as any)?.id || listing.user_id,
-              name: getDisplayName(profile),
+              name: getBusinessDisplayName(profile),
               avatar: (profile as any)?.avatar_url,
               rating: (profile as any)?.rating,
               isBusinessUser: true,
@@ -280,7 +266,7 @@ export default function BusinessListingsScreen() {
 
           return {
             id: businessUser.user_id,
-            name: getDisplayName(profile),
+            name: getBusinessDisplayName(profile),
             avatar: (profile as any)?.avatar_url,
             rating: (profile as any)?.rating,
             location: (profile as any)?.location,
@@ -336,7 +322,7 @@ export default function BusinessListingsScreen() {
           location: listing.location || '',
           seller: {
             id: (profile as any)?.id || listing.user_id,
-            name: getDisplayName(profile),
+            name: getBusinessDisplayName(profile),
             avatar: (profile as any)?.avatar_url,
             rating: (profile as any)?.rating,
             isBusinessUser: true,
@@ -347,7 +333,7 @@ export default function BusinessListingsScreen() {
 
         return {
           id: businessUser.user_id,
-          name: getDisplayName(profile),
+          name: getBusinessDisplayName(profile),
           avatar: (profile as any)?.avatar_url,
           rating: (profile as any)?.rating,
           location: (profile as any)?.location,
@@ -462,6 +448,7 @@ export default function BusinessListingsScreen() {
         ) : (
           <ScrollView
             style={{ flex: 1 }}
+            contentContainerStyle={{ paddingBottom: contentBottomPadding }}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}

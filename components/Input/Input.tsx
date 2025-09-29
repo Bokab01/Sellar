@@ -1,23 +1,20 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   TextInput,
   TextInputProps,
   View,
   StyleSheet,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { Eye, EyeOff, Search } from 'lucide-react-native';
-import { getFontFamily } from '@/theme/fonts';
-import { useInputFocus } from '@/components/KeyboardAvoiding';
+import { useInputFocus } from '@/components/KeyboardAvoiding/KeyboardAwareScrollView';
 
-type InputVariant = 'default' | 'search' | 'password' | 'multiline';
-type InputState = 'default' | 'focus' | 'error' | 'disabled';
-
-interface InputProps extends Omit<TextInputProps, 'style'> {
-  variant?: InputVariant;
-  state?: InputState;
+export interface InputProps extends Omit<TextInputProps, 'style'> {
+  variant?: 'default' | 'search' | 'multiline' | 'password';
+  state?: 'default' | 'focus' | 'error' | 'disabled';
   label?: string;
   error?: string;
   helper?: string;
@@ -25,10 +22,10 @@ interface InputProps extends Omit<TextInputProps, 'style'> {
   rightIcon?: React.ReactNode;
   fullWidth?: boolean;
   containerStyle?: any;
-  style?: any; // Allow style prop for container styling
-  autoExpand?: boolean; // New prop for auto-expanding multiline inputs
-  minHeight?: number; // Minimum height for auto-expanding inputs
-  maxHeight?: number; // Maximum height for auto-expanding inputs
+  style?: any;
+  autoExpand?: boolean;
+  minHeight?: number;
+  maxHeight?: number;
 }
 
 export function Input({
@@ -53,6 +50,16 @@ export function Input({
   const [inputHeight, setInputHeight] = useState(minHeight);
   const inputRef = useRef<TextInput>(null);
   const focusContext = useInputFocus();
+  const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
   
   const isDisabled = state === 'disabled' || props.editable === false;
   const hasError = state === 'error' || !!error;
@@ -60,13 +67,24 @@ export function Input({
   const isMultiline = variant === 'multiline' || props.multiline || autoExpand;
   const shouldAutoExpand = variant === 'multiline' || autoExpand;
 
-  // Handle auto-expand functionality
-  const handleContentSizeChange = (event: any) => {
-    if (shouldAutoExpand) {
-      const newHeight = Math.max(minHeight, Math.min(maxHeight, event.nativeEvent.contentSize.height + 20));
-      setInputHeight(newHeight);
+  // Handle auto-expand functionality with debouncing to prevent shaking
+  const handleContentSizeChange = useCallback((event: any) => {
+    if (shouldAutoExpand && event?.nativeEvent?.contentSize?.height) {
+      // Store the content height before the timeout to avoid null reference
+      const contentHeight = event.nativeEvent.contentSize.height;
+      
+      // Clear existing timeout
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+      
+      // Debounce the height update to prevent rapid changes
+      debounceTimeoutRef.current = setTimeout(() => {
+        const newHeight = Math.max(minHeight, Math.min(maxHeight, contentHeight + 8));
+        setInputHeight(newHeight);
+      }, 16); // ~60fps debounce
     }
-  };
+  }, [shouldAutoExpand, minHeight, maxHeight]);
 
   const getBorderColor = () => {
     switch (currentState) {
@@ -90,19 +108,19 @@ export function Input({
       width: fullWidth ? '100%' : 'auto',
     },
     containerStyle,
-    style, // Apply the style prop to the container
+    style,
   ];
 
   const inputContainerStyles = {
     flexDirection: 'row' as const,
-    alignItems: isMultiline ? 'flex-start' as const : 'center' as const,
+    alignItems: 'center' as const,
     borderWidth: 1,
     borderColor: getBorderColor(),
     borderRadius: theme.borderRadius.md,
     backgroundColor: getBackgroundColor(),
     paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs, // Add vertical padding for better alignment
-    minHeight: isMultiline ? (shouldAutoExpand ? inputHeight : 52) : 52, // Use search-like height for multiline
+    paddingVertical: theme.spacing.sm,
+    minHeight: isMultiline ? (shouldAutoExpand ? inputHeight : 52) : 52,
     ...(variant === 'search' && {
       paddingLeft: theme.spacing.sm,
     }),
@@ -114,11 +132,11 @@ export function Input({
     lineHeight: theme.typography.body.lineHeight,
     fontFamily: theme.typography.body.fontFamily,
     color: isDisabled ? theme.colors.text.muted : theme.colors.text.primary,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: 0, // Remove horizontal padding to prevent alignment issues
-    includeFontPadding: false, // Android: Remove extra font padding
-    textAlignVertical: isMultiline ? ('top' as const) : ('center' as const),
-    height: isMultiline ? (shouldAutoExpand ? inputHeight - 20 : 40) : 40, // Dynamic height for multiline
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    includeFontPadding: false,
+    textAlignVertical: isMultiline ? 'top' as const : 'center' as const,
+    height: isMultiline ? (shouldAutoExpand ? inputHeight : 40) : 40,
   };
 
   const renderLeftIcon = () => {
@@ -128,11 +146,11 @@ export function Input({
           marginRight: theme.spacing.sm,
           alignItems: 'center',
           justifyContent: 'center',
-          height: 40, // Match input height
-          width: 24, // Fixed width for consistent alignment
+          height: 40,
+          width: 20,
         }}>
           <Search
-            size={20}
+            size={18}
             color={theme.colors.text.muted}
           />
         </View>
@@ -144,9 +162,8 @@ export function Input({
           marginRight: theme.spacing.sm,
           alignItems: 'center',
           justifyContent: 'center',
-          height: 40, // Match input height
-          width: 24, // Fixed width for consistent alignment
-          paddingTop: 0,
+          height: 40,
+          width: 20,
         }}>
           {leftIcon}
         </View>
@@ -160,20 +177,18 @@ export function Input({
       return (
         <TouchableOpacity
           onPress={() => setShowPassword(!showPassword)}
-          style={{ 
-            padding: theme.spacing.xs, 
+          style={{
             marginLeft: theme.spacing.sm,
             alignItems: 'center',
             justifyContent: 'center',
-            height: 40, // Match input height
-            width: 32, // Slightly wider for touch target
-            paddingTop: 0,
+            height: 40,
+            width: 20,
           }}
         >
           {showPassword ? (
-            <EyeOff size={20} color={theme.colors.text.muted} />
+            <EyeOff size={18} color={theme.colors.text.muted} />
           ) : (
-            <Eye size={20} color={theme.colors.text.muted} />
+            <Eye size={18} color={theme.colors.text.muted} />
           )}
         </TouchableOpacity>
       );
@@ -184,9 +199,8 @@ export function Input({
           marginLeft: theme.spacing.sm,
           alignItems: 'center',
           justifyContent: 'center',
-          height: 40, // Match input height
-          width: 24, // Fixed width for consistent alignment
-          paddingTop: 0,
+          height: 40,
+          width: 20,
         }}>
           {rightIcon}
         </View>
