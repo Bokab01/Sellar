@@ -134,7 +134,11 @@ export function Badge({
   const sizeStyles = getSizeStyles();
 
   const badgeContent = (
-    <>
+    <View style={{ 
+      flexDirection: 'row', 
+      alignItems: 'center', 
+      justifyContent: 'center',
+    }}>
       {leftIcon && (
         <View style={{ marginRight: theme.spacing.xs }}>
           {leftIcon}
@@ -147,6 +151,7 @@ export function Badge({
           fontSize: (size === 'sm' || size === 'small') ? 8 : (size === 'lg' || size === 'large') ? 14 : 12,
           fontWeight: '700',
           textTransform: 'uppercase',
+          textAlign: 'center',
         }}
       >
         {text}
@@ -156,7 +161,7 @@ export function Badge({
           {icon}
         </View>
       )}
-    </>
+    </View>
   );
 
   return (
@@ -164,14 +169,17 @@ export function Badge({
       style={[
         {
           backgroundColor: colors.backgroundColor,
-          alignSelf: 'flex-start',
+          alignSelf: 'center',
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
           ...sizeStyles,
         },
         style,
       ]}
     >
       {onPress ? (
-        <TouchableOpacity onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <TouchableOpacity onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
           {badgeContent}
         </TouchableOpacity>
       ) : (

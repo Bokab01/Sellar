@@ -897,19 +897,28 @@ export default function ChatScreen() {
       {conversation?.listing && otherUser && !existingTransaction && (
         <View style={{
           paddingHorizontal: theme.spacing.lg,
-          paddingVertical: theme.spacing.md,
+          paddingVertical: theme.spacing.lg,
           backgroundColor: theme.colors.surface,
           borderBottomWidth: 1,
           borderBottomColor: theme.colors.border,
+          alignItems: 'center',
+          justifyContent: 'center',
         }}>
-          <TransactionCompletionButton
-            conversationId={conversationId!}
-            otherUser={otherUser}
-            listing={conversation.listing}
-            existingTransaction={existingTransaction}
-            onTransactionCreated={handleTransactionCreated}
-            onTransactionUpdated={handleTransactionUpdated}
-          />
+          <View style={{
+            width: '100%',
+            maxWidth: 400,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <TransactionCompletionButton
+              conversationId={conversationId!}
+              otherUser={otherUser}
+              listing={conversation.listing}
+              existingTransaction={existingTransaction}
+              onTransactionCreated={handleTransactionCreated}
+              onTransactionUpdated={handleTransactionUpdated}
+            />
+          </View>
         </View>
       )}
 
@@ -917,41 +926,50 @@ export default function ChatScreen() {
       {existingTransaction && (
         <View style={{
           paddingHorizontal: theme.spacing.lg,
-          paddingVertical: theme.spacing.md,
+          paddingVertical: theme.spacing.lg,
           backgroundColor: theme.colors.surface,
           borderBottomWidth: 1,
           borderBottomColor: theme.colors.border,
+          alignItems: 'center',
+          justifyContent: 'center',
         }}>
-          <TransactionCompletionButton
-            conversationId={conversationId!}
-            otherUser={otherUser}
-            listing={conversation?.listing}
-            existingTransaction={existingTransaction}
-            onTransactionCreated={handleTransactionCreated}
-            onTransactionUpdated={handleTransactionUpdated}
-          />
+          <View style={{
+            width: '100%',
+            maxWidth: 400,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <TransactionCompletionButton
+              conversationId={conversationId!}
+              otherUser={otherUser}
+              listing={conversation?.listing}
+              existingTransaction={existingTransaction}
+              onTransactionCreated={handleTransactionCreated}
+              onTransactionUpdated={handleTransactionUpdated}
+            />
+          </View>
         </View>
       )}
 
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <KeyboardAwareScrollView
-         /*  ref={scrollViewRef} */
+          ref={scrollViewRef}
           style={{ flex: 1 }}
-          /* contentContainerStyle={{ 
+          contentContainerStyle={{ 
             paddingVertical: theme.spacing.md,
             paddingBottom: isKeyboardVisible ? theme.spacing.xl : 0, // No padding when keyboard is hidden
             flexGrow: isKeyboardVisible ? 1 : 0, // Only grow when keyboard is visible
             minHeight: isKeyboardVisible ? 'auto' : 'auto', // Natural height when keyboard is hidden
-          }} */
-        /*   enableOnAndroid={true} */
+          }}
+          enableOnAndroid={true}
           enableAutomaticScroll={true}
           keyboardOpeningTime={0}
-        /*   extraScrollHeight={Platform.OS === 'android' ? 0 : 0} // Reduced since we're using KeyboardAvoidingView
+          extraScrollHeight={Platform.OS === 'android' ? 0 : 0} // Reduced since we're using KeyboardAvoidingView
           extraHeight={Platform.OS === 'android' ? 0 : 0} // Reduced since we're using KeyboardAvoidingView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           onContentSizeChange={() => scrollViewRef.current?.scrollToEnd(true)}
-          resetScrollToCoords={{ x: 0, y: 0 }} */
+          resetScrollToCoords={{ x: 0, y: 0 }}
           scrollEventThrottle={16}
         >
           {messages.length === 0 ? (

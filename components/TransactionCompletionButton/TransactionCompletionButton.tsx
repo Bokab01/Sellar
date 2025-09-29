@@ -104,7 +104,8 @@ export function TransactionCompletionButton({
           <View style={[{ 
             alignItems: 'center', 
             justifyContent: 'center',
-            width: '100%'
+            width: '100%',
+            paddingHorizontal: theme.spacing.sm,
           }]}>
             <Button
               variant="primary"
@@ -114,6 +115,11 @@ export function TransactionCompletionButton({
                 {
                   backgroundColor: theme.colors.warning,
                   borderColor: theme.colors.warning,
+                  minHeight: 48,
+                  paddingHorizontal: theme.spacing.lg,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 },
                 style,
               ]}
@@ -146,7 +152,8 @@ export function TransactionCompletionButton({
             <View style={[{ 
               alignItems: 'center', 
               justifyContent: 'center',
-              width: '100%'
+              width: '100%',
+              paddingHorizontal: theme.spacing.sm,
             }]}>
               <Button
                 variant="primary"
@@ -156,6 +163,11 @@ export function TransactionCompletionButton({
                   {
                     backgroundColor: theme.colors.success,
                     borderColor: theme.colors.success,
+                    minHeight: 48,
+                    paddingHorizontal: theme.spacing.lg,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   },
                   style,
                 ]}
@@ -167,7 +179,8 @@ export function TransactionCompletionButton({
             <View style={[{ 
               alignItems: 'center', 
               justifyContent: 'center',
-              width: '100%'
+              width: '100%',
+              paddingHorizontal: theme.spacing.sm,
             }, style]}>
               <Badge
                 text={statusInfo.text}
@@ -199,7 +212,8 @@ export function TransactionCompletionButton({
       <View style={[{ 
         alignItems: 'center', 
         justifyContent: 'center',
-        width: '100%'
+        width: '100%',
+        paddingHorizontal: theme.spacing.sm,
       }, style]}>
         <Badge
           text={statusInfo.text}
@@ -215,7 +229,8 @@ export function TransactionCompletionButton({
       <View style={[{ 
         alignItems: 'center', 
         justifyContent: 'center',
-        width: '100%'
+        width: '100%',
+        paddingHorizontal: theme.spacing.sm,
       }]}>
         <Button
           variant="primary"
@@ -225,6 +240,11 @@ export function TransactionCompletionButton({
             {
               backgroundColor: theme.colors.success,
               borderColor: theme.colors.success,
+              minHeight: 48,
+              paddingHorizontal: theme.spacing.lg,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
             },
             style,
           ]}
