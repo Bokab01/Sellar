@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useMemo, useCallback, useState, useEffect } from 'react';
 import { View, TouchableOpacity, Image, ImageSourcePropType } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
@@ -27,7 +27,7 @@ interface MinimalPremiumProductCardProps {
   listingId?: string;
 }
 
-export function MinimalPremiumProductCard({
+const MinimalPremiumProductCard = memo(function MinimalPremiumProductCard({
   title,
   price,
   currency = 'GHS',
@@ -41,16 +41,26 @@ export function MinimalPremiumProductCard({
 }: MinimalPremiumProductCardProps) {
   const { theme } = useTheme();
   const { shouldLoadHeavyComponent } = useMemoryManager();
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
   
-  // Handle different image formats for ImageViewer (same as original)
-  const images = Array.isArray(image) 
-    ? image.filter(img => typeof img === 'string') as string[]
-    : typeof image === 'string' 
-    ? [image] 
-    : [];
-  
-  const displayImage = Array.isArray(image) ? image[0] : image;
-  const imageSource = typeof displayImage === 'string' ? displayImage : displayImage;
+  // Memoize image processing to prevent recalculation
+  const { images, displayImage, imageSource } = useMemo(() => {
+    const processedImages = Array.isArray(image) 
+      ? image.filter(img => typeof img === 'string') as string[]
+      : typeof image === 'string' 
+      ? [image] 
+      : [];
+    
+    const processedDisplayImage = Array.isArray(image) ? image[0] : image;
+    const processedImageSource = typeof processedDisplayImage === 'string' ? processedDisplayImage : processedDisplayImage;
+    
+    return {
+      images: processedImages,
+      displayImage: processedDisplayImage,
+      imageSource: processedImageSource
+    };
+  }, [image]);
 
   // Add useImageViewer hook
   const {
@@ -60,42 +70,42 @@ export function MinimalPremiumProductCard({
     closeViewer: closeImageViewer,
   } = useImageViewer({ images });
   
-  // Add the complex styling functions from original PremiumProductCard
-  const isBusinessUser = seller?.isBusinessUser || false;
+  // Memoize business user check
+  const isBusinessUser = useMemo(() => seller?.isBusinessUser || false, [seller?.isBusinessUser]);
   
-  const getCardStyles = () => ({
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.lg,
-    overflow: 'hidden' as const,
-    borderWidth: isBusinessUser ? 2 : 1,
-    borderColor: isBusinessUser ? theme.colors.primary : theme.colors.border,
-    ...(isBusinessUser ? theme.shadows.lg : theme.shadows.sm),
-  });
+  // Memoize complex styling calculations
+  const { cardStyles, badgeConfig, sellerStyles } = useMemo(() => {
+    const cardStyles = {
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.borderRadius.lg,
+      overflow: 'hidden' as const,
+      borderWidth: isBusinessUser ? 2 : 1,
+      borderColor: isBusinessUser ? theme.colors.primary : theme.colors.border,
+      ...(isBusinessUser ? theme.shadows.lg : theme.shadows.sm),
+    };
 
-  const getBadgeConfig = () => isBusinessUser ? {
-    text: 'PRO',
-    variant: 'primary' as const,
-    size: 'small' as const,
-  } : null;
+    const badgeConfig = isBusinessUser ? {
+      text: 'PRO',
+      variant: 'primary' as const,
+      size: 'small' as const,
+    } : null;
 
-  const getSellerStyles = () => ({
-    container: isBusinessUser ? {
-      backgroundColor: theme.colors.primary + '10',
-      borderRadius: theme.borderRadius.md,
-      padding: theme.spacing.sm,
-      borderWidth: 1,
-      borderColor: theme.colors.primary + '20',
-    } : {},
-    name: isBusinessUser ? {
-      fontWeight: '600' as const,
-      color: theme.colors.primary,
-    } : {},
-  });
+    const sellerStyles = {
+      container: isBusinessUser ? {
+        backgroundColor: theme.colors.primary + '10',
+        borderRadius: theme.borderRadius.md,
+        padding: theme.spacing.sm,
+        borderWidth: 1,
+        borderColor: theme.colors.primary + '20',
+      } : {},
+      name: isBusinessUser ? {
+        fontWeight: '600' as const,
+        color: theme.colors.primary,
+      } : {},
+    };
 
-  // Calculate styles
-  const cardStyles = getCardStyles();
-  const badgeConfig = getBadgeConfig();
-  const sellerStyles = getSellerStyles();
+    return { cardStyles, badgeConfig, sellerStyles };
+  }, [theme, isBusinessUser]);
   
   return (
     <>
@@ -134,7 +144,7 @@ export function MinimalPremiumProductCard({
           </View>
         )}
 
-        {/* Image Section */}
+        {/* Image Section with Lazy Loading */}
         {imageSource ? (
           <TouchableOpacity
             onPress={() => {
@@ -149,6 +159,19 @@ export function MinimalPremiumProductCard({
               overflow: 'hidden', // Prevent image from expanding beyond container
             }}
           >
+            {!imageLoaded && !imageError && (
+              <View style={{
+                width: '100%',
+                height: '100%',
+                backgroundColor: theme.colors.surfaceVariant,
+                borderTopLeftRadius: theme.borderRadius.lg,
+                borderTopRightRadius: theme.borderRadius.lg,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}>
+                <Text variant="caption" color="secondary">Loading...</Text>
+              </View>
+            )}
             <Image
               source={typeof imageSource === 'string' ? { uri: imageSource } : imageSource}
               style={{
@@ -157,10 +180,12 @@ export function MinimalPremiumProductCard({
                 borderTopLeftRadius: theme.borderRadius.lg,
                 borderTopRightRadius: theme.borderRadius.lg,
                 backgroundColor: theme.colors.surfaceVariant,
+                opacity: imageLoaded ? 1 : 0,
               }}
               resizeMode="cover"
+              onLoad={() => setImageLoaded(true)}
               onError={() => {
-                // Handle image loading errors gracefully
+                setImageError(true);
                 console.log('Image failed to load for listing');
               }}
             />
@@ -264,4 +289,6 @@ export function MinimalPremiumProductCard({
       />
     </>
   );
-}
+});
+
+export { MinimalPremiumProductCard };

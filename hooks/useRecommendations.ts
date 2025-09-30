@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/useAuthStore';
+import { listingCache } from '@/utils/AdvancedCache';
 
 export interface RecommendationListing {
   listing_id: string;
@@ -32,6 +33,10 @@ export interface RecommendationOptions {
   userLocation?: string;
   boostType?: string;
 }
+
+// Simple cache to prevent duplicate API calls
+const recommendationCache = new Map<string, { data: RecommendationListing[], timestamp: number }>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export function useRecommendations() {
   const { user } = useAuthStore();
@@ -80,11 +85,19 @@ export function useRecommendations() {
     }
   }, [user]);
 
-  // Get personalized recommendations
+  // Get personalized recommendations with caching
   const getPersonalizedRecommendations = useCallback(async (
     options: RecommendationOptions = {}
   ): Promise<RecommendationListing[]> => {
     if (!user) return [];
+
+    const cacheKey = `personalized_${user.id}_${options.limit || 20}_${options.offset || 0}`;
+    const cached = recommendationCache.get(cacheKey);
+    
+    // Return cached data if it's still fresh
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      return cached.data;
+    }
 
     setLoading(true);
     setError(null);
@@ -98,7 +111,15 @@ export function useRecommendations() {
 
       if (error) throw error;
 
-      return data || [];
+      const result = data || [];
+      
+      // Cache the result
+      recommendationCache.set(cacheKey, {
+        data: result,
+        timestamp: Date.now()
+      });
+
+      return result;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to get personalized recommendations';
       setError(errorMessage);

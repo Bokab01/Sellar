@@ -1,5 +1,5 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { View, ScrollView, Image, TouchableOpacity, Alert, Linking, Dimensions, StatusBar } from 'react-native';
+import React, { useState, useEffect, lazy, Suspense, useCallback, useMemo } from 'react';
+import { View, ScrollView, Image, TouchableOpacity, Alert, Linking, Dimensions, StatusBar, FlatList } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -51,7 +51,7 @@ export default function ListingDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const imageScrollViewRef = React.useRef<ScrollView>(null);
+  const imageScrollViewRef = React.useRef<FlatList<string>>(null);
   
   // Contact modals
   const [showContactModal, setShowContactModal] = useState(false);
@@ -154,7 +154,8 @@ export default function ListingDetailScreen() {
     }, [listingId])
   );
 
-  const fetchListing = async () => {
+  const fetchListing = useCallback(async () => {
+    const startTime = performance.now();
     try {
       setLoading(true);
       setError(null);
@@ -236,9 +237,11 @@ export default function ListingDetailScreen() {
     } catch (err) {
       setError('Failed to load listing');
     } finally {
+      const endTime = performance.now();
+      console.log(`Listing detail loaded in ${(endTime - startTime).toFixed(2)}ms`);
       setLoading(false);
     }
-  };
+  }, [listingId]);
 
   const checkIfFavorited = async () => {
     if (!user) return;
@@ -317,7 +320,8 @@ export default function ListingDetailScreen() {
     }
   };
 
-  const fetchRelatedItems = async () => {
+  // Memoize fetchRelatedItems to prevent unnecessary calls
+  const fetchRelatedItems = useCallback(async () => {
     if (!listing) return;
 
     // Fetch seller's other items
@@ -449,9 +453,9 @@ export default function ListingDetailScreen() {
     } finally {
       setSimilarListingsLoading(false);
     }
-  };
+  }, [listing, listingId]);
 
-  const toggleFavorite = async () => {
+  const toggleFavorite = useCallback(async () => {
     if (!user) {
       Alert.alert('Sign In Required', 'Please sign in to save favorites');
       return;
@@ -494,7 +498,7 @@ export default function ListingDetailScreen() {
     } catch (err) {
       showErrorToast('Failed to update favorites');
     }
-  };
+  }, [user, listing, isFavorited, listingId, trackInteraction]);
 
   // Wrapper for toggleFavoriteStatus with interaction tracking
   const handleToggleFavorite = async () => {
@@ -952,13 +956,18 @@ export default function ListingDetailScreen() {
         style={{ flex: 1 }} 
         contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
+        // Performance optimizations
+        removeClippedSubviews={true}
+        scrollEventThrottle={16}
+        decelerationRate="fast"
       >
         {/* Hero Image Section */}
         <View style={{ position: 'relative', height: imageHeight }}>
           {listing.images && listing.images.length > 0 ? (
             <>
-              <ScrollView
+              <FlatList
                 ref={imageScrollViewRef}
+                data={listing.images}
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
@@ -966,12 +975,12 @@ export default function ListingDetailScreen() {
                   const index = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
                   setCurrentImageIndex(index);
                 }}
-              >
-                {listing.images.map((imageUrl: string, index: number) => (
+                keyExtractor={(item, index) => `${index}`}
+                renderItem={({ item: imageUrl, index }) => (
                   <TouchableOpacity
-                    key={index}
                     onPress={() => openImageViewer(index)}
                     activeOpacity={0.9}
+                    style={{ width: screenWidth }}
                   >
                     <Image
                       source={{ uri: imageUrl }}
@@ -981,10 +990,25 @@ export default function ListingDetailScreen() {
                         backgroundColor: theme.colors.surfaceVariant,
                       }}
                       resizeMode="cover"
+                      // Performance optimizations
+                      loadingIndicatorSource={{ uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' }}
+                      onLoadStart={() => console.log(`Loading image ${index}`)}
+                      onLoadEnd={() => console.log(`Loaded image ${index}`)}
                     />
                   </TouchableOpacity>
-                ))}
-              </ScrollView>
+                )}
+                // Performance optimizations
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={2}
+                updateCellsBatchingPeriod={100}
+                initialNumToRender={1}
+                windowSize={3}
+                getItemLayout={(data, index) => ({
+                  length: screenWidth,
+                  offset: screenWidth * index,
+                  index,
+                })}
+              />
               
               {/* Image Thumbnails */}
               {listing.images.length > 1 && (
@@ -1005,7 +1029,7 @@ export default function ListingDetailScreen() {
                         onPress={() => {
                           setCurrentImageIndex(index);
                           // Scroll main image to selected thumbnail
-                          imageScrollViewRef.current?.scrollTo({ x: index * screenWidth, animated: true });
+                          imageScrollViewRef.current?.scrollToIndex({ index, animated: true });
                         }}
                         style={{
                           width: 60,
@@ -1390,7 +1414,7 @@ export default function ListingDetailScreen() {
 
           </View>
 
-          {/* Tab Content */}
+          {/* Tab Content with Lazy Loading */}
           <View style={{ backgroundColor: theme.colors.surface, paddingTop: theme.spacing.lg }}>
             {activeRelatedTab === 'seller' ? (
               <View>
@@ -1409,22 +1433,38 @@ export default function ListingDetailScreen() {
                   </View>
                 ) : sellerListings.length > 0 ? (
                   <View>
-                    <Grid columns={2} spacing={4}>
-                      {sellerListings.slice(0, 6).map((item) => (
-                        <ProductCard
-                          key={item.id}
-                          image={item.image}
-                          title={item.title}
-                          price={item.price}
-                          seller={item.seller}
-                          badge={item.badge}
-                          location={item.location}
-                          layout="grid"
-                          fullWidth={true}
-                          onPress={() => router.push(`/(tabs)/home/${item.id}`)}
-                        />
-                      ))}
-                    </Grid>
+                    <FlatList
+                      data={sellerListings.slice(0, 6)}
+                      numColumns={2}
+                      keyExtractor={(item) => item.id}
+                      renderItem={({ item }) => (
+                        <View style={{ flex: 1, margin: 2 }}>
+                          <ProductCard
+                            image={item.image}
+                            title={item.title}
+                            price={item.price}
+                            seller={item.seller}
+                            badge={item.badge}
+                            location={item.location}
+                            layout="grid"
+                            fullWidth={true}
+                            onPress={() => router.push(`/(tabs)/home/${item.id}`)}
+                          />
+                        </View>
+                      )}
+                      // Performance optimizations
+                      removeClippedSubviews={true}
+                      maxToRenderPerBatch={4}
+                      updateCellsBatchingPeriod={100}
+                      initialNumToRender={4}
+                      windowSize={10}
+                      getItemLayout={(data, index) => ({
+                        length: 200,
+                        offset: 200 * Math.floor(index / 2),
+                        index,
+                      })}
+                      scrollEnabled={false}
+                    />
                     
                     {sellerListings.length > 6 && (
                       <Button
@@ -1464,22 +1504,38 @@ export default function ListingDetailScreen() {
                   </View>
                 ) : similarListings.length > 0 ? (
                   <View>
-                    <Grid columns={2} spacing={4}>
-                      {similarListings.slice(0, 6).map((item) => (
-                        <ProductCard
-                          key={item.id}
-                          image={item.image}
-                          title={item.title}
-                          price={item.price}
-                          seller={item.seller}
-                          badge={item.badge}
-                          location={item.location}
-                          layout="grid"
-                          fullWidth={true}
-                          onPress={() => router.push(`/(tabs)/home/${item.id}`)}
-                        />
-                      ))}
-                    </Grid>
+                    <FlatList
+                      data={similarListings.slice(0, 6)}
+                      numColumns={2}
+                      keyExtractor={(item) => item.id}
+                      renderItem={({ item }) => (
+                        <View style={{ flex: 1, margin: 2 }}>
+                          <ProductCard
+                            image={item.image}
+                            title={item.title}
+                            price={item.price}
+                            seller={item.seller}
+                            badge={item.badge}
+                            location={item.location}
+                            layout="grid"
+                            fullWidth={true}
+                            onPress={() => router.push(`/(tabs)/home/${item.id}`)}
+                          />
+                        </View>
+                      )}
+                      // Performance optimizations
+                      removeClippedSubviews={true}
+                      maxToRenderPerBatch={4}
+                      updateCellsBatchingPeriod={100}
+                      initialNumToRender={4}
+                      windowSize={10}
+                      getItemLayout={(data, index) => ({
+                        length: 200,
+                        offset: 200 * Math.floor(index / 2),
+                        index,
+                      })}
+                      scrollEnabled={false}
+                    />
                     
                     {similarListings.length > 6 && (
                       <Button

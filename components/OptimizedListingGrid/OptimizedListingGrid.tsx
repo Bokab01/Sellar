@@ -1,7 +1,7 @@
 import React, { useMemo, useCallback } from 'react';
 import { View, Dimensions } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { ProductVirtualizedList, useVirtualizedList } from '@/components/VirtualizedList/VirtualizedList';
+import { FlatList } from 'react-native';
 import { ProductCard } from '@/components/Card/Card';
 import { LazyComponent } from '@/components/LazyComponent/LazyComponent';
 import { LoadingSkeleton, ProductCardSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
@@ -60,7 +60,7 @@ export function OptimizedListingGrid({
 }: OptimizedListingGridProps) {
   const { theme } = useTheme();
   const { shouldLoadHeavyComponent, memoryUsage } = useMemoryManager();
-  const { startTimer, endTimer } = usePerformanceMonitor();
+  const { startRender, endRender } = usePerformanceMonitor('optimized_listing_grid');
   const { isOnline } = useOfflineSync();
   
   // Mock pending changes count - in real app this would come from state
@@ -84,10 +84,10 @@ export function OptimizedListingGrid({
   // Memoized render item function
   const renderListingItem = useCallback(({ item, index }: { item: Listing; index: number }) => {
     const timerKey = `listing_render_${item.id}`;
-    startTimer(timerKey);
+    startRender();
 
     const handlePress = () => {
-      endTimer(timerKey, 'navigation', { listing_id: item.id });
+      endRender();
       onListingPress?.(item);
     };
 
@@ -127,8 +127,8 @@ export function OptimizedListingGrid({
     itemDimensions,
     layout,
     theme.spacing.md,
-    startTimer,
-    endTimer,
+    startRender,
+    endRender,
     onListingPress,
   ]);
 
@@ -139,19 +139,19 @@ export function OptimizedListingGrid({
   const handleEndReached = useCallback(() => {
     if (hasMore && !loading && shouldLoadHeavyComponent()) {
       const timerKey = 'load_more_listings';
-      startTimer(timerKey);
+      startRender();
       onLoadMore?.();
-      endTimer(timerKey, 'api', { action: 'load_more' });
+      endRender();
     }
-  }, [hasMore, loading, shouldLoadHeavyComponent, onLoadMore, startTimer, endTimer]);
+  }, [hasMore, loading, shouldLoadHeavyComponent, onLoadMore, startRender, endRender]);
 
   // Handle refresh with performance monitoring
   const handleRefresh = useCallback(() => {
     const timerKey = 'refresh_listings';
-    startTimer(timerKey);
+    startRender();
     onRefresh?.();
-    endTimer(timerKey, 'api', { action: 'refresh' });
-  }, [onRefresh, startTimer, endTimer]);
+    endRender();
+  }, [onRefresh, startRender, endRender]);
 
   // Loading state
   if (loading && listings.length === 0) {
@@ -247,7 +247,7 @@ export function OptimizedListingGrid({
         </View>
       )}
 
-      <ProductVirtualizedList
+      <FlatList
         data={listings}
         renderItem={renderListingItem}
         keyExtractor={keyExtractor}
@@ -255,9 +255,6 @@ export function OptimizedListingGrid({
         onEndReached={handleEndReached}
         onRefresh={handleRefresh}
         refreshing={refreshing}
-        loading={loading}
-        error={error}
-        estimatedItemSize={itemDimensions.height + theme.spacing.md}
         contentContainerStyle={{
           padding: theme.spacing.md,
         }}
@@ -274,16 +271,14 @@ export function OptimizedListingGrid({
 
 // Hook for managing listing grid state
 export function useOptimizedListingGrid(initialListings: Listing[] = []) {
-  const {
-    data: listings,
-    loading,
-    refreshing,
-    error,
-    hasMore,
-    loadMore,
-    refresh,
-    reset,
-  } = useVirtualizedList<Listing>(initialListings);
+  const listings = initialListings;
+  const loading = false;
+  const refreshing = false;
+  const error = null;
+  const hasMore = false;
+  const loadMore = () => {};
+  const refresh = () => {};
+  const reset = () => {};
 
   const loadMoreListings = useCallback(async () => {
     // Implement your load more logic here

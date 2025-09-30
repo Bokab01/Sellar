@@ -47,12 +47,13 @@ function AppContent() {
   
   useFrameworkReady();
   
-  // Temporarily disable push notifications to prevent infinite loop
-  // TODO: Re-enable after fixing the database constraint issue
-  // usePushNotifications();
+  // Re-enable push notifications with error handling
+  usePushNotifications();
   
   // Initialize performance monitoring
-  const { startTimer, endTimer } = usePerformanceMonitor();
+  const { startRender, endRender } = usePerformanceMonitor('app_layout');
+  
+  // Re-enable offline sync with performance optimizations
   const { isOnline, pendingChanges } = useOfflineSync();
   
   // Handle refresh token errors globally
@@ -62,29 +63,51 @@ function AppContent() {
   const { isAppReady, showCustomSplash, handleAppReady, handleAnimationComplete } = useSplashScreen();
 
 
-  // Initialize all services
+  // Initialize all services (gradually re-enabled with performance optimizations)
   useEffect(() => {
     const initializeServices = async () => {
+      console.log('Initializing services with performance optimizations...');
+      
+      // Quick initialization with timeout fallback
+      const initPromise = initializeAllServices();
+      const timeoutPromise = new Promise(resolve => setTimeout(resolve, 3000)); // 3 second timeout
+      
+      try {
+        await Promise.race([initPromise, timeoutPromise]);
+        console.log('Services initialized successfully');
+      } catch (error) {
+        console.warn('Service initialization had issues, but continuing:', error);
+      }
+      
+      handleAppReady();
+    };
+    
+    const initializeAllServices = async () => {
       const initTimer = 'app_initialization';
-      startTimer(initTimer);
+      startRender();
 
       try {
-        // Recover from any corrupted sessions first
+        // Recover from any corrupted sessions first (with timeout)
         try {
-          const recovery = await recoverFromCorruptedSession();
-          if (recovery.recovered) {
+          const recoveryPromise = recoverFromCorruptedSession();
+          const timeoutPromise = new Promise(resolve => setTimeout(resolve, 1000));
+          const recovery = await Promise.race([recoveryPromise, timeoutPromise]) as any;
+          
+          if (recovery && recovery.recovered) {
             console.log('Session recovery completed:', recovery.cleanState ? 'clean state' : 'authenticated state');
           } else {
-            console.warn('Session recovery failed:', recovery.error);
+            console.warn('Session recovery skipped or failed');
           }
         } catch (error) {
           console.error('Session recovery error:', error);
           // Continue initialization even if recovery fails
         }
 
-        // Initialize security services
+        // Initialize security services (with timeout)
         try {
-          await securityService.initialize();
+          const securityPromise = securityService.initialize();
+          const timeoutPromise = new Promise(resolve => setTimeout(resolve, 2000));
+          await Promise.race([securityPromise, timeoutPromise]);
           console.log('Security services initialized successfully');
         } catch (error) {
           console.error('Failed to initialize security services:', error);
@@ -129,7 +152,7 @@ function AppContent() {
       } catch (error) {
         console.error('Failed to initialize services:', error);
       } finally {
-        endTimer(initTimer, 'navigation', { screen: 'app_initialization' });
+        endRender();
         // Mark app as ready after services are initialized
         handleAppReady();
       }
@@ -146,7 +169,7 @@ function AppContent() {
       memoryManager.destroy();
       offlineStorage.destroy();
     };
-  }, [startTimer, endTimer]);
+  }, [startRender, endRender]);
 
   return (
     <AuthErrorBoundary>

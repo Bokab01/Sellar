@@ -2,6 +2,7 @@ import React, { useMemo, useEffect } from 'react';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
+import { Platform } from 'react-native';
 
 // Import the screen components explicitly
 import MoreScreen from './index';
@@ -36,10 +37,11 @@ export default function MoreLayout() {
       height: 3,
     },
     tabBarLabelStyle: {
-      fontSize: 13,
+      fontSize: Platform.OS === 'android' ? 13 : 12,
       fontWeight: '700' as const,
       textTransform: 'capitalize' as const,
     },
+    
     tabBarPressColor: theme.colors.primary + '20',
   }), [theme]);
 

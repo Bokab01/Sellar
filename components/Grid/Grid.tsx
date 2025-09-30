@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useMemo } from 'react';
 import { View, ScrollView, Dimensions, Image } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 
@@ -10,13 +10,13 @@ interface GridProps {
   style?: any;
 }
 
-export function Grid({
+const Grid = memo<GridProps>(function Grid({
   children,
   columns = 2,
   spacing,
   scrollable = false,
   style,
-}: GridProps) {
+}) {
   const { theme } = useTheme();
   const { width: screenWidth } = Dimensions.get('window');
   
@@ -26,7 +26,7 @@ export function Grid({
   const totalSpacing = gridSpacing * (columns - 1);
   const itemWidth = (screenWidth - containerPadding - totalSpacing) / columns;
 
-  const renderGrid = () => {
+  const renderGrid = useMemo(() => {
     const rows = [];
     for (let i = 0; i < children.length; i += columns) {
       const rowItems = children.slice(i, i + columns);
@@ -67,11 +67,11 @@ export function Grid({
       );
     }
     return rows;
-  };
+  }, [children, columns, gridSpacing, itemWidth]);
 
   const gridContent = (
     <View style={[{ flex: scrollable ? 0 : 1 }, style]}>
-      {renderGrid()}
+      {renderGrid}
     </View>
   );
 
@@ -87,4 +87,6 @@ export function Grid({
   }
 
   return gridContent;
-}
+});
+
+export { Grid };

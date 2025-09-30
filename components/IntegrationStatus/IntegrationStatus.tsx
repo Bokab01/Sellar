@@ -18,7 +18,7 @@ export function IntegrationStatus({
   position = 'top-right' 
 }: IntegrationStatusProps) {
   const { theme } = useTheme();
-  const { metrics } = usePerformanceMonitor();
+  const { metrics } = usePerformanceMonitor('integration_status');
   const { isOnline, pendingChanges } = useOfflineSync();
   const { memoryUsage } = useMemoryManager();
   
@@ -162,10 +162,10 @@ export function IntegrationStatus({
               Performance Metrics
             </Text>
             <Text variant="caption">
-              Render: {metrics.renderTime}ms | Nav: {metrics.navigationTime}ms
+              Render: {metrics[0]?.renderTime || 0}ms | Nav: {metrics[0]?.frameRate || 0}ms
             </Text>
             <Text variant="caption">
-              API: {metrics.apiResponseTime}ms | Images: {metrics.imageLoadTime}ms
+              API: {metrics[0]?.networkLatency || 0}ms | Images: {metrics[0]?.cacheHitRate || 0}ms
             </Text>
           </View>
 

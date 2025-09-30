@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { View, TouchableOpacity, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -30,7 +30,7 @@ interface RecommendationSectionProps {
   layout?: 'horizontal' | 'grid'; // New prop to control layout
 }
 
-export function RecommendationSection({
+const RecommendationSection = memo(function RecommendationSection({
   title,
   subtitle,
   icon,
@@ -63,8 +63,11 @@ export function RecommendationSection({
   const [recommendations, setRecommendations] = useState<RecommendationListing[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   
-  // Get listing IDs for stats
-  const listingIds = recommendations.map(item => item.listing_id).filter(Boolean);
+  // Memoize listing IDs to prevent unnecessary re-renders
+  const listingIds = useMemo(() => 
+    recommendations.map(item => item.listing_id).filter(Boolean), 
+    [recommendations]
+  );
   
   // Get favorites and view counts for all listings
   const { favorites: hookFavorites, viewCounts, refreshStats } = useMultipleListingStats({ 
@@ -365,4 +368,6 @@ export function RecommendationSection({
       )}
     </View>
   );
-}
+});
+
+export { RecommendationSection };

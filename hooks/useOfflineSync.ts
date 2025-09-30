@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { offlineStorage, cacheUtils } from '@/lib/offlineStorage';
 import { supabase } from '@/lib/supabase';
+import { listingCache, userCache } from '@/utils/AdvancedCache';
 
 export interface OfflineState {
   isOnline: boolean;
@@ -22,21 +23,23 @@ export function useOfflineSync() {
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Initialize offline state
+    // Initialize offline state with performance optimizations
     updateSyncStatus();
 
-    // Listen for network status changes
+    // Listen for network status changes with debouncing
     const unsubscribeNetwork = offlineStorage.onNetworkStatusChange((isOnline) => {
       setState(prev => ({ ...prev, isOnline }));
       
       if (isOnline) {
-        // Trigger sync when coming back online
-        handleSync();
+        // Trigger sync when coming back online with delay to prevent rapid calls
+        setTimeout(() => {
+          handleSync();
+        }, 1000);
       }
     });
 
-    // Update sync status periodically
-    const interval = setInterval(updateSyncStatus, 5000);
+    // Update sync status with longer interval for better performance
+    const interval = setInterval(updateSyncStatus, 10000); // Increased from 5s to 10s
 
     return () => {
       unsubscribeNetwork();

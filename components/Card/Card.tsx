@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { View, TouchableOpacity, Image, ImageSourcePropType } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
@@ -52,7 +52,7 @@ interface ProductCardProps {
   currentUserId?: string;
 }
 
-export function ProductCard({
+const ProductCard = memo<ProductCardProps>(function ProductCard({
   image,
   imagePath,
   title,
@@ -80,7 +80,7 @@ export function ProductCard({
   // Report props
   showReportButton = false,
   currentUserId,
-}: ProductCardProps) {
+}) {
   const { theme } = useTheme();
   const { shouldLoadHeavyComponent } = useMemoryManager();
 
@@ -401,7 +401,8 @@ export function ProductCard({
     )}
   </>
   );
-}
+});
 
 // Export Card as an alias for ProductCard
+export { ProductCard };
 export const Card = ProductCard;

@@ -31,10 +31,8 @@ import {
   VerifiedBadge,
   EnhancedSearchHeader,
   SafeAreaWrapper,
-  // Temporarily disabled performance components
-  // ProductVirtualizedList,
-  // LazyComponent,
 } from '@/components';
+import { VirtualizedList } from '@/components/VirtualizedList/VirtualizedList';
 import { HomeScreenSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
 // Advanced code splitting for better performance
 import { CodeSplitting } from '@/lib/codeSplitting';
@@ -751,6 +749,9 @@ export default function HomeScreen() {
               }
               onScroll={handleScroll}
               scrollEventThrottle={16}
+              // Performance optimizations for smoother scrolling
+              removeClippedSubviews={true}
+              decelerationRate="fast"
             >
                {/* Location Picker Trigger */}
               <TouchableOpacity

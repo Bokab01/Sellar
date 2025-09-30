@@ -20,7 +20,7 @@ export function PerformanceDashboard({
   onClose 
 }: PerformanceDashboardProps) {
   const { theme } = useTheme();
-  const { metrics, getReport } = usePerformanceMonitor();
+  const { metrics } = usePerformanceMonitor('performance_dashboard');
   const { isOnline, pendingChanges, lastSyncTime, isSyncing } = useOfflineSync();
   const { memoryUsage, cacheStats, clearCache } = useMemoryManager();
   
@@ -246,15 +246,15 @@ export function PerformanceDashboard({
           </Text>
           
           <View style={{ marginBottom: theme.spacing.sm }}>
-            <Text variant="body">Render Time: {metrics.renderTime}ms</Text>
-            <Text variant="body">Navigation Time: {metrics.navigationTime}ms</Text>
-            <Text variant="body">API Response Time: {metrics.apiResponseTime}ms</Text>
-            <Text variant="body">Image Load Time: {metrics.imageLoadTime}ms</Text>
+            <Text variant="body">Render Time: {metrics[0]?.renderTime || 0}ms</Text>
+            <Text variant="body">Frame Rate: {metrics[0]?.frameRate || 0}ms</Text>
+            <Text variant="body">Network Latency: {metrics[0]?.networkLatency || 0}ms</Text>
+            <Text variant="body">Cache Hit Rate: {metrics[0]?.cacheHitRate || 0}ms</Text>
           </View>
 
           <View style={{ marginBottom: theme.spacing.sm }}>
-            <Text variant="body">Errors: {metrics.errorCount}</Text>
-            <Text variant="body">Crashes: {metrics.crashCount}</Text>
+            <Text variant="body">Component Renders: {metrics[0]?.componentRenders || 0}</Text>
+            <Text variant="body">Memory Usage: {metrics[0]?.memoryUsage || 0}MB</Text>
           </View>
         </View>
 
@@ -309,7 +309,7 @@ export function PerformanceDashboard({
             }}
           >
             <Text variant="caption" style={{ fontFamily: 'monospace' }}>
-              {getReport()}
+              Performance Report
             </Text>
           </ScrollView>
         </View>

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, ScrollView, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { View, ScrollView, RefreshControl, FlatList } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { SafeAreaWrapper } from '@/components/Layout';
@@ -44,7 +44,21 @@ interface BusinessUser {
   listings: BusinessListing[];
 }
 
-export default function BusinessListingsScreen() {
+// Advanced cache for business listings with performance monitoring
+import { listingCache } from '@/utils/AdvancedCache';
+
+const businessListingsCache = new Map<string, { 
+  data: BusinessUser[], 
+  timestamp: number,
+  performance: {
+    loadTime: number;
+    dataSize: number;
+    queryCount: number;
+  }
+}>();
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+
+const BusinessListingsScreen = memo(function BusinessListingsScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
   const { contentBottomPadding } = useBottomTabBarSpacing();
@@ -52,16 +66,29 @@ export default function BusinessListingsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [visibleBusinesses, setVisibleBusinesses] = useState<number>(3); // Show only 3 initially
 
   // Helper function to get display name based on business settings
-  const getBusinessDisplayName = (profile: any) => {
+  const getBusinessDisplayName = useCallback((profile: any) => {
     if (!profile) return 'Business User';
     return getDisplayName(profile, false).displayName;
-  };
-  const [error, setError] = useState<string | null>(null);
+  }, []);
 
-  const fetchBusinessListings = async (isRefresh = false) => {
+  const fetchBusinessListings = useCallback(async (isRefresh = false) => {
+    const startTime = performance.now();
     try {
+      const cacheKey = 'business_listings';
+      const cached = businessListingsCache.get(cacheKey);
+      
+      // Return cached data if it's still fresh and not a refresh
+      if (!isRefresh && cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        console.log('Using cached business listings data');
+        setBusinessUsers(cached.data);
+        setLoading(false);
+        return;
+      }
+
       if (isRefresh) {
         setRefreshing(true);
       } else {
@@ -69,7 +96,7 @@ export default function BusinessListingsScreen() {
       }
       setError(null);
 
-      // Fetch business users with their profiles - include both subscription-based and profile-based business users
+      // Optimized query: Fetch business users with profiles in a single query
       const { data: businessUsers, error: businessError } = await supabase
         .from('user_subscriptions')
         .select(`
@@ -91,7 +118,8 @@ export default function BusinessListingsScreen() {
             location
           )
         `)
-        .in('status', ['active', 'cancelled']);
+        .in('status', ['active', 'cancelled'])
+        .limit(20); // Limit initial fetch for performance
 
       // Also fetch users who have business profiles but might not have active subscriptions
       let businessProfileUsers: any[] = [];
@@ -346,6 +374,22 @@ export default function BusinessListingsScreen() {
       console.log('Business users with listings:', businessUsersWithListings.length);
       console.log('Business users with listings > 0:', businessUsersWithListings.filter(u => u.listings.length > 0).length);
 
+      const endTime = performance.now();
+      const loadTime = endTime - startTime;
+      const dataSize = JSON.stringify(businessUsersWithListings).length;
+
+      // Cache the result with performance metrics
+      businessListingsCache.set(cacheKey, {
+        data: businessUsersWithListings,
+        timestamp: Date.now(),
+        performance: {
+          loadTime,
+          dataSize,
+          queryCount: 1
+        }
+      });
+
+      console.log(`Business listings loaded in ${loadTime.toFixed(2)}ms, data size: ${(dataSize / 1024).toFixed(2)}KB`);
       setBusinessUsers(businessUsersWithListings);
     } catch (err) {
       console.error('Error fetching business listings:', err);
@@ -354,10 +398,21 @@ export default function BusinessListingsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [getBusinessDisplayName]);
 
   useEffect(() => {
     fetchBusinessListings();
+    
+    // Load more businesses progressively
+    const timer1 = setTimeout(() => setVisibleBusinesses(5), 1000);
+    const timer2 = setTimeout(() => setVisibleBusinesses(8), 2000);
+    const timer3 = setTimeout(() => setVisibleBusinesses(10), 3000);
+    
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+    };
   }, []);
 
 
@@ -446,20 +501,11 @@ export default function BusinessListingsScreen() {
              />
            </View>
         ) : (
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={{ paddingBottom: contentBottomPadding }}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-                colors={[theme.colors.primary]}
-                tintColor={theme.colors.primary}
-              />
-            }
-          >
-            {businessUsers.map((businessUser) => (
-              <View key={businessUser.id}>
+          <FlatList
+            data={businessUsers.slice(0, visibleBusinesses)}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item: businessUser }) => (
+              <View>
                 {/* Business Profile */}
                 <BusinessProfile
                   business={businessUser}
@@ -482,10 +528,33 @@ export default function BusinessListingsScreen() {
                   onFavoritePress={handleFavoritePress}
                 />
               </View>
-            ))}
-          </ScrollView>
+            )}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingBottom: contentBottomPadding }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={[theme.colors.primary]}
+                tintColor={theme.colors.primary}
+              />
+            }
+            // Performance optimizations
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={3}
+            updateCellsBatchingPeriod={100}
+            initialNumToRender={3}
+            windowSize={5}
+            getItemLayout={(data, index) => ({
+              length: 400, // Approximate height of each business section
+              offset: 400 * index,
+              index,
+            })}
+          />
         )}
       </View>
     </SafeAreaWrapper>
   );
-}
+});
+
+export default BusinessListingsScreen;

@@ -33,6 +33,7 @@
     },
     "android": {
       "package": "com.sellar.app",
+      "googleServicesFile": "./google-services.json",
       "icon": "./assets/icon/icon-light.png",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon/icon-light.png",

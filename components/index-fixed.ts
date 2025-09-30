@@ -215,7 +215,7 @@ export * from '../hooks/useSecureAuth';
 export { OptimizedImage, ListingImage, ProfileImage, CommunityImage } from './OptimizedImage/OptimizedImage';
 export { ImageViewer } from './ImageViewer';
 export { CreditBalance } from './CreditBalance';
-export { VirtualizedList, ProductVirtualizedList, ChatVirtualizedList, useVirtualizedList } from './VirtualizedList/VirtualizedList';
+export { VirtualizedList } from './VirtualizedList/VirtualizedList';
 export { LazyComponent, withLazyLoading, createLazyComponent, IntersectionLazyComponent, InteractionLazyComponent } from './LazyComponent/LazyComponent';
 export { OptimizedListingGrid, useOptimizedListingGrid } from './OptimizedListingGrid/OptimizedListingGrid';
 export { 

@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, ScrollView, TouchableOpacity } from 'react-native';
+import React, { memo, useCallback, useMemo } from 'react';
+import { View, ScrollView, TouchableOpacity, FlatList } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { MinimalPremiumProductCard } from '@/components/PremiumProductCard/MinimalPremiumProductCard';
@@ -34,7 +34,7 @@ interface BusinessListingsProps {
   onFavoritePress?: (listingId: string) => void;
 }
 
-export function BusinessListings({
+const BusinessListings = memo(function BusinessListings({
   businessId,
   businessName,
   listings,
@@ -46,93 +46,110 @@ export function BusinessListings({
 }: BusinessListingsProps) {
   const { theme } = useTheme();
 
-  const handleListingPress = (listingId: string) => {
+  const handleListingPress = useCallback((listingId: string) => {
     if (onListingPress) {
       onListingPress(listingId);
     } else {
       router.push(`/(tabs)/home/${listingId}`);
     }
-  };
+  }, [onListingPress]);
 
-  const handleSeeAllPress = () => {
+  const handleSeeAllPress = useCallback(() => {
     if (onSeeAllPress) {
       onSeeAllPress();
     } else {
       router.push(`/profile/${businessId}`);
     }
-  };
+  }, [onSeeAllPress, businessId]);
 
-  // Show up to 10 listings
-  const displayListings = listings.slice(0, 10);
-  const hasMoreListings = listings.length > 10;
+  // Memoize display listings to prevent unnecessary recalculations
+  const displayListings = useMemo(() => listings.slice(0, 10), [listings]);
+  const hasMoreListings = useMemo(() => listings.length > 10, [listings.length]);
+
+  // Memoize the render item function to prevent re-renders
+  const renderListing = useCallback(({ item: listing }: { item: BusinessListing }) => (
+    <View style={{ width: 190 }}>
+      <MinimalPremiumProductCard
+        image={listing.images}
+        title={listing.title}
+        price={listing.price}
+        currency={listing.currency}
+        seller={listing.seller}
+        onPress={() => handleListingPress(listing.id)}
+        viewCount={listing.viewCount}
+        isFavorited={favorites[listing.id] || false}
+        onFavoritePress={currentUserId !== listing.seller.id ? () => onFavoritePress?.(listing.id) : undefined}
+        listingId={listing.id}
+      />
+    </View>
+  ), [handleListingPress, favorites, currentUserId, onFavoritePress]);
 
   return (
     <View style={{ marginBottom: theme.spacing.lg }}>
-      <ScrollView
+      <FlatList
+        data={displayListings}
+        renderItem={renderListing}
+        keyExtractor={(item) => item.id}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{
           paddingHorizontal: theme.spacing.lg,
           gap: theme.spacing.sm,
         }}
-      >
-        {displayListings.map((listing) => (
-          <View key={listing.id} style={{ width: 190 }}>
-            <MinimalPremiumProductCard
-              image={listing.images}
-              title={listing.title}
-              price={listing.price}
-              currency={listing.currency}
-              seller={listing.seller}
-              onPress={() => handleListingPress(listing.id)}
-              viewCount={listing.viewCount}
-              isFavorited={favorites[listing.id] || false}
-              onFavoritePress={currentUserId !== listing.seller.id ? () => onFavoritePress?.(listing.id) : undefined}
-              listingId={listing.id}
-            />
-          </View>
-        ))}
-
-        {/* See All Items Button */}
-        {hasMoreListings && (
-          <TouchableOpacity
-            onPress={handleSeeAllPress}
-            style={{
-              width: 190,
-              height: 280,
-              backgroundColor: theme.colors.surface,
-              borderRadius: theme.borderRadius.lg,
-              borderWidth: 2,
-              borderColor: theme.colors.primary,
-              borderStyle: 'dashed',
-              justifyContent: 'center',
-              alignItems: 'center',
-              padding: theme.spacing.lg,
-            }}
-          >
-            <View style={{ alignItems: 'center' }}>
-              <Text 
-                variant="body" 
-                style={{ 
-                  fontWeight: '600',
-                  color: theme.colors.primary,
-                  textAlign: 'center',
-                  marginBottom: theme.spacing.xs,
-                }}
-              >
-                See All Items
-              </Text>
-              <Text 
-                variant="caption" 
-                color="secondary"
-                style={{ textAlign: 'center' }}
-              >
-                {listings.length - 10} more listings
-              </Text>
-            </View>
-          </TouchableOpacity>
-        )}
-      </ScrollView>
+        // Performance optimizations
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={5}
+        updateCellsBatchingPeriod={50}
+        initialNumToRender={3}
+        windowSize={10}
+        getItemLayout={(data, index) => ({
+          length: 190,
+          offset: 190 * index,
+          index,
+        })}
+        ListFooterComponent={
+          hasMoreListings ? (
+            <TouchableOpacity
+              onPress={handleSeeAllPress}
+              style={{
+                width: 190,
+                height: 280,
+                backgroundColor: theme.colors.surface,
+                borderRadius: theme.borderRadius.lg,
+                borderWidth: 2,
+                borderColor: theme.colors.primary,
+                borderStyle: 'dashed',
+                justifyContent: 'center',
+                alignItems: 'center',
+                padding: theme.spacing.lg,
+              }}
+            >
+              <View style={{ alignItems: 'center' }}>
+                <Text 
+                  variant="body" 
+                  style={{ 
+                    fontWeight: '600',
+                    color: theme.colors.primary,
+                    textAlign: 'center',
+                    marginBottom: theme.spacing.xs,
+                  }}
+                >
+                  See All Items
+                </Text>
+                <Text 
+                  variant="caption" 
+                  color="secondary"
+                  style={{ textAlign: 'center' }}
+                >
+                  {listings.length - 10} more listings
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ) : null
+        }
+      />
     </View>
   );
-}
+});
+
+export { BusinessListings };
