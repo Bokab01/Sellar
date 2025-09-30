@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "335299299670",
+    "project_id": "sellar-1969b",
+    "storage_bucket": "sellar-1969b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:335299299670:android:d7ae0265c87118b6112ef7",
+        "android_client_info": {
+          "package_name": "com.sellar.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDV5IhEOfDavQyG6QPatJjkCUmYfgMsLP0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

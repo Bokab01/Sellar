@@ -30,7 +30,7 @@ yarn-error.*
 
 
 # Firebase client configuration (contains sensitive data)
-google-services.json
+# google-services.json - Commented out to allow EAS builds
 GoogleService-Info.plist
 
 # Expo
