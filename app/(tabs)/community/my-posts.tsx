@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, ScrollView, RefreshControl } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useProfile } from '@/hooks/useProfile';
@@ -42,12 +43,30 @@ export default function MyPostsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Cache data to prevent unnecessary refetches
+  const hasLoadedData = useRef(false);
+  const lastFetchTime = useRef(0);
+  const FETCH_COOLDOWN = 30000; // 30 seconds cooldown
 
-  const fetchMyPosts = useCallback(async () => {
+  const fetchMyPosts = useCallback(async (forceRefresh = false) => {
     if (!user?.id) return;
+
+    // Smart caching - only fetch if needed
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchTime.current;
+    
+    if (!forceRefresh && hasLoadedData.current && timeSinceLastFetch < FETCH_COOLDOWN) {
+      console.log('⏭️ My Posts: Using cached data');
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
 
     try {
       setError(null);
+      console.log('🔄 My Posts: Fetching data', { forceRefresh, timeSinceLastFetch });
+      
       const { data, error: fetchError } = await supabase
         .from('posts')
         .select(`
@@ -74,6 +93,8 @@ export default function MyPostsScreen() {
       }
 
       setPosts(data || []);
+      hasLoadedData.current = true;
+      lastFetchTime.current = now;
     } catch (err: any) {
       console.error('Error fetching my posts:', err);
       setError(err.message || 'Failed to load your posts');
@@ -83,14 +104,35 @@ export default function MyPostsScreen() {
     }
   }, [user]);
 
+  // Reset cache when user changes
+  useEffect(() => {
+    hasLoadedData.current = false;
+    lastFetchTime.current = 0;
+  }, [user?.id]);
+
   useEffect(() => {
     fetchMyPosts();
   }, [fetchMyPosts]);
 
-  const handleRefresh = () => {
+  // Smart focus effect - only refresh if needed
+  useFocusEffect(
+    useCallback(() => {
+      const now = Date.now();
+      const timeSinceLastFetch = now - lastFetchTime.current;
+      
+      if (!hasLoadedData.current || timeSinceLastFetch > FETCH_COOLDOWN) {
+        console.log('🔄 My Posts: Focus refresh', { hasLoadedData: hasLoadedData.current, timeSinceLastFetch });
+        fetchMyPosts();
+      } else {
+        console.log('⏭️ My Posts: Using cached data on focus');
+      }
+    }, [fetchMyPosts])
+  );
+
+  const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchMyPosts();
-  };
+    fetchMyPosts(true); // Force refresh
+  }, [fetchMyPosts]);
 
   // const handleDeletePost = async (postId: string) => {
   //   try {
@@ -109,51 +151,65 @@ export default function MyPostsScreen() {
   //     }
   //   };
 
-  // Transform posts to PostCard format with enhanced features
-  const transformedPosts = posts.map((post) => ({
-    id: post.id,
-    type: (post as any).type || (post.listing ? 'listing' : 'general'), // Determine post type
-    author: {
-      id: user?.id || '',
-      name: profile?.full_name || `${user?.user_metadata?.first_name || 'User'} ${user?.user_metadata?.last_name || ''}`,
-      avatar: profile?.avatar_url || user?.user_metadata?.avatar_url,
-      rating: (profile as any)?.rating || 0, // Use actual rating from profile
-      reviewCount: (profile as any)?.rating_count || (profile as any)?.total_reviews || 0, // Use actual review count
-      isVerified: profile?.is_verified || false,
-      location: profile?.location, // Use actual location from profile
-      profile: profile ? {
-        id: profile.id,
-        full_name: profile.full_name,
-        is_business: profile.is_business || false,
-        business_name: profile.business_name,
-        display_business_name: profile.display_business_name,
-        business_name_priority: profile.business_name_priority,
-        verification_level: profile.verification_level,
-      } : {
+  // Memoize expensive data transformation
+  const transformedPosts = useMemo(() => {
+    return posts.map((post) => ({
+      id: post.id,
+      type: (post as any).type || (post.listing ? 'listing' : 'general'), // Determine post type
+      author: {
         id: user?.id || '',
-        full_name: `${user?.user_metadata?.first_name || 'User'} ${user?.user_metadata?.last_name || ''}`,
-        is_business: false,
-        business_name: null,
-        display_business_name: false,
-        business_name_priority: 'hidden',
-        verification_level: 'none',
+        name: profile?.full_name || `${user?.user_metadata?.first_name || 'User'} ${user?.user_metadata?.last_name || ''}`,
+        avatar: profile?.avatar_url || user?.user_metadata?.avatar_url,
+        rating: (profile as any)?.rating || 0, // Use actual rating from profile
+        reviewCount: (profile as any)?.rating_count || (profile as any)?.total_reviews || 0, // Use actual review count
+        isVerified: profile?.is_verified || false,
+        location: profile?.location, // Use actual location from profile
+        profile: profile ? {
+          id: profile.id,
+          full_name: profile.full_name,
+          is_business: profile.is_business || false,
+          business_name: profile.business_name,
+          display_business_name: profile.display_business_name,
+          business_name_priority: profile.business_name_priority,
+          verification_level: profile.verification_level,
+        } : {
+          id: user?.id || '',
+          full_name: `${user?.user_metadata?.first_name || 'User'} ${user?.user_metadata?.last_name || ''}`,
+          is_business: false,
+          business_name: null,
+          display_business_name: false,
+          business_name_priority: 'hidden',
+          verification_level: 'none',
+        },
       },
-    },
-    timestamp: new Date(post.created_at || new Date()).toLocaleString(),
-    content: post.content,
-    images: post.images || [],
-    likes_count: post.likes_count || 0,
-    comments_count: post.comments_count || 0,
-    shares_count: post.shares_count || 0,
-    isLiked: false,
-    location: post.location,
-    listing: post.listing ? {
-      id: post.listing.id,
-      title: post.listing.title,
-      price: post.listing.price,
-      image: post.listing.image,
-    } : undefined,
-  }));
+      timestamp: new Date(post.created_at || new Date()).toLocaleString(),
+      content: post.content,
+      images: post.images || [],
+      likes_count: post.likes_count || 0,
+      comments_count: post.comments_count || 0,
+      shares_count: post.shares_count || 0,
+      isLiked: false,
+      location: post.location,
+      listing: post.listing ? {
+        id: post.listing.id,
+        title: post.listing.title,
+        price: post.listing.price,
+        image: post.listing.image,
+      } : undefined,
+    }));
+  }, [posts, user, profile]);
+
+  // Memoize expensive stats calculations
+  const stats = useMemo(() => {
+    const totalLikes = posts.reduce((sum, post) => sum + (post.likes_count || 0), 0);
+    const totalComments = posts.reduce((sum, post) => sum + (post.comments_count || 0), 0);
+    
+    return {
+      totalPosts: posts.length,
+      totalLikes,
+      totalComments,
+    };
+  }, [posts]);
 
   return (
     <SafeAreaWrapper>
@@ -175,8 +231,11 @@ export default function MyPostsScreen() {
         {loading ? (
           <ScrollView
             contentContainerStyle={{
-              padding: theme.spacing.lg,
+              padding: theme.spacing.sm,
             }}
+            removeClippedSubviews={true}
+            scrollEventThrottle={32}
+            decelerationRate="fast"
           >
             {Array.from({ length: 3 }).map((_, index) => (
               <LoadingSkeleton
@@ -196,7 +255,7 @@ export default function MyPostsScreen() {
         ) : posts.length > 0 ? (
           <ScrollView
             contentContainerStyle={{
-              padding: theme.spacing.lg,
+              padding: theme.spacing.sm,
               paddingBottom: theme.spacing.xl,
             }}
             showsVerticalScrollIndicator={false}
@@ -207,6 +266,9 @@ export default function MyPostsScreen() {
                 tintColor={theme.colors.primary}
               />
             }
+            removeClippedSubviews={true}
+            scrollEventThrottle={32}
+            decelerationRate="fast"
           >
             {/* Stats Header */}
             <View
@@ -225,19 +287,19 @@ export default function MyPostsScreen() {
               <View style={{ flexDirection: 'row', gap: theme.spacing.lg }}>
                 <View style={{ alignItems: 'center' }}>
                   <Text variant="h3" weight="bold" color="primary">
-                    {posts.length}
+                    {stats.totalPosts}
                   </Text>
                   <Text variant="caption" color="muted">Total Posts</Text>
                 </View>
                 <View style={{ alignItems: 'center' }}>
                   <Text variant="h3" weight="bold" color="primary">
-                    {posts.reduce((sum, post) => sum + (post.likes_count || 0), 0)}
+                    {stats.totalLikes}
                   </Text>
                   <Text variant="caption" color="muted">Total Likes</Text>
                 </View>
                 <View style={{ alignItems: 'center' }}>
                   <Text variant="h3" weight="bold" color="primary">
-                    {posts.reduce((sum, post) => sum + (post.comments_count || 0), 0)}
+                    {stats.totalComments}
                   </Text>
                   <Text variant="caption" color="muted">Total Comments</Text>
                 </View>

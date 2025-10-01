@@ -417,23 +417,9 @@ export default function FeatureMarketplaceScreen() {
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
 
   useEffect(() => {
-    console.log('Feature marketplace: Initial load, refreshing credits...');
     refreshCredits();
   }, []);
 
-  // Add debugging for loading state
-  useEffect(() => {
-    console.log('Feature marketplace: Loading state changed:', loading);
-    console.log('Feature marketplace: Balance:', balance);
-    console.log('Feature marketplace: User:', user?.id);
-  }, [loading, balance, user]);
-
-  // Add a manual refresh function for debugging
-  const handleRefreshListings = () => {
-    console.log('Manually refreshing listings...');
-    console.log('Current user ID:', user?.id);
-    refreshListings();
-  };
 
   // Removed getCategoryIcon function - no longer using categories
 
@@ -454,12 +440,9 @@ export default function FeatureMarketplaceScreen() {
   };
 
   const handleFeaturePurchase = (featureKey: string) => {
-    console.log('Feature marketplace: Attempting to purchase feature:', featureKey);
     const feature = getFeatureByKey(featureKey);
-    console.log('Feature marketplace: Feature found:', feature);
     
     if (!feature) {
-      console.error('Feature marketplace: Feature not found for key:', featureKey);
       Alert.alert('Error', `Feature "${featureKey}" not found. Please try again.`);
       return;
     }
@@ -468,12 +451,6 @@ export default function FeatureMarketplaceScreen() {
     
     // For listing-specific features, check if user has listings
     if (['pulse_boost_24h', 'mega_pulse_7d', 'category_spotlight_3d', 'ad_refresh', 'listing_highlight', 'urgent_badge'].includes(featureKey)) {
-      console.log('Checking listings for feature:', featureKey);
-      console.log('User listings:', userListings);
-      console.log('User listings length:', userListings.length);
-      console.log('Listings loading:', listingsLoading);
-      console.log('User ID:', user?.id);
-      
       if (listingsLoading) {
         Alert.alert('Loading', 'Please wait while we load your listings...');
         return;
@@ -502,7 +479,6 @@ export default function FeatureMarketplaceScreen() {
     }
     
     setShowFeatureModal(true);
-    console.log('Feature marketplace: Modal state set to true');
   };
 
   const handleListingSelection = (listingId: string) => {
@@ -521,42 +497,6 @@ export default function FeatureMarketplaceScreen() {
         showBackButton
         onBackPress={() => router.back()}
         rightActions={[
-          <TouchableOpacity
-            key="refresh-listings"
-            onPress={handleRefreshListings}
-            style={{
-              backgroundColor: theme.colors.surface,
-              borderRadius: theme.borderRadius.full,
-              paddingHorizontal: theme.spacing.sm,
-              paddingVertical: theme.spacing.sm,
-              marginRight: theme.spacing.sm,
-            }}
-          >
-            <Text variant="caption" style={{ fontSize: 12 }}>
-              🔄
-            </Text>
-          </TouchableOpacity>,
-          hasBusinessPlan() ? (
-            <View
-              key="auto-refresh-display"
-              style={{
-                backgroundColor: theme.colors.success,
-                borderRadius: theme.borderRadius.full,
-                paddingHorizontal: theme.spacing.md,
-                paddingVertical: theme.spacing.sm,
-              }}
-            >
-              <Text
-                variant="caption"
-                style={{
-                  color: theme.colors.primaryForeground,
-                  fontWeight: '600',
-                }}
-              >
-                Auto-Refresh Active
-              </Text>
-            </View>
-          ) : (
           <View
             key="credits-display"
             style={{
@@ -575,8 +515,7 @@ export default function FeatureMarketplaceScreen() {
             >
                {loading ? 'Loading...' : `${balance} Credits`}
             </Text>
-            </View>
-          ),
+          </View>
         ]}
       />
 
@@ -615,13 +554,7 @@ export default function FeatureMarketplaceScreen() {
                   ? 'Your listings auto-refresh every 2 hours for maximum visibility'
                   : 'Boost your listings and increase sales with powerful features'
                 }
-              </Text>
-              {/* Debug info - remove in production */}
-              {__DEV__ && (
-                <Text variant="caption" color="muted" style={{ marginTop: theme.spacing.xs }}>
-                  Debug: {userListings.length} listings found, Loading: {listingsLoading ? 'Yes' : 'No'}
                   </Text>
-              )}
                 </View>
               </View>
 

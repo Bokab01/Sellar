@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, ScrollView, RefreshControl } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase } from '@/lib/supabase';
@@ -37,12 +38,29 @@ export default function FollowingScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { unfollowUser } = useFollowState();
+  
+  // Cache data to prevent unnecessary refetches
+  const hasLoadedData = useRef(false);
+  const lastFetchTime = useRef(0);
+  const FETCH_COOLDOWN = 30000; // 30 seconds cooldown
 
-  const fetchFollowing = useCallback(async () => {
+  const fetchFollowing = useCallback(async (forceRefresh = false) => {
     if (!user?.id) return;
+
+    // Smart caching - only fetch if needed
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchTime.current;
+    
+    if (!forceRefresh && hasLoadedData.current && timeSinceLastFetch < FETCH_COOLDOWN) {
+      console.log('⏭️ Following: Using cached data');
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
 
     try {
       setError(null);
+      console.log('🔄 Following: Fetching data', { forceRefresh, timeSinceLastFetch });
       
       // Try to use RPC function first
       try {
@@ -104,6 +122,8 @@ export default function FollowingScreen() {
       }));
 
       setFollowing(transformedData);
+      hasLoadedData.current = true;
+      lastFetchTime.current = now;
     } catch (err: any) {
       console.error('Error fetching following:', err);
       if (err.message.includes('relation "follows" does not exist')) {
@@ -117,9 +137,30 @@ export default function FollowingScreen() {
     }
   }, [user]);
 
+  // Reset cache when user changes
+  useEffect(() => {
+    hasLoadedData.current = false;
+    lastFetchTime.current = 0;
+  }, [user?.id]);
+
   useEffect(() => {
     fetchFollowing();
-  }, [user, fetchFollowing]);
+  }, [fetchFollowing]);
+
+  // Smart focus effect - only refresh if needed
+  useFocusEffect(
+    useCallback(() => {
+      const now = Date.now();
+      const timeSinceLastFetch = now - lastFetchTime.current;
+      
+      if (!hasLoadedData.current || timeSinceLastFetch > FETCH_COOLDOWN) {
+        console.log('🔄 Following: Focus refresh', { hasLoadedData: hasLoadedData.current, timeSinceLastFetch });
+        fetchFollowing();
+      } else {
+        console.log('⏭️ Following: Using cached data on focus');
+      }
+    }, [fetchFollowing])
+  );
 
   const handleUnfollow = async (userId: string) => {
     const success = await unfollowUser(userId);
@@ -131,10 +172,10 @@ export default function FollowingScreen() {
     }
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchFollowing();
-  };
+    fetchFollowing(true); // Force refresh
+  }, [fetchFollowing]);
 
   return (
     <SafeAreaWrapper>
@@ -148,8 +189,11 @@ export default function FollowingScreen() {
         {loading ? (
           <ScrollView
             contentContainerStyle={{
-              padding: theme.spacing.lg,
+              padding: theme.spacing.sm,
             }}
+            removeClippedSubviews={true}
+            scrollEventThrottle={32}
+            decelerationRate="fast"
           >
             {Array.from({ length: 5 }).map((_, index) => (
               <View
@@ -169,7 +213,7 @@ export default function FollowingScreen() {
                   <LoadingSkeleton width="70%" height={16} />
                   <LoadingSkeleton width="50%" height={12} />
                 </View>
-                <LoadingSkeleton width={80} height={32} borderRadius={16} />
+                <LoadingSkeleton width={70} height={28} borderRadius={14} />
               </View>
             ))}
           </ScrollView>
@@ -181,7 +225,7 @@ export default function FollowingScreen() {
         ) : following.length > 0 ? (
           <ScrollView
             contentContainerStyle={{
-              padding: theme.spacing.lg,
+              padding: theme.spacing.sm,
               paddingBottom: theme.spacing.xl,
             }}
             showsVerticalScrollIndicator={false}
@@ -192,6 +236,9 @@ export default function FollowingScreen() {
                 tintColor={theme.colors.primary}
               />
             }
+            removeClippedSubviews={true}
+            scrollEventThrottle={32}
+            decelerationRate="fast"
           >
             {following.map((followingUser) => (
               <View
@@ -252,16 +299,21 @@ export default function FollowingScreen() {
                     )}
                   </View>
                   <Text variant="caption" color="muted">
-                    {followingUser.followers_count} followers • Following since {new Date(followingUser.followed_at).toLocaleDateString()}
+                    Following since {new Date(followingUser.followed_at).toLocaleDateString()}
                   </Text>
                 </View>
                 
                 <Button
                   variant="tertiary"
                   size="sm"
-                  icon={<UserMinus size={16} color={theme.colors.error} />}
+                  icon={<UserMinus size={12} color={theme.colors.error} />}
                   onPress={() => handleUnfollow(followingUser.id)}
-                  style={{ borderColor: theme.colors.error }}
+                  style={{ 
+                    borderColor: theme.colors.error,
+                    paddingHorizontal: theme.spacing.sm,
+                    paddingVertical: theme.spacing.xs,
+                    minHeight: 28
+                  }}
                 >
                   <Text style={{ color: theme.colors.error }}>Unfollow</Text>
                 </Button>

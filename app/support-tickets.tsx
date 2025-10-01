@@ -73,10 +73,84 @@ export default function SupportTicketsScreen() {
           onBackPress={() => router.back()}
         />
         <Container>
-          <View style={styles.loadingContainer}>
-            <LoadingSkeleton height={120} />
-            <LoadingSkeleton height={120} />
-            <LoadingSkeleton height={120} />
+          {/* Header Actions Skeleton */}
+          <View style={styles.headerActions}>
+            <LoadingSkeleton width={120} height={24} />
+            <LoadingSkeleton width={100} height={40} borderRadius={theme.borderRadius.lg} />
+          </View>
+
+          {/* Support Ticket Cards Skeleton */}
+          <View style={styles.ticketsContainer}>
+            {Array.from({ length: 4 }).map((_, index) => (
+              <View
+                key={index}
+                style={{
+                  backgroundColor: theme.colors.surface,
+                  borderRadius: theme.borderRadius.lg,
+                  padding: theme.spacing.lg,
+                  marginBottom: theme.spacing.md,
+                  borderWidth: 1,
+                  borderColor: theme.colors.border,
+                  ...theme.shadows.sm,
+                }}
+              >
+                {/* Header Section */}
+                <View style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  marginBottom: theme.spacing.md,
+                }}>
+                  <View style={{ flex: 1, marginRight: theme.spacing.md }}>
+                    {/* Ticket Number and Priority */}
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      marginBottom: theme.spacing.xs,
+                    }}>
+                      <LoadingSkeleton width={80} height={14} style={{ marginRight: theme.spacing.sm }} />
+                      <LoadingSkeleton width={60} height={20} borderRadius={10} />
+                    </View>
+                    
+                    {/* Subject */}
+                    <LoadingSkeleton width="90%" height={16} style={{ marginBottom: theme.spacing.xs }} />
+                    <LoadingSkeleton width="70%" height={16} style={{ marginBottom: theme.spacing.xs }} />
+                    
+                    {/* Description */}
+                    <LoadingSkeleton width="100%" height={14} style={{ marginBottom: theme.spacing.xs }} />
+                    <LoadingSkeleton width="85%" height={14} />
+                  </View>
+
+                  {/* Arrow Icon */}
+                  <LoadingSkeleton width={20} height={20} />
+                </View>
+
+                {/* Footer Section */}
+                <View style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}>
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                  }}>
+                    <LoadingSkeleton width={16} height={16} style={{ marginRight: theme.spacing.xs }} />
+                    <LoadingSkeleton width={80} height={14} />
+                  </View>
+                  <LoadingSkeleton width={60} height={14} />
+                </View>
+
+                {/* Category Badge */}
+                <View style={{
+                  position: 'absolute',
+                  top: theme.spacing.sm,
+                  right: theme.spacing.sm,
+                }}>
+                  <LoadingSkeleton width={50} height={20} borderRadius={10} />
+                </View>
+              </View>
+            ))}
           </View>
         </Container>
       </SafeAreaWrapper>

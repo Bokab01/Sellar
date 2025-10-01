@@ -120,6 +120,8 @@ export function useCommunityPosts(options: {
   const { postsSubscription, commentsSubscription, likesSubscription } = useCommunityRealtime(handleRealtimeUpdate);
 
   useEffect(() => {
+    // Reset the initial data flag when options change
+    hasInitialDataRef.current = false;
     fetchPosts();
   }, [options.following, options.userId, options.postType, options.location]);
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, RefreshControl, Alert, Platform, TouchableOpacity, Keyboard, TouchableWithoutFeedback, KeyboardAvoidingView } from 'react-native';
+import { View, RefreshControl, Alert, Platform, TouchableOpacity, Keyboard, TouchableWithoutFeedback, Animated } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -45,6 +45,7 @@ export default function PostDetailScreen() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   
   // Reply state
   const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
@@ -55,6 +56,7 @@ export default function PostDetailScreen() {
   // Scroll ref for auto-scrolling to new comments
   const scrollViewRef = useRef<KeyboardAwareScrollView>(null);
   const isScrollingRef = useRef(false);
+  const inputContainerTranslateY = useRef(new Animated.Value(0)).current;
   
 
 
@@ -102,19 +104,47 @@ export default function PostDetailScreen() {
     }
   }, [postId]);
 
-  // Keyboard visibility listeners
+  // Keyboard handling with animation
   useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
-      setIsKeyboardVisible(true);
-    });
-    
-    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
-      setIsKeyboardVisible(false);
-    });
+    const keyboardWillShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        const keyboardHeight = e.endCoordinates.height;
+        setKeyboardHeight(keyboardHeight);
+        setIsKeyboardVisible(true);
+        
+        // Animate input container up by keyboard height
+        Animated.timing(inputContainerTranslateY, {
+          toValue: -keyboardHeight,
+          duration: Platform.OS === 'ios' ? 250 : 200,
+          useNativeDriver: true,
+        }).start();
+
+        // Scroll to bottom when keyboard opens
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToPosition(0, 9999, true);
+        }, 100);
+      }
+    );
+
+    const keyboardWillHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+        setIsKeyboardVisible(false);
+        
+        // Animate input container back to original position
+        Animated.timing(inputContainerTranslateY, {
+          toValue: 0,
+          duration: Platform.OS === 'ios' ? 250 : 200,
+          useNativeDriver: true,
+        }).start();
+      }
+    );
 
     return () => {
-      keyboardDidShowListener?.remove();
-      keyboardDidHideListener?.remove();
+      keyboardWillShowListener.remove();
+      keyboardWillHideListener.remove();
     };
   }, []);
 
@@ -670,12 +700,7 @@ export default function PostDetailScreen() {
 
   return (
     <SafeAreaWrapper style={{ flex: 1 }}>
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-      >
-        <AppHeader
+      <AppHeader
           title="Post"
           showBackButton
           onBackPress={() => router.back()}
@@ -686,15 +711,9 @@ export default function PostDetailScreen() {
             ref={scrollViewRef}
             style={{ flex: 1 }}
             contentContainerStyle={{ 
-              paddingBottom: isKeyboardVisible ? theme.spacing.xl : theme.spacing.sm, // Dynamic padding based on keyboard state
-              flexGrow: 1, // Ensure content fills available space
+              paddingBottom: keyboardHeight,
+              flexGrow: 1,
             }}
-            keyboardShouldPersistTaps="handled"
-            enableOnAndroid={true}
-            enableAutomaticScroll={true}
-            keyboardOpeningTime={0}
-            extraScrollHeight={Platform.OS === 'android' ? 0 : 0} // Reduced since we're using KeyboardAvoidingView
-            extraHeight={Platform.OS === 'android' ? 0 : 0} // Reduced since we're using KeyboardAvoidingView
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl
@@ -755,9 +774,9 @@ export default function PostDetailScreen() {
 
       {/* Reply indicator */}
       {replyingTo && (
-        <View style={{
+        <Animated.View style={{
           position: 'absolute',
-          bottom: isKeyboardVisible ? 80 : 60, // Adjust based on keyboard state
+          bottom: 60,
           left: theme.spacing.lg,
           right: theme.spacing.lg,
           flexDirection: 'row',
@@ -771,6 +790,7 @@ export default function PostDetailScreen() {
           borderColor: theme.colors.border,
           ...theme.shadows.sm,
           zIndex: 1000,
+          transform: [{ translateY: inputContainerTranslateY }],
         }}>
           <Text variant="bodySmall" color="muted">
             Replying to {replyingTo.name}
@@ -783,14 +803,14 @@ export default function PostDetailScreen() {
               Cancel
             </Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       )}
 
       {/* Edit indicator */}
       {editingComment && (
-        <View style={{
+        <Animated.View style={{
           position: 'absolute',
-          bottom: isKeyboardVisible ? 80 : 60, // Adjust based on keyboard state
+          bottom: 60,
           left: theme.spacing.lg,
           right: theme.spacing.lg,
           flexDirection: 'row',
@@ -804,6 +824,7 @@ export default function PostDetailScreen() {
           borderColor: theme.colors.primary + '30',
           ...theme.shadows.sm,
           zIndex: 1000,
+          transform: [{ translateY: inputContainerTranslateY }],
         }}>
           <Text variant="bodySmall" color="primary" style={{ fontWeight: '600' }}>
             Editing comment
@@ -819,11 +840,12 @@ export default function PostDetailScreen() {
               Cancel
             </Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       )}
 
       {/* Comment Input - Using MessageInput component */}
-      <MessageInput
+      <Animated.View style={{ transform: [{ translateY: inputContainerTranslateY }] }}>
+        <MessageInput
         value={commentText}
         onChangeText={setCommentText}
         onSend={handleAddComment}
@@ -840,6 +862,7 @@ export default function PostDetailScreen() {
           borderTopColor: theme.colors.border,
         }}
       />
+      </Animated.View>
 
       {/* Toast */}
       <Toast
@@ -848,7 +871,6 @@ export default function PostDetailScreen() {
         variant="success"
         onHide={() => setShowToast(false)}
       />
-      </KeyboardAvoidingView>
     </SafeAreaWrapper>
   );
 }

@@ -56,18 +56,18 @@ export default function MoreScreen() {
   const refreshSubscription = useMonetizationStore(state => state.refreshSubscription);
   const hasBusinessPlan = useMonetizationStore(state => state.hasBusinessPlan);
 
-  // Debug: Track what's changing
-  const renderCount = React.useRef(0);
-  renderCount.current += 1;
+  // Debug: Track what's changing (disabled for production)
+  // const renderCount = React.useRef(0);
+  // renderCount.current += 1;
   
-  React.useEffect(() => {
-    console.log(`MoreScreen render #${renderCount.current}`, {
-      balance,
-      currentPlan: currentPlan?.id,
-      themeColors: theme.colors.primary,
-      userId: user?.id,
-    });
-  });
+  // React.useEffect(() => {
+  //   console.log(`MoreScreen render #${renderCount.current}`, {
+  //     balance,
+  //     currentPlan: currentPlan?.id,
+  //     themeColors: theme.colors.primary,
+  //     userId: user?.id,
+  //   });
+  // });
 
   
   const [profile, setProfile] = useState<any>(null);
@@ -75,29 +75,27 @@ export default function MoreScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  
+  // Track if we've already loaded data to prevent unnecessary refreshes
+  const hasLoadedData = React.useRef(false);
 
   useEffect(() => {
     if (user) {
+      // Reset loaded data flag when user changes
+      hasLoadedData.current = false;
       fetchUserData();
-      // Refresh credits if balance is 0 (likely not loaded yet)
+      // Only refresh credits if balance is 0 (likely not loaded yet)
       if (balance === 0) {
         refreshCredits();
       }
-      refreshSubscription();
-    }
-  }, [user, balance, refreshCredits, refreshSubscription]);
-
-  // Refresh data when screen comes into focus
-  useFocusEffect(
-    React.useCallback(() => {
-      if (user) {
-        fetchUserData();
-        refreshCredits(); // This will update the transaction count
+      // Only refresh subscription if we don't have current plan data
+      if (!currentPlan) {
+        refreshSubscription();
       }
-    }, [user, refreshCredits])
-  );
+    }
+  }, [user]); // Remove dependencies that cause unnecessary re-renders
 
-  const fetchUserData = async () => {
+  const fetchUserData = React.useCallback(async () => {
     if (!user) return;
 
     try {
@@ -107,13 +105,28 @@ export default function MoreScreen() {
       const { data: profileData, error: profileError } = await dbHelpers.getProfile(user.id);
       if (profileData) {
         setProfile(profileData);
+        hasLoadedData.current = true;
       }
     } catch (error) {
       console.error('Failed to fetch user data:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  // Refresh data when screen comes into focus (only if needed)
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user && !hasLoadedData.current) {
+        // Only fetch if we haven't loaded data yet
+        fetchUserData();
+      }
+      // Only refresh credits if balance is 0 or we don't have transaction data
+      if (user && (balance === 0 || transactions.length === 0)) {
+        refreshCredits();
+      }
+    }, [user, balance, transactions.length, fetchUserData])
+  );
 
   const handleRefresh = async () => {
     setRefreshing(true);

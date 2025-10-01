@@ -735,16 +735,6 @@ export default function HomeScreen() {
                   tintColor={theme.colors.primary}
                   colors={[theme.colors.primary]}
                   progressBackgroundColor={theme.colors.background}
-                  style={{ 
-                    zIndex: 9999,
-                    elevation: 9999,
-                    backgroundColor: theme.colors.background,
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: 60
-                  }}
                 />
               }
               onScroll={handleScroll}
@@ -1010,6 +1000,24 @@ export default function HomeScreen() {
                   />
                 </Suspense>
               )}
+
+              {/* All Listings Section */}
+              <View style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                marginBottom: theme.spacing.lg,
+                paddingHorizontal: theme.spacing.lg
+              }}>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+                    <Text variant="h3">More Listings From Sellers</Text>
+                  </View>
+                  <Text variant="bodySmall" color="muted" style={{ marginTop: theme.spacing.xs }}>
+                    Browse all available items
+                  </Text>
+                </View>
+              </View>
 
               {/* Enhanced ProductCard Grid with Professional Badges */}
               <Grid columns={2} spacing={4}>

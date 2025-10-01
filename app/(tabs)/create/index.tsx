@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { View, ScrollView, Alert, Pressable, BackHandler, Image } from 'react-native';
+import { View, ScrollView, Alert, Pressable, BackHandler, Image, TouchableOpacity } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
@@ -173,6 +173,8 @@ export default function CreateListingScreen() {
   // Autosave state
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
+  const [hasShownDraftAlert, setHasShownDraftAlert] = useState(false);
   const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const AUTOSAVE_KEY = useMemo(() => `listing_draft_${user?.id || 'anonymous'}`, [user?.id]);
 
@@ -186,24 +188,47 @@ export default function CreateListingScreen() {
   const loadDraft = useCallback(async () => {
     try {
       const savedDraft = await AsyncStorage.getItem(AUTOSAVE_KEY);
-      if (savedDraft) {
+      if (savedDraft && !hasShownDraftAlert) {
         const draftData = JSON.parse(savedDraft);
-        // Only load if it's not empty
+        // Only load if it's not empty and we haven't shown the alert yet
         if (draftData.title || draftData.description || draftData.images?.length > 0) {
+          setHasShownDraftAlert(true);
           Alert.alert(
             'Draft Found',
             'You have an unsaved draft. Would you like to continue where you left off?',
             [
-              { text: 'Start Fresh', onPress: () => clearDraft(), style: 'destructive' },
+              { text: 'Start Fresh', onPress: () => {
+                clearDraft();
+                setHasShownDraftAlert(false);
+              }, style: 'destructive' },
               { text: 'Continue', onPress: () => setFormData(draftData) },
             ]
           );
         }
       }
+      
+      // Check if there's an existing draft in the database
+      if (user?.id) {
+        const { data: existingDraft } = await supabase
+          .from('listings')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('status', 'draft')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+          
+        if (existingDraft) {
+          console.log('📄 Found existing draft:', existingDraft.id);
+          setCurrentDraftId(existingDraft.id);
+        } else {
+          console.log('📄 No existing draft found');
+        }
+      }
     } catch (error) {
       console.error('Failed to load draft:', error);
     }
-  }, [AUTOSAVE_KEY]);
+  }, [AUTOSAVE_KEY, user, hasShownDraftAlert]);
 
   const checkListingLimits = useCallback(async () => {
     if (!user) return;
@@ -228,47 +253,241 @@ export default function CreateListingScreen() {
     loadDraft();
   }, [checkListingLimits, loadDraft]);
 
-  // Save draft to AsyncStorage
-  const saveDraft = useCallback(async (data: ListingFormData) => {
+  // Save draft to AsyncStorage and database
+  const saveDraft = useCallback(async (data: ListingFormData, isManualSave = false) => {
     try {
       setIsAutoSaving(true);
+      
+      console.log('💾 Saving draft - currentDraftId:', currentDraftId, 'isManualSave:', isManualSave);
+      
+      // Save to AsyncStorage for local persistence
       await AsyncStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
+      
+      // Only save to database if we have meaningful content
+      if (data.title?.trim() || data.description?.trim() || data.images?.length > 0) {
+        // Map category ID to UUID format
+        const categoryMapping: Record<string, string> = {
+          // Main categories
+          'electronics': '00000000-0000-4000-8000-000000000001',
+          'fashion': '00000000-0000-4000-8000-000000000002',
+          'vehicles': '00000000-0000-4000-8000-000000000003',
+          'home-garden': '00000000-0000-4000-8000-000000000004',
+          'health-sports': '00000000-0000-4000-8000-000000000005',
+          'business': '00000000-0000-4000-8000-000000000006',
+          'education': '00000000-0000-4000-8000-000000000007',
+          'entertainment': '00000000-0000-4000-8000-000000000008',
+          'food': '00000000-0000-4000-8000-000000000009',
+          'services': '00000000-0000-4000-8000-000000000010',
+          'general': '00000000-0000-4000-8000-000000000000',
+          
+          // All subcategories map to their parent category
+          'craft-supplies': '00000000-0000-4000-8000-000000000008', // entertainment
+          'art-crafts': '00000000-0000-4000-8000-000000000008', // entertainment
+          'smartphones': '00000000-0000-4000-8000-000000000001', // electronics
+          'laptops': '00000000-0000-4000-8000-000000000001', // electronics
+          'clothing': '00000000-0000-4000-8000-000000000002', // fashion
+          'cars': '00000000-0000-4000-8000-000000000003', // vehicles
+          'furniture': '00000000-0000-4000-8000-000000000004', // home-garden
+          'fitness': '00000000-0000-4000-8000-000000000005', // health-sports
+          'office': '00000000-0000-4000-8000-000000000006', // business
+          'books': '00000000-0000-4000-8000-000000000007', // education
+          'games': '00000000-0000-4000-8000-000000000008', // entertainment
+          'groceries': '00000000-0000-4000-8000-000000000009', // food
+          'professional': '00000000-0000-4000-8000-000000000010', // services
+        };
+        
+        const DEFAULT_CATEGORY_UUID = '00000000-0000-4000-8000-000000000000'; // General/Other
+        const categoryUUID = categoryMapping[data.categoryId || ''] || DEFAULT_CATEGORY_UUID;
+
+        const draftData: any = {
+          user_id: user!.id,
+          title: data.title?.trim() || 'Untitled Draft',
+          description: data.description?.trim() || '',
+          price: data.price ? Number(data.price) : 0,
+          currency: 'GHS',
+          category_id: categoryUUID,
+          condition: data.condition || 'good',
+          quantity: data.quantity || 1,
+          location: data.location || '',
+          images: data.images?.map(img => img.uri) || [],
+          accept_offers: data.acceptOffers || true,
+          status: 'draft'
+        };
+        
+        // Only add attributes if they exist
+        if (data.categoryAttributes && Object.keys(data.categoryAttributes).length > 0) {
+          draftData.attributes = data.categoryAttributes;
+        }
+
+        // Check if we already have a draft for this session
+        if (currentDraftId) {
+          console.log('Attempting to update existing draft with minimal fields to avoid trigger issues');
+          
+          // Try updating only the essential fields that shouldn't trigger the problematic function
+          const minimalUpdateData = {
+            title: draftData.title,
+            description: draftData.description,
+            price: draftData.price,
+            location: draftData.location,
+            images: draftData.images,
+            updated_at: new Date().toISOString()
+          };
+          
+          const { error: updateError } = await supabase
+            .from('listings')
+            .update(minimalUpdateData)
+            .eq('id', currentDraftId);
+
+          if (updateError) {
+            console.log('Minimal update failed, trying alternative approach:', updateError.message);
+            
+            // If minimal update fails, try updating without the problematic fields
+            const { error: simpleUpdateError } = await supabase
+              .from('listings')
+              .update({
+                title: draftData.title,
+                description: draftData.description,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', currentDraftId);
+              
+            if (simpleUpdateError) {
+              console.log('Simple update also failed, creating new draft:', simpleUpdateError.message);
+              
+              // Last resort: create new draft and let the old one exist
+              const { data: newDraft, error: insertError } = await supabase
+                .from('listings')
+                .insert(draftData)
+                .select('id')
+                .single();
+
+              if (insertError) {
+                console.error('Failed to create new draft:', insertError);
+              } else if (newDraft) {
+                console.log('Created new draft with ID:', newDraft.id, '(keeping old:', currentDraftId, ')');
+                setCurrentDraftId(newDraft.id);
+              }
+            } else {
+              console.log('Simple update succeeded, keeping same draft ID:', currentDraftId);
+            }
+          } else {
+            console.log('Minimal update succeeded, keeping same draft ID:', currentDraftId);
+          }
+        } else {
+          // Create new draft only if none exists
+          console.log('Creating new draft (no existing draft found)');
+          const { data: newDraft, error } = await supabase
+            .from('listings')
+            .insert(draftData)
+            .select('id')
+            .single();
+
+          if (error) {
+            console.error('Failed to create draft:', error);
+          } else if (newDraft) {
+            console.log('Created new draft with ID:', newDraft.id);
+            setCurrentDraftId(newDraft.id);
+          }
+        }
+      }
+      
       setHasUnsavedChanges(false);
+      
+      // Show success message only for manual saves
+      if (isManualSave) {
+        Alert.alert('Draft Saved', 'Your listing has been saved as a draft. You can continue editing it later from My Listings.');
+      }
     } catch (error) {
       console.error('Failed to save draft:', error);
     } finally {
       setIsAutoSaving(false);
     }
-  }, [AUTOSAVE_KEY]);
+  }, [AUTOSAVE_KEY, user, currentDraftId]);
 
-  // Clear draft from AsyncStorage
+  // Clear draft from AsyncStorage and database
   const clearDraft = useCallback(async () => {
     try {
+      // Clear from AsyncStorage
       await AsyncStorage.removeItem(AUTOSAVE_KEY);
+      
+      // Clear current draft from database if it exists
+      if (currentDraftId) {
+        const { error } = await supabase
+          .from('listings')
+          .delete()
+          .eq('id', currentDraftId);
+        
+        if (error) {
+          console.error('Failed to delete draft:', error);
+        }
+        setCurrentDraftId(null);
+      }
+      
+      // Reset form data to initial state
+      setFormData({
+        title: '',
+        description: '',
+        price: '',
+        categoryId: '',
+        condition: '',
+        quantity: 1,
+        location: '',
+        images: [],
+        acceptOffers: true,
+        categoryAttributes: {},
+      });
+      
+      // Reset stepper to first step
+      setCurrentStep(0);
+      
+      // Reset selected features
+      setSelectedFeatures([]);
+      
+      // Reset validation results
+      setValidationResults({});
+      
+      // Reset draft alert flag
+      setHasShownDraftAlert(false);
+      
       setHasUnsavedChanges(false);
     } catch (error) {
       console.error('Failed to clear draft:', error);
     }
-  }, [AUTOSAVE_KEY]);
+  }, [AUTOSAVE_KEY, currentDraftId]);
 
 
 
-  // Handle back button and navigation
+  // Handle back button and navigation - only on create screen
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
-        if (hasUnsavedChanges) {
+        // Show alert if there's any content (saved or unsaved)
+        const hasContent = formData.title?.trim() || formData.description?.trim() || formData.images.length > 0;
+        if (hasContent) {
+          const message = hasUnsavedChanges 
+            ? 'You have unsaved changes. Would you like to save them as a draft before leaving?'
+            : 'Your draft has been saved. Would you like to keep it or discard it?';
+            
           Alert.alert(
-            'Unsaved Changes',
-            'You have unsaved changes. What would you like to do?',
+            hasUnsavedChanges ? 'Unsaved Changes' : 'Draft Found',
+            message,
             [
-              { text: 'Discard', onPress: () => { clearDraft(); router.back(); }, style: 'destructive' },
-              { text: 'Save Draft', onPress: () => { saveDraft(formData); router.back(); } },
+              { text: 'Discard', onPress: () => { 
+                clearDraft(); 
+                router.back(); 
+              }, style: 'destructive' },
+              { text: hasUnsavedChanges ? 'Save Draft' : 'Keep Draft', onPress: () => { 
+                if (hasUnsavedChanges) {
+                  saveDraft(formData, true);
+                }
+                router.back(); 
+              }},
               { text: 'Cancel', style: 'cancel' },
             ]
           );
           return true;
         }
+        // If no content, just navigate back
         return false;
       };
 
@@ -297,7 +516,7 @@ export default function CreateListingScreen() {
       // Set new timeout for autosave
       autosaveTimeoutRef.current = setTimeout(() => {
         const currentData = formDataRef.current;
-        saveDraft(currentData);
+        saveDraft(currentData, false); // false = autosave, not manual save
       }, 2000) as any;
       
       // Debounced validation with proper async handling
@@ -1611,13 +1830,23 @@ export default function CreateListingScreen() {
         title="Sell an item"
         showBackButton
         onBackPress={() => {
-          if (hasUnsavedChanges) {
+          const hasContent = formData.title?.trim() || formData.description?.trim() || formData.images.length > 0;
+          if (hasContent) {
+            const message = hasUnsavedChanges 
+              ? 'You have unsaved changes. Would you like to save them as a draft before leaving?'
+              : 'You have a saved draft. Would you like to keep it or discard it?';
+              
             Alert.alert(
-              'Unsaved Changes',
-              'You have unsaved changes. What would you like to do?',
+              hasUnsavedChanges ? 'Unsaved Changes' : 'Draft Found',
+              message,
               [
                 { text: 'Discard', onPress: () => { clearDraft(); router.back(); }, style: 'destructive' },
-                { text: 'Save Draft', onPress: () => { saveDraft(formData); router.back(); } },
+                { text: hasUnsavedChanges ? 'Save Draft' : 'Keep Draft', onPress: () => { 
+                  if (hasUnsavedChanges) {
+                    saveDraft(formData, true);
+                  }
+                  router.back(); 
+                }},
                 { text: 'Cancel', style: 'cancel' },
               ]
             );
@@ -1625,7 +1854,50 @@ export default function CreateListingScreen() {
             router.back();
           }
         }}
-
+        rightActions={[
+        <TouchableOpacity
+          key="save-draft"
+          onPress={() => {
+            const hasContent = formData.title?.trim() || formData.description?.trim() || formData.images.length > 0;
+            if (hasContent) {
+              saveDraft(formData, true); // true = manual save
+            } else {
+              Alert.alert('No Content', 'Please add some content before saving as draft.');
+            }
+          }}
+          disabled={!hasUnsavedChanges || isAutoSaving}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: theme.spacing.sm,
+            paddingVertical: theme.spacing.xs,
+            borderRadius: theme.borderRadius.md,
+            backgroundColor: (!hasUnsavedChanges || isAutoSaving) 
+              ? theme.colors.border + '20' 
+              : theme.colors.primary + '10',
+            opacity: (!hasUnsavedChanges || isAutoSaving) ? 0.6 : 1,
+          }}
+        >
+          <FileText 
+            size={16} 
+            color={(!hasUnsavedChanges || isAutoSaving) 
+              ? theme.colors.text.muted 
+              : theme.colors.primary} 
+            style={{ marginRight: theme.spacing.xs }} 
+          />
+          <Text 
+            variant="caption" 
+            style={{ 
+              color: (!hasUnsavedChanges || isAutoSaving) 
+                ? theme.colors.text.muted 
+                : theme.colors.primary, 
+              fontWeight: '600' 
+            }}
+          >
+            {isAutoSaving ? 'Saving...' : (!hasUnsavedChanges ? 'Saved' : 'Save Draft')}
+          </Text>
+        </TouchableOpacity>
+        ]}
       />
 
       {/* Autosave Status */}

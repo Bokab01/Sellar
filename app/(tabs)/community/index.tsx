@@ -108,16 +108,41 @@ export default function CommunityScreen() {
     onResume: async () => {
       console.log('📱 Community screen: App resumed, refreshing posts...');
       await refresh();
+      lastRefreshTime.current = Date.now(); // Update refresh time
     },
     debug: true,
   });
 
-  // Refresh posts when screen comes into focus (e.g., after navigating back from post detail)
+  // Smart refresh strategy - only refresh when needed
+  const hasInitialData = React.useRef(false);
+  const lastRefreshTime = React.useRef(0);
+  const REFRESH_COOLDOWN = 30000; // 30 seconds cooldown
+
   useFocusEffect(
     React.useCallback(() => {
-      refresh();
-      refreshAllFollowStates(); // Refresh follow states when screen comes into focus
-    }, [refresh, refreshAllFollowStates])
+      const now = Date.now();
+      const timeSinceLastRefresh = now - lastRefreshTime.current;
+      
+      // Only refresh if:
+      // 1. We don't have initial data yet
+      // 2. It's been more than 30 seconds since last refresh
+      // 3. We have no posts (likely an error state)
+      if (!hasInitialData.current || timeSinceLastRefresh > REFRESH_COOLDOWN || posts.length === 0) {
+        console.log('🔄 Community: Smart refresh triggered', {
+          hasInitialData: hasInitialData.current,
+          timeSinceLastRefresh,
+          postsCount: posts.length
+        });
+        refresh();
+        lastRefreshTime.current = now;
+        hasInitialData.current = true;
+      } else {
+        console.log('⏭️ Community: Skipping refresh (cooldown active)');
+      }
+      
+      // Always refresh follow states (lightweight operation)
+      refreshAllFollowStates();
+    }, [refresh, refreshAllFollowStates, posts.length])
   );
 
   // Handle follow/unfollow functionality
@@ -277,7 +302,10 @@ export default function CommunityScreen() {
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
-                onRefresh={refresh}
+                onRefresh={() => {
+                  refresh();
+                  lastRefreshTime.current = Date.now(); // Update refresh time
+                }}
                 tintColor={theme.colors.primary}
                 colors={[theme.colors.primary]}
               />

@@ -25,9 +25,6 @@ export const CodeSplitting = {
   PremiumProductCard: lazy(() => import('@/components/PremiumProductCard/PremiumProductCard').then(module => ({ default: module.PremiumProductCard }))),
   MinimalPremiumProductCard: lazy(() => import('@/components/PremiumProductCard/MinimalPremiumProductCard').then(module => ({ default: module.MinimalPremiumProductCard }))),
 
-  // Analytics & Reporting
-  ReportModal: lazy(() => import('@/components/ReportModal/UniversalReportModal').then(module => ({ default: module.UniversalReportModal }))),
-
   // Community Features
   PostCard: lazy(() => import('@/components/PostCard/PostCard').then(module => ({ default: module.PostCard }))),
 

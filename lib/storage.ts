@@ -19,7 +19,6 @@ export const STORAGE_BUCKETS = {
 // Helper function to check storage bucket accessibility with detailed diagnostics
 const checkBucketAccess = async (bucket: string): Promise<{ accessible: boolean; error?: string; details?: any }> => {
   try {
-    console.log(`🔍 Checking access to bucket: ${bucket}`);
     
     // First check if we have a valid session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();

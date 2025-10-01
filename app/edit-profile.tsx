@@ -235,7 +235,6 @@ export default function EditProfileScreen() {
       // Auto-set is_business to true if user has business information
       if (formData.business_name.trim() || formData.business_type.trim() || formData.business_description.trim()) {
         updateData.is_business = true;
-        console.log('🔍 Auto-setting is_business to true because business fields are present');
       }
 
       // Only include username if it has a value and is different from current
@@ -243,9 +242,6 @@ export default function EditProfileScreen() {
         updateData.username = formData.username.trim();
       }
 
-      console.log('🔍 Profile Update Data:', updateData);
-      console.log('🔍 Display Business Name:', updateData.display_business_name);
-      console.log('🔍 Business Name:', updateData.business_name);
       
       await updateProfile(updateData);
       

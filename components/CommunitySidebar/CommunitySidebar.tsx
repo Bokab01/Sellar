@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { View, ScrollView, TouchableOpacity, Dimensions, Animated, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -74,14 +74,39 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
   const [trendingUsers, setTrendingUsers] = useState<TrendingUser[]>([]);
   const [loading, setLoading] = useState(true);
   const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
+  
+  // Cache data to prevent unnecessary refetches
+  const hasLoadedData = useRef(false);
+  const lastFetchTime = useRef(0);
+  const FETCH_COOLDOWN = 60000; // 1 minute cooldown
+
+  // Reset cache when user changes
+  useEffect(() => {
+    hasLoadedData.current = false;
+    lastFetchTime.current = 0;
+  }, [user?.id]);
 
   useEffect(() => {
     if (isVisible) {
-      fetchSidebarData();
-      // Refresh credits when sidebar opens
+      // Smart data fetching - only fetch if needed
+      const now = Date.now();
+      const timeSinceLastFetch = now - lastFetchTime.current;
+      
+      if (!hasLoadedData.current || timeSinceLastFetch > FETCH_COOLDOWN) {
+        console.log('🔄 Sidebar: Fetching data', { hasLoadedData: hasLoadedData.current, timeSinceLastFetch });
+        fetchSidebarData();
+        lastFetchTime.current = now;
+        hasLoadedData.current = true;
+      } else {
+        console.log('⏭️ Sidebar: Using cached data');
+        setLoading(false);
+      }
+      
+      // Refresh credits when sidebar opens (lightweight operation)
       if (user && creditBalance === 0) {
         refreshCredits();
       }
+      
       // Animate in
       Animated.timing(slideAnim, {
         toValue: 0,
@@ -96,9 +121,9 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
         useNativeDriver: true,
       }).start();
     }
-  }, [isVisible, user, creditBalance, refreshCredits]);
+  }, [isVisible, user, creditBalance, refreshCredits, fetchSidebarData]);
 
-  const fetchSidebarData = async () => {
+  const fetchSidebarData = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -174,10 +199,10 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
 
-  const navigationItems = [
+  const navigationItems = useMemo(() => [
     {
       icon: UserCheck,
       label: 'Following',
@@ -247,7 +272,7 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
         }
       }
     }
-  ];
+  ], [userStats, onClose]);
 
   if (!isVisible) return null;
 

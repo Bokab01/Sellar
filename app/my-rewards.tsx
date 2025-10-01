@@ -341,7 +341,7 @@ export default function MyRewardsScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: theme.spacing.lg }}
+          contentContainerStyle={{ paddingHorizontal: theme.spacing.sm }}
         >
           {[
             { id: 'overview' as TabType, label: 'Overview', icon: TrendingUp },
@@ -356,9 +356,9 @@ export default function MyRewardsScreen() {
                 key={tab.id}
                 onPress={() => setActiveTab(tab.id)}
                 style={{
-                  paddingVertical: theme.spacing.lg,
+                  paddingVertical: theme.spacing.md,
                   paddingHorizontal: theme.spacing.md,
-                  marginRight: theme.spacing.sm,
+                  marginRight: theme.spacing.lg,
                   borderBottomWidth: 2,
                   borderBottomColor: isActive ? theme.colors.primary : 'transparent',
                 }}

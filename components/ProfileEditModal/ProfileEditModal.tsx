@@ -177,7 +177,6 @@ export function ProfileEditModal({ visible, onClose, onProfileUpdated }: Profile
       // Auto-set is_business to true if user has business information
       if (formData.display_business_name) {
         updates.is_business = true;
-        console.log('🔍 Auto-setting is_business to true because display_business_name is enabled');
       }
 
       const updatedProfile = await updateProfile(updates);

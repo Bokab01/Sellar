@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, ScrollView } from 'react-native';
+import { View } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { Button } from '@/components/Button/Button';
@@ -169,12 +170,14 @@ export function FilterSheet({
         onPress: handleClear,
       }}
     >
-       <ScrollView 
+       <KeyboardAwareScrollView 
          style={{ maxHeight: 500 }}
          showsVerticalScrollIndicator={false}
          bounces={true}
-         scrollEventThrottle={16}
          keyboardShouldPersistTaps="handled"
+         enableOnAndroid
+         enableAutomaticScroll
+         extraScrollHeight={20}
          nestedScrollEnabled={true}
          contentContainerStyle={{ flexGrow: 1 }}
        >
@@ -383,7 +386,7 @@ export function FilterSheet({
             </View>
           </View>
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </AppModal>
   );
 }

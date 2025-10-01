@@ -26,7 +26,6 @@ export { Stepper } from './Stepper/Stepper';
 
 // Moderation Components
 export { ModerationErrorModal } from './ModerationErrorModal/ModerationErrorModal';
-export { ReportModal } from './ReportModal/ReportModal';
 
 // Community Components
 export { ChatBubble } from './ChatBubble/ChatBubble';

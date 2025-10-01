@@ -34,7 +34,7 @@ export function ListingRecommendations({
     return (
       <View style={[{ marginTop: theme.spacing.xl }, style]}>
         <Text variant="h3" style={{ marginBottom: theme.spacing.md }}>
-          You may also like
+          Similar Items
         </Text>
         <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
           {Array.from({ length: 3 }).map((_, index) => (
@@ -42,7 +42,7 @@ export function ListingRecommendations({
               key={index}
               width={180}
               height={200}
-              style={{ borderRadius: theme.borderRadius.md }}
+              style={{ borderRadius: theme.borderRadius.lg }}
             />
           ))}
         </View>
@@ -55,7 +55,7 @@ export function ListingRecommendations({
       {/* Category-based Recommendations */}
       <RecommendationSection
         title="You may also like"
-        subtitle="Similar items in this category"
+        subtitle="In the same category"
         icon={<Heart size={20} color={theme.colors.primary} />}
         type="category"
         listingId={listingId}
@@ -69,8 +69,8 @@ export function ListingRecommendations({
 
       {/* Collaborative Filtering Recommendations */}
       <RecommendationSection
-        title="People who viewed this also viewed"
-        subtitle="Based on user behavior patterns"
+        title="What others also like"
+        subtitle="Based on browsing patterns"
         icon={<Users size={20} color={theme.colors.primary} />}
         type="collaborative"
         listingId={listingId}

@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Tabs } from 'expo-router';
-import { View, Text, Image, Platform } from 'react-native';
+import { View, Text, Image, Platform, useColorScheme } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { MessageCircle, Plus, Users, EllipsisVertical, House, BadgePlus, CirclePlus } from 'lucide-react-native';
 import { useChatStore } from '@/store/useChatStore';
@@ -10,6 +10,7 @@ import { usePathname } from 'expo-router';
 
 export default function TabLayout() {
   const { theme } = useTheme();
+  const colorScheme = useColorScheme();
   const { unreadCounts } = useChatStore();
   const insets = useSafeAreaInsets();
   const { tabBarHeight, tabBarBottomPadding, contentBottomPadding } = useBottomTabBarSpacing();
@@ -20,6 +21,11 @@ export default function TabLayout() {
   
   // Check if we're on the post detail screen
   const isPostDetailScreen = pathname.includes('/community/') && pathname.includes('/');
+  
+  // Get the appropriate icon based on color scheme
+  const createIcon = colorScheme === 'dark' 
+    ? require('@/assets/icon/icon-dark.png')
+    : require('@/assets/icon/icon-light.png');
 
   // Memoize screen options to prevent unnecessary re-renders
   const screenOptions = useMemo(() => ({
@@ -50,8 +56,9 @@ export default function TabLayout() {
     tabBarInactiveTintColor: theme.colors.text.muted,
     tabBarLabelStyle: {
       fontSize: 12,
-      fontWeight: '500' as const,
+      fontWeight: '700' as const,
       marginTop: 4,
+      letterSpacing: 0.5,
     },
     // Optimize animations
     animationEnabled: true,
@@ -131,7 +138,7 @@ export default function TabLayout() {
                 ...theme.shadows.lg,
               }}
             >
-              <Image source={require('@/assets/icon/icon-light.png')} style={{ width: 60, height: 60 }} />
+              <Image source={createIcon} style={{ width: 60, height: 60 }} />
             </View>
           ),
           tabBarLabel: 'Sell',

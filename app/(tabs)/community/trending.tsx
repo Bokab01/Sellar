@@ -218,7 +218,7 @@ export default function TrendingTopicsScreen() {
         <View
           style={{
             flexDirection: 'row',
-            padding: theme.spacing.lg,
+            padding: theme.spacing.sm,
             backgroundColor: theme.colors.surface,
             borderBottomWidth: 1,
             borderBottomColor: theme.colors.border,
@@ -238,11 +238,11 @@ export default function TrendingTopicsScreen() {
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  paddingVertical: theme.spacing.sm,
-                  paddingHorizontal: theme.spacing.md,
+                  paddingVertical: theme.spacing.xs,
+                  paddingHorizontal: theme.spacing.sm,
                   borderRadius: theme.borderRadius.md,
                   backgroundColor: activeTab === tab.key ? theme.colors.primary : 'transparent',
-                  marginHorizontal: theme.spacing.xs,
+                  marginHorizontal: theme.spacing.xs / 2,
                 }}
               >
                 <IconComponent 
@@ -253,7 +253,7 @@ export default function TrendingTopicsScreen() {
                   variant="body"
                   weight="medium"
                   style={{
-                    marginLeft: theme.spacing.xs,
+                    marginLeft: theme.spacing.xs / 2,
                     color: activeTab === tab.key ? '#FFF' : theme.colors.text.primary,
                   }}
                 >

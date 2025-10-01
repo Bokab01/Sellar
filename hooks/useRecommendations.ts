@@ -61,6 +61,11 @@ export function useRecommendations() {
         .single();
 
       if (listingError) {
+        // Handle specific error cases - if listing doesn't exist, don't track
+        if (listingError.code === 'PGRST116' || listingError.message.includes('0 rows')) {
+          console.log('Listing not found, skipping interaction tracking');
+          return;
+        }
         console.error('Error fetching listing:', listingError);
         return;
       }
@@ -302,7 +307,7 @@ export function useRecommendations() {
   const getSearchSuggestions = useCallback(async (
     query: string,
     limit: number = 10
-  ): Promise<{ suggestion: string; frequency: number; last_searched: string }[]> => {
+  ): Promise<{ suggestion_id: string; suggestion_text: string; suggestion_type: string; relevance_score: number }[]> => {
     if (!user) return [];
 
     try {

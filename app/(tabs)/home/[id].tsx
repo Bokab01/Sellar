@@ -1,5 +1,5 @@
-import React, { useState, useEffect, lazy, Suspense, useCallback, useMemo } from 'react';
-import { View, ScrollView, Image, TouchableOpacity, Alert, Linking, Dimensions, StatusBar, FlatList } from 'react-native';
+import React, { useState, useEffect, lazy, Suspense, useCallback, useMemo, useRef } from 'react';
+import { View, ScrollView, Image, TouchableOpacity, Alert, Linking, Dimensions, StatusBar, FlatList, Share } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -35,7 +35,7 @@ import {
 const ImageViewer = lazy(() => import('@/components/ImageViewer/ImageViewer').then(module => ({ default: module.ImageViewer })));
 import { useImageViewer } from '@/hooks/useImageViewer';
 import { useListingStats } from '@/hooks/useListingStats';
-import { Heart, Share, MessageCircle, Phone, PhoneCall, DollarSign, ArrowLeft, Package, MoreVertical } from 'lucide-react-native';
+import { Heart, Share as ShareIcon, MessageCircle, Phone, PhoneCall, DollarSign, ArrowLeft, Package, MoreVertical, Edit, Trash2, Flag, BadgeCent } from 'lucide-react-native';
 import { getDisplayName } from '@/hooks/useDisplayName';
 import { ReportButton } from '@/components/ReportButton/ReportButton';
 
@@ -86,6 +86,9 @@ export default function ListingDetailScreen() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
+  
+  // Popup menu
+  const [showMenu, setShowMenu] = useState(false);
 
   // Related items state
   const [activeRelatedTab, setActiveRelatedTab] = useState<'seller' | 'similar'>('seller');
@@ -205,12 +208,17 @@ export default function ListingDetailScreen() {
           .single();
 
         if (listingError) {
-          setError(listingError.message);
+          // Handle specific error cases in fallback query
+          if (listingError.code === 'PGRST116' || listingError.message.includes('0 rows')) {
+            setError('Listing not found or has been removed');
+          } else {
+            setError(listingError.message);
+          }
           return;
         }
 
         if (!listingData) {
-          setError('Listing not found');
+          setError('Listing not found or has been removed');
           return;
         }
 
@@ -230,7 +238,12 @@ export default function ListingDetailScreen() {
 
         setListing(combinedData);
       } else if (fetchError) {
-        setError(fetchError.message);
+        // Handle specific error cases
+        if (fetchError.code === 'PGRST116' || fetchError.message.includes('0 rows')) {
+          setError('Listing not found or has been removed');
+        } else {
+          setError(fetchError.message);
+        }
       } else {
         setListing(data);
       }
@@ -509,6 +522,107 @@ export default function ListingDetailScreen() {
       await trackInteraction(listingId, 'favorite', {
         source: 'listing_detail'
       });
+    }
+  };
+
+  // Menu action handlers
+  const handleEditListing = () => {
+    setShowMenu(false);
+    router.push(`/edit-listing/${listingId}`);
+  };
+
+  const handleDeleteListing = () => {
+    setShowMenu(false);
+    Alert.alert(
+      'Delete Listing',
+      'Are you sure you want to delete this listing? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('listings')
+                .delete()
+                .eq('id', listingId)
+                .eq('user_id', user?.id);
+
+              if (error) throw error;
+              
+              setToastMessage('Listing deleted successfully');
+              setToastVariant('success');
+              setShowToast(true);
+              
+              // Navigate back after a short delay
+              setTimeout(() => {
+                router.back();
+              }, 1000);
+            } catch (error) {
+              console.error('Error deleting listing:', error);
+              setToastMessage('Failed to delete listing');
+              setToastVariant('error');
+              setShowToast(true);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleShareListing = async () => {
+    setShowMenu(false);
+    try {
+      const shareUrl = `https://sellar.app/listing/${listingId}`;
+      const shareMessage = `Check out this listing: "${listing?.title}" - ${listing?.price ? `GHS ${listing.price.toLocaleString()}` : 'Price on request'}\n\n${shareUrl}`;
+      
+      const result = await Share.share({
+        message: shareMessage,
+        url: shareUrl,
+        title: listing?.title || 'Sellar Listing',
+      });
+
+      if (result.action === Share.sharedAction) {
+        // Track share interaction - error handling is done in trackInteraction
+        if (listingId && user) {
+          await trackInteraction(listingId, 'share', {
+            source: 'listing_detail_menu'
+          });
+        }
+        
+        setToastMessage('Listing shared successfully');
+        setToastVariant('success');
+        setShowToast(true);
+      }
+    } catch (error) {
+      console.error('Error sharing listing:', error);
+      setToastMessage('Failed to share listing');
+      setToastVariant('error');
+      setShowToast(true);
+    }
+  };
+
+  const handleReportListing = () => {
+    setShowMenu(false);
+    if (listing && listingId) {
+      router.push({
+        pathname: '/report',
+        params: {
+          targetType: 'listing',
+          targetId: listingId,
+          targetTitle: listing.title || '',
+          targetUser: listing.profiles ? JSON.stringify({
+            id: listing.profiles.id,
+            name: `${listing.profiles.first_name || ''} ${listing.profiles.last_name || ''}`.trim() || 'Unknown User',
+            avatar: listing.profiles.avatar_url
+          }) : undefined,
+        },
+      });
+    } else {
+      setToastMessage('Cannot report listing - listing not found');
+      setToastVariant('error');
+      setShowToast(true);
     }
   };
 
@@ -887,11 +1001,6 @@ export default function ListingDetailScreen() {
                 backgroundColor: 'rgba(0,0,0,0.5)',
                 justifyContent: 'center',
                 alignItems: 'center',
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.25,
-                shadowRadius: 4,
-                elevation: 5,
               }}
             >
               <Heart 
@@ -904,9 +1013,7 @@ export default function ListingDetailScreen() {
           )}
           
           <TouchableOpacity
-            onPress={() => {
-              Alert.alert('Coming Soon', 'Sharing feature will be available soon');
-            }}
+            onPress={() => setShowMenu(true)}
             style={{
               width: 40,
               height: 40,
@@ -914,47 +1021,130 @@ export default function ListingDetailScreen() {
               backgroundColor: 'rgba(0,0,0,0.5)',
               justifyContent: 'center',
               alignItems: 'center',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.25,
-              shadowRadius: 4,
-              elevation: 5,
             }}
           >
-            <Share size={20} color="white" strokeWidth={2} />
+            <MoreVertical size={20} color="white" strokeWidth={2} />
           </TouchableOpacity>
 
-          {/* Report button - only show if user doesn't own the listing */}
-          {listing && listing.user_id !== user?.id && (
-            <View style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              backgroundColor: 'rgba(0,0,0,0.5)',
-              justifyContent: 'center',
-              alignItems: 'center',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.25,
-              shadowRadius: 4,
-              elevation: 5,
-            }}>
-              <ReportButton
-                targetType="listing"
-                targetId={listingId!}
-                targetTitle={listing.title}
-                variant="icon"
-                size="md"
-                style={{ padding: 0 }}
-              />
-            </View>
-          )}
         </View>
       </View>
 
+      {/* Popup Menu */}
+      {showMenu && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+          
+            zIndex: 2000,
+          }}
+        >
+          <TouchableOpacity
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+            }}
+            onPress={() => setShowMenu(false)}
+            activeOpacity={1}
+          />
+          <View
+            style={{
+              position: 'absolute',
+              top: (StatusBar.currentHeight || 44) + theme.spacing.md + 40 + theme.spacing.sm,
+              right: theme.spacing.lg,
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.borderRadius.lg,
+              paddingVertical: theme.spacing.sm,
+              minWidth: 180,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+              elevation: 10,
+            }}
+          >
+            {/* Edit Button - Only for own listings */}
+            {isOwnListing && (
+              <TouchableOpacity
+                onPress={handleEditListing}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: theme.spacing.sm,
+                  paddingHorizontal: theme.spacing.md,
+                }}
+              >
+                <Edit size={18} color={theme.colors.primary} style={{ marginRight: theme.spacing.sm }} />
+                <Text variant="body" style={{ color: theme.colors.text.primary, fontSize: 14 }}>
+                  Edit Listing
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Delete Button - Only for own listings */}
+            {isOwnListing && (
+              <TouchableOpacity
+                onPress={handleDeleteListing}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: theme.spacing.sm,
+                  paddingHorizontal: theme.spacing.md,
+                }}
+              >
+                <Trash2 size={18} color={theme.colors.error} style={{ marginRight: theme.spacing.sm }} />
+                <Text variant="body" style={{ color: theme.colors.error, fontSize: 14 }}>
+                  Delete Listing
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Share Button - Always available */}
+            <TouchableOpacity
+              onPress={handleShareListing}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: theme.spacing.sm,
+                paddingHorizontal: theme.spacing.md,
+              }}
+            >
+              <ShareIcon size={18} color={theme.colors.primary} style={{ marginRight: theme.spacing.sm }} />
+              <Text variant="body" style={{ color: theme.colors.text.primary, fontSize: 14 }}>
+                Share Listing
+              </Text>
+            </TouchableOpacity>
+
+            {/* Report Button - Only for other users' listings */}
+            {!isOwnListing && (
+              <TouchableOpacity
+                onPress={handleReportListing}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: theme.spacing.sm,
+                  paddingHorizontal: theme.spacing.md,
+                }}
+              >
+                <Flag size={18} color={theme.colors.warning} style={{ marginRight: theme.spacing.sm }} />
+                <Text variant="body" style={{ color: theme.colors.warning, fontSize: 14 }}>
+                  Report Listing
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
+
       <ScrollView 
         style={{ flex: 1 }} 
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: contentBottomPadding }}
         showsVerticalScrollIndicator={false}
         // Performance optimizations
         removeClippedSubviews={true}
@@ -1334,6 +1524,110 @@ export default function ListingDetailScreen() {
             </Text>
           </View>
 
+          {/* Action Buttons - Moved from bottom */}
+          {!isOwnListing && (
+            <View style={{ marginBottom: theme.spacing.xl }}>
+              <View style={{ gap: theme.spacing.md }}>
+                {/* Make an Offer Button */}
+                {canMakeOffer && offerLimitStatus.canMakeOffer && !pendingOffer ? (
+                  <TouchableOpacity
+                    onPress={() => setShowOfferModal(true)}
+                    style={{
+                      backgroundColor: theme.colors.surface,
+                      borderWidth: 1,
+                      borderColor: theme.colors.primary,
+                      borderRadius: theme.borderRadius.md,
+                      paddingVertical: theme.spacing.md,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: theme.spacing.sm,
+                    }}
+                  >
+                    <BadgeCent size={21} color={theme.colors.primary} />
+                    <Text variant="button" style={{ color: theme.colors.primary, fontWeight: '600' }}>
+                      Make an offer
+                    </Text>
+                  </TouchableOpacity>
+                ) : pendingOffer ? (
+                  <TouchableOpacity
+                    disabled
+                    style={{
+                      backgroundColor: theme.colors.surfaceVariant,
+                      borderWidth: 1,
+                      borderColor: theme.colors.border,
+                      borderRadius: theme.borderRadius.md,
+                      paddingVertical: theme.spacing.md,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: theme.spacing.sm,
+                      opacity: 0.6,
+                    }}
+                  >
+                    <DollarSign size={20} color={theme.colors.text.muted} />
+                    <Text variant="button" style={{ color: theme.colors.text.muted, fontWeight: '600' }}>
+                      Offer Pending
+                    </Text>
+                  </TouchableOpacity>
+                ) : offerLimitStatus.limitReached ? (
+                  <TouchableOpacity
+                    disabled
+                    style={{
+                      backgroundColor: theme.colors.error + '10',
+                      borderWidth: 1,
+                      borderColor: theme.colors.error + '30',
+                      borderRadius: theme.borderRadius.md,
+                      paddingVertical: theme.spacing.md,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: theme.spacing.sm,
+                      opacity: 0.8,
+                    }}
+                  >
+                    <DollarSign size={20} color={theme.colors.error} />
+                    <Text variant="button" style={{ color: theme.colors.error, fontWeight: '600' }}>
+                      Offer Limit Reached
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+
+                {/* Message Seller Button */}
+                <TouchableOpacity
+                  onPress={() => setShowContactModal(true)}
+                  style={{
+                    backgroundColor: theme.colors.primary,
+                    borderRadius: theme.borderRadius.md,
+                    paddingVertical: theme.spacing.md,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: theme.spacing.sm,
+                  }}
+                >
+                  <MessageCircle size={20} color={theme.colors.primaryForeground} />
+                  <Text variant="button" style={{ color: theme.colors.primaryForeground, fontWeight: '600' }}>
+                    Message seller
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Callback Request Button */}
+                {listing.profiles?.phone && (
+                  <SimpleCallbackRequestButton
+                    listingId={listingId!}
+                    sellerId={listing.user_id}
+                    sellerName={getDisplayName(listing.profiles, false).displayName}
+                    sellerPhone={listing.profiles.phone}
+                    listingTitle={listing.title}
+                    variant="secondary"
+                    size="md"
+                  />
+                )}
+              </View>
+            </View>
+          )}
+
           {/* Item Details Table */}
           <View style={{ marginBottom: theme.spacing.xl }}>
             <ItemDetailsTable listing={listing} />
@@ -1576,132 +1870,9 @@ export default function ListingDetailScreen() {
         )}
       </ScrollView>
 
-      {/* Bottom Tab Actions */}
-      {!isOwnListing && (
-        <View
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            backgroundColor: theme.colors.surface,
-            borderTopWidth: 1,
-            borderTopColor: theme.colors.border,
-            paddingHorizontal: theme.spacing.sm,
-            paddingVertical: theme.spacing.sm,
-            paddingBottom: contentBottomPadding + theme.spacing.sm,
-            ...theme.shadows.lg,
-          }}
-        >
-          <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
-            {/* Make an Offer Button */}
-            {canMakeOffer && offerLimitStatus.canMakeOffer && !pendingOffer ? (
-              <TouchableOpacity
-                onPress={() => setShowOfferModal(true)}
-                style={{
-                  flex: 1,
-                  backgroundColor: theme.colors.surface,
-                  borderWidth: 1,
-                  borderColor: theme.colors.primary,
-                  borderRadius: theme.borderRadius.md,
-                  paddingVertical: theme.spacing.md,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: theme.spacing.sm,
-                }}
-              >
-                <DollarSign size={20} color={theme.colors.primary} />
-                <Text variant="button" style={{ color: theme.colors.primary, fontWeight: '600' }}>
-                  Make an offer
-                </Text>
-              </TouchableOpacity>
-            ) : pendingOffer ? (
-              <TouchableOpacity
-                disabled
-                style={{
-                  flex: 1,
-                  backgroundColor: theme.colors.surfaceVariant,
-                  borderWidth: 1,
-                  borderColor: theme.colors.border,
-                  borderRadius: theme.borderRadius.md,
-                  paddingVertical: theme.spacing.md,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: theme.spacing.sm,
-                  opacity: 0.6,
-                }}
-              >
-                <DollarSign size={20} color={theme.colors.text.muted} />
-                <Text variant="button" style={{ color: theme.colors.text.muted, fontWeight: '600' }}>
-                  Offer Pending
-                </Text>
-              </TouchableOpacity>
-            ) : offerLimitStatus.limitReached ? (
-              <TouchableOpacity
-                disabled
-                style={{
-                  flex: 1,
-                  backgroundColor: theme.colors.error + '10',
-                  borderWidth: 1,
-                  borderColor: theme.colors.error + '30',
-                  borderRadius: theme.borderRadius.md,
-                  paddingVertical: theme.spacing.md,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: theme.spacing.sm,
-                  opacity: 0.8,
-                }}
-              >
-                <DollarSign size={20} color={theme.colors.error} />
-                <Text variant="button" style={{ color: theme.colors.error, fontWeight: '600' }}>
-                  Offer Limit Reached
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-
-            {/* Message Seller Button */}
-            <TouchableOpacity
-              onPress={() => setShowContactModal(true)}
-              style={{
-                flex: 1,
-                backgroundColor: theme.colors.primary,
-                borderRadius: theme.borderRadius.md,
-                paddingVertical: theme.spacing.md,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: theme.spacing.sm,
-              }}
-            >
-              <MessageCircle size={20} color={theme.colors.primaryForeground} />
-              <Text variant="button" style={{ color: theme.colors.primaryForeground, fontWeight: '600' }}>
-                Message seller
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Callback Request Button */}
-          {!isOwnListing && listing.profiles?.phone && (
-            <View style={{ marginTop: theme.spacing.md }}>
-              <SimpleCallbackRequestButton
-                listingId={listingId!}
-                sellerId={listing.user_id}
-                sellerName={getDisplayName(listing.profiles, false).displayName}
-                sellerPhone={listing.profiles.phone}
-                listingTitle={listing.title}
-                variant="secondary"
-                size="md"
-              />
-            </View>
-          )}
-        </View>
-      )}
-
       {/* Contact Modal */}
       <AppModal
+        position="bottom"
         visible={showContactModal}
         onClose={() => setShowContactModal(false)}
         title="Contact Seller"
@@ -1731,6 +1902,7 @@ export default function ListingDetailScreen() {
 
       {/* Callback Request Modal */}
       <AppModal
+        position="bottom"
         visible={showCallbackModal}
         onClose={() => setShowCallbackModal(false)}
         title="Request Callback"
@@ -1803,7 +1975,8 @@ export default function ListingDetailScreen() {
 
       {/* Make Offer Modal */}
       <AppModal
-      size='lg'
+        size='lg'
+        position="bottom"
         visible={showOfferModal}
         onClose={() => setShowOfferModal(false)}
         title="Make an Offer"
@@ -1878,6 +2051,7 @@ export default function ListingDetailScreen() {
           onClose={closeImageViewer}
         />
       </Suspense>
+
     </SafeAreaWrapper>
   );
 }

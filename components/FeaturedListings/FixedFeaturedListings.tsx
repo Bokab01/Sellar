@@ -431,6 +431,7 @@ export function FixedFeaturedListings({
               price={listing.price}
               currency={listing.currency}
               seller={listing.seller}
+              location={listing.location}
               onPress={() => handleListingPress(listing.id)}
             />
           </View>
@@ -457,6 +458,7 @@ export function FixedFeaturedListings({
               price={listing.price}
               currency={listing.currency}
               seller={listing.seller}
+              location={listing.location}
               onPress={() => handleListingPress(listing.id)}
             />
           </View>

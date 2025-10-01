@@ -194,14 +194,76 @@ export default function TransactionsScreen() {
     return (
       <SafeAreaWrapper>
         <AppHeader
-          title="Transactions"
+          title="Transaction History"
           showBackButton
           onBackPress={() => router.back()}
         />
         <Container>
-          <LoadingSkeleton />
-          <LoadingSkeleton />
-          <LoadingSkeleton />
+          {/* Summary Card Skeleton */}
+          <View style={{
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.borderRadius.lg,
+            padding: theme.spacing.lg,
+            marginBottom: theme.spacing.lg,
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+          }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.md }}>
+              <LoadingSkeleton width={120} height={20} />
+              <LoadingSkeleton width={80} height={24} />
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: theme.spacing.sm }}>
+              <LoadingSkeleton width={100} height={16} />
+              <LoadingSkeleton width={60} height={16} />
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <LoadingSkeleton width={80} height={16} />
+              <LoadingSkeleton width={70} height={16} />
+            </View>
+          </View>
+
+          {/* Transaction Groups Skeleton */}
+          {Array.from({ length: 3 }).map((_, groupIndex) => (
+            <View key={groupIndex} style={{ marginBottom: theme.spacing.lg }}>
+              {/* Date Header Skeleton */}
+              <LoadingSkeleton 
+                width={120} 
+                height={18} 
+                style={{ 
+                  marginBottom: theme.spacing.md,
+                  paddingHorizontal: theme.spacing.sm,
+                }} 
+              />
+              
+              {/* Transaction Cards Skeleton */}
+              {Array.from({ length: 2 + Math.floor(Math.random() * 3) }).map((_, index) => (
+                <View
+                  key={index}
+                  style={{
+                    backgroundColor: theme.colors.surface,
+                    borderRadius: theme.borderRadius.md,
+                    padding: theme.spacing.md,
+                    marginBottom: theme.spacing.sm,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.sm }}>
+                    <LoadingSkeleton width={40} height={40} borderRadius={20} />
+                    <View style={{ marginLeft: theme.spacing.md, flex: 1 }}>
+                      <LoadingSkeleton width="70%" height={16} style={{ marginBottom: theme.spacing.xs }} />
+                      <LoadingSkeleton width="50%" height={12} />
+                    </View>
+                    <LoadingSkeleton width={80} height={20} />
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <LoadingSkeleton width={100} height={14} />
+                    <LoadingSkeleton width={60} height={14} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          ))}
         </Container>
       </SafeAreaWrapper>
     );

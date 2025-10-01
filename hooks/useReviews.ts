@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -72,12 +72,28 @@ export function useReviews(options: {
   const [hasMore, setHasMore] = useState(true);
   const { user } = useAuthStore();
 
+  // Cache data to prevent unnecessary refetches
+  const hasLoadedData = useRef(false);
+  const lastFetchTime = useRef(0);
+  const FETCH_COOLDOWN = 30000; // 30 seconds cooldown
+
   const { userId, listingId, reviewerId, limit = 20, offset = 0 } = options;
 
-  const fetchReviews = useCallback(async (reset = false) => {
+  const fetchReviews = useCallback(async (reset = false, forceRefresh = false) => {
+    // Smart caching - only fetch if needed
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchTime.current;
+    
+    if (!forceRefresh && !reset && hasLoadedData.current && timeSinceLastFetch < FETCH_COOLDOWN) {
+      console.log('⏭️ Reviews: Using cached data');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
+      console.log('🔄 Reviews: Fetching data', { forceRefresh, timeSinceLastFetch });
 
       let query = supabase
         .from('reviews')
@@ -166,6 +182,8 @@ export function useReviews(options: {
       }
 
       setHasMore(data?.length === limit);
+      hasLoadedData.current = true;
+      lastFetchTime.current = now;
     } catch (err) {
       console.error('Error fetching reviews:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch reviews');
@@ -179,7 +197,7 @@ export function useReviews(options: {
   }, [fetchReviews]);
 
   const refresh = useCallback(() => {
-    fetchReviews(true);
+    fetchReviews(true, true); // Force refresh
   }, [fetchReviews]);
 
   const loadMore = useCallback(() => {

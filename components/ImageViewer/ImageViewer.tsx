@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Modal,
@@ -10,30 +10,25 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import {
-  PanGestureHandler,
-  PinchGestureHandler,
-  TapGestureHandler,
-  GestureHandlerRootView,
-  State,
-  PanGestureHandlerGestureEvent,
-  PinchGestureHandlerGestureEvent,
-  TapGestureHandlerGestureEvent,
-} from 'react-native-gesture-handler';
+import { GestureHandlerRootView, GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
   runOnJS,
-  interpolate,
-  Extrapolate,
+  withDecay,
 } from 'react-native-reanimated';
 import { useTheme } from '@/theme/ThemeProvider';
-// Using regular Image component for better reliability
 import { X, ChevronLeft, ChevronRight } from 'lucide-react-native';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+const SPRING_CONFIG = {
+  damping: 20,
+  stiffness: 90,
+  mass: 0.5,
+};
+const TIMING_CONFIG = { duration: 300 };
 
 interface ImageViewerProps {
   visible: boolean;
@@ -44,6 +39,152 @@ interface ImageViewerProps {
   onDownload?: (imageUrl: string, index: number) => Promise<void>;
   showControls?: boolean;
   backgroundColor?: string;
+}
+
+interface ZoomableImageProps {
+  imageUrl: string;
+  isActive: boolean;
+  onSingleTap: () => void;
+}
+
+/**
+ * Individual zoomable image component with its own gesture handling
+ * This prevents gesture conflicts when swiping between images
+ */
+function ZoomableImage({ imageUrl, isActive, onSingleTap }: ZoomableImageProps) {
+  const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const savedTranslateX = useSharedValue(0);
+  const savedTranslateY = useSharedValue(0);
+  const focalX = useSharedValue(0);
+  const focalY = useSharedValue(0);
+
+  // Reset zoom when image becomes inactive
+  useEffect(() => {
+    if (!isActive && scale.value !== 1) {
+      scale.value = withTiming(1, TIMING_CONFIG);
+      savedScale.value = 1;
+      translateX.value = withTiming(0, TIMING_CONFIG);
+      translateY.value = withTiming(0, TIMING_CONFIG);
+      savedTranslateX.value = 0;
+      savedTranslateY.value = 0;
+    }
+  }, [isActive]);
+
+  // Pinch gesture
+  const pinchGesture = Gesture.Pinch()
+    .onStart(() => {
+      savedScale.value = scale.value;
+    })
+    .onUpdate((event) => {
+      scale.value = Math.max(1, Math.min(savedScale.value * event.scale, 5));
+    })
+    .onEnd(() => {
+      if (scale.value < 1) {
+        scale.value = withSpring(1, SPRING_CONFIG);
+        translateX.value = withSpring(0, SPRING_CONFIG);
+        translateY.value = withSpring(0, SPRING_CONFIG);
+        savedScale.value = 1;
+        savedTranslateX.value = 0;
+        savedTranslateY.value = 0;
+      } else {
+        savedScale.value = scale.value;
+      }
+    });
+
+  // Pan gesture for zoomed image
+  const panGesture = Gesture.Pan()
+    .onStart(() => {
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    })
+    .onUpdate((event) => {
+      if (scale.value > 1) {
+        // Only allow panning when zoomed in
+        const maxTranslateX = (screenWidth * (scale.value - 1)) / 2;
+        const maxTranslateY = (screenHeight * (scale.value - 1)) / 2;
+
+        translateX.value = Math.max(
+          -maxTranslateX,
+          Math.min(maxTranslateX, savedTranslateX.value + event.translationX)
+        );
+        translateY.value = Math.max(
+          -maxTranslateY,
+          Math.min(maxTranslateY, savedTranslateY.value + event.translationY)
+        );
+      }
+    })
+    .onEnd(() => {
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    })
+    .enabled(scale.value > 1);
+
+  // Double tap to zoom
+  const doubleTapGesture = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd((event) => {
+      if (scale.value > 1) {
+        // Zoom out
+        scale.value = withSpring(1, SPRING_CONFIG);
+        translateX.value = withSpring(0, SPRING_CONFIG);
+        translateY.value = withSpring(0, SPRING_CONFIG);
+        savedScale.value = 1;
+        savedTranslateX.value = 0;
+        savedTranslateY.value = 0;
+      } else {
+        // Zoom in to tap location
+        const newScale = 2.5;
+        const tapX = event.x - screenWidth / 2;
+        const tapY = event.y - screenHeight / 2;
+
+        scale.value = withSpring(newScale, SPRING_CONFIG);
+        translateX.value = withSpring(-tapX * (newScale - 1) / newScale, SPRING_CONFIG);
+        translateY.value = withSpring(-tapY * (newScale - 1) / newScale, SPRING_CONFIG);
+
+        savedScale.value = newScale;
+        savedTranslateX.value = -tapX * (newScale - 1) / newScale;
+        savedTranslateY.value = -tapY * (newScale - 1) / newScale;
+      }
+    });
+
+  // Single tap to toggle controls
+  const singleTapGesture = Gesture.Tap()
+    .numberOfTaps(1)
+    .onEnd(() => {
+      runOnJS(onSingleTap)();
+    });
+
+  // Combine gestures properly
+  const composedGesture = Gesture.Simultaneous(
+    pinchGesture,
+    panGesture,
+    Gesture.Exclusive(doubleTapGesture, singleTapGesture)
+  );
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: scale.value },
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+    ],
+  }));
+
+  return (
+    <View style={styles.imageWrapper}>
+      <GestureDetector gesture={composedGesture}>
+        <Animated.View style={[styles.imageWrapper, animatedStyle]}>
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.image}
+            resizeMode="contain"
+          />
+        </Animated.View>
+      </GestureDetector>
+    </View>
+  );
 }
 
 export function ImageViewer({
@@ -60,198 +201,68 @@ export function ImageViewer({
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [controlsVisible, setControlsVisible] = useState(true);
 
-  // Animation values
-  const scale = useSharedValue(1);
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const imageTranslateX = useSharedValue(-initialIndex * screenWidth);
+  const translateX = useSharedValue(-initialIndex * screenWidth);
+  const savedTranslateX = useSharedValue(-initialIndex * screenWidth);
 
   // Reset to initial index when modal opens
   useEffect(() => {
     if (visible) {
-      console.log('ImageViewer: Modal opened with initialIndex', initialIndex);
       setCurrentIndex(initialIndex);
-      imageTranslateX.value = -initialIndex * screenWidth;
-      lastImageTranslateX.value = -initialIndex * screenWidth;
-      // Reset zoom and position
-      scale.value = 1;
-      translateX.value = 0;
-      translateY.value = 0;
-      lastScale.value = 1;
-      lastTranslateX.value = 0;
-      lastTranslateY.value = 0;
+      translateX.value = -initialIndex * screenWidth;
+      savedTranslateX.value = -initialIndex * screenWidth;
+      setControlsVisible(true);
     }
   }, [visible, initialIndex]);
-
-  // Refs for gesture handlers
-  const panRef = useRef<any>(null);
-  const pinchRef = useRef<any>(null);
-  const tapRef = useRef<any>(null);
-  const doubleTapRef = useRef<any>(null);
-
-  // Track gesture state
-  const lastScale = useSharedValue(1);
-  const lastTranslateX = useSharedValue(0);
-  const lastTranslateY = useSharedValue(0);
-  const lastImageTranslateX = useSharedValue(-initialIndex * screenWidth);
-
-  const resetImagePosition = useCallback(() => {
-    'worklet';
-    scale.value = withSpring(1);
-    translateX.value = withSpring(0);
-    translateY.value = withSpring(0);
-    lastScale.value = 1;
-    lastTranslateX.value = 0;
-    lastTranslateY.value = 0;
-  }, []);
 
   const changeImage = useCallback((newIndex: number) => {
     if (newIndex >= 0 && newIndex < images.length) {
       setCurrentIndex(newIndex);
-      imageTranslateX.value = withTiming(-newIndex * screenWidth, { duration: 300 });
-      lastImageTranslateX.value = -newIndex * screenWidth;
-      runOnJS(resetImagePosition)();
+      translateX.value = withTiming(-newIndex * screenWidth, TIMING_CONFIG);
+      savedTranslateX.value = -newIndex * screenWidth;
     }
-  }, [images.length, resetImagePosition]);
+  }, [images.length]);
 
-  // Pinch gesture handler
-  const pinchHandler = {
-    onStart: () => {
-      lastScale.value = scale.value;
-    },
-    onActive: (event: any) => {
-      scale.value = Math.max(0.5, Math.min(lastScale.value * event.scale, 5));
-    },
-    onEnd: () => {
-      if (scale.value < 1) {
-        scale.value = withSpring(1);
-        translateX.value = withSpring(0);
-        translateY.value = withSpring(0);
-        lastTranslateX.value = 0;
-        lastTranslateY.value = 0;
-      }
-      lastScale.value = scale.value;
-    },
-  };
+  // Pan gesture for swiping between images
+  const panGesture = Gesture.Pan()
+    .onStart(() => {
+      savedTranslateX.value = translateX.value;
+    })
+    .onUpdate((event) => {
+      translateX.value = savedTranslateX.value + event.translationX;
+    })
+    .onEnd((event) => {
+      const threshold = screenWidth * 0.25;
+      const velocity = event.velocityX;
+      const offset = event.translationX;
 
-  // Pan gesture handler
-  const panHandler = {
-    onStart: () => {
-      lastTranslateX.value = translateX.value;
-      lastTranslateY.value = translateY.value;
-      lastImageTranslateX.value = imageTranslateX.value;
-    },
-    onActive: (event: any) => {
-      if (scale.value > 1) {
-        // Pan when zoomed in
-        const maxTranslateX = (screenWidth * (scale.value - 1)) / 2;
-        const maxTranslateY = (screenHeight * (scale.value - 1)) / 2;
-        
-        translateX.value = Math.max(
-          -maxTranslateX,
-          Math.min(maxTranslateX, lastTranslateX.value + event.translationX)
-        );
-        translateY.value = Math.max(
-          -maxTranslateY,
-          Math.min(maxTranslateY, lastTranslateY.value + event.translationY)
-        );
-      } else {
-        // Swipe between images when not zoomed
-        imageTranslateX.value = lastImageTranslateX.value + event.translationX;
-      }
-    },
-    onEnd: (event: any) => {
-      if (scale.value <= 1) {
-        // Handle image swiping
-        const threshold = screenWidth * 0.3;
-        const velocity = Math.abs(event.velocityX) > 500;
-        
-        if (event.translationX > threshold || (velocity && event.velocityX > 0)) {
+      // Determine if we should change image
+      if (Math.abs(velocity) > 500 || Math.abs(offset) > threshold) {
+        if (offset > 0 && currentIndex > 0) {
           // Swipe right - previous image
-          if (currentIndex > 0) {
-            runOnJS(changeImage)(currentIndex - 1);
-          } else {
-            imageTranslateX.value = withTiming(lastImageTranslateX.value, { duration: 200 });
-          }
-        } else if (event.translationX < -threshold || (velocity && event.velocityX < 0)) {
+          runOnJS(changeImage)(currentIndex - 1);
+        } else if (offset < 0 && currentIndex < images.length - 1) {
           // Swipe left - next image
-          if (currentIndex < images.length - 1) {
-            runOnJS(changeImage)(currentIndex + 1);
-          } else {
-            imageTranslateX.value = withTiming(lastImageTranslateX.value, { duration: 200 });
-          }
+          runOnJS(changeImage)(currentIndex + 1);
         } else {
-          // Snap back
-          imageTranslateX.value = withTiming(lastImageTranslateX.value, { duration: 200 });
+          // Bounce back
+          translateX.value = withSpring(savedTranslateX.value, SPRING_CONFIG);
         }
-      }
-    },
-  };
-
-  // Single tap handler
-  const tapHandler = {
-    onEnd: () => {
-      runOnJS(setControlsVisible)(!controlsVisible);
-    },
-  };
-
-  // Double tap handler
-  const doubleTapHandler = {
-    onEnd: (event: any) => {
-      if (scale.value > 1) {
-        // Zoom out
-        scale.value = withSpring(1);
-        translateX.value = withSpring(0);
-        translateY.value = withSpring(0);
-        lastScale.value = 1;
-        lastTranslateX.value = 0;
-        lastTranslateY.value = 0;
       } else {
-        // Zoom in to tap location
-        const newScale = 2.5;
-        scale.value = withSpring(newScale);
-        
-        // Calculate translate to center on tap
-        const tapX = event.x - screenWidth / 2;
-        const tapY = event.y - screenHeight / 2;
-        
-        translateX.value = withSpring(-tapX * (newScale - 1) / newScale);
-        translateY.value = withSpring(-tapY * (newScale - 1) / newScale);
-        
-        lastScale.value = newScale;
-        lastTranslateX.value = translateX.value;
-        lastTranslateY.value = translateY.value;
+        // Snap back to current position
+        translateX.value = withSpring(savedTranslateX.value, SPRING_CONFIG);
       }
-    },
-  };
+    })
+    .activeOffsetX([-10, 10]);
 
-  // Animated styles
-  const imageContainerStyle = useAnimatedStyle(() => {
-    return {
-      transform: [
-        { translateX: imageTranslateX.value },
-      ],
-    };
-  });
+  const containerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
 
-  const imageStyle = useAnimatedStyle(() => {
-    return {
-      transform: [
-        { scale: scale.value },
-        { translateX: translateX.value },
-        { translateY: translateY.value },
-      ],
-    };
-  });
-
-  const controlsOpacity = useAnimatedStyle(() => {
-    return {
-      opacity: withTiming(controlsVisible ? 1 : 0, { duration: 200 }),
-    };
-  });
+  const controlsOpacity = useAnimatedStyle(() => ({
+    opacity: withTiming(controlsVisible ? 1 : 0, { duration: 200 }),
+  }));
 
   const handleClose = () => {
-    resetImagePosition();
     onClose();
   };
 
@@ -267,7 +278,9 @@ export function ImageViewer({
     }
   };
 
-
+  const toggleControls = useCallback(() => {
+    setControlsVisible((prev) => !prev);
+  }, []);
 
   if (!visible) return null;
 
@@ -282,145 +295,81 @@ export function ImageViewer({
       <StatusBar hidden />
       <GestureHandlerRootView style={{ flex: 1 }}>
         <View style={[styles.container, { backgroundColor }]}>
-        <PanGestureHandler
-          ref={panRef}
-          onGestureEvent={(event) => {
-            if (event.nativeEvent.state === State.BEGAN) {
-              panHandler.onStart();
-            } else if (event.nativeEvent.state === State.ACTIVE) {
-              panHandler.onActive(event.nativeEvent);
-            } else if (event.nativeEvent.state === State.END) {
-              panHandler.onEnd(event.nativeEvent);
-            }
-          }}
-          simultaneousHandlers={[pinchRef]}
-          minPointers={1}
-          maxPointers={1}
-        >
-          <Animated.View style={styles.gestureContainer}>
-            <PinchGestureHandler
-              ref={pinchRef}
-              onGestureEvent={(event) => {
-                if (event.nativeEvent.state === State.BEGAN) {
-                  pinchHandler.onStart();
-                } else if (event.nativeEvent.state === State.ACTIVE) {
-                  pinchHandler.onActive(event.nativeEvent);
-                } else if (event.nativeEvent.state === State.END) {
-                  pinchHandler.onEnd();
-                }
-              }}
-              simultaneousHandlers={[panRef]}
-            >
-              <Animated.View style={styles.gestureContainer}>
-                <TapGestureHandler
-                  ref={tapRef}
-                  onGestureEvent={(event) => {
-                    if (event.nativeEvent.state === State.END) {
-                      tapHandler.onEnd();
-                    }
-                  }}
-                  waitFor={doubleTapRef}
-                  numberOfTaps={1}
+          <GestureDetector gesture={panGesture}>
+            <Animated.View style={[styles.imageContainer, containerStyle]}>
+              {images.map((imageUrl, index) => (
+                <ZoomableImage
+                  key={index}
+                  imageUrl={imageUrl}
+                  isActive={index === currentIndex}
+                  onSingleTap={toggleControls}
+                />
+              ))}
+            </Animated.View>
+          </GestureDetector>
+
+          {showControls && (
+            <Animated.View style={[styles.controls, controlsOpacity]} pointerEvents="box-none">
+              {/* Header */}
+              <SafeAreaView style={styles.header}>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={handleClose}
+                  activeOpacity={0.7}
                 >
-                  <Animated.View style={styles.gestureContainer}>
-                    <TapGestureHandler
-                      ref={doubleTapRef}
-                      onGestureEvent={(event) => {
-                        if (event.nativeEvent.state === State.END) {
-                          doubleTapHandler.onEnd(event.nativeEvent);
-                        }
-                      }}
-                      numberOfTaps={2}
+                  <X size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+
+                <View style={styles.headerSpacer} />
+
+                <View style={styles.headerRight}>
+                  <Text style={styles.imageCounter}>
+                    {currentIndex + 1} of {images.length}
+                  </Text>
+                </View>
+              </SafeAreaView>
+
+              {/* Navigation arrows */}
+              {images.length > 1 && (
+                <>
+                  {currentIndex > 0 && (
+                    <TouchableOpacity
+                      style={[styles.navButton, styles.navButtonLeft]}
+                      onPress={handlePrevious}
+                      activeOpacity={0.7}
                     >
-                      <Animated.View style={styles.gestureContainer}>
-                        <Animated.View style={[styles.imageContainer, imageContainerStyle]}>
-                          {images.map((imageUrl, index) => (
-                            <Animated.View
-                              key={index}
-                              style={[
-                                styles.imageWrapper,
-                                index === currentIndex && imageStyle,
-                              ]}
-                            >
-                              <Image
-                                source={{ uri: imageUrl }}
-                                style={styles.image}
-                                resizeMode="contain"
-                              />
-                            </Animated.View>
-                          ))}
-                        </Animated.View>
-                      </Animated.View>
-                    </TapGestureHandler>
-                  </Animated.View>
-                </TapGestureHandler>
-              </Animated.View>
-            </PinchGestureHandler>
-          </Animated.View>
-        </PanGestureHandler>
+                      <ChevronLeft size={32} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  )}
 
-        {showControls && (
-          <Animated.View style={[styles.controls, controlsOpacity]}>
-            {/* Header */}
-            <SafeAreaView style={styles.header}>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={handleClose}
-                activeOpacity={0.7}
-              >
-                <X size={24} color="#FFFFFF" />
-              </TouchableOpacity>
-              
-              <View style={styles.headerSpacer} />
+                  {currentIndex < images.length - 1 && (
+                    <TouchableOpacity
+                      style={[styles.navButton, styles.navButtonRight]}
+                      onPress={handleNext}
+                      activeOpacity={0.7}
+                    >
+                      <ChevronRight size={32} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
 
-              <View style={styles.headerRight}>
-                <Text style={styles.imageCounter}>
-                  {currentIndex + 1} of {images.length}
-                </Text>
-              </View>
-            </SafeAreaView>
-
-            {/* Navigation arrows */}
-            {images.length > 1 && (
-              <>
-                {currentIndex > 0 && (
-                  <TouchableOpacity
-                    style={[styles.navButton, styles.navButtonLeft]}
-                    onPress={handlePrevious}
-                    activeOpacity={0.7}
-                  >
-                    <ChevronLeft size={32} color="#FFFFFF" />
-                  </TouchableOpacity>
-                )}
-                
-                {currentIndex < images.length - 1 && (
-                  <TouchableOpacity
-                    style={[styles.navButton, styles.navButtonRight]}
-                    onPress={handleNext}
-                    activeOpacity={0.7}
-                  >
-                    <ChevronRight size={32} color="#FFFFFF" />
-                  </TouchableOpacity>
-                )}
-              </>
-            )}
-
-            {/* Page indicators */}
-            {images.length > 1 && (
-              <View style={styles.indicators}>
-                {images.map((_, index) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.indicator,
-                      index === currentIndex && styles.indicatorActive,
-                    ]}
-                  />
-                ))}
-              </View>
-            )}
-          </Animated.View>
-        )}
+              {/* Page indicators */}
+              {images.length > 1 && (
+                <View style={styles.indicators}>
+                  {images.map((_, index) => (
+                    <View
+                      key={index}
+                      style={[
+                        styles.indicator,
+                        index === currentIndex && styles.indicatorActive,
+                      ]}
+                    />
+                  ))}
+                </View>
+              )}
+            </Animated.View>
+          )}
         </View>
       </GestureHandlerRootView>
     </Modal>
@@ -431,12 +380,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  gestureContainer: {
-    flex: 1,
-  },
   imageContainer: {
     flexDirection: 'row',
-    width: screenWidth * 10, // Accommodate multiple images
     height: screenHeight,
   },
   imageWrapper: {
@@ -484,10 +429,14 @@ const styles = StyleSheet.create({
   navButton: {
     position: 'absolute',
     top: '50%',
-    marginTop: -24,
-    padding: 12,
-    borderRadius: 24,
+    marginTop: -20,
+    width: 40,
+    height: 40,
+    padding: 4,
+    borderRadius: 20,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   navButtonLeft: {
     left: 16,

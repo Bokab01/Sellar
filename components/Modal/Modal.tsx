@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Modal as RNModal,
   View,
@@ -6,7 +6,10 @@ import {
   TouchableWithoutFeedback,
   Dimensions,
   Platform,
+  Keyboard,
+  Animated,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { Button } from '@/components/Button/Button';
@@ -53,6 +56,48 @@ export function AppModal({
 }: AppModalProps) {
   const { theme } = useTheme();
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const scrollViewRef = useRef<any>(null);
+  const modalTranslateY = useRef(new Animated.Value(0)).current;
+
+  // Listen to keyboard events to get exact keyboard height
+  useEffect(() => {
+    if (!visible || position !== 'bottom') return;
+
+    const keyboardWillShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        const keyboardHeight = e.endCoordinates.height;
+        setKeyboardHeight(keyboardHeight);
+        
+        // Animate modal up by keyboard height
+        Animated.timing(modalTranslateY, {
+          toValue: -keyboardHeight,
+          duration: Platform.OS === 'ios' ? 250 : 200,
+          useNativeDriver: true,
+        }).start();
+      }
+    );
+
+    const keyboardWillHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+        
+        // Animate modal back to original position
+        Animated.timing(modalTranslateY, {
+          toValue: 0,
+          duration: Platform.OS === 'ios' ? 250 : 200,
+          useNativeDriver: true,
+        }).start();
+      }
+    );
+
+    return () => {
+      keyboardWillShowListener.remove();
+      keyboardWillHideListener.remove();
+    };
+  }, [visible, position]);
 
   const getModalSize = () => {
     if (fullScreen) {
@@ -63,11 +108,11 @@ export function AppModal({
       };
     }
     
-    // For bottom-positioned modals, use full width
+    // For bottom-positioned modals, use full width and more height
     if (position === 'bottom') {
       return {
         width: screenWidth,
-        maxHeight: screenHeight * 0.8,
+        maxHeight: screenHeight * 0.9, // Increased from 0.8 to 0.9
       };
     }
     
@@ -131,19 +176,40 @@ export function AppModal({
       animationType={position === 'bottom' ? 'slide' : 'fade'}
       onRequestClose={onClose}
     >
-      <TouchableWithoutFeedback onPress={dismissOnBackdrop ? onClose : undefined}>
+      <View style={{ flex: 1 }}>
+        <TouchableWithoutFeedback onPress={dismissOnBackdrop ? onClose : undefined}>
+          <View
+            style={[
+              {
+                flex: 1,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                padding: (size === 'full' || fullScreen || position === 'bottom') ? 0 : theme.spacing.lg,
+              },
+              positionStyles,
+            ]}
+          />
+        </TouchableWithoutFeedback>
+        
         <View
           style={[
             {
-              flex: 1,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              position: 'absolute',
+              left: 0,
+              right: 0,
               padding: (size === 'full' || fullScreen || position === 'bottom') ? 0 : theme.spacing.lg,
             },
-            positionStyles,
+            position === 'bottom' && { bottom: 0 },
+            position === 'top' && { top: Platform.OS === 'ios' ? 44 : 24 },
+            position === 'center' && { 
+              top: 0,
+              bottom: 0,
+              justifyContent: 'center',
+              alignItems: 'center',
+            },
           ]}
+          pointerEvents="box-none"
         >
-          <TouchableWithoutFeedback>
-            <View
+            <Animated.View
               style={[
                 {
                   backgroundColor: theme.colors.surface,
@@ -151,104 +217,126 @@ export function AppModal({
                   ...theme.shadows.lg,
                   overflow: 'hidden',
                   alignSelf: position === 'center' ? 'center' : 'stretch',
+                  transform: position === 'bottom' ? [{ translateY: modalTranslateY }] : undefined,
                 },
                 modalSize,
                 position === 'bottom' && {
+                  borderTopLeftRadius: theme.borderRadius.xl,
+                  borderTopRightRadius: theme.borderRadius.xl,
                   borderBottomLeftRadius: 0,
                   borderBottomRightRadius: 0,
                 },
               ]}
             >
-              {/* Header */}
-              {(title || showCloseButton) && (
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingHorizontal: theme.spacing.lg,
-                    paddingTop: theme.spacing.lg,
-                    paddingBottom: theme.spacing.md,
-                    borderBottomWidth: 1,
-                    borderBottomColor: theme.colors.border,
-                  }}
-                >
-                  {title ? (
-                    <Text variant="h3" style={{ flex: 1, fontWeight: '600' }}>
-                      {title}
-                    </Text>
-                  ) : (
-                    <View style={{ flex: 1 }} />
-                  )}
+                {/* Header */}
+                {(title || showCloseButton) && (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingHorizontal: theme.spacing.xl,
+                      paddingTop: position === 'bottom' ? theme.spacing.md : theme.spacing.lg,
+                      paddingBottom: theme.spacing.lg,
+                      borderBottomWidth: 1,
+                      borderBottomColor: theme.colors.border,
+                      backgroundColor: theme.colors.surface,
+                    }}
+                  >
+                    {/* Handle bar for bottom sheets */}
+                    {position === 'bottom' && (
+                      <View
+                        style={{
+                          position: 'absolute',
+                          top: theme.spacing.sm,
+                          left: '50%',
+                          marginLeft: -20,
+                          width: 40,
+                          height: 4,
+                          borderRadius: 2,
+                          backgroundColor: theme.colors.border,
+                        }}
+                      />
+                    )}
+                    
+                    {title ? (
+                      <Text variant="h3" style={{ flex: 1, fontWeight: '600', color: theme.colors.text.primary }}>
+                        {title}
+                      </Text>
+                    ) : (
+                      <View style={{ flex: 1 }} />
+                    )}
 
-                  {showCloseButton && (
-                    <TouchableOpacity
-                      onPress={onClose}
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 16,
-                        backgroundColor: theme.colors.surfaceVariant,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                      }}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <X size={18} color={theme.colors.text.primary} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
+                    {showCloseButton && (
+                      <TouchableOpacity
+                        onPress={onClose}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 18,
+                          backgroundColor: theme.colors.surfaceVariant,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                        }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <X size={20} color={theme.colors.text.secondary} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
 
               {/* Content */}
               <View
                 style={{
                   padding: fullScreen ? 0 : theme.spacing.lg,
                   flex: fullScreen ? 1 : undefined,
+                  flexGrow: position === 'bottom' ? 1 : undefined,
                 }}
               >
                 {children}
               </View>
 
-              {/* Actions */}
-              {(primaryAction || secondaryAction) && (
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    gap: theme.spacing.md,
-                    padding: theme.spacing.lg,
-                    borderTopWidth: 1,
-                    borderTopColor: theme.colors.border,
-                  }}
-                >
-                  {secondaryAction && (
-                    <Button
-                      variant="tertiary"
-                      onPress={secondaryAction.onPress}
-                      style={{ flex: 1 }}
-                    >
-                      {secondaryAction.text}
-                    </Button>
-                  )}
-                  
-                  {primaryAction && (
-                    <Button
-                      variant="primary"
-                      onPress={primaryAction.onPress}
-                      loading={primaryAction.loading}
-                      disabled={primaryAction.disabled}
-                      style={{ flex: 1 }}
-                      leftIcon={primaryAction.icon}
-                    >
-                      {primaryAction.text}
-                    </Button>
-                  )}
-                </View>
-              )}
-            </View>
-          </TouchableWithoutFeedback>
+                {/* Actions */}
+                {(primaryAction || secondaryAction) && (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      gap: theme.spacing.md,
+                      padding: theme.spacing.xl,
+                      paddingBottom: position === 'bottom' ? theme.spacing.xl : theme.spacing.lg,
+                      borderTopWidth: 1,
+                      borderTopColor: theme.colors.border,
+                      backgroundColor: theme.colors.surface,
+                    }}
+                  >
+                    {secondaryAction && (
+                      <Button
+                        variant="secondary"
+                        onPress={secondaryAction.onPress}
+                        style={{ flex: 1 }}
+                      >
+                        {secondaryAction.text}
+                      </Button>
+                    )}
+                    
+                    {primaryAction && (
+                      <Button
+                        variant="primary"
+                        onPress={primaryAction.onPress}
+                        loading={primaryAction.loading}
+                        disabled={primaryAction.disabled}
+                        style={{ flex: 1 }}
+                        leftIcon={primaryAction.icon}
+                      >
+                        {primaryAction.text}
+                      </Button>
+                    )}
+                  </View>
+                )}
+            </Animated.View>
         </View>
-      </TouchableWithoutFeedback>
+      </View>
     </RNModal>
   );
 }

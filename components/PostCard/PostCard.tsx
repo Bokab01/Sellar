@@ -16,7 +16,6 @@ import { useImageViewer } from '@/hooks/useImageViewer';
 import { PostImage, ThumbnailImage } from '@/components/ResponsiveImage/ResponsiveImage';
 import { PostInlineMenu } from '@/components/PostInlineMenu/PostInlineMenu';
 import { useFollowFeedback } from '@/hooks/useFollowFeedback';
-import { UniversalReportModal } from '@/components/ReportModal/UniversalReportModal';
 import { 
   Heart, 
   MessageCircle, 
@@ -101,7 +100,6 @@ export function PostCard({
 }: PostCardProps) {
   const { theme } = useTheme();
   const { user } = useAuthStore();
-  const [showReportModal, setShowReportModal] = useState(false);
   
   // Local state for like functionality
   const [isLiked, setIsLiked] = useState(post.isLiked);
@@ -268,7 +266,15 @@ export function PostCard({
   };
 
   const handleReport = () => {
-    setShowReportModal(true);
+    // Navigate to report screen
+    router.push({
+      pathname: '/report',
+      params: {
+        targetType: 'post',
+        targetId: post.id,
+        targetTitle: post.content,
+      },
+    });
   };
 
   return (
@@ -716,14 +722,6 @@ export function PostCard({
         onClose={closeImageViewer}
       />
 
-      {/* Report Modal */}
-      <UniversalReportModal
-        visible={showReportModal}
-        onClose={() => setShowReportModal(false)}
-        targetType="post"
-        targetId={post.id}
-        targetTitle={post.content}
-      />
     </View>
   );
 }

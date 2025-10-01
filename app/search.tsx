@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, ScrollView, RefreshControl } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -82,7 +82,7 @@ export default function SearchResultsScreen() {
   // Get favorites count for header
   const { incrementFavoritesCount, decrementFavoritesCount } = useFavoritesStore();
 
-  const handleFavoritePress = async (listingId: string) => {
+  const handleFavoritePress = useCallback(async (listingId: string) => {
     if (!user) return;
     
     try {
@@ -105,12 +105,12 @@ export default function SearchResultsScreen() {
     } catch (error) {
       console.error('Error toggling favorite:', error);
     }
-  };
+  }, [user, hookFavorites, decrementFavoritesCount, incrementFavoritesCount, refreshStats]);
 
-  const handleViewPress = (listingId: string) => {
+  const handleViewPress = useCallback((listingId: string) => {
     // Navigate to listing detail to see more details
     router.push(`/(tabs)/home/${listingId}`);
-  };
+  }, []);
 
   // Update search when query param changes
   useEffect(() => {
@@ -119,70 +119,101 @@ export default function SearchResultsScreen() {
     }
   }, [initialQuery]);
 
-  // Transform database listings to component format
-  const transformedProducts = products.map((listing: any) => {
-    const seller = listing.profiles || null;
-    
-    // Determine the highest priority badge (only show ONE badge per listing)
-    let primaryBadge = null;
-    
-    // Priority order: Urgent > Spotlight > Boosted > Business > Verified
-    if (listing.urgent_until && new Date(listing.urgent_until) > new Date()) {
-      primaryBadge = { text: 'Urgent Sale', variant: 'urgent' as const };
-    } else if (listing.spotlight_until && new Date(listing.spotlight_until) > new Date()) {
-      primaryBadge = { text: 'Spotlight', variant: 'spotlight' as const };
-    } else if (listing.boost_until && new Date(listing.boost_until) > new Date()) {
-      primaryBadge = { text: 'Boosted', variant: 'featured' as const };
-    } else if (seller?.account_type === 'business') {
-      primaryBadge = { text: 'Business', variant: 'info' as const };
-    } else if (seller?.verification_status === 'verified') {
-      primaryBadge = { text: 'Verified', variant: 'success' as const };
-    }
+  // Transform database listings to component format - memoized for performance
+  const transformedProducts = useMemo(() => {
+    return products.map((listing: any) => {
+      const seller = listing.profiles || null;
+      
+      // Determine the highest priority badge (only show ONE badge per listing)
+      let primaryBadge = null;
+      
+      // Priority order: Urgent > Spotlight > Boosted > Business > Verified
+      if (listing.urgent_until && new Date(listing.urgent_until) > new Date()) {
+        primaryBadge = { text: 'Urgent Sale', variant: 'urgent' as const };
+      } else if (listing.spotlight_until && new Date(listing.spotlight_until) > new Date()) {
+        primaryBadge = { text: 'Spotlight', variant: 'spotlight' as const };
+      } else if (listing.boost_until && new Date(listing.boost_until) > new Date()) {
+        primaryBadge = { text: 'Boosted', variant: 'featured' as const };
+      } else if (seller?.account_type === 'business') {
+        primaryBadge = { text: 'Business', variant: 'info' as const };
+      } else if (seller?.verification_status === 'verified') {
+        primaryBadge = { text: 'Verified', variant: 'success' as const };
+      }
 
-    return {
-      id: listing.id,
-      image: listing.images || ['https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg'],
-      title: listing.title,
-      price: listing.price,
-      seller: {
-        id: seller?.id || listing.user_id,
-        name: seller ? getDisplayName(seller, false).displayName : 'Anonymous User',
-        avatar: seller?.avatar_url || null,
-        rating: seller?.rating || 0,
-        badges: seller?.account_type === 'business' ? ['business'] : [],
-      },
-      badge: primaryBadge || undefined, // Convert null to undefined
-      location: listing.location,
-      views: listing.views_count || 0,
-      favorites: listing.favorites_count || 0,
-      isBoosted: listing.boost_until && new Date(listing.boost_until) > new Date(),
-    };
-  });
+      return {
+        id: listing.id,
+        image: listing.images || ['https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg'],
+        title: listing.title,
+        price: listing.price,
+        seller: {
+          id: seller?.id || listing.user_id,
+          name: seller ? getDisplayName(seller, false).displayName : 'Anonymous User',
+          avatar: seller?.avatar_url || null,
+          rating: seller?.rating || 0,
+          badges: seller?.account_type === 'business' ? ['business'] : [],
+        },
+        badge: primaryBadge || undefined, // Convert null to undefined
+        location: listing.location,
+        views: listing.views_count || 0,
+        favorites: listing.favorites_count || 0,
+        isBoosted: listing.boost_until && new Date(listing.boost_until) > new Date(),
+      };
+    });
+  }, [products]);
 
-  const handleClearSearch = () => {
+  const handleClearSearch = useCallback(() => {
     setSearchQuery('');
     setSelectedCategories([]);
-  };
+  }, [setSelectedCategories]);
+
+  // Memoize header title to prevent unnecessary re-renders
+  const headerTitle = useMemo(() => {
+    if (categoryName) {
+      return `${categoryName} (${products.length})`;
+    }
+    if (searchQuery) {
+      return `Results for "${searchQuery}"`;
+    }
+    return 'Search Results';
+  }, [categoryName, searchQuery, products.length]);
+
+  const handleBackPress = useCallback(() => {
+    router.back();
+  }, []);
+
+  const handleFilterPress = useCallback(() => {
+    setShowFilters(true);
+  }, [setShowFilters]);
+
+  const handleApplyFilters = useCallback((newFilters: any) => {
+    setFilters(newFilters);
+    setShowFilters(false);
+  }, [setFilters, setShowFilters]);
+
+  const handleClearFilters = useCallback(() => {
+    setFilters({
+      priceRange: { min: undefined, max: undefined },
+      condition: [],
+      categories: [],
+      location: '',
+      sortBy: 'Newest First',
+    });
+    setShowFilters(false);
+  }, [setFilters, setShowFilters]);
 
   return (
     <SafeAreaWrapper>
       <AppHeader
-        title={
-          categoryName 
-            ? `${categoryName} (${products.length})` 
-            : searchQuery 
-              ? `Results for "${searchQuery}"` 
-              : 'Search Results'
-        }
+        title={headerTitle}
         showBackButton
-        onBackPress={() => router.back()}
+        onBackPress={handleBackPress}
       />
 
       {/* Search Bar */}
       <SearchBar
         value={searchQuery}
         onChangeText={setSearchQuery}
-        onFilter={() => setShowFilters(true)}
+        onFilter={handleFilterPress}
         onClear={searchQuery ? handleClearSearch : undefined}
         placeholder="Search for anything..."
       />
@@ -256,6 +287,10 @@ export default function SearchResultsScreen() {
                 colors={[theme.colors.primary]}
               />
             }
+            // Performance optimizations for ScrollView
+            removeClippedSubviews={true}
+            scrollEventThrottle={16}
+            decelerationRate="fast"
           >
             <Grid columns={2} spacing={4}>
               {transformedProducts.map((product) => (
@@ -290,22 +325,8 @@ export default function SearchResultsScreen() {
         onClose={() => setShowFilters(false)}
         filters={filters}
         currentCategory={categoryName} // Pass current category for smart filtering
-        onApplyFilters={(newFilters) => {
-          // Update filters in app store
-          setFilters(newFilters);
-          setShowFilters(false);
-        }}
-        onClearFilters={() => {
-          // Clear filters in app store
-          setFilters({
-            priceRange: { min: undefined, max: undefined },
-            condition: [],
-            categories: [],
-            location: '',
-            sortBy: 'Newest First',
-          });
-          setShowFilters(false);
-        }}
+        onApplyFilters={handleApplyFilters}
+        onClearFilters={handleClearFilters}
       />
     </SafeAreaWrapper>
   );

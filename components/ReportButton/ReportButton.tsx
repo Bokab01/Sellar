@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import { TouchableOpacity, Alert } from 'react-native';
+import React from 'react';
+import { TouchableOpacity } from 'react-native';
 import { Flag } from 'lucide-react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
-import { UniversalReportModal, ReportTargetType } from '@/components/ReportModal/UniversalReportModal';
+import { router } from 'expo-router';
+
+export type ReportTargetType = 'listing' | 'post' | 'comment' | 'message' | 'user';
 
 interface ReportButtonProps {
   targetType: ReportTargetType;
@@ -29,7 +31,6 @@ export function ReportButton({
   style
 }: ReportButtonProps) {
   const { theme } = useTheme();
-  const [showReportModal, setShowReportModal] = useState(false);
 
   const getIconSize = () => {
     switch (size) {
@@ -65,7 +66,15 @@ export function ReportButton({
   };
 
   const handlePress = () => {
-    setShowReportModal(true);
+    router.push({
+      pathname: '/report',
+      params: {
+        targetType,
+        targetId,
+        targetTitle: targetTitle || '',
+        targetUser: targetUser ? JSON.stringify(targetUser) : undefined,
+      },
+    });
   };
 
   const renderContent = () => {
@@ -104,32 +113,21 @@ export function ReportButton({
   };
 
   return (
-    <>
-      <TouchableOpacity
-        onPress={handlePress}
-        style={[
-          {
-            flexDirection: variant === 'full' ? 'row' : undefined,
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: getPadding(),
-            borderRadius: theme.borderRadius.sm,
-          },
-          style
-        ]}
-        activeOpacity={0.7}
-      >
-        {renderContent()}
-      </TouchableOpacity>
-
-      <UniversalReportModal
-        visible={showReportModal}
-        onClose={() => setShowReportModal(false)}
-        targetType={targetType}
-        targetId={targetId}
-        targetTitle={targetTitle}
-        targetUser={targetUser}
-      />
-    </>
+    <TouchableOpacity
+      onPress={handlePress}
+      style={[
+        {
+          flexDirection: variant === 'full' ? 'row' : undefined,
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: getPadding(),
+          borderRadius: theme.borderRadius.sm,
+        },
+        style
+      ]}
+      activeOpacity={0.7}
+    >
+      {renderContent()}
+    </TouchableOpacity>
   );
 }

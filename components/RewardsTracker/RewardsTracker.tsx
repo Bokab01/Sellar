@@ -197,7 +197,7 @@ export function RewardsTracker({ style }: RewardsTrackerProps) {
 
   if (loading) {
     return (
-      <View style={[{ padding: theme.spacing.lg }, style]}>
+      <View style={[{ padding: theme.spacing.sm }, style]}>
         {Array.from({ length: 5 }).map((_, index) => (
           <LoadingSkeleton
             key={index}
@@ -271,8 +271,8 @@ export function RewardsTracker({ style }: RewardsTrackerProps) {
       {/* Rewards List */}
       <ScrollView
         contentContainerStyle={{
-          paddingHorizontal: theme.spacing.lg,
-          paddingBottom: theme.spacing.xl,
+          paddingHorizontal: theme.spacing.xs,
+          paddingBottom: theme.spacing.xs,
         }}
         showsVerticalScrollIndicator={false}
       >

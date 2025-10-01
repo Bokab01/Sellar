@@ -6,9 +6,10 @@ import { Text } from '@/components/Typography/Text';
 import { Search, X, Clock, TrendingUp } from 'lucide-react-native';
 
 interface SearchSuggestion {
-  suggestion: string;
-  frequency: number;
-  last_searched: string;
+  suggestion_id: string;
+  suggestion_text: string;
+  suggestion_type: string;
+  relevance_score: number;
 }
 
 interface EnhancedSearchBarProps {
@@ -114,32 +115,37 @@ export function EnhancedSearchBar({
     return date.toLocaleDateString();
   };
 
-  const renderSuggestion = ({ item }: { item: SearchSuggestion }) => (
-    <TouchableOpacity
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: theme.spacing.md,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.colors.border,
-      }}
-      onPress={() => handleSuggestionPress(item.suggestion)}
-      activeOpacity={0.7}
-    >
-      <Clock size={16} color={theme.colors.text.muted} />
-      <View style={{ flex: 1, marginLeft: theme.spacing.sm }}>
-        <Text variant="body" numberOfLines={1}>
-          {item.suggestion}
-        </Text>
-        <Text variant="caption" color="muted">
-          {formatLastSearched(item.last_searched)} • {item.frequency} searches
-        </Text>
-      </View>
-      {item.frequency > 5 && (
-        <TrendingUp size={14} color={theme.colors.primary} />
-      )}
-    </TouchableOpacity>
-  );
+  const renderSuggestion = ({ item }: { item: SearchSuggestion }) => {
+    const icon = item.suggestion_type === 'recent_search' ? Clock : TrendingUp;
+    const IconComponent = icon;
+    
+    return (
+      <TouchableOpacity
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          padding: theme.spacing.md,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.colors.border,
+        }}
+        onPress={() => handleSuggestionPress(item.suggestion_text)}
+        activeOpacity={0.7}
+      >
+        <IconComponent size={16} color={theme.colors.text.muted} />
+        <View style={{ flex: 1, marginLeft: theme.spacing.sm }}>
+          <Text variant="body" numberOfLines={1}>
+            {item.suggestion_text}
+          </Text>
+          <Text variant="caption" color="muted">
+            {item.suggestion_type === 'recent_search' ? 'Recent' : item.suggestion_type === 'listing' ? 'Popular Listing' : 'Category'}
+          </Text>
+        </View>
+        {item.relevance_score > 0.9 && (
+          <TrendingUp size={14} color={theme.colors.primary} />
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={[{ position: 'relative' }, style]}>
@@ -227,7 +233,7 @@ export function EnhancedSearchBar({
             <FlatList
               data={suggestions}
               renderItem={renderSuggestion}
-              keyExtractor={(item) => item.suggestion}
+              keyExtractor={(item) => item.suggestion_id}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             />

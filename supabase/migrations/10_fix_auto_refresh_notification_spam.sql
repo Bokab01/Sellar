@@ -4,7 +4,7 @@
 -- This migration fixes the issue where users get spammed with notifications
 -- every time their listings are auto-refreshed (every 2 hours)
 
--- Update the listing notification function to exclude auto-refresh updates
+-- Update the listing notification function to exclude auto-refresh updates and handle DELETE operations
 CREATE OR REPLACE FUNCTION create_listing_notification()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -12,6 +12,7 @@ DECLARE
     seller_avatar TEXT;
     listing_title TEXT;
     is_auto_refresh BOOLEAN := FALSE;
+    user_id_to_use UUID;
 BEGIN
     -- Check if this is an auto-refresh update using session variable
     -- The auto-refresh function should set this variable
@@ -23,42 +24,71 @@ BEGIN
 
     -- Skip notification for auto-refresh updates
     IF is_auto_refresh THEN
-        RETURN NEW;
+        RETURN COALESCE(NEW, OLD);
     END IF;
 
-    -- Get seller details
-    SELECT username, avatar_url INTO seller_username, seller_avatar
-    FROM profiles 
-    WHERE id = NEW.user_id;
-    
-    -- Get listing title
-    listing_title := NEW.title;
-    
-    -- Create notification for the seller (listing created/updated)
-    INSERT INTO notifications (user_id, type, title, body, data)
-    VALUES (
-        NEW.user_id,
-        'listing',
-        CASE 
-            WHEN TG_OP = 'INSERT' THEN 'Listing Created Successfully! 🎉'
-            WHEN TG_OP = 'UPDATE' THEN 'Listing Updated ✏️'
-            ELSE 'Listing ' || TG_OP
-        END,
-        CASE 
-            WHEN TG_OP = 'INSERT' THEN 'Your listing "' || listing_title || '" has been created and is now live!'
-            WHEN TG_OP = 'UPDATE' THEN 'Your listing "' || listing_title || '" has been updated successfully.'
-            ELSE 'Your listing "' || listing_title || '" was ' || TG_OP
-        END,
-        jsonb_build_object(
-            'listing_id', NEW.id,
-            'listing_title', listing_title,
-            'action', TG_OP,
-            'created_at', NEW.created_at,
-            'is_auto_refresh', is_auto_refresh
-        )
-    );
-    
-    RETURN NEW;
+    -- Handle different trigger operations
+    IF TG_OP = 'DELETE' THEN
+        -- For DELETE operations, use OLD instead of NEW
+        user_id_to_use := OLD.user_id;
+        listing_title := OLD.title;
+        
+        -- Get seller details from OLD record
+        SELECT username, avatar_url INTO seller_username, seller_avatar
+        FROM profiles 
+        WHERE id = OLD.user_id;
+        
+        -- Create notification for listing deletion
+        INSERT INTO notifications (user_id, type, title, body, data)
+        VALUES (
+            user_id_to_use,
+            'listing',
+            'Listing Deleted 🗑️',
+            'Your listing "' || listing_title || '" has been deleted.',
+            jsonb_build_object(
+                'listing_id', OLD.id,
+                'action', 'DELETE',
+                'created_at', NOW()
+            )
+        );
+        
+        RETURN OLD;
+    ELSE
+        -- For INSERT and UPDATE operations, use NEW
+        user_id_to_use := NEW.user_id;
+        listing_title := NEW.title;
+        
+        -- Get seller details from NEW record
+        SELECT username, avatar_url INTO seller_username, seller_avatar
+        FROM profiles 
+        WHERE id = NEW.user_id;
+        
+        -- Create notification for listing creation/update
+        INSERT INTO notifications (user_id, type, title, body, data)
+        VALUES (
+            user_id_to_use,
+            'listing',
+            CASE 
+                WHEN TG_OP = 'INSERT' THEN 'Listing Created Successfully! 🎉'
+                WHEN TG_OP = 'UPDATE' THEN 'Listing Updated ✏️'
+                ELSE 'Listing ' || TG_OP
+            END,
+            CASE 
+                WHEN TG_OP = 'INSERT' THEN 'Your listing "' || listing_title || '" has been created and is now live!'
+                WHEN TG_OP = 'UPDATE' THEN 'Your listing "' || listing_title || '" has been updated successfully.'
+                ELSE 'Your listing "' || listing_title || '" was ' || TG_OP
+            END,
+            jsonb_build_object(
+                'listing_id', NEW.id,
+                'listing_title', listing_title,
+                'action', TG_OP,
+                'created_at', NEW.created_at,
+                'is_auto_refresh', is_auto_refresh
+            )
+        );
+        
+        RETURN NEW;
+    END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -145,5 +175,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Update the trigger to handle DELETE operations
+DROP TRIGGER IF EXISTS trigger_create_listing_notification ON listings;
+CREATE TRIGGER trigger_create_listing_notification
+    AFTER INSERT OR UPDATE OR DELETE ON listings
+    FOR EACH ROW
+    EXECUTE FUNCTION create_listing_notification();
+
+-- Add comments explaining the fixes
+COMMENT ON FUNCTION create_listing_notification() IS 'Creates notifications for listing operations (INSERT, UPDATE, DELETE) with proper null handling and auto-refresh detection';
+COMMENT ON TRIGGER trigger_create_listing_notification ON listings IS 'Triggers notification creation for all listing operations, properly handling DELETE operations and auto-refresh detection';
+
 -- Verify the fix
-SELECT 'Auto-refresh notification spam fix applied successfully' as status;
+SELECT 'Auto-refresh notification spam fix and DELETE operation fix applied successfully' as status;

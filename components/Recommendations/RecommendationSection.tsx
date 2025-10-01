@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { View, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, TouchableOpacity, RefreshControl, ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -224,7 +224,7 @@ const RecommendationSection = memo(function RecommendationSection({
               key={index}
               width={180}
               height={200}
-              style={{ borderRadius: theme.borderRadius.md }}
+              style={{ borderRadius: theme.borderRadius.lg }}
             />
           ))}
         </View>
@@ -330,7 +330,21 @@ const RecommendationSection = memo(function RecommendationSection({
           })}
         </Grid>
       ) : (
-        <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: theme.spacing.lg,
+            gap: theme.spacing.sm,
+          }}
+          style={{ marginHorizontal: -theme.spacing.lg }}
+          removeClippedSubviews={true}
+          scrollEventThrottle={32}
+          decelerationRate="fast"
+          pagingEnabled={false}
+          snapToInterval={200}
+          snapToAlignment="start"
+        >
           {recommendations.slice(0, limit).map((item, index) => {
             // Ensure we have valid data before rendering
             if (!item || !item.listing_id || !item.title) {
@@ -338,7 +352,7 @@ const RecommendationSection = memo(function RecommendationSection({
             }
             
             return (
-              <View key={item.listing_id} style={{ width: 180 }}>
+              <View key={item.listing_id} style={{ width: 190 }}>
                 <ProductCard
                   image={Array.isArray(item.images) ? item.images[0] : (item.images || '')}
                   title={item.title || 'Untitled'}
@@ -351,6 +365,7 @@ const RecommendationSection = memo(function RecommendationSection({
                     rating: 0
                   }}
                   location={item.location || 'Unknown'}
+                  layout="grid"
                   listingId={item.listing_id}
                   isFavorited={hookFavorites[item.listing_id] || false}
                   viewCount={viewCounts[item.listing_id] || 0}
@@ -361,10 +376,10 @@ const RecommendationSection = memo(function RecommendationSection({
                   showReportButton={false}
                   currentUserId={user?.id || ""}
                 />
-            </View>
+              </View>
             );
           })}
-        </View>
+        </ScrollView>
       )}
     </View>
   );

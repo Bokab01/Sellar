@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Platform, Alert, TouchableOpacity, Linking, Image, Keyboard, TouchableWithoutFeedback, KeyboardAvoidingView } from 'react-native';
+import { View, Platform, Alert, TouchableOpacity, Linking, Image, Keyboard, TouchableWithoutFeedback, Animated, ScrollView } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -72,8 +72,10 @@ export default function ChatScreen() {
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
   const [lastSeenText, setLastSeenText] = useState('');
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   
   const scrollViewRef = useRef<KeyboardAwareScrollView>(null);
+  const inputContainerTranslateY = useRef(new Animated.Value(0)).current;
 
   // Get conversation details
   const [conversation, setConversation] = useState<any>(null);
@@ -89,6 +91,45 @@ export default function ChatScreen() {
       console.log('📱 Chat detail screen loaded for conversation:', conversationId);
     }
   }, [conversationId]);
+
+  // Keyboard event listeners for smooth animation
+  useEffect(() => {
+    const keyboardWillShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        const keyboardHeight = e.endCoordinates.height;
+        setKeyboardHeight(keyboardHeight);
+        setIsKeyboardVisible(true);
+        
+        // Animate input container up by keyboard height
+        Animated.timing(inputContainerTranslateY, {
+          toValue: -keyboardHeight,
+          duration: Platform.OS === 'ios' ? 250 : 200,
+          useNativeDriver: true,
+        }).start();
+      }
+    );
+
+    const keyboardWillHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+        setIsKeyboardVisible(false);
+        
+        // Animate input container back to original position
+        Animated.timing(inputContainerTranslateY, {
+          toValue: 0,
+          duration: Platform.OS === 'ios' ? 250 : 200,
+          useNativeDriver: true,
+        }).start();
+      }
+    );
+
+    return () => {
+      keyboardWillShowListener.remove();
+      keyboardWillHideListener.remove();
+    };
+  }, []);
 
   useEffect(() => {
     // Load draft message only when conversation changes, not when draftMessages changes
@@ -741,12 +782,7 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaWrapper style={{ flex: 1 }}>
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-      >
-        <AppHeader
+      <AppHeader
         title={otherUser ? getDisplayName(otherUser, false).displayName : 'Chat'}
         subtitle={otherUser ? lastSeenText : ''}
         showBackButton
@@ -955,22 +991,10 @@ export default function ChatScreen() {
         <KeyboardAwareScrollView
           ref={scrollViewRef}
           style={{ flex: 1 }}
-          contentContainerStyle={{ 
-            paddingVertical: theme.spacing.md,
-            paddingBottom: isKeyboardVisible ? theme.spacing.xl : 0, // No padding when keyboard is hidden
-            flexGrow: isKeyboardVisible ? 1 : 0, // Only grow when keyboard is visible
-            minHeight: isKeyboardVisible ? 'auto' : 'auto', // Natural height when keyboard is hidden
+          contentContainerStyle={{
+            paddingHorizontal: theme.spacing.lg,
+            paddingBottom: keyboardHeight,
           }}
-          enableOnAndroid={true}
-          enableAutomaticScroll={true}
-          keyboardOpeningTime={0}
-          extraScrollHeight={Platform.OS === 'android' ? 0 : 0} // Reduced since we're using KeyboardAvoidingView
-          extraHeight={Platform.OS === 'android' ? 0 : 0} // Reduced since we're using KeyboardAvoidingView
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd(true)}
-          resetScrollToCoords={{ x: 0, y: 0 }}
-          scrollEventThrottle={16}
         >
           {messages.length === 0 ? (
             <EmptyState
@@ -1186,7 +1210,7 @@ export default function ChatScreen() {
       </TouchableWithoutFeedback>
 
       {/* Message Input - Fixed at bottom */}
-      <View
+      <Animated.View
         style={{
           flexDirection: 'row',
           alignItems: 'flex-end',
@@ -1197,6 +1221,7 @@ export default function ChatScreen() {
           paddingTop: theme.spacing.xs,
           paddingBottom: Platform.OS === 'android' ? Math.max(insets.bottom, theme.spacing.sm) : theme.spacing.sm,
           gap: theme.spacing.xs,
+          transform: [{ translateY: inputContainerTranslateY }],
         }}
       >
         {/* Image Picker */}
@@ -1221,10 +1246,11 @@ export default function ChatScreen() {
           }}
           conversationId={conversationId}
         />
-      </View>
+      </Animated.View>
 
       {/* Make Offer Modal */}
       <AppModal
+        position="bottom"
         visible={showOfferModal}
         onClose={() => setShowOfferModal(false)}
         title="Make an Offer"
@@ -1288,6 +1314,7 @@ export default function ChatScreen() {
 
       {/* Counter Offer Modal */}
       <AppModal
+        position="bottom"
         visible={showCounterModal}
         onClose={() => setShowCounterModal(false)}
         title="Make Counter Offer"
@@ -1346,7 +1373,6 @@ export default function ChatScreen() {
         variant={toastVariant}
         onHide={() => setShowToast(false)}
       />
-      </KeyboardAvoidingView>
     </SafeAreaWrapper>
   );
 }

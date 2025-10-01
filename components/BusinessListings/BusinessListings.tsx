@@ -75,6 +75,7 @@ const BusinessListings = memo(function BusinessListings({
         price={listing.price}
         currency={listing.currency}
         seller={listing.seller}
+        location={listing.location}
         onPress={() => handleListingPress(listing.id)}
         viewCount={listing.viewCount}
         isFavorited={favorites[listing.id] || false}

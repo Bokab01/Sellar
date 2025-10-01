@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Animated } from 'react-native';
+import { View, Animated, Image, useColorScheme } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Grid } from '@/components/Grid/Grid';
 
@@ -169,17 +169,87 @@ export function ProductCardSkeleton() {
 // Home screen specific skeleton that matches the current UI
 export function HomeScreenSkeleton() {
   const { theme } = useTheme();
+  const colorScheme = useColorScheme();
+  const animatedValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(animatedValue, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animatedValue, {
+          toValue: 0,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    animation.start();
+
+    return () => animation.stop();
+  }, []);
+
+  const opacity = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.4, 1],
+  });
+
+  const scale = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.95, 1.05],
+  });
+
+  // Use the appropriate icon based on color scheme
+  const iconSource = colorScheme === 'dark' 
+    ? require('@/assets/icon/icon-dark.png')
+    : require('@/assets/icon/icon-light.png');
 
   return (
     <View style={{ 
-      paddingHorizontal: theme.spacing.lg,
-      paddingTop: 120, // Account for floating search header space
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingBottom: 100, // Center it better accounting for bottom tabs
     }}>
-      <Grid columns={2}>
-        {Array.from({ length: 6 }).map((_, index) => (
-          <ProductCardSkeleton key={index} />
-        ))}
-      </Grid>
+      <Animated.View style={{ 
+        opacity,
+        transform: [{ scale }],
+        alignItems: 'center',
+      }}>
+        {/* App Icon */}
+        <Animated.Image
+          source={iconSource}
+          style={{
+            width: 120,
+            height: 120,
+            borderRadius: 30,
+            marginBottom: theme.spacing.xl,
+          }}
+          resizeMode="contain"
+        />
+        
+        <Animated.Text style={{
+          fontSize: 28,
+          fontWeight: '700',
+          color: theme.colors.text.primary,
+          marginBottom: theme.spacing.sm,
+          opacity,
+        }}>
+          Sellar
+        </Animated.Text>
+        
+        <Animated.Text style={{
+          fontSize: 14,
+          color: theme.colors.text.secondary,
+          opacity,
+        }}>
+          Loading your marketplace...
+        </Animated.Text>
+      </Animated.View>
     </View>
   );
 }

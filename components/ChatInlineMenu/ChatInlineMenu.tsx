@@ -3,7 +3,6 @@ import { View, TouchableOpacity, Alert, Animated, Modal } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { router } from 'expo-router';
-import { UniversalReportModal } from '@/components/ReportModal/UniversalReportModal';
 import { 
   EllipsisVertical, 
   User, 
@@ -44,7 +43,6 @@ export function ChatInlineMenu({
 }: ChatInlineMenuProps) {
   const { theme } = useTheme();
   const [showMenu, setShowMenu] = useState(false);
-  const [showReportModal, setShowReportModal] = useState(false);
   const menuAnimation = useRef(new Animated.Value(0)).current;
 
   const toggleMenu = () => {
@@ -160,7 +158,14 @@ export function ChatInlineMenu({
 
   const handleReport = () => {
     setShowMenu(false);
-    setShowReportModal(true);
+    router.push({
+      pathname: '/report',
+      params: {
+        targetType: 'user',
+        targetId: otherUser?.id,
+        targetTitle: `${otherUser?.first_name || 'User'} ${otherUser?.last_name || ''}`.trim(),
+      },
+    });
   };
 
   const menuItems = [
@@ -321,20 +326,6 @@ export function ChatInlineMenu({
           </View>
         </TouchableOpacity>
       </Modal>
-
-      {/* Report Modal */}
-      <UniversalReportModal
-        visible={showReportModal}
-        onClose={() => setShowReportModal(false)}
-        targetType="user"
-        targetId={otherUser?.id}
-        targetTitle={`${otherUser?.first_name || 'User'} ${otherUser?.last_name || ''}`.trim()}
-        targetUser={{
-          id: otherUser?.id,
-          name: `${otherUser?.first_name || 'User'} ${otherUser?.last_name || ''}`.trim(),
-          avatar: otherUser?.avatar_url
-        }}
-      />
     </>
   );
 }

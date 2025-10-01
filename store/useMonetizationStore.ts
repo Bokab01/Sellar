@@ -521,7 +521,6 @@ export const useMonetizationStore = create<MonetizationState>()(
       if (verifyError) {
         console.error('❌ Error verifying update:', verifyError);
       } else {
-        console.log('🔍 Verification - Current subscription status:', verifySub?.status);
       }
 
       // Add a small delay to ensure database consistency

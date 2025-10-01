@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, ScrollView, RefreshControl } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase } from '@/lib/supabase';
@@ -36,12 +37,29 @@ export default function FollowersScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [followingStates, setFollowingStates] = useState<Record<string, boolean>>({});
+  
+  // Cache data to prevent unnecessary refetches
+  const hasLoadedData = useRef(false);
+  const lastFetchTime = useRef(0);
+  const FETCH_COOLDOWN = 30000; // 30 seconds cooldown
 
-  const fetchFollowers = useCallback(async () => {
+  const fetchFollowers = useCallback(async (forceRefresh = false) => {
     if (!user?.id) return;
+
+    // Smart caching - only fetch if needed
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchTime.current;
+    
+    if (!forceRefresh && hasLoadedData.current && timeSinceLastFetch < FETCH_COOLDOWN) {
+      console.log('⏭️ Followers: Using cached data');
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
 
     try {
       setError(null);
+      console.log('🔄 Followers: Fetching data', { forceRefresh, timeSinceLastFetch });
       
       // Try to use RPC function first
       try {
@@ -118,6 +136,9 @@ export default function FollowersScreen() {
         states[follower.id] = follower.is_following_back;
       });
       setFollowingStates(states);
+      
+      hasLoadedData.current = true;
+      lastFetchTime.current = now;
     } catch (err: any) {
       console.error('Error fetching followers:', err);
       if (err.message.includes('relation "follows" does not exist')) {
@@ -131,9 +152,30 @@ export default function FollowersScreen() {
     }
   }, [user]);
 
+  // Reset cache when user changes
+  useEffect(() => {
+    hasLoadedData.current = false;
+    lastFetchTime.current = 0;
+  }, [user?.id]);
+
   useEffect(() => {
     fetchFollowers();
-  }, [user, fetchFollowers]);
+  }, [fetchFollowers]);
+
+  // Smart focus effect - only refresh if needed
+  useFocusEffect(
+    useCallback(() => {
+      const now = Date.now();
+      const timeSinceLastFetch = now - lastFetchTime.current;
+      
+      if (!hasLoadedData.current || timeSinceLastFetch > FETCH_COOLDOWN) {
+        console.log('🔄 Followers: Focus refresh', { hasLoadedData: hasLoadedData.current, timeSinceLastFetch });
+        fetchFollowers();
+      } else {
+        console.log('⏭️ Followers: Using cached data on focus');
+      }
+    }, [fetchFollowers])
+  );
 
   const handleFollowToggle = async (userId: string) => {
     const isCurrentlyFollowing = followingStates[userId];
@@ -201,10 +243,10 @@ export default function FollowersScreen() {
     }
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchFollowers();
-  };
+    fetchFollowers(true); // Force refresh
+  }, [fetchFollowers]);
 
   return (
     <SafeAreaWrapper>
@@ -218,8 +260,11 @@ export default function FollowersScreen() {
         {loading ? (
           <ScrollView
             contentContainerStyle={{
-              padding: theme.spacing.lg,
+              padding: theme.spacing.sm,
             }}
+            removeClippedSubviews={true}
+            scrollEventThrottle={32}
+            decelerationRate="fast"
           >
             {Array.from({ length: 5 }).map((_, index) => (
               <View
@@ -239,7 +284,7 @@ export default function FollowersScreen() {
                   <LoadingSkeleton width="70%" height={16} />
                   <LoadingSkeleton width="50%" height={12} />
                 </View>
-                <LoadingSkeleton width={80} height={32} borderRadius={16} />
+                <LoadingSkeleton width={70} height={28} borderRadius={14} />
               </View>
             ))}
           </ScrollView>
@@ -251,7 +296,7 @@ export default function FollowersScreen() {
         ) : followers.length > 0 ? (
           <ScrollView
             contentContainerStyle={{
-              padding: theme.spacing.lg,
+              padding: theme.spacing.sm,
               paddingBottom: theme.spacing.xl,
             }}
             showsVerticalScrollIndicator={false}
@@ -262,6 +307,9 @@ export default function FollowersScreen() {
                 tintColor={theme.colors.primary}
               />
             }
+            removeClippedSubviews={true}
+            scrollEventThrottle={32}
+            decelerationRate="fast"
           >
             {followers.map((follower) => (
               <View
@@ -307,7 +355,7 @@ export default function FollowersScreen() {
                     )}
                   </View>
                   <Text variant="caption" color="muted">
-                    {follower.followers_count} followers • Followed you on {new Date(follower.followed_at).toLocaleDateString()}
+                    Followed you on {new Date(follower.followed_at).toLocaleDateString()}
                   </Text>
                 </View>
                 
@@ -316,10 +364,15 @@ export default function FollowersScreen() {
                   size="sm"
                   icon={
                     followingStates[follower.id] ? 
-                      <UserCheck size={16} color={theme.colors.primary} /> :
-                      <UserPlus2 size={16} color="#FFF" />
+                      <UserCheck size={12} color={theme.colors.primary} /> :
+                      <UserPlus2 size={12} color="#FFF" />
                   }
                   onPress={() => handleFollowToggle(follower.id)}
+                  style={{ 
+                    paddingHorizontal: theme.spacing.sm,
+                    paddingVertical: theme.spacing.xs,
+                    minHeight: 28
+                  }}
                 >
                   {followingStates[follower.id] ? 'Following' : 'Follow Back'}
                 </Button>

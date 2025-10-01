@@ -90,6 +90,9 @@ const RecommendationFeed = memo(function RecommendationFeed({
         />
       }
       showsVerticalScrollIndicator={false}
+      removeClippedSubviews={true}
+      scrollEventThrottle={32}
+      decelerationRate="fast"
     >
       {/* Personalized Recommendations - Load first */}
       {loadedSections.includes('personalized') && (
@@ -98,8 +101,8 @@ const RecommendationFeed = memo(function RecommendationFeed({
           subtitle="Based on your interests and activity"
           icon={<Star size={20} color={theme.colors.primary} />}
           type="personalized"
-          limit={4}
-          layout="grid"
+          limit={6}
+          layout="horizontal"
           showViewAll={true}
           onViewAll={onViewAllPersonalized}
           onListingPress={onListingPress}
@@ -114,8 +117,8 @@ const RecommendationFeed = memo(function RecommendationFeed({
           icon={<TrendingUp size={20} color={theme.colors.primary} />}
           type="trending"
           userLocation={user.user_metadata?.location}
-          limit={4}
-          layout="grid"
+          limit={6}
+          layout="horizontal"
           showViewAll={true}
           onViewAll={onViewAllTrending}
           onListingPress={onListingPress}
@@ -129,8 +132,8 @@ const RecommendationFeed = memo(function RecommendationFeed({
           subtitle="Items you've looked at"
           icon={<Eye size={20} color={theme.colors.primary} />}
           type="recently_viewed"
-          limit={4}
-          layout="grid"
+          limit={6}
+          layout="horizontal"
           showViewAll={true}
           onViewAll={onViewAllRecentlyViewed}
           onListingPress={onListingPress}
@@ -145,8 +148,8 @@ const RecommendationFeed = memo(function RecommendationFeed({
           icon={<Zap size={20} color={theme.colors.primary} />}
           type="boosted"
           boostType="featured"
-          limit={4}
-          layout="grid"
+          limit={6}
+          layout="horizontal"
           showViewAll={false}
           onListingPress={onListingPress}
         />

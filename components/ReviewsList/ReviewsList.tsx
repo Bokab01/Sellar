@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { View, TouchableOpacity, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
@@ -49,19 +49,19 @@ export function ReviewsList({
   // Note: Review deletion is disabled for data integrity
   const { toggleHelpfulVote, loading: voteLoading } = useReviewHelpfulVote();
 
-  const handleWriteReview = () => {
+  const handleWriteReview = useCallback(() => {
     setEditingReview(null);
     setShowReviewForm(true);
-  };
+  }, []);
 
-  const handleEditReview = (review: Review) => {
+  const handleEditReview = useCallback((review: Review) => {
     setEditingReview(review);
     setShowReviewForm(true);
-  };
+  }, []);
 
   // Note: Review deletion is disabled for data integrity
 
-  const handleHelpfulVote = async (review: Review) => {
+  const handleHelpfulVote = useCallback(async (review: Review) => {
     if (!user) {
       Alert.alert('Sign In Required', 'Please sign in to vote on reviews');
       return;
@@ -73,14 +73,14 @@ export function ReviewsList({
     } catch (error) {
       Alert.alert('Error', 'Failed to update vote');
     }
-  };
+  }, [user, toggleHelpfulVote, refresh]);
 
-  const handleReviewSuccess = () => {
+  const handleReviewSuccess = useCallback(() => {
     refresh();
     onReviewChange?.();
-  };
+  }, [refresh, onReviewChange]);
 
-  const renderReviewActions = (review: Review) => {
+  const renderReviewActions = useCallback((review: Review) => {
     const isOwnReview = user?.id === review.reviewer_id;
     
     return (
@@ -155,9 +155,9 @@ export function ReviewsList({
         )}
       </View>
     );
-  };
+  }, [user, handleHelpfulVote, voteLoading, theme]);
 
-  const renderReview = (review: Review) => {
+  const renderReview = useCallback((review: Review) => {
     const timeAgo = formatDistanceToNow(new Date(review.created_at), { addSuffix: true });
     
     return (
@@ -208,17 +208,53 @@ export function ReviewsList({
         {renderReviewActions(review)}
       </View>
     );
-  };
+  }, [theme, renderReviewActions]);
 
   if (loading && reviews.length === 0) {
     return (
       <View style={style}>
         {Array.from({ length: 3 }).map((_, index) => (
-          <LoadingSkeleton
+          <View
             key={index}
-            height={150}
-            style={{ marginBottom: theme.spacing.md }}
-          />
+            style={{
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.borderRadius.lg,
+              padding: theme.spacing.lg,
+              marginBottom: theme.spacing.md,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+            }}
+          >
+            {/* Header with avatar and name */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
+              <LoadingSkeleton width={40} height={40} borderRadius={20} />
+              <View style={{ marginLeft: theme.spacing.md, flex: 1 }}>
+                <LoadingSkeleton width="60%" height={16} style={{ marginBottom: theme.spacing.xs }} />
+                <LoadingSkeleton width="40%" height={12} />
+              </View>
+              <LoadingSkeleton width={60} height={20} />
+            </View>
+            
+            {/* Rating stars */}
+            <View style={{ flexDirection: 'row', marginBottom: theme.spacing.sm }}>
+              {Array.from({ length: 5 }).map((_, starIndex) => (
+                <LoadingSkeleton key={starIndex} width={16} height={16} style={{ marginRight: theme.spacing.xs }} />
+              ))}
+            </View>
+            
+            {/* Comment text */}
+            <View style={{ marginBottom: theme.spacing.md }}>
+              <LoadingSkeleton width="100%" height={14} style={{ marginBottom: theme.spacing.xs }} />
+              <LoadingSkeleton width="90%" height={14} style={{ marginBottom: theme.spacing.xs }} />
+              <LoadingSkeleton width="70%" height={14} />
+            </View>
+            
+            {/* Action buttons */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <LoadingSkeleton width={80} height={32} borderRadius={16} />
+              <LoadingSkeleton width={60} height={32} borderRadius={16} />
+            </View>
+          </View>
         ))}
       </View>
     );

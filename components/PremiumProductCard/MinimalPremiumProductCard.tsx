@@ -19,6 +19,7 @@ interface MinimalPremiumProductCardProps {
     name: string;
     isBusinessUser?: boolean;
   };
+  location?: string;
   onPress?: () => void;
   // New props for view count and favorites
   viewCount?: number;
@@ -33,6 +34,7 @@ const MinimalPremiumProductCard = memo(function MinimalPremiumProductCard({
   currency = 'GHS',
   image,
   seller,
+  location,
   onPress,
   viewCount = 0,
   isFavorited = false,
@@ -275,6 +277,21 @@ const MinimalPremiumProductCard = memo(function MinimalPremiumProductCard({
                 fontWeight: '700',
               }}
             />
+            
+            {/* Location */}
+            {location && (
+              <Text 
+                variant="caption"
+                color="muted"
+                numberOfLines={1}
+                style={{ 
+                  marginTop: theme.spacing.xs,
+                  fontSize: 10,
+                }}
+              >
+                {location}
+              </Text>
+            )}
           </View>
           
         </View>
