@@ -4,52 +4,11 @@
 -- =============================================
 -- CATEGORIES SEED DATA
 -- =============================================
+-- NOTE: Categories are now managed in migration 20_comprehensive_categories.sql
+-- This section has been deprecated and replaced with a comprehensive category system
+-- (18 main categories + 102 subcategories)
 
--- Insert main categories with predefined UUIDs for consistency
-INSERT INTO categories (id, name, slug, parent_id, icon, is_active, sort_order) VALUES
--- Main categories
-('00000000-0000-4000-8000-000000000001', 'Electronics & Technology', 'electronics', NULL, 'smartphone', true, 1),
-('00000000-0000-4000-8000-000000000002', 'Fashion', 'fashion', NULL, 'shirt', true, 2),
-('00000000-0000-4000-8000-000000000003', 'Vehicles', 'vehicles', NULL, 'car', true, 3),
-('00000000-0000-4000-8000-000000000004', 'Home & Garden', 'home-garden', NULL, 'home', true, 4),
-('00000000-0000-4000-8000-000000000005', 'Sports & Fitness', 'health-sports', NULL, 'dumbbell', true, 5),
-('00000000-0000-4000-8000-000000000006', 'Business & Industrial', 'business', NULL, 'briefcase', true, 6),
-('00000000-0000-4000-8000-000000000007', 'Books & Media', 'education', NULL, 'book', true, 7),
-('00000000-0000-4000-8000-000000000008', 'Entertainment', 'entertainment', NULL, 'gamepad-2', true, 8),
-('00000000-0000-4000-8000-000000000009', 'Food & Beverages', 'food', NULL, 'utensils', true, 9),
-('00000000-0000-4000-8000-000000000010', 'Services', 'services', NULL, 'briefcase', true, 10),
-('00000000-0000-4000-8000-000000000011', 'Baby & Kids', 'baby-kids', NULL, 'baby', true, 11),
-('00000000-0000-4000-8000-000000000012', 'Beauty & Health', 'beauty-health', NULL, 'heart', true, 12),
-('00000000-0000-4000-8000-000000000013', 'Pets & Animals', 'pets-animals', NULL, 'heart', true, 13),
-('00000000-0000-4000-8000-000000000014', 'Art & Crafts', 'art-crafts', NULL, 'palette', true, 14),
-('00000000-0000-4000-8000-000000000015', 'Tickets & Events', 'tickets-events', NULL, 'ticket', true, 15),
-('00000000-0000-4000-8000-000000000000', 'Other', 'general', NULL, 'more-horizontal', true, 16);
-
--- Electronics subcategories
-INSERT INTO categories (id, name, slug, parent_id, icon, is_active, sort_order) VALUES
-('10000000-0000-4000-8000-000000000001', 'Phones & Tablets', 'phones-tablets', '00000000-0000-4000-8000-000000000001', 'smartphone', true, 1),
-('10000000-0000-4000-8000-000000000002', 'Computers & Laptops', 'computers', '00000000-0000-4000-8000-000000000001', 'laptop', true, 2),
-('10000000-0000-4000-8000-000000000003', 'Audio & Video', 'audio-video', '00000000-0000-4000-8000-000000000001', 'headphones', true, 3),
-('10000000-0000-4000-8000-000000000004', 'Gaming', 'gaming', '00000000-0000-4000-8000-000000000001', 'gamepad-2', true, 4),
-('10000000-0000-4000-8000-000000000005', 'Home Appliances', 'home-appliances', '00000000-0000-4000-8000-000000000001', 'refrigerator', true, 5);
-
--- Fashion subcategories
-INSERT INTO categories (id, name, slug, parent_id, icon, is_active, sort_order) VALUES
-('20000000-0000-4000-8000-000000000001', 'Men''s Fashion', 'mens-fashion', '00000000-0000-4000-8000-000000000002', 'user', true, 1),
-('20000000-0000-4000-8000-000000000002', 'Women''s Fashion', 'womens-fashion', '00000000-0000-4000-8000-000000000002', 'user', true, 2),
-('20000000-0000-4000-8000-000000000003', 'Kids'' Fashion', 'kids-fashion', '00000000-0000-4000-8000-000000000002', 'baby', true, 3);
-
--- Vehicles subcategories
-INSERT INTO categories (id, name, slug, parent_id, icon, is_active, sort_order) VALUES
-('30000000-0000-4000-8000-000000000001', 'Cars', 'cars', '00000000-0000-4000-8000-000000000003', 'car', true, 1),
-('30000000-0000-4000-8000-000000000002', 'Motorcycles', 'motorcycles', '00000000-0000-4000-8000-000000000003', 'bike', true, 2),
-('30000000-0000-4000-8000-000000000003', 'Auto Parts & Accessories', 'auto-parts', '00000000-0000-4000-8000-000000000003', 'settings', true, 3);
-
--- Home & Garden subcategories
-INSERT INTO categories (id, name, slug, parent_id, icon, is_active, sort_order) VALUES
-('40000000-0000-4000-8000-000000000001', 'Furniture', 'furniture', '00000000-0000-4000-8000-000000000004', 'armchair', true, 1),
-('40000000-0000-4000-8000-000000000002', 'Home Decor', 'home-decor', '00000000-0000-4000-8000-000000000004', 'palette', true, 2),
-('40000000-0000-4000-8000-000000000003', 'Garden & Outdoor', 'garden', '00000000-0000-4000-8000-000000000004', 'flower', true, 3);
+-- Old category data removed - see migration 20_comprehensive_categories.sql for current categories
 
 -- =============================================
 -- CREDIT PACKAGES SEED DATA

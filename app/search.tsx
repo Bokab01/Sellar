@@ -56,20 +56,25 @@ export default function SearchResultsScreen() {
     return searchTerms.length > 0 ? searchTerms.join(' ') : '';
   }, [searchQuery, filters.categories]);
 
-  const { 
-    listings: products, 
-    loading, 
-    error, 
-    refreshing, 
-    refresh 
-  } = useListings({
+  // Memoize useListings parameters to prevent unnecessary re-fetches
+  const listingsParams = useMemo(() => ({
     search: combinedSearchQuery, // Combined search query with filter categories
     category: categoryId, // Add category filter
     location: filters.location,
     priceMin: filters.priceRange.min,
     priceMax: filters.priceRange.max,
     condition: filters.condition,
-  });
+    // Add performance optimizations for "Other" category
+    limit: categoryId === '00000000-0000-4000-8000-000000000000' ? 50 : undefined, // Limit results for "Other" category
+  }), [combinedSearchQuery, categoryId, filters.location, filters.priceRange.min, filters.priceRange.max, filters.condition]);
+
+  const { 
+    listings: products, 
+    loading, 
+    error, 
+    refreshing, 
+    refresh 
+  } = useListings(listingsParams);
 
   // Get listing IDs for stats
   const listingIds = products.map(product => product.id).filter(Boolean);
@@ -122,6 +127,7 @@ export default function SearchResultsScreen() {
   // Transform database listings to component format - memoized for performance
   const transformedProducts = useMemo(() => {
     return products.map((listing: any) => {
+      // For "Other" category, we might not have joined profile data, so handle gracefully
       const seller = listing.profiles || null;
       
       // Determine the highest priority badge (only show ONE badge per listing)
@@ -176,6 +182,9 @@ export default function SearchResultsScreen() {
     }
     return 'Search Results';
   }, [categoryName, searchQuery, products.length]);
+
+  // Check if this is the "Other" category for special handling
+  const isOtherCategory = categoryId === '00000000-0000-4000-8000-000000000000';
 
   const handleBackPress = useCallback(() => {
     router.back();
@@ -247,7 +256,7 @@ export default function SearchResultsScreen() {
         ) : loading ? (
           <View style={{ paddingHorizontal: theme.spacing.lg }}>
             <Grid columns={2}>
-              {Array.from({ length: 6 }).map((_, index) => (
+              {Array.from({ length: isOtherCategory ? 8 : 6 }).map((_, index) => (
                 <LoadingSkeleton
                   key={index}
                   width="100%"

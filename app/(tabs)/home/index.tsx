@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useMemo, lazy, Suspense, useCallback } from 'react';
 import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl, Alert, Animated, Pressable } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -138,10 +138,7 @@ export default function HomeScreen() {
   const scrollToTopScale = useRef(new Animated.Value(0.8)).current;
   const mainScrollViewRef = useRef<any>(null);
 
-  // Category counts from database
-  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
-  const [categoryCountsLoading, setCategoryCountsLoading] = useState(true);
-  const [categoryIdMap, setCategoryIdMap] = useState<Record<string, string>>({});
+  // Category counts removed - no longer displayed in UI for better performance
 
   // Smart search modal removed - now using dedicated screen
 
@@ -330,148 +327,67 @@ export default function HomeScreen() {
   }, [profile?.location, currentLocation, setCurrentLocation]);
 
 
-  // Fetch category counts from database
-  useEffect(() => {
-    const fetchCategoryCounts = async () => {
-      try {
-        // First, get all categories from the database
-        const { data: categories, error: categoriesError } = await supabase
-          .from('categories')
-          .select('id, slug')
-          .eq('is_active', true);
+  // Cache for listings to prevent unnecessary refetches when navigating back
+  const listingsCache = useRef<{ data: any[]; timestamp: number } | null>(null);
+  const LISTINGS_CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
 
-        if (categoriesError) {
-          console.error('Failed to fetch categories:', categoriesError);
-          setCategoryCountsLoading(false);
-          return;
-        }
-
-        // Create a mapping of slugs to category IDs
-        const categoryMap: Record<string, string> = {};
-        categories?.forEach((cat: any) => {
-          // Map our frontend category names to database slugs
-          const slugMapping: Record<string, string> = {
-            'electronics': 'electronics',
-            'vehicles': 'vehicles',
-            'home': 'home-garden',
-            'fashion': 'fashion',
-            'books': 'education',
-            'sports': 'health-sports',
-            'services': 'services',
-            'other': 'general'
-          };
-          
-          Object.entries(slugMapping).forEach(([frontendKey, dbSlug]) => {
-            if (cat.slug === dbSlug) {
-              categoryMap[frontendKey] = cat.id;
-            }
-          });
-        });
-
-        // Get counts for each category using category_id
-        const counts: Record<string, number> = {};
-        
-        // Get total count first
-        const { count: totalCount, error: totalError } = await supabase
-          .from('listings')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'active');
-
-        if (!totalError) {
-          counts['total'] = totalCount || 0;
-        }
-
-        // Get counts for each specific category
-        for (const [frontendKey, categoryId] of Object.entries(categoryMap)) {
-          const { count, error } = await supabase
-            .from('listings')
-            .select('*', { count: 'exact', head: true })
-            .eq('category_id', categoryId)
-            .eq('status', 'active');
-
-          if (!error) {
-            counts[frontendKey] = count || 0;
-          } else {
-            counts[frontendKey] = 0;
-          }
-        }
-
-        // For categories not in the database, set to 0
-        const allCategories = ['electronics', 'vehicles', 'home', 'fashion', 'books', 'sports', 'services', 'other'];
-        allCategories.forEach(cat => {
-          if (!(cat in counts)) {
-            counts[cat] = 0;
-          }
-        });
-
-        setCategoryCounts(counts);
-        setCategoryIdMap(categoryMap);
-      } catch (error) {
-        console.error('Failed to fetch category counts:', error);
-      } finally {
-        setCategoryCountsLoading(false);
+  // Handle focus effect for smooth navigation back
+  useFocusEffect(
+    useCallback(() => {
+      const now = Date.now();
+      
+      // Check if we have fresh cached data
+      if (listingsCache.current && 
+          (now - listingsCache.current.timestamp) < LISTINGS_CACHE_DURATION) {
+        console.log('📱 Using cached listings data for smooth navigation back');
+        return; // Don't refetch if we have fresh data
       }
-    };
-
-    fetchCategoryCounts();
-  }, []);
+    }, [])
+  );
 
   // This will be handled after products is defined
 
   const categories = [
-   /*  { 
-      id: 'all', 
-      label: 'All', 
-      icon: <Grid3X3 size={24} color={theme.colors.primary} />, 
-      count: categoryCounts.total || 0
-    }, */
     { 
       id: 'electronics', 
       label: 'Electronics', 
-      icon: <Smartphone size={24} color={theme.colors.primary} />, 
-      count: categoryCounts.electronics || 0 
+      icon: <Smartphone size={24} color={theme.colors.primary} />
     },
     { 
       id: 'vehicles', 
       label: 'Vehicles', 
-      icon: <Car size={24} color={theme.colors.primary} />, 
-      count: categoryCounts.vehicles || 0 
+      icon: <Car size={24} color={theme.colors.primary} />
     },
     { 
       id: 'home', 
       label: 'Home & Garden', 
-      icon: <House size={24} color={theme.colors.primary} />, 
-      count: categoryCounts.home || 0 
+      icon: <House size={24} color={theme.colors.primary} />
     },
     { 
       id: 'fashion', 
       label: 'Fashion', 
-      icon: <Shirt size={24} color={theme.colors.primary} />, 
-      count: categoryCounts.fashion || 0 
+      icon: <Shirt size={24} color={theme.colors.primary} />
     },
     { 
       id: 'books', 
       label: 'Books & Media', 
-      icon: <Book size={24} color={theme.colors.primary} />, 
-      count: categoryCounts.books || 0 
+      icon: <Book size={24} color={theme.colors.primary} />
     },
     { 
       id: 'sports', 
       label: 'Sports', 
-      icon: <Dumbbell size={24} color={theme.colors.primary} />, 
-      count: categoryCounts.sports || 0 
+      icon: <Dumbbell size={24} color={theme.colors.primary} />
     },
     { 
       id: 'services', 
       label: 'Services', 
-      icon: <Briefcase size={24} color={theme.colors.primary} />, 
-      count: categoryCounts.services || 0 
+      icon: <Briefcase size={24} color={theme.colors.primary} />
     },
+    // "Browse All" option instead of "Other" category for better UX
     { 
-      id: 'other', 
-      label: 'Other', 
-      icon: <Grid2X2 size={24} color={theme.colors.primary} />, 
-      count: categoryCounts.other || 0 
+      id: 'browse-all', 
+      label: 'Browse All', 
+      icon: <Grid2X2 size={24} color={theme.colors.primary} />
     },
   ];
 
@@ -495,6 +411,16 @@ export default function HomeScreen() {
     refreshing, 
     refresh 
   } = useListings(listingsOptions);
+
+  // Cache listings data when fetched
+  useEffect(() => {
+    if (products && products.length > 0) {
+      listingsCache.current = {
+        data: products,
+        timestamp: Date.now()
+      };
+    }
+  }, [products]);
 
   // App resume handling - refresh listings when app comes back from background
   const onResumeCallback = React.useCallback(async () => {
@@ -615,10 +541,19 @@ export default function HomeScreen() {
     }, [refreshStats, fetchFavoritesCount])
   );
 
-  const handleCategoryToggle = (categoryId: string) => {
+  const handleCategoryToggle = useCallback((categoryId: string) => {
     if (categoryId === 'all') {
       // If "All" is selected, clear all categories and stay on home screen
       setSelectedCategories([]);
+    } else if (categoryId === 'browse-all') {
+      // For "Browse All", navigate to search without a specific category
+      router.prefetch('/search');
+      router.push({
+        pathname: '/search',
+        params: { 
+          categoryName: 'Browse All Categories'
+        }
+      });
     } else {
       // Navigate to search results screen with the selected category
       const categoryName = categories.find(cat => cat.id === categoryId)?.label;
@@ -634,12 +569,15 @@ export default function HomeScreen() {
         'health': '00000000-0000-4000-8000-000000000012', // Beauty & Health (same as beauty)
         'home': '00000000-0000-4000-8000-000000000004', // Home & Garden
         'services': '00000000-0000-4000-8000-000000000010', // Services
-        'other': '00000000-0000-4000-8000-000000000000' // Other
       };
       
       const mappedCategoryId = categoryIdMap[categoryId];
       
       if (mappedCategoryId && categoryName) {
+        // Preload search screen for better performance
+        router.prefetch('/search');
+        
+        // Navigate to search results screen
         router.push({
           pathname: '/search',
           params: { 
@@ -649,7 +587,7 @@ export default function HomeScreen() {
         });
       }
     }
-  };
+  }, [categories, setSelectedCategories]);
 
   const firstName = profile?.first_name || user?.user_metadata?.first_name || 'User';
   const lastName = profile?.last_name || user?.user_metadata?.last_name || '';
@@ -943,35 +881,6 @@ export default function HomeScreen() {
                         >
                           {category.label}
                         </Text>
-                        
-                        {/* Category Count Badge */}
-                        <View
-                          style={{
-                            backgroundColor: theme.colors.primary + '15',
-                            borderRadius: theme.borderRadius.full,
-                            paddingHorizontal: theme.spacing.sm,
-                            paddingVertical: theme.spacing.xs,
-                            minWidth: 24,
-                            alignItems: 'center',
-                            borderWidth: 1,
-                            borderColor: theme.colors.primary + '20',
-                          }}
-                        >
-                          <Text
-                            variant="caption"
-                            style={{
-                              color: theme.colors.primary,
-                              fontSize: 11,
-                              fontWeight: '700',
-                            }}
-                          >
-                            {categoryCountsLoading 
-                              ? '...' 
-                              : category.count > 999 
-                                ? `${Math.floor(category.count / 1000)}k` 
-                                : category.count}
-                          </Text>
-                        </View>
                       </TouchableOpacity>
                     );
                   })}

@@ -48,7 +48,7 @@ import {
   ArrowRight
 } from 'lucide-react-native';
 import { router } from 'expo-router';
-import { findCategoryById, COMPREHENSIVE_CATEGORIES } from '@/constants/categories';
+import { findCategoryById as findCategoryByIdUtil, DbCategory } from '@/utils/categoryUtils';
 import { getCategoryAttributes, hasCategoryAttributes } from '@/constants/categoryAttributes';
 import { networkUtils } from '@/utils/networkUtils';
 
@@ -1093,8 +1093,17 @@ export default function CreateListingScreen() {
     }
   };
 
-  const selectedCategory = formData.categoryId ? findCategoryById(COMPREHENSIVE_CATEGORIES, formData.categoryId) : null;
+  const [selectedCategory, setSelectedCategory] = useState<DbCategory | null>(null);
   const selectedCondition = CONDITIONS.find(c => c.value === formData.condition);
+
+  // Fetch selected category details
+  useEffect(() => {
+    if (formData.categoryId) {
+      findCategoryByIdUtil(formData.categoryId).then(setSelectedCategory);
+    } else {
+      setSelectedCategory(null);
+    }
+  }, [formData.categoryId]);
 
   // Stable input handlers to prevent keyboard dismissal
   const handleTitleChange = useCallback((text: string) => {

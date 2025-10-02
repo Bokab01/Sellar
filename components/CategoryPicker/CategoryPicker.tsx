@@ -1,11 +1,25 @@
-import React, { useState } from 'react';
-import { View, ScrollView, Pressable } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, ScrollView, Pressable, ActivityIndicator, Image, TextInput } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { Button } from '@/components/Button/Button';
 import { AppModal } from '@/components/Modal/Modal';
-import { ChevronRight, ArrowLeft, Check } from 'lucide-react-native';
-import { Category, COMPREHENSIVE_CATEGORIES, findCategoryById, getCategoryPath } from '@/constants/categories';
+import { ChevronRight, ArrowLeft, Check, Search, X } from 'lucide-react-native';
+import { supabase } from '@/lib/supabase';
+
+// Database category interface matching Supabase schema
+interface DbCategory {
+  id: string;
+  name: string;
+  slug: string;
+  icon: string;
+  parent_id: string | null;
+  is_active: boolean;
+  sort_order: number;
+  image_url?: string;
+  color?: string;
+  description?: string;
+}
 
 interface CategoryPickerProps {
   value?: string;
@@ -13,8 +27,6 @@ interface CategoryPickerProps {
   placeholder?: string;
   disabled?: boolean;
 }
-
-type SelectionStep = 'main' | 'subcategory' | 'final';
 
 export function CategoryPicker({ 
   value, 
@@ -24,72 +36,201 @@ export function CategoryPicker({
 }: CategoryPickerProps) {
   const { theme } = useTheme();
   const [isVisible, setIsVisible] = useState(false);
-  const [currentStep, setCurrentStep] = useState<SelectionStep>('main');
-  const [selectedMainCategory, setSelectedMainCategory] = useState<Category | null>(null);
-  const [selectedSubcategory, setSelectedSubcategory] = useState<Category | null>(null);
-  const [breadcrumb, setBreadcrumb] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(false);
+  
+  // Category state
+  const [mainCategories, setMainCategories] = useState<DbCategory[]>([]);
+  const [currentCategories, setCurrentCategories] = useState<DbCategory[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<DbCategory | null>(null);
+  const [breadcrumb, setBreadcrumb] = useState<DbCategory[]>([]);
+  
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<DbCategory[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [allCategories, setAllCategories] = useState<DbCategory[]>([]);
 
-  const selectedCategory = value ? findCategoryById(COMPREHENSIVE_CATEGORIES, value) : null;
-  const selectedPath = value ? getCategoryPath(COMPREHENSIVE_CATEGORIES, value) : [];
+  // Function definitions
+  const fetchMainCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .is('parent_id', null)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
 
-  const handleOpen = () => {
+      if (error) throw error;
+      setMainCategories(data || []);
+      setCurrentCategories(data || []);
+    } catch (error) {
+      console.error('Error fetching main categories:', error);
+    }
+  };
+
+  const fetchAllCategoriesForSearch = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      setAllCategories(data || []);
+    } catch (error) {
+      console.error('Error fetching all categories:', error);
+    }
+  };
+
+  // Fetch main categories and all categories on mount
+  useEffect(() => {
+    fetchMainCategories();
+    fetchAllCategoriesForSearch();
+  }, []);
+
+  // Fetch selected category details when value changes
+  useEffect(() => {
+    if (value) {
+      fetchCategoryDetails(value);
+    } else {
+      setSelectedCategory(null);
+    }
+  }, [value]);
+
+  const fetchSubcategories = async (parentId: string) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('parent_id', parentId)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching subcategories:', error);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCategoryDetails = async (categoryId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('id', categoryId)
+        .single();
+
+      if (error) throw error;
+      setSelectedCategory(data);
+    } catch (error) {
+      console.error('Error fetching category details:', error);
+    }
+  };
+
+  const handleOpen = async () => {
     if (disabled) return;
     setIsVisible(true);
-    setCurrentStep('main');
-    setSelectedMainCategory(null);
-    setSelectedSubcategory(null);
+    setCurrentCategories(mainCategories);
     setBreadcrumb([]);
+    setSearchQuery('');
+    setSearchResults([]);
+    setIsSearching(false);
   };
 
   const handleClose = () => {
     setIsVisible(false);
-    setCurrentStep('main');
-    setSelectedMainCategory(null);
-    setSelectedSubcategory(null);
+    setCurrentCategories(mainCategories);
     setBreadcrumb([]);
+    setSearchQuery('');
+    setSearchResults([]);
+    setIsSearching(false);
   };
 
-  const handleMainCategorySelect = (category: Category) => {
-    setSelectedMainCategory(category);
-    setBreadcrumb([category]);
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
     
-    if (category.subcategories && category.subcategories.length > 0) {
-      setCurrentStep('subcategory');
+    if (!query.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    
+    // Filter categories by name, description, or slug
+    const results = allCategories.filter((category) => {
+      const searchLower = query.toLowerCase();
+      return (
+        category.name.toLowerCase().includes(searchLower) ||
+        category.slug.toLowerCase().includes(searchLower) ||
+        (category.description && category.description.toLowerCase().includes(searchLower))
+      );
+    });
+    
+    setSearchResults(results);
+  };
+
+  const handleSearchResultSelect = async (category: DbCategory) => {
+    // If it's a parent category with subcategories, navigate to it
+    const subcategories = await fetchSubcategories(category.id);
+    
+    if (subcategories.length > 0) {
+      // Navigate to this category's subcategories
+      setCurrentCategories(subcategories);
+      setBreadcrumb([category]);
+      setSearchQuery('');
+      setSearchResults([]);
+      setIsSearching(false);
     } else {
-      // No subcategories, select this category directly
+      // Select this category directly
       onCategorySelect(category.id);
       handleClose();
     }
   };
 
-  const handleSubcategorySelect = (subcategory: Category) => {
-    setSelectedSubcategory(subcategory);
-    const newBreadcrumb = [...breadcrumb, subcategory];
-    setBreadcrumb(newBreadcrumb);
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setIsSearching(false);
+  };
+
+  const handleCategorySelect = async (category: DbCategory) => {
+    // Check if category has subcategories
+    const subcategories = await fetchSubcategories(category.id);
     
-    if (subcategory.subcategories && subcategory.subcategories.length > 0) {
-      setCurrentStep('final');
+    if (subcategories.length > 0) {
+      // Navigate to subcategories
+      setCurrentCategories(subcategories);
+      setBreadcrumb([...breadcrumb, category]);
     } else {
-      // No further subcategories, select this one
-      onCategorySelect(subcategory.id);
+      // No subcategories, select this category
+      onCategorySelect(category.id);
       handleClose();
     }
   };
 
-  const handleFinalCategorySelect = (finalCategory: Category) => {
-    onCategorySelect(finalCategory.id);
-    handleClose();
-  };
-
   const handleBackPress = () => {
-    if (currentStep === 'final') {
-      setCurrentStep('subcategory');
-      setBreadcrumb(breadcrumb.slice(0, -1));
-      setSelectedSubcategory(null);
-    } else if (currentStep === 'subcategory') {
-      setCurrentStep('main');
+    if (breadcrumb.length === 0) return;
+
+    if (breadcrumb.length === 1) {
+      // Go back to main categories
+      setCurrentCategories(mainCategories);
       setBreadcrumb([]);
-      setSelectedMainCategory(null);
+    } else {
+      // Go back to previous level
+      const newBreadcrumb = breadcrumb.slice(0, -1);
+      const parentCategory = newBreadcrumb[newBreadcrumb.length - 1];
+      
+      fetchSubcategories(parentCategory.id).then((subcategories) => {
+        setCurrentCategories(subcategories);
+        setBreadcrumb(newBreadcrumb);
+      });
     }
   };
 
@@ -120,10 +261,10 @@ export function CategoryPicker({
     </View>
   );
 
-  const renderCategoryItem = (category: Category, onPress: () => void, showArrow: boolean = true) => (
+  const renderCategoryItem = (category: DbCategory) => (
     <Pressable
       key={category.id}
-      onPress={onPress}
+      onPress={() => handleCategorySelect(category)}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
@@ -137,38 +278,41 @@ export function CategoryPicker({
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
         <View style={{
-          width: 40,
-          height: 40,
+          width: 48,
+          height: 48,
           borderRadius: theme.borderRadius.md,
-          backgroundColor: theme.colors.primary + '10',
+          backgroundColor: category.color || theme.colors.primary + '10',
           alignItems: 'center',
           justifyContent: 'center',
           marginRight: theme.spacing.md,
+          overflow: 'hidden',
         }}>
-          <Text style={{ fontSize: 18 }}>
-            {getCategoryIcon(category.icon)}
-          </Text>
+          {category.image_url ? (
+            <Image
+              source={{ uri: category.image_url }}
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+            />
+          ) : (
+            <Text style={{ fontSize: 20 }}>
+              {getCategoryIcon(category.icon)}
+            </Text>
+          )}
         </View>
         
         <View style={{ flex: 1 }}>
           <Text variant="body" style={{ fontWeight: '500' }}>
             {category.name}
           </Text>
-          {category.subcategories && category.subcategories.length > 0 && (
-            <Text variant="caption" color="muted">
-              {category.subcategories.length} subcategories
+          {category.description && (
+            <Text variant="caption" color="muted" numberOfLines={1}>
+              {category.description}
             </Text>
           )}
         </View>
       </View>
       
-      {showArrow && category.subcategories && category.subcategories.length > 0 && (
-        <ChevronRight size={20} color={theme.colors.text.muted} />
-      )}
-      
-      {!showArrow && (
-        <Check size={20} color={theme.colors.primary} />
-      )}
+      <ChevronRight size={20} color={theme.colors.text.muted} />
     </Pressable>
   );
 
@@ -213,6 +357,16 @@ export function CategoryPicker({
       'settings': '⚙️',
       'wrench': '🔧',
       'circle': '⭕',
+      'cog': '⚙️',
+      'wind': '💨',
+      'box': '📦',
+      'anchor': '⚓',
+      'key': '🔑',
+      'calendar': '📅',
+      'users': '👥',
+      'square': '⬜',
+      'bag': '👜',
+      'sparkles': '✨',
       'armchair': '🪑',
       'sofa': '🛋️',
       'bed': '🛏️',
@@ -220,18 +374,19 @@ export function CategoryPicker({
       'palette': '🎨',
       'image': '🖼️',
       'lightbulb': '💡',
-      'square': '⬜',
       'flower': '🌸',
       'shovel': '🪓',
       'sun': '☀️',
       'activity': '📈',
       'heart': '❤️',
+      'scissors': '✂️',
+      'tent': '⛺',
       'trophy': '🏆',
       'graduation-cap': '🎓',
+      'pencil': '✏️',
       'book-open': '📖',
       'film': '🎬',
       'music': '🎵',
-      'users': '👥',
       'scale': '⚖️',
       'calculator': '🧮',
       'spray-can': '🧴',
@@ -245,6 +400,23 @@ export function CategoryPicker({
       'gift': '🎁',
       'search': '🔍',
       'clock': '🕐',
+      'wifi': '📡',
+      'shopping-basket': '🛒',
+      'tractor': '🚜',
+      'bone': '🦴',
+      'cow': '🐄',
+      'hard-hat': '🎩',
+      'boxes': '📦',
+      'shopping-cart': '🛒',
+      'plane': '✈️',
+      'map': '🗺️',
+      'building': '🏢',
+      'file': '📄',
+      'credit-card': '💳',
+      'puzzle': '🧩',
+      'repeat': '🔄',
+      'heart-pulse': '💓',
+      'grid': '⊞',
     };
     return iconMap[iconName] || '📦';
   };
@@ -273,11 +445,6 @@ export function CategoryPicker({
               <Text variant="body" style={{ fontWeight: '500' }}>
                 {selectedCategory.name}
               </Text>
-              {selectedPath.length > 1 && (
-                <Text variant="caption" color="muted">
-                  {selectedPath.slice(0, -1).map(cat => cat.name).join(' > ')}
-                </Text>
-              )}
             </View>
           ) : (
             <Text variant="body" color="muted">
@@ -295,9 +462,50 @@ export function CategoryPicker({
         size="lg"
       >
         <View style={{ maxHeight: 500 }}>
-          {breadcrumb.length > 0 && renderBreadcrumb()}
+          {/* Search Bar */}
+          <View style={{
+            paddingHorizontal: theme.spacing.lg,
+            paddingTop: theme.spacing.md,
+            paddingBottom: theme.spacing.sm,
+            backgroundColor: theme.colors.surface,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.colors.border,
+          }}>
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: theme.colors.surfaceVariant,
+              borderRadius: theme.borderRadius.md,
+              paddingHorizontal: theme.spacing.md,
+              height: 44,
+            }}>
+              <Search size={18} color={theme.colors.text.muted} />
+              <TextInput
+                value={searchQuery}
+                onChangeText={handleSearch}
+                placeholder="Search categories..."
+                placeholderTextColor={theme.colors.text.muted}
+                style={{
+                  flex: 1,
+                  marginLeft: theme.spacing.sm,
+                  fontSize: 15,
+                  color: theme.colors.text.primary,
+                  paddingVertical: 0,
+                }}
+              />
+              {searchQuery.length > 0 && (
+                <Pressable onPress={handleClearSearch} hitSlop={8}>
+                  <X size={18} color={theme.colors.text.muted} />
+                </Pressable>
+              )}
+            </View>
+          </View>
+
+          {/* Breadcrumb */}
+          {!isSearching && breadcrumb.length > 0 && renderBreadcrumb()}
           
-          {currentStep !== 'main' && (
+          {/* Back Button */}
+          {!isSearching && breadcrumb.length > 0 && (
             <View style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -308,7 +516,7 @@ export function CategoryPicker({
             }}>
               <Button
                 variant="ghost"
-                icon={<ArrowLeft size={18} color={theme.colors.text.primary} />}
+                leftIcon={<ArrowLeft size={18} color={theme.colors.text.primary} />}
                 onPress={handleBackPress}
                 size="sm"
               >
@@ -317,38 +525,98 @@ export function CategoryPicker({
             </View>
           )}
 
+          {/* Category List */}
           <ScrollView showsVerticalScrollIndicator={false}>
-            {currentStep === 'main' && (
+            {loading ? (
+              <View style={{ padding: theme.spacing.xl, alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+              </View>
+            ) : isSearching ? (
               <View>
-                {COMPREHENSIVE_CATEGORIES.map((category) =>
-                  renderCategoryItem(
-                    category,
-                    () => handleMainCategorySelect(category)
-                  )
+                {searchResults.length > 0 ? (
+                  <>
+                    <View style={{
+                      paddingHorizontal: theme.spacing.lg,
+                      paddingVertical: theme.spacing.sm,
+                      backgroundColor: theme.colors.surfaceVariant,
+                    }}>
+                      <Text variant="caption" color="muted">
+                        {searchResults.length} {searchResults.length === 1 ? 'result' : 'results'} found
+                      </Text>
+                    </View>
+                    {searchResults.map((category) => (
+                      <Pressable
+                        key={category.id}
+                        onPress={() => handleSearchResultSelect(category)}
+                        style={({ pressed }) => ({
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          paddingHorizontal: theme.spacing.lg,
+                          paddingVertical: theme.spacing.lg,
+                          backgroundColor: pressed ? theme.colors.surfaceVariant : 'transparent',
+                          borderBottomWidth: 1,
+                          borderBottomColor: theme.colors.border,
+                        })}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                          <View style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: theme.borderRadius.md,
+                            backgroundColor: category.color || theme.colors.primary + '10',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginRight: theme.spacing.md,
+                            overflow: 'hidden',
+                          }}>
+                            {category.image_url ? (
+                              <Image
+                                source={{ uri: category.image_url }}
+                                style={{ width: '100%', height: '100%' }}
+                                resizeMode="cover"
+                              />
+                            ) : (
+                              <Text style={{ fontSize: 18 }}>
+                                {getCategoryIcon(category.icon)}
+                              </Text>
+                            )}
+                          </View>
+                          
+                          <View style={{ flex: 1 }}>
+                            <Text variant="body" style={{ fontWeight: '500' }}>
+                              {category.name}
+                            </Text>
+                            {category.description && (
+                              <Text variant="caption" color="muted" numberOfLines={1}>
+                                {category.description}
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                        
+                        <ChevronRight size={20} color={theme.colors.text.muted} />
+                      </Pressable>
+                    ))}
+                  </>
+                ) : (
+                  <View style={{
+                    padding: theme.spacing.xl,
+                    alignItems: 'center',
+                  }}>
+                    <Search size={48} color={theme.colors.text.muted} style={{ marginBottom: theme.spacing.md }} />
+                    <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
+                      No categories found for "{searchQuery}"
+                    </Text>
+                    <Text variant="caption" color="muted" style={{ textAlign: 'center', marginTop: theme.spacing.xs }}>
+                      Try a different search term
+                    </Text>
+                  </View>
                 )}
               </View>
-            )}
-
-            {currentStep === 'subcategory' && selectedMainCategory?.subcategories && (
+            ) : (
               <View>
-                {selectedMainCategory.subcategories.map((subcategory) =>
-                  renderCategoryItem(
-                    subcategory,
-                    () => handleSubcategorySelect(subcategory)
-                  )
-                )}
-              </View>
-            )}
-
-            {currentStep === 'final' && selectedSubcategory?.subcategories && (
-              <View>
-                {selectedSubcategory.subcategories.map((finalCategory) =>
-                  renderCategoryItem(
-                    finalCategory,
-                    () => handleFinalCategorySelect(finalCategory),
-                    false
-                  )
-                )}
+                {currentCategories.map((category) => renderCategoryItem(category))}
               </View>
             )}
           </ScrollView>

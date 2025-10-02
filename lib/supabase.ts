@@ -829,7 +829,7 @@ export const dbHelpers = {
   // Listing operations
   async getListings(options: any) {
     try {
-      // First, try the full query with joins
+      // Use the full query with joins for all categories
       let query = db.listings
         .select(`
           *,
