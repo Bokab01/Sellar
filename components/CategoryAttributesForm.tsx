@@ -1,16 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
-  ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { Input } from './Input';
+import { Text } from '@/components/Typography/Text';
+import { Input } from '@/components/Input/Input';
 import { Picker } from '@react-native-picker/picker';
-import { Checkbox } from 'expo-checkbox';
+import Checkbox from 'expo-checkbox';
 import { supabase } from '@/lib/supabase';
-import { useTheme } from '@/hooks/useTheme';
+import { useTheme } from '@/theme/ThemeProvider';
 
 // Types
 export interface CategoryAttribute {
@@ -96,7 +95,7 @@ export const CategoryAttributesForm: React.FC<CategoryAttributesFormProps> = ({
           <Input
             {...commonProps}
             value={value || ''}
-            onChangeText={(text) => onChange(attribute.slug, text)}
+            onChangeText={(text: string) => onChange(attribute.slug, text)}
             placeholder={attribute.placeholder}
             maxLength={attribute.max_length || undefined}
           />
@@ -107,7 +106,7 @@ export const CategoryAttributesForm: React.FC<CategoryAttributesFormProps> = ({
           <Input
             {...commonProps}
             value={value?.toString() || ''}
-            onChangeText={(text) => {
+            onChangeText={(text: string) => {
               const numValue = text === '' ? null : parseFloat(text);
               onChange(attribute.slug, numValue);
             }}
@@ -119,7 +118,7 @@ export const CategoryAttributesForm: React.FC<CategoryAttributesFormProps> = ({
       case 'select':
         return (
           <View style={styles.fieldContainer}>
-            <Text style={[styles.label, { color: theme.colors.text }]}>
+            <Text style={[styles.label, { color: theme.colors.text.primary }]}>
               {attribute.label}
               {attribute.is_required && <Text style={styles.required}> *</Text>}
             </Text>
@@ -140,7 +139,7 @@ export const CategoryAttributesForm: React.FC<CategoryAttributesFormProps> = ({
               <Picker
                 selectedValue={value || ''}
                 onValueChange={(itemValue) => onChange(attribute.slug, itemValue)}
-                style={[styles.picker, { color: theme.colors.text }]}
+                style={[styles.picker, { color: theme.colors.text.primary }]}
               >
                 <Picker.Item label={attribute.placeholder || 'Select...'} value="" />
                 {attribute.options?.map((option) => (
@@ -163,7 +162,7 @@ export const CategoryAttributesForm: React.FC<CategoryAttributesFormProps> = ({
       case 'multiselect':
         return (
           <View style={styles.fieldContainer}>
-            <Text style={[styles.label, { color: theme.colors.text }]}>
+            <Text style={[styles.label, { color: theme.colors.text.primary }]}>
               {attribute.label}
               {attribute.is_required && <Text style={styles.required}> *</Text>}
             </Text>
@@ -181,7 +180,7 @@ export const CategoryAttributesForm: React.FC<CategoryAttributesFormProps> = ({
                   <View key={option.value} style={styles.checkboxItem}>
                     <Checkbox
                       value={isChecked}
-                      onValueChange={(checked) => {
+                      onValueChange={(checked: boolean) => {
                         const newValues = checked
                           ? [...selectedValues, option.value]
                           : selectedValues.filter((v) => v !== option.value);
@@ -190,7 +189,7 @@ export const CategoryAttributesForm: React.FC<CategoryAttributesFormProps> = ({
                       color={isChecked ? theme.colors.primary : undefined}
                     />
                     <Text
-                      style={[styles.checkboxLabel, { color: theme.colors.text }]}
+                      style={[styles.checkboxLabel, { color: theme.colors.text.primary }]}
                       onPress={() => {
                         const newValues = isChecked
                           ? selectedValues.filter((v) => v !== option.value)
@@ -218,12 +217,12 @@ export const CategoryAttributesForm: React.FC<CategoryAttributesFormProps> = ({
             <View style={styles.checkboxItem}>
               <Checkbox
                 value={value || false}
-                onValueChange={(checked) => onChange(attribute.slug, checked)}
+                onValueChange={(checked: boolean) => onChange(attribute.slug, checked)}
                 color={value ? theme.colors.primary : undefined}
               />
               <View style={styles.booleanLabelContainer}>
                 <Text
-                  style={[styles.checkboxLabel, { color: theme.colors.text }]}
+                  style={[styles.checkboxLabel, { color: theme.colors.text.primary }]}
                   onPress={() => onChange(attribute.slug, !value)}
                 >
                   {attribute.label}
@@ -247,7 +246,7 @@ export const CategoryAttributesForm: React.FC<CategoryAttributesFormProps> = ({
       case 'range':
         return (
           <View style={styles.fieldContainer}>
-            <Text style={[styles.label, { color: theme.colors.text }]}>
+            <Text style={[styles.label, { color: theme.colors.text.primary }]}>
               {attribute.label}
               {attribute.is_required && <Text style={styles.required}> *</Text>}
             </Text>
@@ -259,7 +258,7 @@ export const CategoryAttributesForm: React.FC<CategoryAttributesFormProps> = ({
             <View style={styles.rangeContainer}>
               <Input
                 value={value?.min?.toString() || ''}
-                onChangeText={(text) => {
+                onChangeText={(text: string) => {
                   const numValue = text === '' ? null : parseFloat(text);
                   onChange(attribute.slug, { ...value, min: numValue });
                 }}
@@ -267,10 +266,10 @@ export const CategoryAttributesForm: React.FC<CategoryAttributesFormProps> = ({
                 keyboardType="numeric"
                 containerStyle={styles.rangeInput}
               />
-              <Text style={[styles.rangeSeparator, { color: theme.colors.text }]}>-</Text>
+              <Text style={[styles.rangeSeparator, { color: theme.colors.text.primary }]}>-</Text>
               <Input
                 value={value?.max?.toString() || ''}
-                onChangeText={(text) => {
+                onChangeText={(text: string) => {
                   const numValue = text === '' ? null : parseFloat(text);
                   onChange(attribute.slug, { ...value, max: numValue });
                 }}
@@ -309,7 +308,7 @@ export const CategoryAttributesForm: React.FC<CategoryAttributesFormProps> = ({
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+      <Text style={[styles.sectionTitle, { color: theme.colors.text.primary }]}>
         Category Details
       </Text>
       {attributes.map((attribute) => (

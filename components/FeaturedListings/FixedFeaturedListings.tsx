@@ -175,7 +175,7 @@ export function FixedFeaturedListings({
 
         const businessUserIds = allBusinessUsers.map(user => user.user_id);
 
-        // Fetch listings from business users first (priority)
+        // Fetch listings ONLY from Sellar Pro (business) users
         const { data: businessListings, error: businessListingsError } = await supabase
           .from('listings')
           .select(`
@@ -192,36 +192,12 @@ export function FixedFeaturedListings({
           .eq('status', 'active')
           .in('user_id', businessUserIds)
           .order('created_at', { ascending: false })
-          .limit(Math.ceil(maxItems * 0.7)); // 70% from business users
+          .limit(maxItems); // Show only Pro user listings
 
         if (businessListingsError) throw businessListingsError;
 
-        // Fetch additional listings from regular users with boosted features
-        const { data: boostedListings, error: boostedListingsError } = await supabase
-          .from('listings')
-          .select(`
-            id,
-            title,
-            price,
-            currency,
-            images,
-            location,
-            views_count,
-            created_at,
-            user_id
-          `)
-          .eq('status', 'active')
-          .not('user_id', 'in', `(${businessUserIds.join(',')})`)
-          .order('views_count', { ascending: false })
-          .limit(Math.ceil(maxItems * 0.3)); // 30% from regular users
-
-        if (boostedListingsError) throw boostedListingsError;
-
-        // Combine and limit results
-        const allListings = [
-          ...(businessListings || []),
-          ...(boostedListings || [])
-        ].slice(0, maxItems);
+        // Use only business listings - no regular users in "Featured Sellar Pro"
+        const allListings = businessListings || [];
 
         // Get unique user IDs for profile fetching
         const allUserIds = [...new Set(allListings.map(listing => listing.user_id))];
@@ -254,28 +230,21 @@ export function FixedFeaturedListings({
           }
         }
 
-        // Transform data with stable values (no Math.random)
+        // Transform data - all users are Sellar Pro (business) users
         const transformedListings: FeaturedListing[] = allListings?.map(listing => {
           const businessUser = allBusinessUsers?.find(user => user.user_id === listing.user_id);
-          const isBusinessUser = !!businessUser;
-          
-          let sellerProfile;
-          if (isBusinessUser) {
-            sellerProfile = businessUser.profiles;
-          } else {
-            sellerProfile = regularUserProfiles.find(profile => profile.id === listing.user_id) || {
-              id: listing.user_id,
-              first_name: 'User',
-              last_name: '',
-              full_name: 'User',
-              avatar_url: null,
-              rating: null,
-              is_business: false,
-              business_name: null,
-              display_business_name: false,
-              business_name_priority: 'hidden'
-            };
-          }
+          const sellerProfile = businessUser?.profiles || {
+            id: listing.user_id,
+            first_name: 'Business',
+            last_name: 'User',
+            full_name: 'Business User',
+            avatar_url: null,
+            rating: null,
+            is_business: true,
+            business_name: null,
+            display_business_name: false,
+            business_name_priority: 'hidden'
+          };
 
           // Use stable pseudo-random values based on listing ID
           const idHash = listing.id.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
@@ -292,11 +261,11 @@ export function FixedFeaturedListings({
               name: getDisplayName(sellerProfile),
               avatar: (sellerProfile as any)?.avatar_url,
               rating: (sellerProfile as any)?.rating,
-              isBusinessUser: isBusinessUser,
+              isBusinessUser: true, // All featured listings are from Sellar Pro users
             },
             isBoosted: idHash % 2 === 0, // Stable based on ID hash
             isSponsored: idHash % 3 === 0, // Stable based on ID hash
-            isPriority: isBusinessUser, // Business users get priority
+            isPriority: true, // All featured listings are priority (Sellar Pro)
             viewCount: listing.views_count || 0,
             createdAt: listing.created_at,
           };

@@ -246,6 +246,7 @@ CREATE TRIGGER trigger_create_message_notification
     FOR EACH ROW
     EXECUTE FUNCTION create_message_notification();
 
+DROP TRIGGER IF EXISTS trigger_create_listing_notification ON listings;
 CREATE TRIGGER trigger_create_listing_notification
     AFTER INSERT OR UPDATE ON listings
     FOR EACH ROW

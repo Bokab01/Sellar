@@ -25,15 +25,14 @@ export const validateListingStep = (step: number, formData: ListingFormData): Va
   const warnings: Record<string, string> = {};
 
   switch (step) {
-    case 0: // Photos
+    case 0: // Photos + Basic Info (merged)
+      // Photos validation
       if (formData.images.length === 0) {
         errors.images = 'At least one photo is required';
       } else if (formData.images.length < 3) {
         warnings.images = 'Adding more photos increases your chances of selling by 300%';
       }
-      break;
 
-    case 1: // Basic Info
       // Title validation
       if (!formData.title.trim()) {
         errors.title = 'Title is required';
@@ -69,10 +68,13 @@ export const validateListingStep = (step: number, formData: ListingFormData): Va
       }
       break;
 
-    case 2: // Category & Location
+    case 1: // Category, Location & Details (merged)
+      // Category validation
       if (!formData.categoryId) {
         errors.categoryId = 'Please select a category';
       }
+      
+      // Location validation
       if (!formData.location.trim()) {
         errors.location = 'Please select your location';
       }
@@ -89,13 +91,6 @@ export const validateListingStep = (step: number, formData: ListingFormData): Va
             }
           }
         }
-      }
-      break;
-
-    case 3: // Details
-      // Condition validation
-      if (!formData.condition) {
-        errors.condition = 'Please select the item condition';
       }
 
       // Price validation
@@ -122,9 +117,9 @@ export const validateListingStep = (step: number, formData: ListingFormData): Va
       }
       break;
 
-    case 4: // Review
+    case 2: // Review (now step 2 instead of 3)
       // Final validation - check all fields
-      const allStepsValid = [0, 1, 2, 3].every(stepIndex => {
+      const allStepsValid = [0, 1].every(stepIndex => {
         const stepValidation = validateListingStep(stepIndex, formData);
         return stepValidation.isValid;
       });
@@ -146,8 +141,8 @@ export const validateCompleteForm = (formData: ListingFormData): ValidationResul
   const allErrors: Record<string, string> = {};
   const allWarnings: Record<string, string> = {};
 
-  // Validate all steps
-  for (let step = 0; step <= 4; step++) {
+  // Validate all steps (now 3 steps: 0-2)
+  for (let step = 0; step <= 2; step++) {
     const stepValidation = validateListingStep(step, formData);
     Object.assign(allErrors, stepValidation.errors);
     Object.assign(allWarnings, stepValidation.warnings);

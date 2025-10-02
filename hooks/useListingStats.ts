@@ -83,7 +83,8 @@ export function useListingStats({
       const result = await trackListingView(listingId, sellerId);
       
       if (result.error) {
-        console.error('Error tracking view:', result.error);
+        // Log error but don't set error state - view tracking is not critical
+        console.log('Could not track view:', result.error);
       } else if (result.success) {
         // Refresh view count after tracking
         const viewCountResult = await getListingViewCount(listingId);
@@ -92,7 +93,8 @@ export function useListingStats({
         }
       }
     } catch (err) {
-      console.error('Error tracking view:', err);
+      // Log error but don't set error state - view tracking is not critical
+      console.log('Could not track view');
     }
   }, [listingId, sellerId]);
 

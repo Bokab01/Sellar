@@ -18,6 +18,7 @@ import {
   EmptyState,
   ErrorState,
   LoadingSkeleton,
+  PostCardSkeleton,
   PostCard,
   CommunitySidebar,
   SidebarToggle,
@@ -275,13 +276,7 @@ export default function CommunityScreen() {
             }}
           >
             {Array.from({ length: 3 }).map((_, index) => (
-              <LoadingSkeleton
-                key={index}
-                width="100%"
-                height={200}
-                borderRadius={theme.borderRadius.lg}
-                style={{ marginBottom: theme.spacing.lg }}
-              />
+              <PostCardSkeleton key={index} showImage={index % 2 === 0} />
             ))}
           </ScrollView>
         ) : error ? (

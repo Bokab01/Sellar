@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { View, ScrollView, Alert, Pressable, BackHandler, Image, TouchableOpacity } from 'react-native';
+import { View, ScrollView, Alert, Pressable, BackHandler, Image, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
@@ -30,12 +30,12 @@ import {
   Stepper,
   LocationPicker,
     CategoryPicker,
-  CategoryAttributes,
   StepIndicator,
   Toast,
   AppModal,
   Badge,
 } from '@/components';
+import { CategoryAttributesForm } from '@/components/CategoryAttributesForm';
 import { ListingFeatureSelector } from '@/components/ListingFeatureSelector/ListingFeatureSelector';
 import { SelectedImage } from '@/components/ImagePicker';
 import { 
@@ -49,7 +49,6 @@ import {
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { findCategoryById as findCategoryByIdUtil, DbCategory } from '@/utils/categoryUtils';
-import { getCategoryAttributes, hasCategoryAttributes } from '@/constants/categoryAttributes';
 import { networkUtils } from '@/utils/networkUtils';
 
 
@@ -86,32 +85,18 @@ interface SelectedFeature {
 
 const STEPS = [
   {
-    id: 'photos',
-    title: 'Photos',
-    description: 'Add photos of your item',
-    icon: Camera,
-    color: 'primary',
-  },
-  {
     id: 'basic-info',
     title: 'Info',
-    description: 'Title and description',
+    description: 'Photos, title & description',
     icon: FileText,
-    color: 'success',
-  },
-  {
-    id: 'category',
-    title: 'Category',
-    description: 'What and where are you selling?',
-    icon: Package,
-    color: 'warning',
+    color: 'primary',
   },
   {
     id: 'details',
     title: 'Details',
-    description: 'Price and condition',
-    icon: DollarSign,
-    color: 'error',
+    description: 'Category, location, price & more',
+    icon: Package,
+    color: 'warning',
   },
   {
     id: 'review',
@@ -265,39 +250,8 @@ export default function CreateListingScreen() {
       
       // Only save to database if we have meaningful content
       if (data.title?.trim() || data.description?.trim() || data.images?.length > 0) {
-        // Map category ID to UUID format
-        const categoryMapping: Record<string, string> = {
-          // Main categories
-          'electronics': '00000000-0000-4000-8000-000000000001',
-          'fashion': '00000000-0000-4000-8000-000000000002',
-          'vehicles': '00000000-0000-4000-8000-000000000003',
-          'home-garden': '00000000-0000-4000-8000-000000000004',
-          'health-sports': '00000000-0000-4000-8000-000000000005',
-          'business': '00000000-0000-4000-8000-000000000006',
-          'education': '00000000-0000-4000-8000-000000000007',
-          'entertainment': '00000000-0000-4000-8000-000000000008',
-          'food': '00000000-0000-4000-8000-000000000009',
-          'services': '00000000-0000-4000-8000-000000000010',
-          'general': '00000000-0000-4000-8000-000000000000',
-          
-          // All subcategories map to their parent category
-          'craft-supplies': '00000000-0000-4000-8000-000000000008', // entertainment
-          'art-crafts': '00000000-0000-4000-8000-000000000008', // entertainment
-          'smartphones': '00000000-0000-4000-8000-000000000001', // electronics
-          'laptops': '00000000-0000-4000-8000-000000000001', // electronics
-          'clothing': '00000000-0000-4000-8000-000000000002', // fashion
-          'cars': '00000000-0000-4000-8000-000000000003', // vehicles
-          'furniture': '00000000-0000-4000-8000-000000000004', // home-garden
-          'fitness': '00000000-0000-4000-8000-000000000005', // health-sports
-          'office': '00000000-0000-4000-8000-000000000006', // business
-          'books': '00000000-0000-4000-8000-000000000007', // education
-          'games': '00000000-0000-4000-8000-000000000008', // entertainment
-          'groceries': '00000000-0000-4000-8000-000000000009', // food
-          'professional': '00000000-0000-4000-8000-000000000010', // services
-        };
-        
-        const DEFAULT_CATEGORY_UUID = '00000000-0000-4000-8000-000000000000'; // General/Other
-        const categoryUUID = categoryMapping[data.categoryId || ''] || DEFAULT_CATEGORY_UUID;
+        // CategoryId from CategoryPicker is already a valid UUID
+        const categoryUUID = data.categoryId || null;
 
         const draftData: any = {
           user_id: user!.id,
@@ -632,7 +586,10 @@ export default function CreateListingScreen() {
       const keywords = extractKeywords(sanitizedTitle, sanitizedDescription);
 
       // Create listing with optimized data including category attributes
-      // Map category IDs to proper UUIDs or use default
+      // CategoryId from CategoryPicker is already a valid UUID, no mapping needed
+      const categoryUUID = formData.categoryId;
+      
+      /* OLD HARDCODED MAPPING - NO LONGER NEEDED
       const categoryMapping: Record<string, string> = {
         // Main categories
         'electronics': '00000000-0000-4000-8000-000000000001',
@@ -867,9 +824,7 @@ export default function CreateListingScreen() {
         'vintage-items': '00000000-0000-4000-8000-000000000000',
         'memorabilia': '00000000-0000-4000-8000-000000000000',
       };
-      
-      const DEFAULT_CATEGORY_UUID = '00000000-0000-4000-8000-000000000000'; // General/Other
-      const categoryUUID = categoryMapping[formData.categoryId] || DEFAULT_CATEGORY_UUID;
+      */
       
       const listingData = {
         user_id: user!.id,
@@ -878,7 +833,7 @@ export default function CreateListingScreen() {
         price: Number(formData.price),
         currency: 'GHS',
         category_id: categoryUUID, // Use mapped category UUID
-        condition: formData.condition,
+        condition: formData.categoryAttributes.condition || 'good', // Get from attributes or default to 'good'
         quantity: formData.quantity,
         location: formData.location,
         images: imageUrls,
@@ -889,12 +844,11 @@ export default function CreateListingScreen() {
         status: 'active'
       };
 
-      // Ensure condition is valid, fallback to 'good' if empty or invalid
-      const validConditions = ['new', 'like_new', 'good', 'fair', 'poor'];
-      const finalCondition = validConditions.includes(formData.condition) ? formData.condition : 'good';
-      
-      // Update the listing data with the validated condition
-      listingData.condition = finalCondition;
+      // Condition is now handled via category attributes
+      // Ensure we have a valid condition value for database
+      const validConditions = ['new', 'like_new', 'good', 'fair', 'poor', 'brand_new', 'foreign_used', 'locally_used', 'excellent', 'for_parts', 'acceptable'];
+      const conditionValue = formData.categoryAttributes.condition || 'good';
+      listingData.condition = validConditions.includes(conditionValue as string) ? conditionValue : 'good';
 
 
 
@@ -1094,7 +1048,6 @@ export default function CreateListingScreen() {
   };
 
   const [selectedCategory, setSelectedCategory] = useState<DbCategory | null>(null);
-  const selectedCondition = CONDITIONS.find(c => c.value === formData.condition);
 
   // Fetch selected category details
   useEffect(() => {
@@ -1129,11 +1082,11 @@ export default function CreateListingScreen() {
     updateFormData({ categoryId, categoryAttributes: {} });
   }, [updateFormData]);
 
-  const handleCategoryAttributeChange = useCallback((attributeId: string, value: string | string[]) => {
+  const handleCategoryAttributeChange = useCallback((slug: string, value: any) => {
     updateFormData({ 
       categoryAttributes: { 
         ...(formData.categoryAttributes || {}), 
-        [attributeId]: value 
+        [slug]: value 
       } 
     });
   }, [updateFormData, formData.categoryAttributes]);
@@ -1142,9 +1095,7 @@ export default function CreateListingScreen() {
     updateFormData({ location });
   }, [updateFormData]);
 
-  const handleConditionSelect = useCallback((condition: string) => {
-    updateFormData({ condition });
-  }, [updateFormData]);
+  // Condition is now handled via category attributes, not separately
 
   const handleQuantityChange = useCallback((quantity: number) => {
     updateFormData({ quantity });
@@ -1165,116 +1116,108 @@ export default function CreateListingScreen() {
   };
 
   // Step Components - Memoized to prevent re-renders
-  const PhotosStep = useMemo(() => (
-    <View style={{ gap: theme.spacing.lg }}>
-      
-      <CustomImagePicker
-        limit={8}
-        value={formData.images}
-        onChange={handleImagesChange}
-        disabled={loading}
-      />
-      
-      {loading && uploadProgress > 0 && (
-        <View style={{
-          backgroundColor: theme.colors.surfaceVariant,
-          borderRadius: theme.borderRadius.md,
-          padding: theme.spacing.md,
-        }}>
-          <Text variant="bodySmall" color="secondary" style={{ textAlign: 'center', marginBottom: theme.spacing.sm }}>
-            Uploading images... {Math.round(uploadProgress * 100)}%
-          </Text>
-          <View style={{
-            height: 4,
-            backgroundColor: theme.colors.border,
-            borderRadius: 2,
-            overflow: 'hidden',
-          }}>
-            <View style={{
-              height: '100%',
-              width: `${uploadProgress * 100}%`,
-              backgroundColor: theme.colors.primary,
-            }} />
-          </View>
-        </View>
-      )}
-
-      {formData.images.length === 0 && (
-        <View style={{
-          backgroundColor: theme.colors.warning + '10',
-          borderColor: theme.colors.warning,
-          borderWidth: 1,
-          borderRadius: theme.borderRadius.md,
-          padding: theme.spacing.lg,
-          alignItems: 'center',
-        }}>
-          <Text variant="body" style={{ color: theme.colors.warning, textAlign: 'center' }}>
-            📸 At least one photo is required to continue
-          </Text>
-        </View>
-      )}
-      
-      <View style={{
-        backgroundColor: theme.colors.primary + '10',
-        borderRadius: theme.borderRadius.md,
-        padding: theme.spacing.md,
-        flexDirection: 'row',
-        alignItems: 'center',
-      }}>
-        <Camera size={20} color={theme.colors.primary} style={{ marginRight: theme.spacing.sm }} />
-        <Text variant="bodySmall" style={{ color: theme.colors.primary, flex: 1 }}>
-          Great photos can increase your sales by up to 300%!
-        </Text>
-        <Button
-          variant="ghost"
-          size="sm"
-          onPress={() => setShowPhotoTips(true)}
-        >
-          Tips
-        </Button>
-      </View>
-    </View>
-  ), [formData.images, loading, uploadProgress, theme, handleImagesChange]);
+  // PhotosStep merged into BasicInfoStep
 
   const BasicInfoStep = useMemo(() => (
     <View style={{ gap: theme.spacing.lg }}>
-
-      <Input
-        label="Title"
-        placeholder="e.g. Samsung Galaxy Note 20"
-        value={formData.title}
-        onChangeText={handleTitleChange}
-        helper={validationResults[1]?.warnings.title || "Be descriptive and specific (min. 10 characters)"}
-        error={validationResults[1]?.errors.title}
-      />
-
-      <Input
-        variant="multiline"
-        label="Describe your item"
-        placeholder="Describe your item in detail..."
-        value={formData.description}
-        onChangeText={handleDescriptionChange}
-        helper={validationResults[1]?.warnings.description || "Include condition, age, reason for selling, etc. (min. 20 characters)"}
-        containerStyle={{ minHeight: 120 }}
-        error={validationResults[1]?.errors.description}
-      />
-
-      <View style={{
-        backgroundColor: theme.colors.success + '10',
-        borderRadius: theme.borderRadius.md,
-        padding: theme.spacing.md,
-      }}>
-        <Text variant="bodySmall" style={{ color: theme.colors.success, textAlign: 'center' }}>
-          💡 Detailed listings get 5x more views!
+      
+      {/* Photos Section */}
+      <View>
+        <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+          Photos
         </Text>
+        
+        <CustomImagePicker
+          limit={8}
+          value={formData.images}
+          onChange={handleImagesChange}
+          disabled={loading}
+        />
+        
+        {loading && uploadProgress > 0 && (
+          <View style={{
+            backgroundColor: theme.colors.surfaceVariant,
+            borderRadius: theme.borderRadius.md,
+            padding: theme.spacing.md,
+            marginTop: theme.spacing.sm,
+          }}>
+            <Text variant="bodySmall" color="secondary" style={{ textAlign: 'center', marginBottom: theme.spacing.sm }}>
+              Uploading images... {Math.round(uploadProgress * 100)}%
+            </Text>
+            <View style={{
+              height: 4,
+              backgroundColor: theme.colors.border,
+              borderRadius: 2,
+              overflow: 'hidden',
+            }}>
+              <View style={{
+                height: '100%',
+                width: `${uploadProgress * 100}%`,
+                backgroundColor: theme.colors.primary,
+              }} />
+            </View>
+          </View>
+        )}
+
+        {formData.images.length === 0 && (
+          <View style={{
+            backgroundColor: theme.colors.warning + '10',
+            borderColor: theme.colors.warning,
+            borderWidth: 1,
+            borderRadius: theme.borderRadius.md,
+            padding: theme.spacing.md,
+            alignItems: 'center',
+            marginTop: theme.spacing.sm,
+          }}>
+            <Text variant="bodySmall" style={{ color: theme.colors.warning, textAlign: 'center' }}>
+              📸 At least one photo is required
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Basic Info Section */}
+      <View>
+        <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+          Basic Information
+        </Text>
+
+        <View style={{ gap: theme.spacing.md }}>
+          <Input
+            label="Title"
+            placeholder="e.g. Samsung Galaxy Note 20"
+            value={formData.title}
+            onChangeText={handleTitleChange}
+            helper={validationResults[0]?.warnings.title || "Be descriptive and specific (min. 10 characters)"}
+            error={validationResults[0]?.errors.title}
+          />
+
+          <Input
+            variant="multiline"
+            label="Describe your item"
+            placeholder="Describe your item in detail..."
+            value={formData.description}
+            onChangeText={handleDescriptionChange}
+            helper={validationResults[0]?.warnings.description || "Include condition, age, reason for selling, etc. (min. 20 characters)"}
+            containerStyle={{ minHeight: 120 }}
+            error={validationResults[0]?.errors.description}
+          />
+
+          <View style={{
+            backgroundColor: theme.colors.success + '10',
+            borderRadius: theme.borderRadius.md,
+            padding: theme.spacing.sm,
+          }}>
+            <Text variant="bodySmall" style={{ color: theme.colors.success, textAlign: 'center' }}>
+              💡 Great photos & details get 5x more views!
+            </Text>
+          </View>
+        </View>
       </View>
     </View>
-  ), [formData.title, formData.description, validationResults, theme, handleTitleChange, handleDescriptionChange]);
+  ), [formData.images, formData.title, formData.description, loading, uploadProgress, validationResults, theme, handleImagesChange, handleTitleChange, handleDescriptionChange]);
 
   const CategoryStep = useMemo(() => {
-    const categoryAttributes = formData.categoryId ? getCategoryAttributes(formData.categoryId) : [];
-    const showAttributes = hasCategoryAttributes(formData.categoryId);
-
     return (
       <View style={{ gap: theme.spacing.lg }}>
         <View>
@@ -1304,18 +1247,13 @@ export default function CreateListingScreen() {
           )}
         </View>
 
-        {/* Category-specific attributes */}
-        {showAttributes && (
-          <View>
-            <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
-              Product Details
-            </Text>
-            <CategoryAttributes
-              attributes={categoryAttributes}
-              values={formData.categoryAttributes}
-              onChange={handleCategoryAttributeChange}
-            />
-          </View>
+        {/* Dynamic Category Attributes Form */}
+        {formData.categoryId && (
+          <CategoryAttributesForm
+            categoryId={formData.categoryId}
+            values={formData.categoryAttributes}
+            onChange={handleCategoryAttributeChange}
+          />
         )}
 
         <View>
@@ -1344,132 +1282,70 @@ export default function CreateListingScreen() {
             </View>
           )}
         </View>
+
+        {/* Pricing & Selling Details */}
+        <View style={{ marginTop: theme.spacing.xl }}>
+          <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+            Pricing & Details
+          </Text>
+
+          <View style={{ gap: theme.spacing.lg }}>
+            <Input
+              label="Price (GHS)"
+              placeholder="0.00"
+              value={formData.price}
+              onChangeText={handlePriceChange}
+              keyboardType="numeric"
+              helper={validationResults[2]?.warnings.price || "Set a competitive price"}
+              error={validationResults[2]?.errors.price}
+            />
+
+            {formData.price && !isNaN(Number(formData.price)) && Number(formData.price) > 0 && (
+              <View style={{ alignItems: 'center', marginVertical: theme.spacing.md }}>
+                <PriceDisplay amount={Number(formData.price)} size="xl" />
+              </View>
+            )}
+
+            <Stepper
+              value={formData.quantity}
+              onValueChange={handleQuantityChange}
+              min={1}
+              max={99}
+              showLabel={true}
+              label="How many are you selling?"
+            />
+
+            <View>
+              <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.md }}>
+                How do you want to sell your item?
+              </Text>
+              <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
+                <Chip
+                  text="Fixed Price"
+                  variant="filter"
+                  selected={!formData.acceptOffers}
+                  onPress={() => handleAcceptOffersChange(false)}
+                />
+                <Chip
+                  text="Accept Offers"
+                  variant="filter"
+                  selected={formData.acceptOffers}
+                  onPress={() => handleAcceptOffersChange(true)}
+                />
+              </View>
+              {formData.acceptOffers && (
+                <Text variant="caption" color="muted" style={{ marginTop: theme.spacing.sm }}>
+                  Buyers can negotiate the price with you
+                </Text>
+              )}
+            </View>
+          </View>
+        </View>
       </View>
     );
-  }, [formData.categoryId, formData.location, formData.categoryAttributes, selectedCategory, theme, handleCategorySelect, handleLocationSelect, handleCategoryAttributeChange]);
+  }, [formData.categoryId, formData.location, formData.categoryAttributes, formData.price, formData.quantity, formData.acceptOffers, selectedCategory, validationResults, theme, handleCategorySelect, handleLocationSelect, handleCategoryAttributeChange, handlePriceChange, handleQuantityChange, handleAcceptOffersChange]);
 
-  const DetailsStep = useMemo(() => (
-    <View style={{ gap: theme.spacing.lg }}>
-
-      <View>
-        <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
-          Condition
-        </Text>
-        <View style={{ gap: theme.spacing.sm }}>
-          {CONDITIONS.map((condition) => (
-            <Pressable
-              key={condition.value}
-              onPress={() => handleConditionSelect(condition.value)}
-              style={({ pressed }) => ({
-                flexDirection: 'row',
-                alignItems: 'center',
-                padding: theme.spacing.md,
-                borderRadius: theme.borderRadius.md,
-                borderWidth: 1,
-                borderColor: formData.condition === condition.value 
-                  ? theme.colors.primary 
-                  : theme.colors.border,
-                backgroundColor: pressed 
-                  ? theme.colors.surfaceVariant 
-                  : formData.condition === condition.value 
-                    ? theme.colors.primary + '10' 
-                    : theme.colors.surface,
-              })}
-            >
-              <View style={{
-                width: 20,
-                height: 20,
-                borderRadius: 10,
-                borderWidth: 2,
-                borderColor: formData.condition === condition.value 
-                  ? theme.colors.primary 
-                  : theme.colors.border,
-                backgroundColor: formData.condition === condition.value 
-                  ? theme.colors.primary 
-                  : 'transparent',
-                marginRight: theme.spacing.md,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                {formData.condition === condition.value && (
-                  <View style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
-                    backgroundColor: theme.colors.surface,
-                  }} />
-                )}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text variant="body" style={{ 
-                  fontWeight: '500',
-                  color: formData.condition === condition.value 
-                    ? theme.colors.primary 
-                    : theme.colors.text.primary,
-                  marginBottom: theme.spacing.xs,
-                }}>
-                  {condition.label}
-                </Text>
-                <Text variant="caption" color="muted">
-                  {condition.description}
-                </Text>
-              </View>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      <Input
-        label="Price (GHS)"
-        placeholder="0.00"
-        value={formData.price}
-        onChangeText={handlePriceChange}
-        keyboardType="numeric"
-        helper={validationResults[3]?.warnings.price || "Set a competitive price"}
-        error={validationResults[3]?.errors.price}
-      />
-
-      {formData.price && !isNaN(Number(formData.price)) && Number(formData.price) > 0 && (
-        <View style={{ alignItems: 'center', marginVertical: theme.spacing.md }}>
-          <PriceDisplay amount={Number(formData.price)} size="xl" />
-        </View>
-      )}
-
-      <Stepper
-        value={formData.quantity}
-        onValueChange={handleQuantityChange}
-        min={1}
-        max={99}
-        showLabel={true}
-        label="How many are you selling?"
-      />
-
-      <View>
-        <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.md }}>
-          How do you want to sell your item?
-        </Text>
-        <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
-          <Chip
-            text="Fixed Price"
-            variant="filter"
-            selected={!formData.acceptOffers}
-            onPress={() => handleAcceptOffersChange(false)}
-          />
-          <Chip
-            text="Accept Offers"
-            variant="filter"
-            selected={formData.acceptOffers}
-            onPress={() => handleAcceptOffersChange(true)}
-          />
-        </View>
-        {formData.acceptOffers && (
-          <Text variant="caption" color="muted" style={{ marginTop: theme.spacing.sm }}>
-            Buyers can negotiate the price with you
-          </Text>
-        )}
-      </View>
-    </View>
-  ), [formData.condition, formData.price, formData.quantity, formData.acceptOffers, validationResults, theme, handleConditionSelect, handlePriceChange, handleQuantityChange, handleAcceptOffersChange]);
+  // DetailsStep merged into CategoryStep above
 
 
 
@@ -1559,9 +1435,11 @@ export default function CreateListingScreen() {
           <Text variant="caption" color="muted">
             Category: {selectedCategory?.name}
           </Text>
-          <Text variant="caption" color="muted">
-            Condition: {selectedCondition?.label}
-          </Text>
+          {formData.categoryAttributes.condition && (
+            <Text variant="caption" color="muted">
+              Condition: {formData.categoryAttributes.condition}
+            </Text>
+          )}
           <Text variant="caption" color="muted">
             Quantity: {formData.quantity}
           </Text>
@@ -1817,15 +1695,13 @@ export default function CreateListingScreen() {
         </View>
       )}
     </View>
-  ), [formData, selectedCategory, selectedCondition, theme, hasUnlimitedListings, userListingsCount, getMaxListings, balance]);
+  ), [formData, selectedCategory, theme, hasUnlimitedListings, userListingsCount, getMaxListings, balance]);
 
   const renderStepContent = () => {
     switch (currentStep) {
-      case 0: return PhotosStep;
-      case 1: return BasicInfoStep;
-      case 2: return CategoryStep;
-      case 3: return DetailsStep;
-      case 4: return ReviewStep;
+      case 0: return BasicInfoStep; // Photos + Title + Description
+      case 1: return CategoryStep; // Category + Location + Price + Quantity
+      case 2: return ReviewStep;
       default: return null;
     }
   };
@@ -1863,107 +1739,67 @@ export default function CreateListingScreen() {
             router.back();
           }
         }}
-        rightActions={[
-        <TouchableOpacity
-          key="save-draft"
-          onPress={() => {
-            const hasContent = formData.title?.trim() || formData.description?.trim() || formData.images.length > 0;
-            if (hasContent) {
-              saveDraft(formData, true); // true = manual save
-            } else {
-              Alert.alert('No Content', 'Please add some content before saving as draft.');
-            }
-          }}
-          disabled={!hasUnsavedChanges || isAutoSaving}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: theme.spacing.sm,
-            paddingVertical: theme.spacing.xs,
-            borderRadius: theme.borderRadius.md,
-            backgroundColor: (!hasUnsavedChanges || isAutoSaving) 
-              ? theme.colors.border + '20' 
-              : theme.colors.primary + '10',
-            opacity: (!hasUnsavedChanges || isAutoSaving) ? 0.6 : 1,
-          }}
-        >
-          <FileText 
-            size={16} 
-            color={(!hasUnsavedChanges || isAutoSaving) 
-              ? theme.colors.text.muted 
-              : theme.colors.primary} 
-            style={{ marginRight: theme.spacing.xs }} 
-          />
-          <Text 
-            variant="caption" 
-            style={{ 
-              color: (!hasUnsavedChanges || isAutoSaving) 
-                ? theme.colors.text.muted 
-                : theme.colors.primary, 
-              fontWeight: '600' 
-            }}
-          >
-            {isAutoSaving ? 'Saving...' : (!hasUnsavedChanges ? 'Saved' : 'Save Draft')}
-          </Text>
-        </TouchableOpacity>
-        ]}
+        rightActions={
+          (isAutoSaving || hasUnsavedChanges || (formData.title || formData.description || formData.images.length > 0))
+          ? [
+              <View
+                key="autosave-status"
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: theme.spacing.sm,
+                  paddingVertical: theme.spacing.xs,
+                  borderRadius: theme.borderRadius.md,
+                  backgroundColor: isAutoSaving 
+                    ? theme.colors.primary + '10'
+                    : hasUnsavedChanges 
+                      ? theme.colors.warning + '10'
+                      : theme.colors.success + '10',
+                }}
+              >
+                {isAutoSaving ? (
+                  <>
+                    <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginRight: theme.spacing.xs }} />
+                    <Text variant="caption" style={{ color: theme.colors.primary, fontWeight: '600' }}>
+                      Saving...
+                    </Text>
+                  </>
+                ) : hasUnsavedChanges ? (
+                  <>
+                    <View style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: 3,
+                      backgroundColor: theme.colors.warning,
+                      marginRight: theme.spacing.xs,
+                    }} />
+                    <Text variant="caption" style={{ color: theme.colors.warning, fontWeight: '600' }}>
+                      Unsaved
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={14} color={theme.colors.success} style={{ marginRight: theme.spacing.xs }} />
+                    <Text variant="caption" style={{ color: theme.colors.success, fontWeight: '600' }}>
+                      Saved
+                    </Text>
+                  </>
+                )}
+              </View>
+            ]
+          : []
+        }
       />
 
-      {/* Autosave Status */}
-      {(isAutoSaving || hasUnsavedChanges || (formData.title || formData.description || formData.images.length > 0)) && (
-        <View style={{
-          paddingHorizontal: theme.spacing.lg,
-          paddingVertical: theme.spacing.sm,
-          backgroundColor: theme.colors.surfaceVariant,
-          borderBottomWidth: 1,
-          borderBottomColor: theme.colors.border,
-        }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-            {isAutoSaving && (
-              <>
-                <View style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: theme.colors.warning,
-                  marginRight: theme.spacing.xs,
-                }} />
-                <Text variant="caption" color="muted">Saving draft...</Text>
-              </>
-            )}
-            {!isAutoSaving && hasUnsavedChanges && (
-              <>
-                <View style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: theme.colors.error,
-                  marginRight: theme.spacing.xs,
-                }} />
-                <Text variant="caption" color="muted">Unsaved changes</Text>
-              </>
-            )}
-            {!isAutoSaving && !hasUnsavedChanges && (formData.title || formData.description || formData.images.length > 0) && (
-              <>
-                <View style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: theme.colors.success,
-                  marginRight: theme.spacing.xs,
-                }} />
-                <Text variant="caption" color="muted">Draft saved</Text>
-              </>
-            )}
-          </View>
-        </View>
-      )}
 
-      <View style={{ flex: 1 }}>
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+      >
         {/* Progress Indicator */}
         <View style={{
           paddingHorizontal: theme.spacing.lg,
-          paddingVertical: theme.spacing.md,
           backgroundColor: theme.colors.surface,
           borderBottomWidth: 1,
           borderBottomColor: theme.colors.border,
@@ -1984,11 +1820,12 @@ export default function CreateListingScreen() {
         {/* Step Content */}
         <ScrollView 
           style={{ flex: 1 }}
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: theme.spacing.xl }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
-          <View style={{ flex: 1, padding: theme.spacing.lg }}>
+          <View style={{ flex: 1, paddingHorizontal: theme.spacing.sm, paddingVertical: theme.spacing.sm }}>
             {renderStepContent()}
           </View>
         </ScrollView>
@@ -2026,7 +1863,7 @@ export default function CreateListingScreen() {
             {currentStep === STEPS.length - 1 ? 'Publish Listing' : 'Next'}
           </Button>
         </View>
-      </View>
+      </KeyboardAvoidingView>
 
       {/* Payment Modal */}
       <AppModal

@@ -1223,14 +1223,16 @@ BEGIN
         RETURN;
     END IF;
     
-    -- Get current balance
-    SELECT COALESCE(balance, 0) INTO current_balance
-    FROM user_credits WHERE user_id = p_user_id;
-    
     -- Create credits record if it doesn't exist
     INSERT INTO user_credits (user_id, balance, lifetime_earned, lifetime_spent)
     VALUES (p_user_id, 0, 0, 0)
     ON CONFLICT (user_id) DO NOTHING;
+    
+    -- Get current balance with row lock
+    SELECT COALESCE(balance, 0) INTO current_balance
+    FROM user_credits 
+    WHERE user_id = p_user_id
+    FOR UPDATE;
     
     -- Award anniversary bonus
     UPDATE user_credits
@@ -1243,11 +1245,11 @@ BEGIN
     -- Log transaction
     INSERT INTO credit_transactions (
         user_id, type, amount, balance_before, balance_after,
-        reference_type, metadata
+        reference_id, reference_type, metadata
     )
     VALUES (
         p_user_id, 'earned', bonus_amount, current_balance, current_balance + bonus_amount,
-        'anniversary_bonus', 
+        NULL, 'anniversary_bonus', 
         jsonb_build_object('anniversary_year', EXTRACT(YEAR FROM CURRENT_DATE))
     );
     
@@ -1270,6 +1272,7 @@ CREATE OR REPLACE FUNCTION award_community_reward(
 RETURNS BOOLEAN AS $$
 DECLARE
     current_balance INTEGER;
+    new_balance INTEGER;
 BEGIN
     -- Insert community reward
     INSERT INTO community_rewards (
@@ -1279,31 +1282,36 @@ BEGIN
         p_user_id, p_type, p_points, p_description, p_metadata, true
     );
     
-    -- Get current balance
-    SELECT COALESCE(balance, 0) INTO current_balance
-    FROM user_credits WHERE user_id = p_user_id;
-    
-    -- Create credits record if it doesn't exist
+    -- Ensure user_credits record exists FIRST
     INSERT INTO user_credits (user_id, balance, lifetime_earned, lifetime_spent)
     VALUES (p_user_id, 0, 0, 0)
     ON CONFLICT (user_id) DO NOTHING;
     
+    -- Get current balance with row lock to prevent race conditions
+    SELECT COALESCE(balance, 0) INTO current_balance
+    FROM user_credits 
+    WHERE user_id = p_user_id
+    FOR UPDATE;
+    
+    -- Calculate new balance
+    new_balance := current_balance + p_points;
+    
     -- Award credits
     UPDATE user_credits
     SET 
-        balance = balance + p_points,
+        balance = new_balance,
         lifetime_earned = lifetime_earned + p_points,
         updated_at = NOW()
     WHERE user_id = p_user_id;
     
-    -- Log transaction
+    -- Log transaction with explicit balance values
     INSERT INTO credit_transactions (
         user_id, type, amount, balance_before, balance_after,
-        reference_type, metadata
+        reference_id, reference_type, metadata
     )
     VALUES (
-        p_user_id, 'earned', p_points, current_balance, current_balance + p_points,
-        'community_reward', 
+        p_user_id, 'earned', p_points, current_balance, new_balance,
+        NULL, 'community_reward', 
         jsonb_build_object('reward_type', p_type, 'description', p_description)
     );
     

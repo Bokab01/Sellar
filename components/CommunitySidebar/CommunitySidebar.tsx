@@ -121,7 +121,8 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
         useNativeDriver: true,
       }).start();
     }
-  }, [isVisible, user, creditBalance, refreshCredits, fetchSidebarData]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVisible, user, creditBalance, refreshCredits]);
 
   const fetchSidebarData = useCallback(async () => {
     try {

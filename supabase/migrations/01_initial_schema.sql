@@ -2074,10 +2074,8 @@ CREATE TRIGGER trigger_create_comment_notification
     FOR EACH ROW
     EXECUTE FUNCTION create_comment_notification();
 
-CREATE TRIGGER trigger_create_listing_notification
-    AFTER INSERT OR UPDATE ON listings
-    FOR EACH ROW
-    EXECUTE FUNCTION create_listing_notification();
+-- NOTE: trigger_create_listing_notification is created in migration 09_notification_triggers.sql
+-- and updated in 10_fix_auto_refresh_notification_spam.sql
 
 -- Helpful vote functions to replace supabase.raw usage
 -- These functions handle incrementing and decrementing helpful counts safely
