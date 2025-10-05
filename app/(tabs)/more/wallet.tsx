@@ -142,18 +142,13 @@ export default function WalletScreen() {
         setProfile(profileData);
       }
 
-      // Fetch transaction history
+      // Fetch credit transaction history
       const { data: transactionData } = await supabase
-        .from('transactions')
-        .select(`
-          *,
-          related_listing:related_listing_id (
-            title
-          )
-        `)
+        .from('credit_transactions')
+        .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(5);
       
       if (transactionData) {
         setTransactions(transactionData);
@@ -178,12 +173,12 @@ export default function WalletScreen() {
 
   const getTransactionIcon = (type: string) => {
     switch (type) {
-      case 'credit':
-      case 'refund':
+      case 'earned':
+      case 'refunded':
       case 'bonus':
         return <ArrowDownLeft size={20} color={theme.colors.success} />;
-      case 'debit':
-      case 'purchase':
+      case 'spent':
+      case 'penalty':
         return <ArrowUpRight size={20} color={theme.colors.error} />;
       default:
         return <DollarSign size={20} color={theme.colors.text.muted} />;
@@ -192,12 +187,12 @@ export default function WalletScreen() {
 
   const getTransactionColor = (type: string) => {
     switch (type) {
-      case 'credit':
-      case 'refund':
+      case 'earned':
+      case 'refunded':
       case 'bonus':
         return theme.colors.success;
-      case 'debit':
-      case 'purchase':
+      case 'spent':
+      case 'penalty':
         return theme.colors.error;
       default:
         return theme.colors.text.primary;
@@ -326,18 +321,26 @@ export default function WalletScreen() {
                   ...theme.shadows.sm,
                 }}
               >
-                {transactions.slice(0, 5).map((transaction, index) => (
-                  <ListItem
-                    key={transaction.id}
-                    title={transaction.description}
-                    subtitle={transaction.related_listing?.title || `${transaction.type || 'Unknown'} transaction`}
-                    timestamp={new Date(transaction.created_at).toLocaleDateString()}
-                    rightIcon={getTransactionIcon(transaction.type)}
-                    style={{
-                      borderBottomWidth: index < Math.min(transactions.length, 5) - 1 ? 1 : 0,
-                    }}
-                  />
-                ))}
+                {transactions.slice(0, 5).map((transaction, index) => {
+                  const isCredit = transaction.type === 'earned' || transaction.type === 'bonus' || transaction.type === 'refunded';
+                  const displayAmount = isCredit ? `+${transaction.amount}` : `-${transaction.amount}`;
+                  const description = transaction.metadata?.reward_type 
+                    ? `${transaction.reference_type} - ${transaction.metadata.reward_type}`
+                    : transaction.reference_type || transaction.type;
+                  
+                  return (
+                    <ListItem
+                      key={transaction.id}
+                      title={`${displayAmount} Credits`}
+                      subtitle={description.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                      timestamp={new Date(transaction.created_at).toLocaleDateString()}
+                      rightIcon={getTransactionIcon(transaction.type)}
+                      style={{
+                        borderBottomWidth: index < Math.min(transactions.length, 5) - 1 ? 1 : 0,
+                      }}
+                    />
+                  );
+                })}
               </View>
             ) : (
               <EmptyState
@@ -364,6 +367,7 @@ export default function WalletScreen() {
                   padding: theme.spacing.lg,
                 }}
                 activeOpacity={0.7}
+                onPress={() => router.push('/invite')}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
                   <View
@@ -383,14 +387,14 @@ export default function WalletScreen() {
                       Invite Friends
                     </Text>
                     <Text variant="bodySmall" color="secondary">
-                      Earn GHS 10 for each friend who joins and makes their first sale
+                      For each friend who joins Sellar, you earn 20 credits to boost your listings
                     </Text>
                   </View>
-                  <Badge text="GHS 10" variant="success" />
+                  <Badge text="20" variant="success" />
                 </View>
               </TouchableOpacity>
 
-              <TouchableOpacity
+             {/*  <TouchableOpacity
                 style={{
                   backgroundColor: theme.colors.warning + '10',
                   borderColor: theme.colors.warning + '30',
@@ -423,7 +427,7 @@ export default function WalletScreen() {
                   </View>
                   <Badge text="1%" variant="warning" />
                 </View>
-              </TouchableOpacity>
+              </TouchableOpacity> */}
             </View>
           </View>
 
@@ -506,16 +510,16 @@ export default function WalletScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text variant="h4" style={{ marginBottom: theme.spacing.xs }}>
-                    Feature Marketplace
+                    Boost Your Listings
                   </Text>
                   <Text variant="bodySmall" color="muted">
-                    Boost listings • Analytics • Premium features
+                    Boost listings • Ad-refresh • Listing Highlight • Urgent Badge
                   </Text>
                 </View>
                 <ArrowUpRight size={20} color={theme.colors.text.muted} />
               </View>
               <Text variant="caption" color="muted" style={{ textAlign: 'center' }}>
-                Explore premium features →
+                Explore boost features →
               </Text>
             </TouchableOpacity>
           </View>

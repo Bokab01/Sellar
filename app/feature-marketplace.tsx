@@ -493,7 +493,7 @@ export default function FeatureMarketplaceScreen() {
   return (
     <SafeAreaWrapper>
       <AppHeader
-        title="Feature Marketplace"
+        title="Boost Your Listings"
         showBackButton
         onBackPress={() => router.back()}
         rightActions={[
@@ -547,7 +547,7 @@ export default function FeatureMarketplaceScreen() {
             </View>
                 <View style={{ flex: 1 }}>
                   <Text variant="h4" style={{ marginBottom: theme.spacing.sm }}>
-                {hasBusinessPlan() ? 'Sellar Pro Features' : 'Premium Features'}
+                {hasBusinessPlan() ? 'Sellar Pro Features' : 'Available Boosts'}
                   </Text>
                   <Text variant="bodySmall" color="secondary">
                 {hasBusinessPlan() 

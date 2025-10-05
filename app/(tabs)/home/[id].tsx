@@ -35,7 +35,7 @@ import {
 const ImageViewer = lazy(() => import('@/components/ImageViewer/ImageViewer').then(module => ({ default: module.ImageViewer })));
 import { useImageViewer } from '@/hooks/useImageViewer';
 import { useListingStats } from '@/hooks/useListingStats';
-import { Heart, Share as ShareIcon, MessageCircle, Phone, PhoneCall, DollarSign, ArrowLeft, Package, MoreVertical, Edit, Trash2, Flag, BadgeCent } from 'lucide-react-native';
+import { Heart, Share as ShareIcon, MessageCircle, Phone, PhoneCall, DollarSign, ArrowLeft, Package, MoreVertical, Edit, Trash2, Flag, BadgeCent, RefreshCw } from 'lucide-react-native';
 import { getDisplayName } from '@/hooks/useDisplayName';
 import { ReportButton } from '@/components/ReportButton/ReportButton';
 
@@ -626,6 +626,46 @@ export default function ListingDetailScreen() {
     }
   };
 
+  const handleRelistListing = async () => {
+    setShowMenu(false);
+    
+    Alert.alert(
+      'Relist Item',
+      'This will make your listing active again and visible to buyers. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Relist',
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('listings')
+                .update({ 
+                  status: 'active',
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', listingId);
+
+              if (error) throw error;
+
+              setToastMessage('Listing relisted successfully');
+              setToastVariant('success');
+              setShowToast(true);
+
+              // Refresh listing data
+              await fetchListing();
+            } catch (error) {
+              console.error('Error relisting:', error);
+              setToastMessage('Failed to relist item');
+              setToastVariant('error');
+              setShowToast(true);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleContactSeller = async () => {
     if (!user) {
       Alert.alert('Sign In Required', 'Please sign in to contact sellers');
@@ -911,24 +951,121 @@ export default function ListingDetailScreen() {
   };
 
   if (loading) {
+    const screenHeight = Dimensions.get('window').height;
+    const imageHeight = screenHeight * 0.6;
+    
     return (
       <SafeAreaWrapper>
-        <AppHeader
-          title=""
-          showBackButton
-          onBackPress={() => router.back()}
-        />
-        <ScrollView contentContainerStyle={{ padding: theme.spacing.lg }}>
-          <LoadingSkeleton width="100%" height={300} style={{ marginBottom: theme.spacing.lg }} />
-          <LoadingSkeleton width="80%" height={24} style={{ marginBottom: theme.spacing.md }} />
-          <LoadingSkeleton width="40%" height={32} style={{ marginBottom: theme.spacing.lg }} />
-          <LoadingSkeleton width="100%" height={100} />
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        
+        {/* Fixed Header Overlay Skeleton */}
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            paddingTop: (StatusBar.currentHeight || 44) + theme.spacing.md,
+            paddingHorizontal: theme.spacing.lg,
+            paddingBottom: theme.spacing.md,
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <LoadingSkeleton width={40} height={40} borderRadius={20} />
+          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+            <LoadingSkeleton width={40} height={40} borderRadius={20} />
+            <LoadingSkeleton width={40} height={40} borderRadius={20} />
+          </View>
+        </View>
+
+        <ScrollView style={{ flex: 1 }}>
+          {/* Hero Image Skeleton */}
+          <LoadingSkeleton width="100%" height={imageHeight} borderRadius={0} />
+          
+          {/* Content Section */}
+          <View style={{ 
+            backgroundColor: theme.colors.background,
+            borderTopLeftRadius: theme.borderRadius.xl,
+            borderTopRightRadius: theme.borderRadius.xl,
+            marginTop: -20,
+            padding: theme.spacing.lg,
+          }}>
+            {/* Badges Row Skeleton */}
+            <View style={{ flexDirection: 'row', gap: theme.spacing.xs, marginBottom: theme.spacing.md }}>
+              <LoadingSkeleton width={80} height={24} borderRadius={theme.borderRadius.full} />
+              <LoadingSkeleton width={100} height={24} borderRadius={theme.borderRadius.full} />
+            </View>
+
+            {/* Title Skeleton */}
+            <LoadingSkeleton width="90%" height={28} style={{ marginBottom: theme.spacing.sm }} />
+            <LoadingSkeleton width="70%" height={28} style={{ marginBottom: theme.spacing.lg }} />
+
+            {/* Price Skeleton */}
+            <LoadingSkeleton width="40%" height={36} style={{ marginBottom: theme.spacing.lg }} />
+
+            {/* Stats Row Skeleton */}
+            <View style={{ flexDirection: 'row', gap: theme.spacing.lg, marginBottom: theme.spacing.xl }}>
+              <LoadingSkeleton width={60} height={20} />
+              <LoadingSkeleton width={60} height={20} />
+            </View>
+
+            {/* Description Section Skeleton */}
+            <LoadingSkeleton width={120} height={20} style={{ marginBottom: theme.spacing.md }} />
+            <LoadingSkeleton width="100%" height={16} style={{ marginBottom: theme.spacing.xs }} />
+            <LoadingSkeleton width="100%" height={16} style={{ marginBottom: theme.spacing.xs }} />
+            <LoadingSkeleton width="80%" height={16} style={{ marginBottom: theme.spacing.xl }} />
+
+            {/* Item Details Table Skeleton */}
+            <LoadingSkeleton width={120} height={20} style={{ marginBottom: theme.spacing.md }} />
+            <View style={{ 
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.borderRadius.lg,
+              padding: theme.spacing.md,
+              gap: theme.spacing.sm,
+              marginBottom: theme.spacing.xl,
+            }}>
+              {[1, 2, 3, 4].map((i) => (
+                <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <LoadingSkeleton width="40%" height={16} />
+                  <LoadingSkeleton width="50%" height={16} />
+                </View>
+              ))}
+            </View>
+
+            {/* Seller Section Skeleton */}
+            <LoadingSkeleton width={100} height={20} style={{ marginBottom: theme.spacing.md }} />
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.borderRadius.lg,
+              padding: theme.spacing.md,
+              marginBottom: theme.spacing.xl,
+            }}>
+              <LoadingSkeleton width={48} height={48} borderRadius={24} style={{ marginRight: theme.spacing.md }} />
+              <View style={{ flex: 1 }}>
+                <LoadingSkeleton width="60%" height={18} style={{ marginBottom: theme.spacing.xs }} />
+                <LoadingSkeleton width="40%" height={14} />
+              </View>
+            </View>
+
+            {/* Action Buttons Skeleton */}
+            <View style={{ flexDirection: 'row', gap: theme.spacing.md, marginBottom: theme.spacing.xl }}>
+              <LoadingSkeleton width="48%" height={48} borderRadius={theme.borderRadius.lg} style={{ flex: 1 }} />
+              <LoadingSkeleton width="48%" height={48} borderRadius={theme.borderRadius.lg} style={{ flex: 1 }} />
+            </View>
+          </View>
         </ScrollView>
       </SafeAreaWrapper>
     );
   }
 
   if (error || !listing) {
+    const isListingNotFound = error?.includes('not found') || error?.includes('removed');
+    
     return (
       <SafeAreaWrapper>
         <AppHeader
@@ -937,8 +1074,12 @@ export default function ListingDetailScreen() {
           onBackPress={() => router.back()}
         />
         <ErrorState
-          message={error || 'Listing not found'}
-          onRetry={fetchListing}
+          title={isListingNotFound ? 'Listing Unavailable' : 'Something went wrong'}
+          message={isListingNotFound 
+            ? 'This listing has been removed or is no longer available. Browse other listings to find similar items.'
+            : error || 'Unable to load listing details'}
+          onRetry={!isListingNotFound ? fetchListing : undefined}
+          retryText="Refresh"
         />
       </SafeAreaWrapper>
     );
@@ -1069,8 +1210,8 @@ export default function ListingDetailScreen() {
               elevation: 10,
             }}
           >
-            {/* Edit Button - Only for own listings */}
-            {isOwnListing && (
+            {/* Edit Button - Only for own listings (not sold) */}
+            {isOwnListing && listing.status !== 'sold' && (
               <TouchableOpacity
                 onPress={handleEditListing}
                 style={{
@@ -1083,6 +1224,24 @@ export default function ListingDetailScreen() {
                 <Edit size={18} color={theme.colors.primary} style={{ marginRight: theme.spacing.sm }} />
                 <Text variant="body" style={{ color: theme.colors.text.primary, fontSize: 14 }}>
                   Edit Listing
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Relist Button - Only for own sold listings */}
+            {isOwnListing && listing.status === 'sold' && (
+              <TouchableOpacity
+                onPress={handleRelistListing}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: theme.spacing.sm,
+                  paddingHorizontal: theme.spacing.md,
+                }}
+              >
+                <RefreshCw size={18} color={theme.colors.primary} style={{ marginRight: theme.spacing.sm }} />
+                <Text variant="body" style={{ color: theme.colors.primary, fontSize: 14 }}>
+                  Relist Item
                 </Text>
               </TouchableOpacity>
             )}
@@ -1372,6 +1531,32 @@ export default function ListingDetailScreen() {
               flexWrap: 'wrap',
               marginTop: theme.spacing.sm,
             }}>
+              {/* Sold Badge */}
+              {listing.status === 'sold' && (
+                <View style={{
+                  backgroundColor: theme.colors.text.muted + '15',
+                  borderWidth: 1,
+                  borderColor: theme.colors.text.muted + '30',
+                  borderRadius: theme.borderRadius.full,
+                  paddingHorizontal: theme.spacing.md,
+                  paddingVertical: theme.spacing.sm,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: theme.spacing.xs,
+                }}>
+                  <Text style={{ fontSize: 14, color: theme.colors.text.secondary }}>✅</Text>
+                  <Text 
+                    variant="caption" 
+                    style={{ 
+                      color: theme.colors.text.secondary,
+                      fontWeight: '600',
+                    }}
+                  >
+                    Sold
+                  </Text>
+                </View>
+              )}
+
               {/* Condition Badge */}
               <View style={{
                 backgroundColor: theme.colors.primary + '15',
@@ -1514,6 +1699,45 @@ export default function ListingDetailScreen() {
             </View>
           )}
 
+          {/* Sold Item Banner */}
+          {listing.status === 'sold' && (
+            <View
+              style={{
+                backgroundColor: theme.colors.text.muted + '15',
+                borderWidth: 1,
+                borderColor: theme.colors.text.muted + '30',
+                borderRadius: theme.borderRadius.md,
+                padding: theme.spacing.lg,
+                marginBottom: theme.spacing.lg,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.md,
+              }}
+            >
+              <View style={{
+                backgroundColor: theme.colors.text.muted + '20',
+                borderRadius: theme.borderRadius.full,
+                padding: theme.spacing.sm,
+              }}>
+                <Text style={{ fontSize: 20 }}>✅</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text variant="body" style={{ 
+                  fontWeight: '600', 
+                  color: theme.colors.text.secondary,
+                  marginBottom: theme.spacing.xs 
+                }}>
+                  This item has been sold
+                </Text>
+                <Text variant="bodySmall" style={{ color: theme.colors.text.secondary }}>
+                  {isOwnListing 
+                    ? 'You can relist this item from your listings page.'
+                    : 'Check out similar items below or browse other listings.'}
+                </Text>
+              </View>
+            </View>
+          )}
+
           {/* Description */}
           <View style={{ marginBottom: theme.spacing.xl }}>
             <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
@@ -1525,7 +1749,7 @@ export default function ListingDetailScreen() {
           </View>
 
           {/* Action Buttons - Moved from bottom */}
-          {!isOwnListing && (
+          {!isOwnListing && listing.status !== 'sold' && (
             <View style={{ marginBottom: theme.spacing.xl }}>
               <View style={{ gap: theme.spacing.md }}>
                 {/* Make an Offer Button */}

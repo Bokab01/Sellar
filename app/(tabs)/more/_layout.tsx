@@ -28,7 +28,6 @@ export default function MoreLayout() {
       backgroundColor: theme.colors.surface,
       borderBottomWidth: 1,
       borderBottomColor: theme.colors.border,
-    
     },
     tabBarActiveTintColor: theme.colors.primary,
     tabBarInactiveTintColor: theme.colors.text.muted,
@@ -39,7 +38,6 @@ export default function MoreLayout() {
     tabBarLabelStyle: {
       fontSize: Platform.OS === 'android' ? 13 : 12,
       fontWeight: '700' as const,
-      textTransform: 'capitalize' as const,
     },
     
     tabBarPressColor: theme.colors.primary + '20',

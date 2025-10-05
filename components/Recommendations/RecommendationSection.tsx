@@ -74,8 +74,23 @@ const RecommendationSection = memo(function RecommendationSection({
     listingIds 
   });
   
-  // Get favorites count for header
-  const { incrementFavoritesCount, decrementFavoritesCount } = useFavoritesStore();
+  // Get favorites from global store for sync across all instances
+  const { 
+    incrementFavoritesCount, 
+    decrementFavoritesCount,
+    listingFavoriteCounts,
+    toggleFavorite: toggleGlobalFavorite,
+    incrementListingFavoriteCount,
+    decrementListingFavoriteCount,
+    updateListingFavoriteCount,
+    favorites: globalFavorites
+  } = useFavoritesStore();
+  
+  // Merge hook favorites with global favorites
+  const favorites = useMemo(() => ({
+    ...hookFavorites,
+    ...globalFavorites
+  }), [hookFavorites, globalFavorites]);
 
   const loadRecommendations = useCallback(async () => {
     try {
@@ -120,31 +135,55 @@ const RecommendationSection = memo(function RecommendationSection({
     await loadRecommendations();
     setRefreshing(false);
   }, [loadRecommendations]);
+  
+  // Initialize listing favorite counts when recommendations load
+  useEffect(() => {
+    recommendations.forEach(item => {
+      if (item.favorites_count !== undefined) {
+        const currentStoreCount = listingFavoriteCounts[item.listing_id];
+        if (currentStoreCount === undefined) {
+          updateListingFavoriteCount(item.listing_id, item.favorites_count);
+        }
+      }
+    });
+  }, [recommendations]);
 
   const handleFavoritePress = useCallback(async (listingId: string) => {
     if (!user) return;
     
     try {
+      const isFavorited = favorites[listingId] || false;
+      
+      // Optimistic update using global store (syncs across all instances)
+      toggleGlobalFavorite(listingId);
+      
+      // Update the listing's favorite count optimistically
+      if (isFavorited) {
+        decrementListingFavoriteCount(listingId);
+      } else {
+        incrementListingFavoriteCount(listingId);
+      }
+      
       // Import and use the favorites function
       const { toggleFavorite } = await import('@/lib/favoritesAndViews');
       const result = await toggleFavorite(listingId);
       
-      if (!result.error) {
-        // Update header favorites count
-        const currentFavorite = hookFavorites[listingId] || false;
-        if (currentFavorite) {
-          decrementFavoritesCount();
+      if (result.error) {
+        // Revert optimistic updates on error
+        toggleGlobalFavorite(listingId);
+        if (isFavorited) {
+          incrementListingFavoriteCount(listingId);
         } else {
-          incrementFavoritesCount();
+          decrementListingFavoriteCount(listingId);
         }
-        
+      } else {
         // Refresh stats to get latest data
         refreshStats();
       }
     } catch (error) {
       console.error('Error toggling favorite:', error);
     }
-  }, [user, hookFavorites, decrementFavoritesCount, incrementFavoritesCount, refreshStats]);
+  }, [user, favorites, toggleGlobalFavorite, incrementListingFavoriteCount, decrementListingFavoriteCount, refreshStats]);
 
   const handleViewPress = useCallback((listingId: string) => {
     // Navigate to listing detail to see more details
@@ -316,9 +355,9 @@ const RecommendationSection = memo(function RecommendationSection({
                   layout="grid"
                   fullWidth={true}
                   listingId={item.listing_id}
-                  isFavorited={hookFavorites[item.listing_id] || false}
+                  isFavorited={favorites[item.listing_id] || false}
                   viewCount={viewCounts[item.listing_id] || 0}
-                  favoritesCount={item.favorites_count || 0}
+                  favoritesCount={listingFavoriteCounts[item.listing_id] ?? item.favorites_count ?? 0}
                   onPress={() => onListingPress?.(item.listing_id)}
                   onFavoritePress={user?.id !== item.user_id ? () => handleFavoritePress(item.listing_id) : undefined}
                   onViewPress={() => handleViewPress(item.listing_id)}
@@ -367,9 +406,9 @@ const RecommendationSection = memo(function RecommendationSection({
                   location={item.location || 'Unknown'}
                   layout="grid"
                   listingId={item.listing_id}
-                  isFavorited={hookFavorites[item.listing_id] || false}
+                  isFavorited={favorites[item.listing_id] || false}
                   viewCount={viewCounts[item.listing_id] || 0}
-                  favoritesCount={item.favorites_count || 0}
+                  favoritesCount={listingFavoriteCounts[item.listing_id] ?? item.favorites_count ?? 0}
                   onPress={() => onListingPress?.(item.listing_id)}
                   onFavoritePress={user?.id !== item.user_id ? () => handleFavoritePress(item.listing_id) : undefined}
                   onViewPress={() => handleViewPress(item.listing_id)}

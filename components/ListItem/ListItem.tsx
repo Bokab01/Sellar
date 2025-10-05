@@ -123,10 +123,20 @@ export function ListItem({
             variant="bodySmall"
             color="secondary"
             numberOfLines={1}
-            style={{ marginBottom: description ? theme.spacing.xs : 0 }}
+            style={{ marginBottom: description || badge ? theme.spacing.xs : 0 }}
           >
             {subtitle}
           </Text>
+        )}
+
+        {badge && (
+          <View style={{ marginTop: theme.spacing.xs, alignSelf: 'flex-start' }}>
+            <Badge
+              text={badge.text}
+              variant={badge.variant}
+              size="sm"
+            />
+          </View>
         )}
 
         {description && (
@@ -138,16 +148,6 @@ export function ListItem({
           >
             {description}
           </Text>
-        )}
-
-        {badge && (
-          <View style={{ marginTop: theme.spacing.sm }}>
-            <Badge
-              text={badge.text}
-              variant={badge.variant}
-              size="sm"
-            />
-          </View>
         )}
       </View>
 

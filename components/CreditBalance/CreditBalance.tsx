@@ -8,7 +8,6 @@ import Animated, {
   withDelay,
   withTiming,
   interpolate,
-  Extrapolate,
 } from 'react-native-reanimated';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
@@ -103,7 +102,7 @@ export function CreditBalance({
           scaleValue.value,
           [0, 0.8, 1],
           [0, 1.1, 1],
-          Extrapolate.CLAMP
+          'clamp'
         ),
       },
     ],
@@ -114,7 +113,7 @@ export function CreditBalance({
       fadeValue.value,
       [0, 0.5, 1],
       [0, 0, 1],
-      Extrapolate.CLAMP
+      'clamp'
     ),
     transform: [
       {
@@ -122,7 +121,7 @@ export function CreditBalance({
           fadeValue.value,
           [0, 1],
           [20, 0],
-          Extrapolate.CLAMP
+          'clamp'
         ),
       },
     ],
@@ -150,7 +149,7 @@ export function CreditBalance({
                   <Zap 
                     size={24} 
                     color={theme.colors.primary} 
-                    style={{ marginBottom: 4 }}
+                    style={{ marginBottom: theme.spacing.md }}
                   />
                   <Text 
                     style={[styles.balanceText, { color: theme.colors.text.primary }]}
@@ -195,7 +194,14 @@ export function CreditBalance({
         <Button
           variant="primary"
           onPress={onTopUp}
-          style={[styles.actionButton, { backgroundColor: theme.colors.primary }]}
+          style={[styles.actionButton, { 
+            backgroundColor: theme.colors.primary,
+            shadowColor: 'transparent',
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0,
+            shadowRadius: 0,
+            elevation: 0,
+          }]}
           icon={<Plus size={20} color="#FFFFFF" />}
         >
           Top Up Credits
@@ -207,7 +213,7 @@ export function CreditBalance({
           style={[styles.actionButton, { borderColor: theme.colors.primary }]}
           icon={<Building size={20} color={theme.colors.primary} />}
         >
-          Business Plans
+          Sellar Pro Plan
         </Button>
       </Animated.View>
 
@@ -331,13 +337,6 @@ const styles = StyleSheet.create({
   actionButton: {
     borderRadius: 16,
     paddingVertical: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
   },
   valueContainer: {
     width: '100%',
@@ -346,14 +345,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   valueText: {
     fontSize: 18,

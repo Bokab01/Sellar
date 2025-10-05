@@ -136,8 +136,12 @@ export const dbHelpers = {
     const { data, error } = await db.messages
       .select(`
         *,
-        profiles!messages_sender_id_fkey(*),
-        offers(*)
+        sender:profiles!messages_sender_id_fkey(*),
+        offers(
+          *,
+          buyer:buyer_id(*),
+          seller:seller_id(*)
+        )
       `)
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: false })

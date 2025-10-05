@@ -258,7 +258,7 @@ export default function BusinessDashboardScreen() {
     return (
       <SafeAreaWrapper>
         <View style={{ flex: 1, marginTop: theme.spacing.md }}>
-          <AppHeader title="Sellar Pro Dashboard" />
+          {/* <AppHeader title="Sellar Pro Dashboard" /> */}
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
             <Text variant="body" color="secondary">Loading subscription data...</Text>
           </View>
@@ -270,22 +270,19 @@ export default function BusinessDashboardScreen() {
   // Free user dashboard (single screen, no tabs)
   if (currentTier === 'free') {
       return (
-      <SafeAreaWrapper>
-        <View style={{ flex: 1, marginTop: theme.spacing.md }}>
-          <AppHeader title="Sellar Pro Dashboard" />
+        <View style={{ flex: 1, marginTop: 0, backgroundColor: theme.colors.background }}>
+          {/* <AppHeader title="Sellar Pro Dashboard" /> */}
           <FreeUserDashboard
             loading={loading}
             quickStats={quickStats}
           />
         </View>
-      </SafeAreaWrapper>
-    );
-  }
+      );
+    }
 
   // Business user dashboard (with tabs)
   return (
-    <SafeAreaWrapper>
-      <View style={{ flex: 1, marginTop: theme.spacing.md }}>
+      <View style={{ flex: 1, marginTop: theme.spacing.md, backgroundColor: theme.colors.background }}>
         {renderTabBar}
         {activeTab === 'boost' ? (
           // Use View for boost tab to avoid nested virtualized lists
@@ -305,6 +302,5 @@ export default function BusinessDashboardScreen() {
         </ScrollView>
         )}
       </View>
-    </SafeAreaWrapper>
   );
 }

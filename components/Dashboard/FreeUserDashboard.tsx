@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { 
   Crown, 
   BarChart3, 
@@ -31,13 +32,17 @@ export const FreeUserDashboard: React.FC<FreeUserDashboardProps> = ({
   quickStats,
 }) => {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
     <Container style={{ paddingTop: theme.spacing.lg }}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: insets.bottom + theme.spacing.xl }}
+      >
         {/* Premium Upgrade Hero Card */}
         <View style={{
-          backgroundColor: `linear-gradient(135deg, ${theme.colors.primary}15, ${theme.colors.primary}05)`,
+          backgroundColor: theme.colors.surface,
           borderRadius: theme.borderRadius.xl,
           padding: theme.spacing.xl,
           marginBottom: theme.spacing.xl,
@@ -64,11 +69,11 @@ export const FreeUserDashboard: React.FC<FreeUserDashboardProps> = ({
               padding: theme.spacing.md,
               marginRight: theme.spacing.md,
             }}>
-              <Crown size={28} color="#FFFFFF" />
+              <Crown size={28} color={theme.colors.primaryForeground} />
             </View>
             <View style={{ flex: 1 }}>
               <Text variant="h3" style={{ marginBottom: theme.spacing.xs, color: theme.colors.primary }}>
-                Unlock Business Power
+                Unlock Sellar Pro
               </Text>
               <Text variant="body" color="secondary" style={{ lineHeight: 22 }}>
                 Get comprehensive analytics, auto-refresh every 2 hours, and priority support to grow your business faster.
@@ -85,7 +90,7 @@ export const FreeUserDashboard: React.FC<FreeUserDashboardProps> = ({
           }}>
             {[
               { icon: BarChart3, label: 'Advanced Analytics', color: theme.colors.success },
-              { icon: Zap, label: '120 Boost Credits', color: theme.colors.warning },
+              { icon: Zap, label: 'Auto-refresh', color: theme.colors.warning },
               { icon: HeadphonesIcon, label: 'Priority Support', color: theme.colors.primary },
               { icon: TrendingUp, label: 'Growth Tools', color: theme.colors.info },
             ].map((feature, index) => (
@@ -114,20 +119,14 @@ export const FreeUserDashboard: React.FC<FreeUserDashboardProps> = ({
           <Button
             variant="primary"
             onPress={() => router.push('/subscription-plans')}
+            leftIcon={<ArrowUp size={18} color={theme.colors.primaryForeground} />}
             style={{ 
               width: '100%',
               paddingVertical: theme.spacing.md,
               borderRadius: theme.borderRadius.lg,
             }}
           >
-            <ArrowUp size={18} color="#FFFFFF" />
-            <Text variant="body" style={{ 
-              color: '#FFFFFF', 
-              marginLeft: theme.spacing.sm,
-              fontWeight: '700',
-            }}>
-              Upgrade to Business
-            </Text>
+            Upgrade to Sellar Pro
           </Button>
         </View>
 
@@ -227,7 +226,7 @@ export const FreeUserDashboard: React.FC<FreeUserDashboardProps> = ({
               <Text style={{ fontWeight: '600' }}>Want more insights?</Text>
             </Text>
             <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
-              Upgrade to Business for advanced analytics, growth tracking, and detailed performance metrics.
+              Upgrade to Sellar Pro for advanced analytics, growth tracking, and detailed performance metrics.
             </Text>
           </View>
         </View>
@@ -333,15 +332,15 @@ export const FreeUserDashboard: React.FC<FreeUserDashboardProps> = ({
           borderColor: theme.colors.border,
         }}>
           <Text variant="h4" style={{ marginBottom: theme.spacing.lg }}>
-            Why Upgrade to Business?
+            Why Upgrade to Sellar Pro?
           </Text>
           
           <View style={{ gap: theme.spacing.md }}>
             {[
               { 
                 icon: Zap, 
-                title: '120 Monthly Boost Credits', 
-                description: 'Promote your listings with priority placement and featured badges',
+                title: 'Auto-refresh', 
+                description: 'Boost your listings with auto-refresh every 2 hours',
                 color: theme.colors.warning 
               },
               { 
@@ -353,13 +352,13 @@ export const FreeUserDashboard: React.FC<FreeUserDashboardProps> = ({
               { 
                 icon: HeadphonesIcon, 
                 title: 'Priority Support', 
-                description: 'Fast response times and dedicated business support team',
+                description: 'Fast response times and dedicated support team',
                 color: theme.colors.success 
               },
               { 
                 icon: TrendingUp, 
                 title: 'Growth Tools', 
-                description: 'Auto-refresh every 2 hours and advanced listing management',
+                description: 'Advanced listing management and growth tools',
                 color: theme.colors.info 
               },
             ].map((benefit, index) => (
@@ -392,19 +391,13 @@ export const FreeUserDashboard: React.FC<FreeUserDashboardProps> = ({
           <Button
             variant="primary"
             onPress={() => router.push('/subscription-plans')}
+            leftIcon={<Crown size={18} color={theme.colors.primaryForeground} />}
             style={{ 
               width: '100%',
               marginTop: theme.spacing.lg,
             }}
           >
-            <Crown size={18} color="#FFFFFF" />
-            <Text variant="body" style={{ 
-              color: '#FFFFFF', 
-              marginLeft: theme.spacing.sm,
-              fontWeight: '700',
-            }}>
-              Start Free Trial
-            </Text>
+            Start Free Trial
           </Button>
         </View>
       </ScrollView>

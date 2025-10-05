@@ -28,7 +28,9 @@ import {
   Settings,
   ExternalLink,
   Send,
-  Headphones
+  Headphones,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react-native';
 
 export default function HelpScreen() {
@@ -41,6 +43,25 @@ export default function HelpScreen() {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  
+  // Collapsible state
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+  const [expandedQuestions, setExpandedQuestions] = useState<Record<string, boolean>>({});
+
+  const toggleCategory = (title: string) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [title]: !prev[title]
+    }));
+  };
+
+  const toggleQuestion = (categoryTitle: string, questionIndex: number) => {
+    const key = `${categoryTitle}-${questionIndex}`;
+    setExpandedQuestions(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
 
   const faqSections = [
     {
@@ -111,6 +132,74 @@ export default function HelpScreen() {
         },
       ],
     },
+    {
+      title: 'Technical Issues',
+      items: [
+        {
+          question: 'App is crashing or freezing',
+          answer: 'Try closing and reopening the app. If the problem persists, clear the app cache in your device settings or reinstall the app. Make sure you have the latest version.',
+        },
+        {
+          question: 'My photos won\'t upload',
+          answer: 'Check your internet connection and ensure you\'ve granted photo permissions to Sellar. Photos should be under 10MB each. Try compressing large images.',
+        },
+        {
+          question: 'Messages not sending or loading',
+          answer: 'Check your internet connection. If messages still don\'t work, try logging out and back in. Ensure notifications are enabled in your device settings.',
+        },
+      ],
+    },
+    {
+      title: 'Safety Guidelines',
+      items: [
+        {
+          question: 'How to stay safe when meeting buyers/sellers?',
+          answer: 'Always meet in public places during daylight hours. Bring a friend if possible. Never share personal banking details. Trust your instincts and report suspicious behavior.',
+        },
+        {
+          question: 'How do I spot scams?',
+          answer: 'Be wary of deals that seem too good to be true, requests for advance payment, or buyers/sellers who refuse to meet in person. Check user ratings and verification status.',
+        },
+        {
+          question: 'What items are prohibited on Sellar?',
+          answer: 'Illegal items, weapons, drugs, counterfeit goods, live animals (except pets with proper documentation), and adult content are strictly prohibited.',
+        },
+      ],
+    },
+    {
+      title: 'Features',
+      items: [
+        {
+          question: 'How does listing boost work?',
+          answer: 'Boosting a listing moves it to the top of search results and category pages for 24 hours. Boosted listings get 5x more views on average.',
+        },
+        {
+          question: 'What is auto-refresh?',
+          answer: 'Sellar Pro users get automatic listing refresh every 2 hours, keeping their listings at the top without manual intervention. Regular users can refresh manually once every 2 hours.',
+        },
+        {
+          question: 'How do I use the favorites feature?',
+          answer: 'Tap the heart icon on any listing to save it to your favorites. Access your saved items from More > My Favorites anytime.',
+        },
+      ],
+    },
+    {
+      title: 'Policies',
+      items: [
+        {
+          question: 'What is your refund policy?',
+          answer: 'Credits are non-refundable once purchased. Subscription plans can be cancelled anytime, and you\'ll keep access until the end of your billing period with no refund for partial months.',
+        },
+        {
+          question: 'Can I delete my account?',
+          answer: 'Yes, go to More > Settings > Account > Delete Account. This is permanent and will remove all your data, listings, and messages after a 30-day grace period.',
+        },
+        {
+          question: 'What happens if my listing violates policies?',
+          answer: 'Listings that violate our policies will be removed. Repeated violations may result in account suspension or permanent ban. You\'ll receive a notification explaining the violation.',
+        },
+      ],
+    },
   ];
 
   const contactOptions = [
@@ -139,12 +228,6 @@ export default function HelpScreen() {
       subtitle: 'Create and track support requests',
       icon: <MessageCircle size={20} color={theme.colors.text.primary} />,
       onPress: () => router.push('/support-tickets'),
-    },
-    {
-      title: 'Knowledge Base',
-      subtitle: 'Browse help articles and guides',
-      icon: <FileText size={20} color={theme.colors.text.primary} />,
-      onPress: () => router.push('/knowledge-base'),
     },
     {
       title: 'Community Help',
@@ -207,7 +290,7 @@ export default function HelpScreen() {
         <Container>
           {/* Contact Options */}
           <View style={{ marginBottom: theme.spacing.xl }}>
-            <Text variant="h3" style={{ marginBottom: theme.spacing.lg }}>
+            <Text variant="h4" style={{ marginBottom: theme.spacing.lg }}>
               Get Help
             </Text>
 
@@ -240,45 +323,128 @@ export default function HelpScreen() {
           </View>
 
           {/* FAQ Sections */}
-          {faqSections.map((section) => (
-            <View key={section.title} style={{ marginBottom: theme.spacing.xl }}>
-              <Text variant="h3" style={{ marginBottom: theme.spacing.lg }}>
-                {section.title}
-              </Text>
+          <View style={{ marginBottom: theme.spacing.xl }}>
+            <Text variant="h4" style={{ marginBottom: theme.spacing.lg }}>
+              Frequently Asked Questions
+            </Text>
 
-              <View
-                style={{
-                  backgroundColor: theme.colors.surface,
-                  borderRadius: theme.borderRadius.lg,
-                  borderWidth: 1,
-                  borderColor: theme.colors.border,
-                  ...theme.shadows.sm,
-                }}
-              >
-                {section.items.map((item, index) => (
-                  <View
-                    key={index}
+            <View
+              style={{
+                backgroundColor: theme.colors.surface,
+                borderRadius: theme.borderRadius.lg,
+                overflow: 'hidden',
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                ...theme.shadows.sm,
+              }}
+            >
+              {faqSections.map((section, sectionIndex) => {
+                const isCategoryExpanded = expandedCategories[section.title];
+                
+                return (
+                  <View 
+                    key={section.title}
                     style={{
-                      padding: theme.spacing.lg,
-                      borderBottomWidth: index < section.items.length - 1 ? 1 : 0,
+                      borderBottomWidth: sectionIndex < faqSections.length - 1 ? 1 : 0,
                       borderBottomColor: theme.colors.border,
                     }}
                   >
-                    <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.md }}>
-                      {item.question}
-                    </Text>
-                    <Text variant="bodySmall" color="secondary" style={{ lineHeight: 20 }}>
-                      {item.answer}
-                    </Text>
+                    {/* Category Header - Collapsible */}
+                    <TouchableOpacity
+                      onPress={() => toggleCategory(section.title)}
+                      activeOpacity={0.7}
+                      style={{
+                        padding: theme.spacing.lg,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <Text variant="body" style={{ fontWeight: '600', flex: 1 }}>
+                        {section.title}
+                      </Text>
+                      {isCategoryExpanded ? (
+                        <ChevronDown size={20} color={theme.colors.primary} />
+                      ) : (
+                        <ChevronRight size={20} color={theme.colors.text.muted} />
+                      )}
+                    </TouchableOpacity>
+
+                    {/* Category Content - Questions */}
+                    {isCategoryExpanded && (
+                      <View
+                        style={{
+                          backgroundColor: theme.colors.background,
+                          paddingHorizontal: theme.spacing.md,
+                        }}
+                      >
+                        {section.items.map((item, index) => {
+                          const questionKey = `${section.title}-${index}`;
+                          const isQuestionExpanded = expandedQuestions[questionKey];
+                          
+                          return (
+                            <View
+                              key={index}
+                              style={{
+                                borderBottomWidth: index < section.items.length - 1 ? 1 : 0,
+                                borderBottomColor: theme.colors.border,
+                              }}
+                            >
+                              {/* Question - Collapsible */}
+                              <TouchableOpacity
+                                onPress={() => toggleQuestion(section.title, index)}
+                                activeOpacity={0.7}
+                                style={{
+                                  paddingVertical: theme.spacing.md,
+                                  paddingHorizontal: theme.spacing.sm,
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                }}
+                              >
+                                <Text 
+                                  variant="body" 
+                                  style={{ 
+                                    fontWeight: '600',
+                                    flex: 1,
+                                    marginRight: theme.spacing.md,
+                                  }}
+                                >
+                                  {item.question}
+                                </Text>
+                                {isQuestionExpanded ? (
+                                  <ChevronDown size={14} color={theme.colors.primary} />
+                                ) : (
+                                  <ChevronRight size={14} color={theme.colors.text.muted} />
+                                )}
+                              </TouchableOpacity>
+
+                              {/* Answer */}
+                              {isQuestionExpanded && (
+                                <View style={{ 
+                                  paddingHorizontal: theme.spacing.sm,
+                                  paddingBottom: theme.spacing.md,
+                                  paddingTop: 0,
+                                }}>
+                                  <Text variant="caption" color="secondary" style={{ lineHeight: 18 }}>
+                                    {item.answer}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
                   </View>
-                ))}
-              </View>
+                );
+              })}
             </View>
-          ))}
+          </View>
 
           {/* Quick Links */}
           <View style={{ marginBottom: theme.spacing.xl }}>
-            <Text variant="h3" style={{ marginBottom: theme.spacing.lg }}>
+            <Text variant="h4" style={{ marginBottom: theme.spacing.lg }}>
               Legal & Safety
             </Text>
 

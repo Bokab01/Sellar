@@ -9,7 +9,7 @@ import { useBottomTabBarSpacing } from '@/hooks/useBottomTabBarSpacing';
 import { usePathname } from 'expo-router';
 
 export default function TabLayout() {
-  const { theme } = useTheme();
+  const { theme, isDarkMode } = useTheme();
   const colorScheme = useColorScheme();
   const { unreadCounts } = useChatStore();
   const insets = useSafeAreaInsets();
@@ -21,11 +21,6 @@ export default function TabLayout() {
   
   // Check if we're on the post detail screen
   const isPostDetailScreen = pathname.includes('/community/') && pathname.includes('/');
-  
-  // Get the appropriate icon based on color scheme
-  const createIcon = colorScheme === 'dark' 
-    ? require('@/assets/icon/icon-dark.png')
-    : require('@/assets/icon/icon-light.png');
 
   // Memoize screen options to prevent unnecessary re-renders
   const screenOptions = useMemo(() => ({
@@ -125,22 +120,29 @@ export default function TabLayout() {
           tabBarStyle: {
             display: 'none',
           },
-          tabBarIcon: ({ size, color }) => (
-            <View
-              style={{
-                backgroundColor: theme.colors.primary,
-                borderRadius: 20,
-                width: 40,
-                height: 40,
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginBottom: 20,
-                ...theme.shadows.lg,
-              }}
-            >
-              <Image source={createIcon} style={{ width: 60, height: 60 }} />
-            </View>
-          ),
+          tabBarIcon: ({ size, color }) => {
+            // Use isDarkMode to determine which icon to show
+            const createIcon = isDarkMode 
+              ? require('@/assets/icon/icon-dark.png')
+              : require('@/assets/icon/icon-light.png');
+            
+            return (
+              <View
+                style={{
+                  backgroundColor: theme.colors.primary,
+                  borderRadius: 20,
+                  width: 40,
+                  height: 40,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: 20,
+                  ...theme.shadows.lg,
+                }}
+              >
+                <Image source={createIcon} style={{ width: 60, height: 60 }} />
+              </View>
+            );
+          },
           tabBarLabel: 'Sell',
         }}
       />

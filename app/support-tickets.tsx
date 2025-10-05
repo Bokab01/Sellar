@@ -11,7 +11,6 @@ import {
   EmptyState,
   LoadingSkeleton,
   SupportTicketCard,
-  CreateTicketModal,
 } from '@/components';
 import { Plus, Ticket } from 'lucide-react-native';
 import { useSupportTickets } from '@/hooks/useSupport';
@@ -19,7 +18,6 @@ import { useSupportTickets } from '@/hooks/useSupport';
 export default function SupportTicketsScreen() {
   const { theme } = useTheme();
   const { tickets, loading, error, refetch } = useSupportTickets();
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
 
@@ -34,11 +32,6 @@ export default function SupportTicketsScreen() {
     // Navigate to ticket details - route will be created later
     console.log('Navigate to ticket:', ticketId);
   }, []);
-
-  const handleTicketCreated = useCallback(() => {
-    setShowCreateModal(false);
-    refetch();
-  }, [refetch]);
 
   // Memoize styles to prevent re-renders
   const styles = useMemo(() => ({
@@ -168,7 +161,7 @@ export default function SupportTicketsScreen() {
             key="create"
             variant="ghost"
             size="sm"
-            onPress={() => setShowCreateModal(true)}
+            onPress={() => router.push('/create-support-ticket')}
             style={styles.headerButton}
           >
             <Plus size={20} color={theme.colors.primary} />
@@ -194,15 +187,6 @@ export default function SupportTicketsScreen() {
               </Text>
             </View>
 
-           {/*  <Button
-              variant="primary"
-              size="md"
-              onPress={() => setShowCreateModal(true)}
-              style={styles.newTicketButton}
-              icon={<Plus size={18} color={theme.colors.surface} />}
-            >
-              New Ticket
-            </Button> */}
           </View>
 
           {/* Error State */}
@@ -239,7 +223,7 @@ export default function SupportTicketsScreen() {
               description="You haven't created any support tickets yet. Create one to get help with any issues."
               action={{
                 text: 'Create First Ticket',
-                onPress: () => setShowCreateModal(true),
+                onPress: () => router.push('/create-support-ticket'),
               }}
             />
           )}
@@ -261,7 +245,7 @@ export default function SupportTicketsScreen() {
               <Button
                 variant="ghost"
                 size="md"
-                onPress={() => router.push('/knowledge-base')}
+                onPress={() => router.push('/help')}
                 style={{
                   justifyContent: 'flex-start',
                   paddingHorizontal: 0,
@@ -297,13 +281,6 @@ export default function SupportTicketsScreen() {
           </View>
         </Container>
       </ScrollView>
-
-      {/* Create Ticket Modal */}
-      <CreateTicketModal
-        visible={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onTicketCreated={handleTicketCreated}
-      />
     </SafeAreaWrapper>
   );
 }

@@ -845,10 +845,33 @@ export default function CreateListingScreen() {
       };
 
       // Condition is now handled via category attributes
-      // Ensure we have a valid condition value for database
-      const validConditions = ['new', 'like_new', 'good', 'fair', 'poor', 'brand_new', 'foreign_used', 'locally_used', 'excellent', 'for_parts', 'acceptable'];
-      const conditionValue = formData.categoryAttributes.condition || 'good';
-      listingData.condition = validConditions.includes(conditionValue as string) ? conditionValue : 'good';
+      // Map condition attribute values to valid database values
+      const conditionMapping: Record<string, string> = {
+        'new': 'new',
+        'like_new': 'like_new',
+        'good': 'good',
+        'fair': 'fair',
+        'poor': 'poor',
+        'brand_new': 'new',
+        'Brand New': 'new',
+        'Like New': 'like_new',
+        'Good': 'good',
+        'Fair': 'fair',
+        'Poor': 'poor',
+        'foreign_used': 'good',
+        'Foreign Used': 'good',
+        'locally_used': 'fair',
+        'Locally Used': 'fair',
+        'excellent': 'like_new',
+        'Excellent': 'like_new',
+        'for_parts': 'poor',
+        'For Parts': 'poor',
+        'acceptable': 'fair',
+        'Acceptable': 'fair',
+      };
+      
+      const conditionValue = formData.categoryAttributes.condition as string || 'good';
+      listingData.condition = conditionMapping[conditionValue] || 'good';
 
 
 
@@ -1306,20 +1329,24 @@ export default function CreateListingScreen() {
               </View>
             )}
 
-            <Stepper
-              value={formData.quantity}
-              onValueChange={handleQuantityChange}
-              min={1}
-              max={99}
-              showLabel={true}
-              label="How many are you selling?"
-            />
+            <View style={{ alignItems: 'center' }}>
+              <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.md, textAlign: 'center' }}>
+                How many are you selling?
+              </Text>
+              <Stepper
+                value={formData.quantity}
+                onValueChange={handleQuantityChange}
+                min={1}
+                max={99}
+                showLabel={false}
+              />
+            </View>
 
-            <View>
-              <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.md }}>
+            <View style={{ alignItems: 'center' }}>
+              <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.md, textAlign: 'center' }}>
                 How do you want to sell your item?
               </Text>
-              <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
+              <View style={{ flexDirection: 'row', gap: theme.spacing.md, justifyContent: 'center' }}>
                 <Chip
                   text="Fixed Price"
                   variant="filter"
@@ -1334,7 +1361,7 @@ export default function CreateListingScreen() {
                 />
               </View>
               {formData.acceptOffers && (
-                <Text variant="caption" color="muted" style={{ marginTop: theme.spacing.sm }}>
+                <Text variant="caption" color="muted" style={{ marginTop: theme.spacing.sm, textAlign: 'center' }}>
                   Buyers can negotiate the price with you
                 </Text>
               )}

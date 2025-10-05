@@ -1,3 +1,12 @@
+// ⚠️ DEPRECATED WARNING ⚠️
+// This file is kept for legacy validation fallback only.
+// Category attributes are now stored in the database (category_attributes table)
+// and fetched dynamically via get_category_attributes() RPC function.
+// 
+// New code should fetch attributes from the database, not from this file.
+// This will be removed in a future version once validation is fully migrated.
+// See: supabase/migrations/23_category_attributes.sql & 24_seed_category_attributes.sql
+
 export interface AttributeOption {
   value: string;
   label: string;

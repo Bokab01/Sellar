@@ -22,7 +22,7 @@ import {
   Toast,
   Grid,
 } from '@/components';
-import { Package, Plus, CreditCard as Edit, Eye, EyeOff, Trash2, TrendingUp, Clock, CircleCheck as CheckCircle, Circle as XCircle, Pause, Check, X, MoreHorizontal, SquareCheckBig } from 'lucide-react-native';
+import { Package, Plus, CreditCard as Edit, Eye, EyeOff, Trash2, TrendingUp, Clock, CircleCheck as CheckCircle, Circle as XCircle, Pause, Check, X, MoreHorizontal, SquareCheckBig, RefreshCw } from 'lucide-react-native';
 
 type ListingStatus = 'all' | 'active' | 'sold' | 'draft' | 'expired' | 'suspended' | 'hidden';
 
@@ -49,6 +49,7 @@ export default function MyListingsScreen() {
     deactivate: false,
     markSold: false,
     restore: false,
+    relist: false,
   });
   const [longPressedItem, setLongPressedItem] = useState<string | null>(null);
   
@@ -101,6 +102,17 @@ export default function MyListingsScreen() {
       elevation: 0,
     },
     restore: {
+      flex: 1, 
+      minHeight: 40,
+      backgroundColor: theme.colors.primary + '15',
+      borderWidth: 1,
+      borderColor: theme.colors.primary + '30',
+      paddingHorizontal: theme.spacing.xs,
+      paddingVertical: theme.spacing.xs,
+      shadowOpacity: 0,
+      elevation: 0,
+    },
+    relist: {
       flex: 1, 
       minHeight: 40,
       backgroundColor: theme.colors.primary + '15',
@@ -379,6 +391,54 @@ export default function MyListingsScreen() {
     }
   };
 
+  const handleBulkRelist = async () => {
+    if (selectedListings.size === 0) return;
+
+    setBulkActionLoading(prev => ({ ...prev, relist: true }));
+    try {
+      const { error } = await supabase
+        .from('listings')
+        .update({ 
+          status: 'active',
+          updated_at: new Date().toISOString()
+        })
+        .in('id', Array.from(selectedListings));
+
+      if (error) throw error;
+
+      setToastMessage(`${selectedListings.size} listing${selectedListings.size > 1 ? 's' : ''} relisted successfully`);
+      setShowToast(true);
+      clearSelection();
+      await fetchMyListings();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to relist items');
+    } finally {
+      setBulkActionLoading(prev => ({ ...prev, relist: false }));
+    }
+  };
+
+  const handleRelistListing = async (listingId: string) => {
+    try {
+      const { error } = await supabase
+        .from('listings')
+        .update({ 
+          status: 'active',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', listingId);
+
+      if (error) throw error;
+
+      setToastMessage('Listing relisted successfully');
+      setShowToast(true);
+      
+      // Refresh listings
+      await fetchMyListings();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to relist listing');
+    }
+  };
+
   // Animate bulk actions when selection changes
   useEffect(() => {
     if (isSelectionMode) {
@@ -458,6 +518,9 @@ export default function MyListingsScreen() {
   );
   const canRestore = selectedListingsData.some(listing => 
     listing.status === 'hidden' || listing.status === 'suspended'
+  );
+  const canRelist = selectedListingsData.some(listing => 
+    listing.status === 'sold'
   );
   const canDelete = selectedListingsData.length > 0;
 
@@ -655,6 +718,23 @@ export default function MyListingsScreen() {
                   </Text>
                 </Button>
               )}
+              
+              {/* Relist Button - Only for sold listings */}
+              {canRelist && (
+                <Button
+                  variant="secondary"
+                  icon={<RefreshCw size={14} color={theme.colors.primary} />}
+                  onPress={handleBulkRelist}
+                  loading={bulkActionLoading.relist}
+                  disabled={bulkActionLoading.relist}
+                  style={bulkActionStyles.relist}
+                  size="sm"
+                >
+                  <Text variant="caption" numberOfLines={1} style={{ fontSize: 10, fontWeight: '600', color: theme.colors.primary, margin: 0, padding: 0 }}>
+                    Relist
+                  </Text>
+                </Button>
+              )}
             </View>
           </Animated.View>
         )}
@@ -813,34 +893,52 @@ export default function MyListingsScreen() {
                         gap: theme.spacing.xs,
                       }}
                     >
-                    <Button
-                      variant="icon"
-                      icon={<Edit size={16} color={theme.colors.text.primary} />}
-                      onPress={() => router.push(`/edit-listing/${listing.id}` as any)}
-                      style={{
-                        width: 32,
-                        height: 32,
-                        backgroundColor: theme.colors.surface,
-                        borderRadius: theme.borderRadius.md,
-                        ...theme.shadows.md,
-                      }}
-                    />
+                    {/* Show relist button for sold items */}
+                    {listing.status === 'sold' ? (
+                      <Button
+                        variant="icon"
+                        icon={<RefreshCw size={16} color={theme.colors.primary} />}
+                        onPress={() => handleRelistListing(listing.id)}
+                        style={{
+                          width: 32,
+                          height: 32,
+                          backgroundColor: theme.colors.surface,
+                          borderRadius: theme.borderRadius.md,
+                          ...theme.shadows.md,
+                        }}
+                      />
+                    ) : (
+                      <Button
+                        variant="icon"
+                        icon={<Edit size={16} color={theme.colors.text.primary} />}
+                        onPress={() => router.push(`/edit-listing/${listing.id}` as any)}
+                        style={{
+                          width: 32,
+                          height: 32,
+                          backgroundColor: theme.colors.surface,
+                          borderRadius: theme.borderRadius.md,
+                          ...theme.shadows.md,
+                        }}
+                      />
+                    )}
 
-                    <Button
-                      variant="icon"
-                      icon={listing.status === 'active' ? 
-                        <EyeOff size={16} color={theme.colors.warning} /> : 
-                        <Eye size={16} color={theme.colors.success} />
-                      }
-                      onPress={() => handleToggleStatus(listing.id, listing.status)}
-                      style={{
-                        width: 32,
-                        height: 32,
-                        backgroundColor: theme.colors.surface,
-                        borderRadius: theme.borderRadius.md,
-                        ...theme.shadows.md,
-                      }}
-                    />
+                    {listing.status !== 'sold' && (
+                      <Button
+                        variant="icon"
+                        icon={listing.status === 'active' ? 
+                          <EyeOff size={16} color={theme.colors.warning} /> : 
+                          <Eye size={16} color={theme.colors.success} />
+                        }
+                        onPress={() => handleToggleStatus(listing.id, listing.status)}
+                        style={{
+                          width: 32,
+                          height: 32,
+                          backgroundColor: theme.colors.surface,
+                          borderRadius: theme.borderRadius.md,
+                          ...theme.shadows.md,
+                        }}
+                      />
+                    )}
 
                     <Button
                       variant="icon"

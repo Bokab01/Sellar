@@ -315,7 +315,7 @@ export default function BuyCreditsScreen() {
                     }}
                   >
                     <Text variant="bodySmall" style={{ textAlign: 'center' }}>
-                      💡 Enough for {Math.floor(package_.credits / 15)} Pulse Boosts or {Math.floor(package_.credits / 10)} extra listings
+                      💡 Enough for {Math.floor(package_.credits / 15)} Pulse Boosts or {Math.floor(package_.credits / 5)} Ad Refreshes
                     </Text>
                   </View>
 
@@ -399,22 +399,37 @@ export default function BuyCreditsScreen() {
             <View style={{ gap: theme.spacing.md }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
                 <Text style={{ fontSize: 20 }}>⚡</Text>
-                <Text variant="body">Boost your listings for 24 hours (15 credits)</Text>
+                <Text variant="body">Pulse Boost - 24-hour visibility boost (15 credits)</Text>
               </View>
               
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
-                <Text style={{ fontSize: 20 }}>📋</Text>
-                <Text variant="body">List more than 5 products (10 credits each)</Text>
+                <Text style={{ fontSize: 20 }}>🚀</Text>
+                <Text variant="body">Mega Pulse - 7-day mega visibility boost (50 credits)</Text>
               </View>
               
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
                 <Text style={{ fontSize: 20 }}>🎯</Text>
-                <Text variant="body">Get category spotlight (35 credits)</Text>
+                <Text variant="body">Category Spotlight - 3-day spotlight (35 credits)</Text>
+              </View>
+              
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+                <Text style={{ fontSize: 20 }}>🔄</Text>
+                <Text variant="body">Ad Refresh - Move to top instantly (5 credits)</Text>
+              </View>
+              
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+                <Text style={{ fontSize: 20 }}>✨</Text>
+                <Text variant="body">Listing Highlight - Colored border for 7 days (10 credits)</Text>
+              </View>
+              
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+                <Text style={{ fontSize: 20 }}>🔥</Text>
+                <Text variant="body">Urgent Badge - "Urgent Sale" badge for 3 days (8 credits)</Text>
               </View>
               
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
                 <Text style={{ fontSize: 20 }}>🏢</Text>
-                <Text variant="body">Unlock business profile (50 credits)</Text>
+                <Text variant="body">Unlock Sellar Pro profile</Text>
               </View>
             </View>
           </View>
@@ -445,7 +460,7 @@ export default function BuyCreditsScreen() {
               variant="primary"
               onPress={() => router.push('/subscription-plans')}
               size="md"
-              style={{ alignSelf: 'flex-start' }}
+              style={{ alignSelf: 'center' }}
             >
               View Seller Pro Plans
             </Button>

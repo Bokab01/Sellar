@@ -66,7 +66,7 @@ export function ChatInlineMenu({
 
   const handleViewListing = () => {
     setShowMenu(false);
-    if (conversation?.listing_id) {
+    if (conversation?.listing_id && conversation?.listing?.status === 'active') {
       router.push(`/home/${conversation.listing_id}`);
     }
   };
@@ -179,7 +179,7 @@ export function ChatInlineMenu({
       icon: Eye,
       title: 'Listing',
       onPress: handleViewListing,
-      show: !!conversation?.listing_id,
+      show: !!conversation?.listing_id && conversation?.listing?.status === 'active',
     },
     {
       icon: Phone,

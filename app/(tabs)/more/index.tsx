@@ -233,7 +233,7 @@ export default function MoreScreen() {
           onPress: () => router.push('/(tabs)/more/dashboard'),
         }, */
         {
-          title: 'Feature Marketplace',
+          title: 'Boost Listings',
           subtitle: 'Boost your listings and unlock tools',
           icon: <Zap size={20} color={theme.colors.warning} />,
           onPress: () => router.push('/feature-marketplace'),
@@ -295,7 +295,6 @@ export default function MoreScreen() {
           title: 'Invite Friends',
           subtitle: 'Share Sellar and earn rewards',
           icon: <UserPlus2 size={20} color={theme.colors.primary} />,
-          badge: { text: 'Earn GHS 10', variant: 'success' as const },
           onPress: () => router.push('/invite'),
         },
       ],

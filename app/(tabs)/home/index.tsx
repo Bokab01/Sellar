@@ -501,44 +501,63 @@ export default function HomeScreen() {
   });
   
   // Get favorites count for header
-  const { incrementFavoritesCount, decrementFavoritesCount, fetchFavoritesCount } = useFavoritesStore();
+  const { 
+    incrementFavoritesCount, 
+    decrementFavoritesCount, 
+    fetchFavoritesCount, 
+    fetchFavorites,
+    favorites: globalFavorites,
+    listingFavoriteCounts,
+    toggleFavorite: toggleGlobalFavorite,
+    incrementListingFavoriteCount,
+    decrementListingFavoriteCount,
+    updateListingFavoriteCount
+  } = useFavoritesStore();
   
-  // Local state for optimistic updates
-  const [optimisticFavorites, setOptimisticFavorites] = useState<Record<string, boolean>>({});
-  const [optimisticFavoritesCount, setOptimisticFavoritesCount] = useState<Record<string, number>>({});
-  
-  // Merge hook favorites with optimistic updates
+  // Use global favorites from store (merged with hook favorites for backward compatibility)
   const favorites = useMemo(() => ({
     ...hookFavorites,
-    ...optimisticFavorites
-  }), [hookFavorites, optimisticFavorites]);
+    ...globalFavorites
+  }), [hookFavorites, globalFavorites]);
   
-  // Update transformed products with optimistic favorites count
+  // Merge transformed products with optimistic favorite counts from global store
   const transformedProductsWithOptimisticCounts = useMemo(() => {
     return transformedProducts.map(product => ({
       ...product,
-      favorites: optimisticFavoritesCount[product.id] !== undefined 
-        ? optimisticFavoritesCount[product.id] 
+      favorites: listingFavoriteCounts[product.id] !== undefined 
+        ? listingFavoriteCounts[product.id] 
         : product.favorites
     }));
-  }, [transformedProducts, optimisticFavoritesCount]);
+  }, [transformedProducts, listingFavoriteCounts]);
 
   // Initialize favorites count when component mounts
   useEffect(() => {
     fetchFavoritesCount();
   }, [fetchFavoritesCount]);
 
+  // Initialize listing favorite counts when products load
+  useEffect(() => {
+    transformedProducts.forEach(product => {
+      // Always update if the product has a favorites count and it's different from what's in store
+      if (product.favorites !== undefined) {
+        const currentStoreCount = listingFavoriteCounts[product.id];
+        if (currentStoreCount === undefined) {
+          updateListingFavoriteCount(product.id, product.favorites);
+        }
+      }
+    });
+  }, [transformedProducts]);
+
   // Refresh data when screen comes into focus (e.g., returning from favorites screen)
   useFocusEffect(
     React.useCallback(() => {
-      // Clear any optimistic updates when returning to home screen
-      setOptimisticFavorites({});
-      setOptimisticFavoritesCount({});
+      // Fetch latest favorites from database
+      fetchFavorites();
       
       // Refresh stats to get latest data from database
       refreshStats();
       fetchFavoritesCount();
-    }, [refreshStats, fetchFavoritesCount])
+    }, [refreshStats, fetchFavoritesCount, fetchFavorites])
   );
 
   const handleCategoryToggle = useCallback((categoryId: string) => {
@@ -944,59 +963,37 @@ export default function HomeScreen() {
                       listingId={product.id}
                       isFavorited={favorites[product.id] || false}
                       viewCount={viewCounts[product.id] || 0}
-                      favoritesCount={product.favorites || 0}
+                      favoritesCount={listingFavoriteCounts[product.id] ?? product.favorites ?? 0}
                       isHighlighted={product.isHighlighted}
                       onPress={() => handleListingPress(product.id)}
                       onFavoritePress={user?.id !== product.seller.id ? () => {
                         // Handle favorite toggle - only show for other users' listings
                         import('@/lib/favoritesAndViews').then(({ toggleFavorite }) => {
-                          // Optimistic update - immediately update local state
-                          const currentFavorite = favorites[product.id] || false;
-                          const currentFavoritesCount = product.favorites || 0;
-                          const newFavoritesCount = currentFavorite 
-                            ? currentFavoritesCount - 1 
-                            : currentFavoritesCount + 1;
+                          const isFavorited = favorites[product.id] || false;
                           
-                          // Update both favorite state and count optimistically
-                          setOptimisticFavorites(prev => ({
-                            ...prev,
-                            [product.id]: !currentFavorite
-                          }));
+                          // Optimistic update using global store (syncs across all instances)
+                          toggleGlobalFavorite(product.id);
                           
-                          setOptimisticFavoritesCount(prev => ({
-                            ...prev,
-                            [product.id]: newFavoritesCount
-                          }));
-                          
-                          // Update header favorites count
-                          if (currentFavorite) {
-                            decrementFavoritesCount();
+                          // Update the listing's favorite count optimistically
+                          if (isFavorited) {
+                            decrementListingFavoriteCount(product.id);
                           } else {
-                            incrementFavoritesCount();
+                            incrementListingFavoriteCount(product.id);
                           }
                           
+                          // Perform actual database toggle
                           toggleFavorite(product.id).then((result) => {
                             if (result.error) {
                               // Revert optimistic updates on error
-                              setOptimisticFavorites(prev => ({
-                                ...prev,
-                                [product.id]: currentFavorite
-                              }));
-                              setOptimisticFavoritesCount(prev => ({
-                                ...prev,
-                                [product.id]: currentFavoritesCount
-                              }));
-                              
-                              // Revert header favorites count
-                              if (currentFavorite) {
-                                incrementFavoritesCount();
+                              toggleGlobalFavorite(product.id);
+                              if (isFavorited) {
+                                incrementListingFavoriteCount(product.id);
                               } else {
-                                decrementFavoritesCount();
+                                decrementListingFavoriteCount(product.id);
                               }
                             } else {
-                              // Keep optimistic updates until next data refresh
-                              // The optimistic state will be cleared when the component re-renders with fresh data
-                              // No need to clear immediately as it causes flickering
+                              // Refresh stats after successful toggle
+                              refreshStats();
                             }
                           });
                         });

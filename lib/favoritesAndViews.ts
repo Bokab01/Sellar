@@ -101,6 +101,19 @@ export async function trackListingView(listingId: string, sellerId?: string): Pr
       return { success: true }; // Not an error, just don't track
     }
 
+    // First, check if the listing still exists
+    const { data: listingExists, error: listingError } = await supabase
+      .from('listings')
+      .select('id')
+      .eq('id', listingId)
+      .single();
+
+    // If listing doesn't exist or was deleted, silently skip tracking
+    if (listingError || !listingExists) {
+      console.log('⚠️ Listing not found, skipping view tracking:', listingId);
+      return { success: true }; // Not an error, just don't track for deleted listings
+    }
+
     // Check if user has already viewed this listing
     const { data: existingView, error: checkError } = await supabase
       .from('listing_views')

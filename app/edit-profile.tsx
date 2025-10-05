@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, RefreshControl, TouchableOpacity, Alert, Image } from 'react-native';
+import { View, ScrollView, RefreshControl, TouchableOpacity, Alert, Image, KeyboardAvoidingView, Platform } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { router } from 'expo-router';
 import { Text } from '@/components/Typography/Text';
@@ -492,13 +492,19 @@ export default function EditProfileScreen() {
         ]}
       />
 
-      <ScrollView
+      <KeyboardAvoidingView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: theme.spacing.xl }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: theme.spacing.xl }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+          keyboardShouldPersistTaps="handled"
+        >
         <Container style={{ paddingTop: theme.spacing.lg }}>
           {/* Profile Completion Header */}
           <View
@@ -1163,6 +1169,7 @@ export default function EditProfileScreen() {
           )}
         </Container>
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Avatar Picker Modal */}
       {showAvatarPicker && (
