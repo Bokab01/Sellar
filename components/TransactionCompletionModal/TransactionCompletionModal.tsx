@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Alert, ScrollView } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -21,6 +21,7 @@ import {
   HandCoins
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase-client';
+import { reputationService } from '@/lib/reputationService';
 
 interface TransactionCompletionModalProps {
   visible: boolean;
@@ -59,10 +60,23 @@ export function TransactionCompletionModal({
     existingTransaction?.id || null
   );
 
+  // Sync createdTransactionId when existingTransaction changes
+  useEffect(() => {
+    if (existingTransaction?.id && !createdTransactionId) {
+      setCreatedTransactionId(existingTransaction.id);
+    }
+  }, [existingTransaction?.id, createdTransactionId]);
+
   const isBuyer = user?.id !== listing?.user_id;
   const role = isBuyer ? 'buyer' : 'seller';
 
   const handleCreateTransaction = async () => {
+    // If transaction already exists, don't create a new one
+    if (existingTransaction) {
+      setStep('confirmation');
+      return;
+    }
+
     if (!transactionData.agreedPrice.trim()) {
       Alert.alert('Error', 'Please enter the agreed price');
       return;
@@ -111,22 +125,116 @@ export function TransactionCompletionModal({
   };
 
   const handleConfirmMeetup = async () => {
-    if (!createdTransactionId) return;
+    if (!createdTransactionId) {
+      Alert.alert('Error', 'Transaction ID not found. Please try again.');
+      return;
+    }
 
     setLoading(true);
     try {
       const confirmationField = isBuyer ? 'buyer_confirmed_at' : 'seller_confirmed_at';
       
-      const { error } = await supabase
+      // Update the confirmation timestamp
+      const { data: updatedTransaction, error } = await supabase
         .from('meetup_transactions')
         .update({
           [confirmationField]: new Date().toISOString(),
         })
-        .eq('id', createdTransactionId);
+        .eq('id', createdTransactionId)
+        .select('buyer_confirmed_at, seller_confirmed_at, listing_id')
+        .single();
 
       if (error) throw error;
+      
+      // Check if both parties have now confirmed
+      const bothConfirmed = updatedTransaction.buyer_confirmed_at && updatedTransaction.seller_confirmed_at;
+      
+      if (bothConfirmed && updatedTransaction.listing_id) {
+        console.log('✅ Both parties confirmed! Finalizing transaction');
+        
+        // Check if there's a pending transaction for this conversation
+        const { data: pendingTxs, error: pendingTxError } = await supabase
+          .from('pending_transactions')
+          .select('id, quantity_reserved')
+          .eq('conversation_id', conversationId)
+          .eq('listing_id', updatedTransaction.listing_id)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(1);
 
+        if (!pendingTxError && pendingTxs && pendingTxs.length > 0) {
+          // =============================================
+          // PARTIAL QUANTITY TRANSACTION
+          // =============================================
+          const pendingTx = pendingTxs[0];
+          console.log('✅ Found pending transaction, confirming quantity:', pendingTx.quantity_reserved);
+          
+          // Use the confirm_pending_transaction function
+          const { data: bothConfirmedPending, error: confirmError } = await supabase
+            .rpc('confirm_pending_transaction', {
+              p_pending_tx_id: pendingTx.id,
+              p_user_id: user!.id,
+              p_role: role
+            });
+
+          if (confirmError) {
+            console.error('Error confirming pending transaction:', confirmError);
+          } else {
+            console.log('✅ Pending transaction confirmed successfully');
+            
+            // Link the meetup transaction to the pending transaction
+            await supabase
+              .from('pending_transactions')
+              .update({ meetup_transaction_id: createdTransactionId })
+              .eq('id', pendingTx.id);
+          }
+        } else {
+          // =============================================
+          // FULL LISTING TRANSACTION (old method)
+          // =============================================
+          console.log('✅ No pending transaction found, marking full listing as sold');
+          
+          // Mark listing as sold (remove reservation)
+          const { error: listingError } = await supabase
+            .from('listings')
+            .update({
+              status: 'sold',
+              reserved_until: null,
+              reserved_for: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', updatedTransaction.listing_id);
+
+          if (listingError) {
+            console.error('Error marking listing as sold:', listingError);
+          } else {
+            console.log('✅ Listing marked as sold successfully');
+          }
+        }
+        
+        // Award reputation points to both parties for successful transaction
+        try {
+          const buyerId = updatedTransaction.buyer_id;
+          const sellerId = updatedTransaction.seller_id;
+          
+          await Promise.all([
+            reputationService.updateTransactionStats(buyerId, true),
+            reputationService.updateTransactionStats(sellerId, true)
+          ]);
+          
+          console.log('✅ Reputation points awarded to both parties');
+        } catch (repError) {
+          console.error('Failed to award reputation points:', repError);
+          // Don't fail transaction completion if reputation update fails
+        }
+      }
+      
       setStep('success');
+      
+      // Small delay to ensure database update propagates before notifying parent
+      setTimeout(() => {
+        onTransactionCreated?.(createdTransactionId);
+      }, 300);
     } catch (error) {
       console.error('Error confirming transaction:', error);
       Alert.alert('Error', 'Failed to confirm meetup. Please try again.');

@@ -188,9 +188,20 @@ CREATE POLICY "Users can insert messages in their conversations" ON messages
         )
     );
 
--- Users can update their own messages
-CREATE POLICY "Users can update their own messages" ON messages
-    FOR UPDATE USING (auth.uid() = sender_id);
+-- Users can update messages in their conversations
+-- Allows users to update their own messages (as sender) or mark messages as read in their conversations (as recipient)
+CREATE POLICY "Users can update messages in their conversations" ON messages
+    FOR UPDATE USING (
+        -- User is the sender (can update their own messages)
+        auth.uid() = sender_id
+        OR
+        -- User is a participant in the conversation (can mark messages as read)
+        auth.uid() IN (
+            SELECT participant_1 FROM conversations WHERE id = conversation_id
+            UNION
+            SELECT participant_2 FROM conversations WHERE id = conversation_id
+        )
+    );
 
 -- Users can delete their own messages
 CREATE POLICY "Users can delete their own messages" ON messages

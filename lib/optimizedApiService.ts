@@ -217,7 +217,19 @@ class OptimizedApiService {
           query = query.eq('category_id', filters.category);
         }
         if (filters.location) {
-          query = query.ilike('location', `%${filters.location}%`);
+          // Skip filtering if "All Regions" is selected
+          if (filters.location === 'All Regions') {
+            // Don't apply any location filter - show all listings
+          }
+          // Handle "All [Region]" selections (e.g., "All Ashanti", "All Greater Accra")
+          else if (filters.location.startsWith('All ')) {
+            const regionName = filters.location.replace('All ', '');
+            query = query.ilike('location', `%${regionName}%`);
+          }
+          // Normal city filtering (e.g., "Kumasi, Ashanti")
+          else {
+            query = query.ilike('location', `%${filters.location}%`);
+          }
         }
         if (filters.minPrice) {
           query = query.gte('price', filters.minPrice);

@@ -47,7 +47,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       set({ loading: true, error: null });
       console.log('🔔 Fetching notifications for user:', userId);
 
-      const { data, error: fetchError } = await dbHelpers.getNotifications(userId);
+      // Fetch ALL notifications (limit: 1000) to ensure we show everything
+      const { data, error: fetchError } = await dbHelpers.getNotifications(userId, 1000, 0);
 
       if (fetchError) {
         console.error('🔔 Error fetching notifications:', fetchError);
@@ -56,6 +57,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         const notifications = (data || []).filter((n: any) => n && typeof n === 'object' && !n.error) as unknown as Notification[];
         const unreadCount = notifications.filter((n: any) => !n.is_read).length;
         
+        console.log('🔔 Fetched notifications:', notifications.length, 'Unread:', unreadCount);
         
         set({ 
           notifications, 

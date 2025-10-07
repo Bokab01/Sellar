@@ -93,6 +93,39 @@ export default function ChatScreen() {
     }
   }, [conversationId, conversationDeleted]);
 
+  // Realtime subscription for transaction updates
+  useEffect(() => {
+    if (!conversationId || !user?.id || !conversation?.listing_id) return;
+
+    console.log('🔔 Setting up realtime subscription for transactions');
+    
+    const channel = supabase
+      .channel(`transaction-${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'meetup_transactions',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          console.log('🔔 Transaction update received:', payload);
+          
+          // Refresh transaction data
+          if (conversation?.listing_id) {
+            checkExistingTransaction(conversation.listing_id);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('🔔 Cleaning up transaction subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [conversationId, user?.id, conversation?.listing_id]);
+
   // Keyboard event listeners for smooth animation
   useEffect(() => {
     const keyboardWillShowListener = Keyboard.addListener(
@@ -504,23 +537,12 @@ export default function ChatScreen() {
         refreshMessages();
       }, 500); // Small delay to ensure database update is complete
 
-      // Determine the correct message based on user role (seller vs buyer)
-      const isSeller = user.id === existingOffer.seller_id;
-      const isBuyer = user.id === existingOffer.buyer_id;
-      
+      // Send a neutral system message that works for both users
       let systemMessage = '';
       if (action === 'accept') {
-        if (isSeller) {
-          systemMessage = `✅ Offer accepted! The buyer has been notified. Please coordinate to complete the transaction within 48 hours.`;
-        } else if (isBuyer) {
-          systemMessage = `✅ Offer accepted! The listing has been reserved for you. Please complete the transaction within 48 hours.`;
-        }
+        systemMessage = `✅ Offer accepted! Please coordinate to complete the transaction within 48 hours.`;
       } else {
-        if (isSeller) {
-          systemMessage = `❌ Offer declined. You have declined the buyer's offer.`;
-        } else if (isBuyer) {
-          systemMessage = `❌ Offer declined. The seller has declined your offer.`;
-        }
+        systemMessage = `❌ Offer declined.`;
       }
       
       await sendMessage(systemMessage, 'system');
@@ -537,22 +559,98 @@ export default function ChatScreen() {
     try {
       console.log('🎯 Handling offer acceptance:', { offerId, acceptedOffer });
 
-      // 1. Update listing status to 'sold'
-      if (conversation?.listing_id) {
-        console.log('🎯 Updating listing status to sold:', conversation.listing_id);
+      if (!conversation?.listing_id) {
+        console.error('🎯 No listing_id found in conversation');
+        return;
+      }
+
+      // Get listing details to check quantity
+      const { data: listing, error: listingFetchError } = await supabase
+        .from('listings')
+        .select('quantity, quantity_reserved')
+        .eq('id', conversation.listing_id)
+        .single();
+
+      if (listingFetchError || !listing) {
+        console.error('🎯 Error fetching listing:', listingFetchError);
+        return;
+      }
+
+      console.log('🎯 Listing details:', listing);
+
+      // Determine quantity being purchased (default to 1 if not specified in offer)
+      const quantityToPurchase = acceptedOffer.quantity || 1;
+      const availableQuantity = listing.quantity - (listing.quantity_reserved || 0);
+
+      console.log('🎯 Quantity check:', { 
+        total: listing.quantity, 
+        reserved: listing.quantity_reserved, 
+        available: availableQuantity,
+        requested: quantityToPurchase 
+      });
+
+      // Check if enough quantity is available
+      if (availableQuantity < quantityToPurchase) {
+        showErrorToast(`Only ${availableQuantity} item(s) available`);
+        return;
+      }
+
+      // Decide reservation strategy based on quantity
+      if (listing.quantity === 1 || quantityToPurchase === listing.quantity) {
+        // =============================================
+        // FULL LISTING RESERVATION (quantity = 1 or buying all)
+        // =============================================
+        console.log('🎯 Using full listing reservation (old method)');
+        
+        const reservedUntil = new Date();
+        reservedUntil.setHours(reservedUntil.getHours() + 48);
+        
+        // First, get current reservation_count
+        const { data: currentListing } = await supabase
+          .from('listings')
+          .select('reservation_count')
+          .eq('id', conversation.listing_id)
+          .single();
+
         const { error: listingError } = await supabase
           .from('listings')
           .update({ 
-            status: 'sold',
+            status: 'reserved',
+            reserved_until: reservedUntil.toISOString(),
+            reserved_for: acceptedOffer.buyer_id,
+            reservation_count: (currentListing?.reservation_count || 0) + 1,
             updated_at: new Date().toISOString()
           })
           .eq('id', conversation.listing_id);
 
         if (listingError) {
-          console.error('🎯 Error updating listing status:', listingError);
+          console.error('🎯 Error reserving listing:', listingError);
         } else {
-          console.log('🎯 Successfully updated listing status to sold');
+          console.log('🎯 Successfully reserved full listing until:', reservedUntil);
         }
+      } else {
+        // =============================================
+        // PARTIAL QUANTITY RESERVATION (multi-quantity listing)
+        // =============================================
+        console.log('🎯 Using partial quantity reservation (new method)');
+        
+        const { data: pendingTx, error: pendingTxError } = await supabase
+          .rpc('create_pending_transaction', {
+            p_listing_id: conversation.listing_id,
+            p_conversation_id: conversationId!,
+            p_buyer_id: acceptedOffer.buyer_id,
+            p_quantity: quantityToPurchase,
+            p_agreed_price: acceptedOffer.amount,
+            p_hours_until_expiry: 48
+          });
+
+        if (pendingTxError) {
+          console.error('🎯 Error creating pending transaction:', pendingTxError);
+          showErrorToast('Failed to reserve quantity');
+          return;
+        }
+
+        console.log('🎯 Successfully created pending transaction:', pendingTx);
       }
 
       // 2. Reject all other pending offers for this listing
@@ -573,13 +671,11 @@ export default function ChatScreen() {
         console.log('🎯 Successfully rejected other pending offers');
       }
 
-      // 3. Create a transaction record (if you have a transactions table)
-      // This would link the buyer, seller, listing, and offer
       console.log('🎯 Offer acceptance flow completed successfully');
 
     } catch (err) {
       console.error('🎯 Error in handleOfferAcceptance:', err);
-      // Don't throw error here - the offer was still accepted
+      showErrorToast('Failed to process offer acceptance');
     }
   };
 
@@ -859,14 +955,20 @@ export default function ChatScreen() {
         subtitle={otherUser ? lastSeenText : ''}
         showBackButton
         onBackPress={() => router.push('/(tabs)/inbox')}
+        onTitlePress={otherUser ? () => router.push(`/profile/${otherUser.id}`) : undefined}
         leftAction={
           otherUser ? (
-            <Avatar
-              name={getDisplayName(otherUser, false).displayName}
-              source={otherUser.avatar_url}
-              size="sm"
-              style={{ marginLeft: theme.spacing.sm }}
-            />
+            <TouchableOpacity 
+              onPress={() => router.push(`/profile/${otherUser.id}`)}
+              activeOpacity={0.7}
+            >
+              <Avatar
+                name={getDisplayName(otherUser, false).displayName}
+                source={otherUser.avatar_url}
+                size="sm"
+                style={{ marginLeft: theme.spacing.sm }}
+              />
+            </TouchableOpacity>
           ) : undefined
         }
         rightActions={[

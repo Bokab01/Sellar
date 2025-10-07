@@ -2,7 +2,9 @@ import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { View, TouchableOpacity, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
-import { ReviewCard } from '@/components/ReviewCard/ReviewCard';
+import { Avatar } from '@/components/Avatar/Avatar';
+import { Rating } from '@/components/Rating/Rating';
+import { Badge } from '@/components/Badge/Badge';
 import { Button } from '@/components/Button/Button';
 import { EmptyState } from '@/components/EmptyState/EmptyState';
 import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
@@ -160,6 +162,18 @@ export function ReviewsList({
   const renderReview = useCallback((review: Review) => {
     const timeAgo = formatDistanceToNow(new Date(review.created_at), { addSuffix: true });
     
+    // Determine review type badge
+    const getReviewTypeBadge = () => {
+      if (review.review_type === 'buyer_to_seller') {
+        return { text: 'As Buyer', variant: 'info' as const };
+      } else if (review.review_type === 'seller_to_buyer') {
+        return { text: 'As Seller', variant: 'success' as const };
+      }
+      return null;
+    };
+
+    const reviewTypeBadge = getReviewTypeBadge();
+    
     return (
       <View
         key={review.id}
@@ -172,18 +186,80 @@ export function ReviewsList({
           borderColor: theme.colors.border,
         }}
       >
-        <ReviewCard
-          reviewer={{
-            name: review.reviewer?.full_name || 'Anonymous',
-            avatar: review.reviewer?.avatar_url || undefined,
+        {/* Custom Header with Badge */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginBottom: theme.spacing.md,
           }}
-          rating={review.rating}
-          comment={review.comment}
-          timestamp={timeAgo}
-          helpful={review.helpful_count}
-          verified={review.is_verified_purchase}
-          style={{ backgroundColor: 'transparent', padding: 0, margin: 0, borderWidth: 0 }}
-        />
+        >
+          <Avatar
+            source={review.reviewer?.avatar_url || undefined}
+            name={review.reviewer?.full_name || 'Anonymous'}
+            size="sm"
+            style={{ marginRight: theme.spacing.md }}
+          />
+
+          <View style={{ flex: 1 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.xs,
+                flexWrap: 'wrap',
+              }}
+            >
+              <Text variant="bodySmall" style={{ fontWeight: '600' }}>
+                {review.reviewer?.full_name || 'Anonymous'}
+              </Text>
+              
+              {review.is_verified_purchase && (
+                <View
+                  style={{
+                    backgroundColor: theme.colors.success,
+                    borderRadius: theme.borderRadius.sm,
+                    paddingHorizontal: theme.spacing.xs,
+                    paddingVertical: 2,
+                  }}
+                >
+                  <Text
+                    variant="caption"
+                    style={{
+                      color: theme.colors.successForeground,
+                      fontSize: 9,
+                      fontWeight: '600',
+                    }}
+                  >
+                    VERIFIED
+                  </Text>
+                </View>
+              )}
+
+              {reviewTypeBadge && (
+                <Badge 
+                  text={reviewTypeBadge.text} 
+                  variant={reviewTypeBadge.variant}
+                  size="sm"
+                />
+              )}
+            </View>
+
+            <Text variant="caption" color="muted" style={{ marginTop: 2 }}>
+              {timeAgo}
+            </Text>
+          </View>
+        </View>
+
+        {/* Rating */}
+        <View style={{ marginBottom: theme.spacing.sm }}>
+          <Rating rating={review.rating} size="sm" />
+        </View>
+
+        {/* Comment */}
+        <Text variant="body" style={{ marginBottom: theme.spacing.md }}>
+          {review.comment}
+        </Text>
 
         {/* Listing Info (if applicable) */}
         {review.listing && (

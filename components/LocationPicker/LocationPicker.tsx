@@ -40,12 +40,28 @@ export function LocationPicker({
   };
 
   const handleRegionSelect = (region: string) => {
+    // Check if "All Regions" was selected
+    if (region === 'All Regions') {
+      onLocationSelect('All Regions');
+      setShowPicker(false);
+      resetPicker();
+      return;
+    }
+    
     setSelectedRegion(region);
     setCurrentStep('city');
     setSearchText('');
   };
 
   const handleCitySelect = (city: string) => {
+    // Check if "All [Region]" was selected
+    if (city === `All ${selectedRegion}`) {
+      onLocationSelect(`All ${selectedRegion}`);
+      setShowPicker(false);
+      resetPicker();
+      return;
+    }
+    
     const fullLocation = `${city}, ${selectedRegion}`;
     onLocationSelect(fullLocation);
     setShowPicker(false);
@@ -150,6 +166,29 @@ export function LocationPicker({
           {currentStep === 'region' && (
             <ScrollView style={{ maxHeight: 400 }}>
               <View style={{ gap: theme.spacing.xs }}>
+                {/* All Regions Option */}
+                <TouchableOpacity
+                  onPress={() => handleRegionSelect('All Regions')}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingVertical: theme.spacing.md,
+                    paddingHorizontal: theme.spacing.lg,
+                    borderRadius: theme.borderRadius.md,
+                    backgroundColor: theme.colors.primary + '10',
+                    borderWidth: 1,
+                    borderColor: theme.colors.primary + '30',
+                    marginBottom: theme.spacing.sm,
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text variant="body" style={{ fontWeight: '600', color: theme.colors.primary }}>
+                    All Regions
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Individual Regions */}
                 {GHANA_REGIONS
                   .filter(region => 
                     region.toLowerCase().includes(searchText.toLowerCase())
@@ -182,6 +221,26 @@ export function LocationPicker({
             <>
               <ScrollView style={{ maxHeight: 350 }}>
                 <View style={{ gap: theme.spacing.xs }}>
+                  {/* All [Region] Option */}
+                  <TouchableOpacity
+                    onPress={() => handleCitySelect(`All ${selectedRegion}`)}
+                    style={{
+                      paddingVertical: theme.spacing.md,
+                      paddingHorizontal: theme.spacing.lg,
+                      borderRadius: theme.borderRadius.md,
+                      backgroundColor: theme.colors.primary + '10',
+                      borderWidth: 1,
+                      borderColor: theme.colors.primary + '30',
+                      marginBottom: theme.spacing.sm,
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text variant="body" style={{ fontWeight: '600', color: theme.colors.primary }}>
+                      All {selectedRegion}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Individual Cities */}
                   {MAJOR_CITIES[selectedRegion]
                     ?.filter(city => 
                       city.toLowerCase().includes(searchText.toLowerCase())

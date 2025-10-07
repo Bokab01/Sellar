@@ -79,22 +79,6 @@ export default function MoreScreen() {
   // Track if we've already loaded data to prevent unnecessary refreshes
   const hasLoadedData = React.useRef(false);
 
-  useEffect(() => {
-    if (user) {
-      // Reset loaded data flag when user changes
-      hasLoadedData.current = false;
-      fetchUserData();
-      // Only refresh credits if balance is 0 (likely not loaded yet)
-      if (balance === 0) {
-        refreshCredits();
-      }
-      // Only refresh subscription if we don't have current plan data
-      if (!currentPlan) {
-        refreshSubscription();
-      }
-    }
-  }, [user]); // Remove dependencies that cause unnecessary re-renders
-
   const fetchUserData = React.useCallback(async () => {
     if (!user) return;
 
@@ -114,18 +98,31 @@ export default function MoreScreen() {
     }
   }, [user]);
 
-  // Refresh data when screen comes into focus (only if needed)
+  // Single effect to handle initial data loading
+  useEffect(() => {
+    if (user && !hasLoadedData.current) {
+      fetchUserData();
+    } else if (!user) {
+      // Reset when user logs out
+      hasLoadedData.current = false;
+      setProfile(null);
+    }
+  }, [user, fetchUserData]);
+
+  // Refresh data when screen comes into focus (only refresh credits/subscription, not profile)
   useFocusEffect(
     React.useCallback(() => {
-      if (user && !hasLoadedData.current) {
-        // Only fetch if we haven't loaded data yet
-        fetchUserData();
+      if (user) {
+        // Only refresh credits if balance is 0 or we don't have transaction data
+        if (balance === 0 || transactions.length === 0) {
+          refreshCredits();
+        }
+        // Only refresh subscription if we don't have current plan data
+        if (!currentPlan) {
+          refreshSubscription();
+        }
       }
-      // Only refresh credits if balance is 0 or we don't have transaction data
-      if (user && (balance === 0 || transactions.length === 0)) {
-        refreshCredits();
-      }
-    }, [user, balance, transactions.length, fetchUserData])
+    }, [user, balance, transactions.length, currentPlan, refreshCredits, refreshSubscription])
   );
 
   const handleRefresh = async () => {

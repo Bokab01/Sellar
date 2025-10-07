@@ -30,6 +30,7 @@ import {
   EnhancedReviewCard,
 } from '@/components';
 import { FullUserBadges } from '@/components/UserBadges/UserBadges';
+import { ReputationDisplay } from '@/components/ReputationDisplay/ReputationDisplay';
 import { 
   MessageCircle, 
   Phone, 
@@ -376,6 +377,13 @@ export default function UserProfileScreen() {
       case 'about':
         return (
           <View style={{ gap: theme.spacing.md }}>
+            {/* Reputation Display */}
+            <ReputationDisplay
+              userId={profileId!}
+              variant="full"
+              style={{ marginBottom: theme.spacing.md }}
+            />
+
             {/* Professional About Section */}
             <View style={{
               backgroundColor: theme.colors.surface,
@@ -699,6 +707,7 @@ export default function UserProfileScreen() {
               }}>
                 <Button
                   variant={isFollowing ? 'tertiary' : 'primary'}
+                  size="md"
                   icon={isFollowing ? 
                     <UserMinus size={18} color={theme.colors.primary} /> : 
                     <UserPlus2 size={18} color={theme.colors.primaryForeground} />
@@ -712,6 +721,7 @@ export default function UserProfileScreen() {
 
                 <Button
                   variant="secondary"
+                  size="md"
                   icon={<MessageCircle size={18} color={theme.colors.primary} />}
                   onPress={handleMessage}
                   style={{ flex: 1 }}

@@ -7,7 +7,6 @@ export interface ListingFormData {
   description: string;
   categoryId: string;
   categoryAttributes: Record<string, string | string[]>;
-  condition: string;
   price: string;
   quantity: number;
   acceptOffers: boolean;

@@ -4,6 +4,15 @@
  */
 
 import { supabase } from './supabase';
+import * as LeoProfanity from 'leo-profanity';
+import {
+  ghanaianProfanityWords,
+  ghanaianSensitiveWords,
+  ghanaianScamPatterns,
+  isGhanaianCulturalContext,
+  getGhanaianProfanitySeverity,
+  normalizeGhanaianText,
+} from './ghanaianProfanity';
 import { ContentModerator } from '../utils/security';
 
 export interface ModerationResult {
@@ -49,18 +58,22 @@ export interface ModerationQueueItem {
 }
 
 class ContentModerationService {
-  private profanityWords: Set<string>;
   private spamPatterns: RegExp[];
   private suspiciousPatterns: RegExp[];
 
   constructor() {
-    // Initialize moderation patterns
-    this.profanityWords = new Set([
-      // Basic profanity list - in production, use a comprehensive database
-      'damn', 'hell', 'shit', 'fuck', 'bitch', 'ass', 'bastard', 'crap',
-      'idiot', 'stupid', 'moron', 'dumb', 'retard', 'gay', 'fag',
-      // Add more words as needed
-    ]);
+    // Initialize leo-profanity with custom Ghanaian word list
+    // Reset to start fresh
+    LeoProfanity.clearList();
+    
+    // Load the default English dictionary (1,600+ words)
+    LeoProfanity.loadDictionary('en');
+    
+    // Add Ghanaian profanity words
+    LeoProfanity.add(ghanaianProfanityWords);
+    
+    // leo-profanity has comprehensive English profanity detection built-in
+    // Plus our custom Ghanaian words
 
     this.spamPatterns = [
       /\b(buy now|click here|limited time|act now|free money|make money fast)\b/gi,
@@ -69,6 +82,7 @@ class ContentModerationService {
       /\$\d+|\d+\$|USD\d+|\d+USD/gi,
       /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g, // Credit card patterns
       /\b(whatsapp|telegram|signal)\s*:?\s*\+?\d{10,}/gi, // Contact sharing
+      ...ghanaianScamPatterns, // Add Ghanaian-specific scam patterns
     ];
 
     this.suspiciousPatterns = [
@@ -180,9 +194,10 @@ class ContentModerationService {
         suggestedAction = 'approve';
       } else if (requiresManualReview) {
         suggestedAction = 'review';
-      } else if (averageConfidence > 0.8) {
+      } else if (averageConfidence > 0.6) {
         suggestedAction = 'reject';
-      } else if (averageConfidence > 0.5) {
+      } else if (averageConfidence > 0.2) {
+        // Lowered threshold from 0.5 to 0.2 to catch single profanity words
         suggestedAction = 'flag';
       }
 
@@ -219,7 +234,7 @@ class ContentModerationService {
   }
 
   /**
-   * Detect profanity in content
+   * Detect profanity in content using leo-profanity library + Ghanaian words
    */
   private detectProfanity(content: string): {
     detected: boolean;
@@ -227,36 +242,98 @@ class ContentModerationService {
     words: string[];
     severity: 'low' | 'medium' | 'high' | 'critical';
   } {
-    const lowerContent = content.toLowerCase();
     const foundWords: string[] = [];
+    let maxSeverity: 'low' | 'medium' | 'high' | 'critical' = 'low';
     
-    for (const word of this.profanityWords) {
-      if (lowerContent.includes(word)) {
-        foundWords.push(word);
-      }
+    // Normalize the content first to catch special character variations
+    const normalizedContent = normalizeGhanaianText(content);
+    
+    // Use leo-profanity to check for profanity (on normalized text)
+    const isProfane = LeoProfanity.check(normalizedContent);
+    
+    if (isProfane) {
+      // Get the cleaned version to see what was filtered (use normalized content)
+      const cleaned = LeoProfanity.clean(normalizedContent);
+      
+      // Extract profane words by comparing normalized content and cleaned
+      const words = normalizedContent.toLowerCase().split(/\s+/);
+      const cleanedWords = cleaned.toLowerCase().split(/\s+/);
+      
+      words.forEach((word, index) => {
+        if (cleanedWords[index] && cleanedWords[index].includes('*')) {
+          // Check if it's a sensitive word that might be acceptable in context
+          const isSensitive = ghanaianSensitiveWords.includes(word);
+          
+          if (isSensitive) {
+            // Check cultural context
+            if (!isGhanaianCulturalContext(content, word)) {
+              foundWords.push(word);
+              const wordSeverity = getGhanaianProfanitySeverity(word);
+              if (this.compareSeverity(wordSeverity, maxSeverity) > 0) {
+                maxSeverity = wordSeverity;
+              }
+            }
+          } else {
+            foundWords.push(word);
+            const wordSeverity = getGhanaianProfanitySeverity(word);
+            if (this.compareSeverity(wordSeverity, maxSeverity) > 0) {
+              maxSeverity = wordSeverity;
+            }
+          }
+        }
+      });
+      
+      // Also check for exact Ghanaian profanity matches
+      // Content is already normalized above, just normalize profanity words
+      ghanaianProfanityWords.forEach(profanity => {
+        const normalizedProfanity = normalizeGhanaianText(profanity);
+        const regex = new RegExp(`\\b${normalizedProfanity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+        
+        if (regex.test(normalizedContent) && !foundWords.includes(profanity)) {
+          // Check if it's acceptable in cultural context
+          if (!isGhanaianCulturalContext(content, profanity)) {
+            foundWords.push(profanity);
+            const wordSeverity = getGhanaianProfanitySeverity(profanity);
+            if (this.compareSeverity(wordSeverity, maxSeverity) > 0) {
+              maxSeverity = wordSeverity;
+            }
+          }
+        }
+      });
     }
 
-    // Check for variations and obfuscations
+    // Check for variations and obfuscations (on both original and normalized content)
     const obfuscatedPatterns = [
       /f[\*\-_]?u[\*\-_]?c[\*\-_]?k/gi,
       /s[\*\-_]?h[\*\-_]?i[\*\-_]?t/gi,
       /b[\*\-_]?i[\*\-_]?t[\*\-_]?c[\*\-_]?h/gi,
+      /k[\*\-_]?w[\*\-_]?a[\*\-_]?s[\*\-_]?i?a/gi, // Ghanaian obfuscation
+      /g[\*\-_]?y[\*\-_]?i[\*\-_]?m[\*\-_]?i/gi,
     ];
 
     for (const pattern of obfuscatedPatterns) {
-      if (pattern.test(content)) {
+      // Check both original and normalized content for obfuscations
+      if (pattern.test(content) || pattern.test(normalizedContent)) {
         foundWords.push('obfuscated profanity');
+        maxSeverity = 'high';
       }
     }
 
     const detected = foundWords.length > 0;
-    const confidence = detected ? Math.min(0.9, foundWords.length * 0.3) : 0;
-    
-    let severity: 'low' | 'medium' | 'high' | 'critical' = 'low';
-    if (foundWords.length > 3) severity = 'high';
-    else if (foundWords.length > 1) severity = 'medium';
+    const confidence = detected ? Math.min(0.95, foundWords.length * 0.35) : 0;
 
-    return { detected, confidence, words: foundWords, severity };
+    return { detected, confidence, words: foundWords, severity: maxSeverity };
+  }
+
+  /**
+   * Compare severity levels
+   */
+  private compareSeverity(
+    a: 'low' | 'medium' | 'high' | 'critical',
+    b: 'low' | 'medium' | 'high' | 'critical'
+  ): number {
+    const levels = { low: 1, medium: 2, high: 3, critical: 4 };
+    return levels[a] - levels[b];
   }
 
   /**
@@ -396,18 +473,22 @@ class ContentModerationService {
     const types: string[] = [];
     let confidence = 0;
 
-    // Phone numbers
+    // Phone numbers (disabled for marketplace - users need to share contact info)
+    // Only flag if multiple phone numbers are present (spam indicator)
     const phonePattern = /(\+?\d{1,4}[\s\-]?)?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{4}/g;
-    if (phonePattern.test(content)) {
-      types.push('Phone number');
-      confidence += 0.8;
+    const phoneMatches = content.match(phonePattern);
+    if (phoneMatches && phoneMatches.length > 2) {
+      types.push('Multiple phone numbers');
+      confidence += 0.6;
     }
 
-    // Email addresses
+    // Email addresses (disabled for marketplace - users may need to share contact)
+    // Only flag if multiple emails are present (spam indicator)
     const emailPattern = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
-    if (emailPattern.test(content)) {
-      types.push('Email address');
-      confidence += 0.7;
+    const emailMatches = content.match(emailPattern);
+    if (emailMatches && emailMatches.length > 2) {
+      types.push('Multiple email addresses');
+      confidence += 0.6;
     }
 
     // Credit card numbers
@@ -424,11 +505,12 @@ class ContentModerationService {
       confidence += 0.9;
     }
 
-    // Addresses (basic detection)
-    const addressPattern = /\b\d+\s+[A-Za-z\s]+(?:street|st|avenue|ave|road|rd|drive|dr|lane|ln|boulevard|blvd)\b/gi;
+    // Addresses (strict detection - only flag complete addresses with apartment/unit numbers)
+    // This is intentionally strict to avoid false positives on location descriptions
+    const addressPattern = /\b\d+\s+[A-Za-z\s]+(?:street|st|avenue|ave|road|rd|drive|dr|lane|ln|boulevard|blvd),?\s*(?:apt|apartment|unit|suite|#)\s*\d+/gi;
     if (addressPattern.test(content)) {
       types.push('Address');
-      confidence += 0.6;
+      confidence += 0.7;
     }
 
     const detected = types.length > 0;
@@ -510,6 +592,13 @@ class ContentModerationService {
     manualReviewRequired: boolean
   ): Promise<void> {
     try {
+      // Skip if content doesn't have a valid UUID yet (e.g., temp IDs during creation)
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!content.id || !uuidRegex.test(content.id)) {
+        console.log('Skipping moderation queue - content ID is not a valid UUID yet:', content.id);
+        return;
+      }
+
       // Calculate priority based on flags
       let priority = 1;
       const highSeverityFlags = flags.filter(flag => flag.severity === 'high' || flag.severity === 'critical');
@@ -527,15 +616,15 @@ class ContentModerationService {
           content_id: content.id,
           user_id: content.userId,
           content_text: content.content,
-          content_images: content.images || [],
           flagged_reason: flags.map(flag => flag.type),
-          auto_flagged: true,
           manual_review_required: manualReviewRequired,
           priority_level: priority,
         });
 
       if (error) {
         console.error('Error adding to moderation queue:', error);
+      } else {
+        console.log('Content added to moderation queue:', content.id);
       }
 
     } catch (error) {
@@ -548,6 +637,13 @@ class ContentModerationService {
    */
   private async logModerationResult(content: ContentItem, result: ModerationResult): Promise<void> {
     try {
+      // Skip if content doesn't have a valid UUID yet (e.g., temp IDs during creation)
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!content.id || !uuidRegex.test(content.id)) {
+        console.log('Skipping content flags logging - content ID is not a valid UUID yet:', content.id);
+        return;
+      }
+
       // Store flags in content_flags table
       for (const flag of result.flags) {
         await supabase
@@ -563,6 +659,10 @@ class ContentModerationService {
               severity: flag.severity,
             },
           });
+      }
+
+      if (result.flags.length > 0) {
+        console.log(`Logged ${result.flags.length} flags for content:`, content.id);
       }
 
     } catch (error) {
@@ -627,11 +727,11 @@ class ContentModerationService {
         contentType: item.content_type,
         userId: item.user_id,
         content: item.content_text,
-        images: item.content_images || [],
-        flags: [], // Would need to fetch from content_flags table
+        images: [], // Images not stored in queue, fetch from original content if needed
+        flags: [], // Fetch from content_flags table separately if needed
         priority: item.priority_level,
         status: item.status,
-        autoFlagged: item.auto_flagged,
+        autoFlagged: true,
         manualReviewRequired: item.manual_review_required,
         reviewedBy: item.reviewed_by,
         reviewedAt: item.reviewed_at ? new Date(item.reviewed_at) : undefined,

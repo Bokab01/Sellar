@@ -194,7 +194,6 @@ function AppContent() {
         <Stack.Screen name="feature-marketplace"  />
         <Stack.Screen name="help"  />
         <Stack.Screen name="invite"  />
-        <Stack.Screen name="knowledge-base"  />
         <Stack.Screen name="my-listings"  />
         <Stack.Screen name="my-rewards"  />
         <Stack.Screen name="notification-settings"  />

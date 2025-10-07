@@ -229,9 +229,9 @@ export function useListingsRealtime(onListingUpdate: (listing: any) => void) {
     onInsert: async (payload) => {
       console.log('🔗 Real-time listing insert:', payload);
       
-      // Only process active listings
-      if (payload.status !== 'active') {
-        console.log('🔗 Skipping non-active listing:', payload.status);
+      // Only process active and reserved listings
+      if (payload.status !== 'active' && payload.status !== 'reserved') {
+        console.log('🔗 Skipping non-active/reserved listing:', payload.status);
         return;
       }
       
@@ -241,11 +241,11 @@ export function useListingsRealtime(onListingUpdate: (listing: any) => void) {
           .from('listings')
           .select(`
             *,
-            profiles(*),
+            profiles!posts_user_id_fkey(*),
             categories(*)
           `)
           .eq('id', payload.id)
-          .eq('status', 'active') // Ensure we only get active listings
+          .in('status', ['active', 'reserved']) // Get active and reserved listings
           .single();
         
         if (!error && data) {
@@ -253,15 +253,15 @@ export function useListingsRealtime(onListingUpdate: (listing: any) => void) {
           onListingUpdate(data);
         } else {
           console.warn('🔗 Failed to fetch complete listing data:', error);
-          // Only fallback if the listing is active
-          if (payload.status === 'active') {
+          // Fallback if the listing is active or reserved
+          if (payload.status === 'active' || payload.status === 'reserved') {
             onListingUpdate(payload);
           }
         }
       } catch (err) {
         console.error('🔗 Error fetching listing data:', err);
-        // Only fallback if the listing is active
-        if (payload.status === 'active') {
+        // Fallback if the listing is active or reserved
+        if (payload.status === 'active' || payload.status === 'reserved') {
           onListingUpdate(payload);
         }
       }
@@ -269,19 +269,19 @@ export function useListingsRealtime(onListingUpdate: (listing: any) => void) {
     onUpdate: async (payload) => {
       console.log('🔗 Real-time listing update:', payload);
       
-      // Process both active and inactive listings (for removal)
+      // Process active, reserved, and inactive listings (for removal)
       try {
-        if (payload.status === 'active') {
-          // Fetch complete data for active listings
+        if (payload.status === 'active' || payload.status === 'reserved') {
+          // Fetch complete data for active and reserved listings
           const { data, error } = await supabase
             .from('listings')
             .select(`
               *,
-              profiles(*),
+              profiles!posts_user_id_fkey(*),
               categories(*)
             `)
             .eq('id', payload.id)
-            .eq('status', 'active')
+            .in('status', ['active', 'reserved'])
             .single();
           
           if (!error && data) {
@@ -292,8 +292,8 @@ export function useListingsRealtime(onListingUpdate: (listing: any) => void) {
             onListingUpdate(payload);
           }
         } else {
-          // For inactive listings, pass the payload to allow removal from UI
-          console.log('🔗 Listing became inactive, removing from UI:', payload.id);
+          // For inactive listings (sold, suspended, etc.), remove from UI
+          console.log('🔗 Listing became inactive, removing from UI:', payload.id, payload.status);
           onListingUpdate({ ...payload, _shouldRemove: true });
         }
       } catch (err) {
@@ -321,7 +321,7 @@ export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
           .from('posts')
           .select(`
             *,
-            profiles(*),
+            profiles!posts_user_id_fkey(*),
             listings(*)
           `)
           .eq('id', payload.id)
@@ -349,7 +349,7 @@ export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
           .from('posts')
           .select(`
             *,
-            profiles(*),
+            profiles!posts_user_id_fkey(*),
             listings(*)
           `)
           .eq('id', payload.id)
@@ -390,7 +390,7 @@ export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
             .from('posts')
             .select(`
               *,
-              profiles(*),
+              profiles!posts_user_id_fkey(*),
               listings(*)
             `)
             .eq('id', payload.post_id)
@@ -419,7 +419,7 @@ export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
             .from('posts')
             .select(`
               *,
-              profiles(*),
+              profiles!posts_user_id_fkey(*),
               listings(*)
             `)
             .eq('id', payload.post_id)
@@ -448,7 +448,7 @@ export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
             .from('posts')
             .select(`
               *,
-              profiles(*),
+              profiles!posts_user_id_fkey(*),
               listings(*)
             `)
             .eq('id', payload.post_id)
@@ -472,7 +472,7 @@ export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
             .from('posts')
             .select(`
               *,
-              profiles(*),
+              profiles!posts_user_id_fkey(*),
               listings(*)
             `)
             .eq('id', payload.post_id)

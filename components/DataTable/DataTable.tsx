@@ -179,14 +179,34 @@ export function ItemDetailsTable({
   // Add category attributes if they exist
   if (listing.attributes && Object.keys(listing.attributes).length > 0) {
     Object.entries(listing.attributes).forEach(([key, value]) => {
-      // Skip empty values
-      if (!value || (Array.isArray(value) && value.length === 0) || (typeof value === 'string' && value.trim() === '')) {
+      // Skip empty values (but allow 0 and false as valid values)
+      if (
+        value === null || 
+        value === undefined || 
+        (Array.isArray(value) && value.length === 0) || 
+        (typeof value === 'string' && value.trim() === '')
+      ) {
         return;
       }
       
       // Get appropriate icon based on attribute type
       const getAttributeIcon = (attrKey: string) => {
         const key = attrKey.toLowerCase();
+        // Property/Real Estate attributes
+        if (key.includes('bedroom')) return '🛏️';
+        if (key.includes('bathroom')) return '🚿';
+        if (key.includes('parking')) return '🅿️';
+        if (key.includes('floor') || key.includes('storey')) return '🏢';
+        if (key.includes('area') || key.includes('sqft') || key.includes('sqm')) return '📐';
+        if (key.includes('furnished')) return '🛋️';
+        if (key.includes('kitchen')) return '🍳';
+        if (key.includes('balcony')) return '🌆';
+        if (key.includes('garden') || key.includes('yard')) return '🌳';
+        if (key.includes('pool') || key.includes('swimming')) return '🏊';
+        if (key.includes('gym') || key.includes('fitness')) return '💪';
+        if (key.includes('security')) return '🔒';
+        if (key.includes('elevator') || key.includes('lift')) return '🛗';
+        // Electronics attributes
         if (key.includes('brand') || key.includes('make')) return '🏷️';
         if (key.includes('model')) return '📱';
         if (key.includes('year')) return '📅';
@@ -210,6 +230,7 @@ export function ItemDetailsTable({
         if (key.includes('connectivity')) return '🔌';
         if (key.includes('features')) return '✨';
         if (key.includes('accessories')) return '🎒';
+        // Vehicle attributes
         if (key.includes('mileage') || key.includes('km')) return '🛣️';
         if (key.includes('fuel') || key.includes('gas')) return '⛽';
         if (key.includes('transmission')) return '⚙️';
@@ -252,9 +273,21 @@ export function ItemDetailsTable({
           .join(' ');
       };
       
+      // Format the value based on its type
+      let displayValue: string;
+      if (typeof value === 'number') {
+        displayValue = String(value);
+      } else if (typeof value === 'boolean') {
+        displayValue = value ? 'Yes' : 'No';
+      } else if (typeof value === 'string' || Array.isArray(value)) {
+        displayValue = formatAttributeValue(value);
+      } else {
+        displayValue = String(value);
+      }
+
       data.push({
         label: key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        value: formatAttributeValue(typeof value === 'string' || Array.isArray(value) ? value : ''),
+        value: displayValue,
         icon: <Text style={{ fontSize: 16 }}>{getAttributeIcon(key)}</Text>,
       });
     });
@@ -320,22 +353,30 @@ export function SellerInfoTable({
 
 export function ListingStatsTable({ 
   listing, 
+  viewCount,
+  favoritesCount,
   compact = false,
   style 
 }: { 
   listing: any; 
+  viewCount?: number;
+  favoritesCount?: number;
   compact?: boolean;
   style?: any;
 }) {
+  // Use real-time stats if provided, otherwise fall back to listing data
+  const actualViewCount = viewCount !== undefined ? viewCount : (listing.views_count || 0);
+  const actualFavoritesCount = favoritesCount !== undefined ? favoritesCount : (listing.favorites_count || 0);
+  
   const data: DataTableRow[] = [
     {
       label: 'Views',
-      value: listing.views_count || 0,
+      value: actualViewCount,
       icon: <Text style={{ fontSize: 16 }}>👁️</Text>,
     },
     {
       label: 'Favorites',
-      value: listing.favorites_count || 0,
+      value: actualFavoritesCount,
       icon: <Text style={{ fontSize: 16 }}>❤️</Text>,
     },
     {

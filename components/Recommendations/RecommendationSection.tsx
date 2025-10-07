@@ -127,6 +127,7 @@ const RecommendationSection = memo(function RecommendationSection({
       setRecommendations(data);
     } catch (err) {
       console.error('Error loading recommendations:', err);
+      // Error is already handled by the hook functions (they set error state)
     }
   }, [type, listingId, userLocation, boostType, limit, getPersonalizedRecommendations, getTrendingNearUser, getCategoryRecommendations, getRecentlyViewed, getCollaborativeRecommendations, getBoostedListings]);
 
@@ -338,6 +339,11 @@ const RecommendationSection = memo(function RecommendationSection({
               return null;
             }
             
+            // Determine badge based on status
+            const badge = item.status === 'reserved' 
+              ? { text: 'Reserved', variant: 'warning' as const }
+              : undefined;
+            
             return (
               <View key={item.listing_id} style={{ position: 'relative' }}>
                 <ProductCard
@@ -351,6 +357,7 @@ const RecommendationSection = memo(function RecommendationSection({
                     avatar: item.seller_avatar || undefined,
                     rating: 0
                   }}
+                  badge={badge}
                   location={item.location || 'Unknown'}
                   layout="grid"
                   fullWidth={true}
@@ -390,6 +397,11 @@ const RecommendationSection = memo(function RecommendationSection({
               return null;
             }
             
+            // Determine badge based on status
+            const badge = item.status === 'reserved' 
+              ? { text: 'Reserved', variant: 'warning' as const }
+              : undefined;
+            
             return (
               <View key={item.listing_id} style={{ width: 190 }}>
                 <ProductCard
@@ -403,6 +415,7 @@ const RecommendationSection = memo(function RecommendationSection({
                     avatar: item.seller_avatar || undefined,
                     rating: 0
                   }}
+                  badge={badge}
                   location={item.location || 'Unknown'}
                   layout="grid"
                   listingId={item.listing_id}

@@ -43,7 +43,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { useAppStore } from '@/store/useAppStore';
 import { BusinessProfileSetupModal } from '@/components/BusinessProfileSetupModal/BusinessProfileSetupModal';
-import { validateName, validateUsername } from '@/utils/validation';
+import { validateName, validateUsername, validatePhoneNumber } from '@/utils/validation';
 import { checkMultipleUniqueness } from '@/utils/uniquenessValidation';
 import * as ImagePicker from 'expo-image-picker';
 import { Image as ImageIcon } from 'lucide-react-native';
@@ -102,7 +102,7 @@ export default function EditProfileScreen() {
   });
 
   const [avatar, setAvatar] = useState<string | null>(null);
-
+  const [phoneError, setPhoneError] = useState<string>('');
 
   // Initialize form with profile data
   useEffect(() => {
@@ -173,6 +173,16 @@ export default function EditProfileScreen() {
       const usernameValidation = validateUsername(formData.username);
       if (!usernameValidation.isValid) {
         Alert.alert('Validation Error', usernameValidation.error!);
+        return;
+      }
+    }
+
+    // Validate phone number if provided
+    if (formData.phone.trim()) {
+      const phoneValidation = validatePhoneNumber(formData.phone);
+      if (!phoneValidation.isValid) {
+        Alert.alert('Invalid Phone Number', phoneValidation.error!);
+        setPhoneError(phoneValidation.error!);
         return;
       }
     }
@@ -638,9 +648,27 @@ export default function EditProfileScreen() {
               <Input
                 label="Phone Number"
                 value={formData.phone}
-                onChangeText={(value) => updateFormField('phone', value)}
-                placeholder="Enter your phone number"
+                onChangeText={(value) => {
+                  updateFormField('phone', value);
+                  // Validate on change
+                  if (value.trim()) {
+                    const validation = validatePhoneNumber(value);
+                    setPhoneError(validation.error || '');
+                  } else {
+                    setPhoneError('');
+                  }
+                }}
+                onBlur={() => {
+                  // Validate on blur
+                  if (formData.phone.trim()) {
+                    const validation = validatePhoneNumber(formData.phone);
+                    setPhoneError(validation.error || '');
+                  }
+                }}
+                placeholder="e.g., 0244002233"
                 keyboardType="phone-pad"
+                error={phoneError}
+                helper={phoneError || "10 digits starting with 0 (e.g., 0244002233)"}
               />
 
               <View>
@@ -1205,7 +1233,7 @@ export default function EditProfileScreen() {
                   const { status } = await ImagePicker.requestCameraPermissionsAsync();
                   if (status === 'granted') {
                     const result = await ImagePicker.launchCameraAsync({
-                      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                      mediaTypes: ['images'],
                       allowsEditing: true,
                       aspect: [1, 1],
                       quality: 0.8,
@@ -1230,7 +1258,7 @@ export default function EditProfileScreen() {
                   const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
                   if (status === 'granted') {
                     const result = await ImagePicker.launchImageLibraryAsync({
-                      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                      mediaTypes: ['images'],
                       allowsEditing: true,
                       aspect: [1, 1],
                       quality: 0.8,

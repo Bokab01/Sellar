@@ -20,6 +20,7 @@ interface AppState {
     categories: string[];
     location: string;
     sortBy: string;
+    attributeFilters?: Record<string, any>;
   };
   setFilters: (filters: Partial<AppState['filters']>) => void;
   
@@ -47,7 +48,8 @@ export const useAppStore = create<AppState>((set) => ({
     condition: [],
     categories: [],
     location: '',
-    sortBy: 'Newest First',
+    sortBy: 'newest',
+    attributeFilters: {},
   },
   setFilters: (newFilters) => 
     set((state) => ({ 

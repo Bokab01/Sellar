@@ -437,8 +437,7 @@ export function PrioritySupportDashboard() {
             title="Knowledge Base"
             description="Find answers to common questions"
             leftIcon={<MessageSquare size={20} color={theme.colors.text.primary} />}
-            onPress={() => router.push('/knowledge-base')}
-            showChevron
+            onPress={() => router.push('/help')}
           />
           
           <ListItem
@@ -448,7 +447,6 @@ export function PrioritySupportDashboard() {
             onPress={() => {
               // Navigate to business guide
             }}
-            showChevron
             style={{ borderTopWidth: 1, borderTopColor: theme.colors.border }}
           />
           
@@ -459,7 +457,6 @@ export function PrioritySupportDashboard() {
             onPress={() => {
               // Navigate to scheduling
             }}
-            showChevron
             style={{ borderTopWidth: 1, borderTopColor: theme.colors.border }}
           />
         </View>

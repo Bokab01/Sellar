@@ -833,6 +833,8 @@ export const dbHelpers = {
   // Listing operations
   async getListings(options: any) {
     try {
+      console.log('📊 getListings called with options:', options);
+      
       // Use the full query with joins for all categories
       let query = db.listings
         .select(`
@@ -840,7 +842,9 @@ export const dbHelpers = {
           profiles!listings_user_id_fkey(*),
           categories!listings_category_id_fkey(*)
         `)
-        .eq('status', 'active'); // Only get active listings
+        .in('status', ['active', 'reserved']); // Get active and reserved listings (reserved = offer accepted, pending transaction)
+      
+      console.log('📊 Query will fetch listings with status: active, reserved');
 
       // Apply filters
       if (options.userId) {
@@ -849,6 +853,31 @@ export const dbHelpers = {
       
       if (options.category) {
         query = query.eq('category_id', options.category);
+      }
+      
+      // Handle multiple categories by name
+      if (options.categories && options.categories.length > 0) {
+          // Fetch category IDs by name (try exact match first)
+        const { data: categoryData } = await db.categories
+          .select('id, name')
+          .in('name', options.categories);
+        
+        if (categoryData && categoryData.length > 0) {
+          const mainCategoryIds = categoryData.map((cat: any) => cat.id);
+          
+          // Fetch all subcategories for these main categories
+          const { data: subcategoryData } = await db.categories
+            .select('id, name, parent_id')
+            .in('parent_id', mainCategoryIds);
+          
+          // Combine main category IDs and subcategory IDs
+          const allCategoryIds = [
+            ...mainCategoryIds,
+            ...(subcategoryData?.map((cat: any) => cat.id) || [])
+          ];
+          
+          query = query.in('category_id', allCategoryIds);
+        }
       }
       
       if (options.search) {
@@ -875,8 +904,36 @@ export const dbHelpers = {
         query = query.in('condition', options.condition);
       }
       
+      // Apply attribute filters (including condition when it's a dynamic attribute)
+      if (options.attributeFilters && Object.keys(options.attributeFilters).length > 0) {
+        Object.entries(options.attributeFilters).forEach(([key, value]: [string, any]) => {
+          if (value) {
+            if (Array.isArray(value) && value.length > 0) {
+              // For array values, check if any value matches using OR
+              const orConditions = value.map(v => `attributes->>${key}.eq.${v}`).join(',');
+              query = query.or(orConditions);
+            } else {
+              // For single values, use the ->> operator to extract text value
+              query = query.eq(`attributes->>${key}`, value);
+            }
+          }
+        });
+      }
+      
       if (options.location) {
-        query = query.ilike('location', `%${options.location}%`);
+        // Skip filtering if "All Regions" is selected
+        if (options.location === 'All Regions') {
+          // Don't apply any location filter - show all listings
+        } 
+        // Handle "All [Region]" selections (e.g., "All Ashanti", "All Greater Accra")
+        else if (options.location.startsWith('All ')) {
+          const regionName = options.location.replace('All ', '');
+          query = query.ilike('location', `%${regionName}%`);
+        } 
+        // Normal city filtering (e.g., "Kumasi, Ashanti")
+        else {
+          query = query.ilike('location', `%${options.location}%`);
+        }
       }
 
       // Order by creation date (newest first)
@@ -889,10 +946,11 @@ export const dbHelpers = {
       
       // If the joined query fails, try a simpler query without joins
       if (error && (error.message.includes('schema cache') || error.message.includes('relationship'))) {
+        console.log('📊 Fallback to simple query without joins');
         
         let simpleQuery = db.listings
           .select('*')
-          .eq('status', 'active');
+          .in('status', ['active', 'reserved']); // Get active and reserved listings
 
         // Apply the same filters to the simple query
         if (options.userId) {
@@ -938,8 +996,17 @@ export const dbHelpers = {
         return { data: simpleData, error: simpleError };
       }
       
+      console.log(`📊 getListings returned ${data?.length || 0} listings`);
+      if (data && data.length > 0) {
+        const statuses = data.map((l: any) => l.status);
+        console.log('📊 Listing statuses:', statuses);
+        const reservedCount = statuses.filter((s: string) => s === 'reserved').length;
+        console.log(`📊 Reserved listings: ${reservedCount}`);
+      }
+      
       return { data, error };
     } catch (err) {
+      console.error('📊 getListings error:', err);
       return { data: null, error: err };
     }
   },

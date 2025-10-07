@@ -27,6 +27,9 @@ export { Stepper } from './Stepper/Stepper';
 // Moderation Components
 export { ModerationErrorModal } from './ModerationErrorModal/ModerationErrorModal';
 
+// Reputation System Components
+export { ReputationDisplay } from './ReputationDisplay/ReputationDisplay';
+
 // Community Components
 export { ChatBubble } from './ChatBubble/ChatBubble';
 export { ListItem } from './ListItem/ListItem';

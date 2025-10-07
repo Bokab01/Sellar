@@ -67,7 +67,7 @@ export function ChatImagePicker({ onImageSelected, disabled = false }: ChatImage
 
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -89,7 +89,7 @@ export function ChatImagePicker({ onImageSelected, disabled = false }: ChatImage
 
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsMultipleSelection: false,
         quality: 0.8,
         allowsEditing: true,

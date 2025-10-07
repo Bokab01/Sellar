@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Alert } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/useAuthStore';
+import { reputationService } from '@/lib/reputationService';
+import { contentModerationService } from '@/lib/contentModerationService';
 
 export interface Review {
   id: string;
@@ -9,6 +12,7 @@ export interface Review {
   listing_id: string | null;
   rating: number;
   comment: string;
+  review_type: 'buyer_to_seller' | 'seller_to_buyer' | null;
   is_verified_purchase: boolean;
   helpful_count: number;
   created_at: string;
@@ -318,11 +322,41 @@ export function useCreateReview() {
       setLoading(true);
       setError(null);
 
+      // Moderate review comment before creating
+      const moderationResult = await contentModerationService.moderateContent({
+        id: 'temp-review-id',
+        type: 'comment', // Reviews are similar to comments
+        userId: user.id,
+        content: reviewData.comment,
+      });
+
+      // Check if content is approved
+      if (!moderationResult.isApproved) {
+        if (moderationResult.requiresManualReview) {
+          throw new Error('Your review has been submitted for review due to our content policies. You will be notified once the review is complete.');
+        } else {
+          // Content was rejected
+          const flagReasons = moderationResult.flags
+            .map(flag => {
+              if (flag.type === 'profanity') return 'Inappropriate language detected';
+              if (flag.type === 'personal_info') return 'Personal information detected';
+              if (flag.type === 'spam') return 'Spam-like content detected';
+              if (flag.type === 'inappropriate') return 'Inappropriate content detected';
+              if (flag.type === 'suspicious_links') return 'Suspicious links detected';
+              return flag.details;
+            })
+            .join('\n• ');
+          
+          throw new Error(`Your review cannot be published:\n\n• ${flagReasons}\n\nPlease review and modify your content.`);
+        }
+      }
+
       const { data, error: createError } = await supabase
         .from('reviews')
         .insert({
           reviewer_id: user.id,
-          ...reviewData
+          ...reviewData,
+          status: moderationResult.requiresManualReview ? 'hidden' : 'published',
         })
         .select(`
           *,
@@ -342,6 +376,34 @@ export function useCreateReview() {
         .single();
 
       if (createError) throw createError;
+
+      // Log moderation result with actual review ID
+      if (data?.id) {
+        try {
+          await contentModerationService.moderateContent({
+            id: data.id,
+            type: 'comment',
+            userId: user.id,
+            content: reviewData.comment,
+          });
+        } catch (logError) {
+          console.error('Failed to log moderation result:', logError);
+        }
+      }
+
+      // Award reputation points to the reviewed user
+      if (data) {
+        try {
+          await reputationService.updateReviewStats(
+            reviewData.reviewed_user_id,
+            data.rating >= 4 // 4+ stars is positive
+          );
+          console.log('Reputation updated for reviewed user');
+        } catch (repError) {
+          console.error('Failed to update reputation:', repError);
+          // Don't fail review creation if reputation update fails
+        }
+      }
 
       return data;
     } catch (err) {

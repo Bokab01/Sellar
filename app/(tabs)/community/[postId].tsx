@@ -9,6 +9,7 @@ import { useBottomTabBarSpacing } from '@/hooks/useBottomTabBarSpacing';
 import { supabase } from '@/lib/supabase';
 import { useRealtime } from '@/hooks/useRealtime';
 import { UserProfile } from '@/hooks/useProfile';
+import { contentModerationService } from '@/lib/contentModerationService';
 import {
   Text,
   SafeAreaWrapper,
@@ -384,6 +385,49 @@ export default function PostDetailScreen() {
         // Refresh comments to get updated content
         await fetchComments();
       } else {
+        // Moderate content before creating comment
+        const moderationResult = await contentModerationService.moderateContent({
+          id: 'temp-comment-id', // Temporary ID
+          type: 'comment',
+          userId: user.id,
+          content: commentText.trim(),
+        });
+
+        // Check if content is approved
+        if (!moderationResult.isApproved) {
+          setSubmittingComment(false);
+          
+          if (moderationResult.requiresManualReview) {
+            Alert.alert(
+              'Content Under Review',
+              'Your comment has been submitted for review due to our content policies. You will be notified once the review is complete.',
+              [{ text: 'OK' }]
+            );
+            setCommentText('');
+            setReplyingTo(null);
+            return;
+          } else {
+            // Content was rejected
+            const flagReasons = moderationResult.flags
+              .map(flag => {
+                if (flag.type === 'profanity') return 'Inappropriate language detected';
+                if (flag.type === 'personal_info') return 'Personal information detected';
+                if (flag.type === 'spam') return 'Spam-like content detected';
+                if (flag.type === 'inappropriate') return 'Inappropriate content detected';
+                if (flag.type === 'suspicious_links') return 'Suspicious links detected';
+                return flag.details;
+              })
+              .join('\n• ');
+            
+            Alert.alert(
+              'Content Policy Violation',
+              `Your comment cannot be published:\n\n• ${flagReasons}\n\nPlease review and modify your content.`,
+              [{ text: 'OK' }]
+            );
+            return;
+          }
+        }
+
         // Add new comment or reply
         console.log('Attempting to add comment:', {
           postId,
@@ -399,7 +443,8 @@ export default function PostDetailScreen() {
             post_id: postId!,
             user_id: user.id,
             content: commentText.trim(),
-            parent_id: replyingTo?.id || null, // Add parent_id if replying
+            parent_id: replyingTo?.id || null,
+            status: moderationResult.requiresManualReview ? 'hidden' : 'active',
           })
           .select();
 
@@ -409,10 +454,25 @@ export default function PostDetailScreen() {
         }
 
         console.log('Comment added successfully:', data);
-        setCommentText('');
-        setReplyingTo(null); // Clear reply state
         
-        // Refresh comments and post data to get updated counts from database
+        // Log moderation result with actual comment ID
+        if (data && data[0]?.id) {
+          try {
+            await contentModerationService.moderateContent({
+              id: data[0].id,
+              type: 'comment',
+              userId: user.id,
+              content: commentText.trim(),
+            });
+          } catch (logError) {
+            console.error('Failed to log moderation result:', logError);
+          }
+        }
+
+        setCommentText('');
+        setReplyingTo(null);
+        
+        // Refresh comments and post data
         await fetchComments();
         await fetchPost();
       }

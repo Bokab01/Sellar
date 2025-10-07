@@ -63,6 +63,7 @@
     "expo-web-browser": "~15.0.7",
     "isomorphic-dompurify": "^2.26.0",
     "jest-expo": "~54.0.12",
+    "leo-profanity": "^1.8.0",
     "lucide-react-native": "^0.475.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",

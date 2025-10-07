@@ -99,13 +99,13 @@ export function OfferCard({
           backgroundColor: offer.isOwn 
             ? theme.colors.primary + '10' 
             : theme.colors.surface,
-          borderRadius: theme.borderRadius.lg,
-          padding: theme.spacing.lg,
+          borderRadius: theme.borderRadius.md,
+          padding: theme.spacing.md,
           borderWidth: 1,
           borderColor: offer.isOwn 
             ? theme.colors.primary + '30' 
             : theme.colors.border,
-          marginVertical: theme.spacing.sm,
+          marginVertical: theme.spacing.xs,
         },
         style,
       ]}
@@ -115,103 +115,96 @@ export function OfferCard({
         style={{
           flexDirection: 'row',
           justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: theme.spacing.md,
+          alignItems: 'center',
+          marginBottom: theme.spacing.sm,
         }}
       >
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-            <Text variant="body" style={{ fontWeight: '600' }}>
-              💰 {offer.isOwn ? 'Your Offer' : 'Offer Received'}
-            </Text>
-            <Badge 
-              text={statusBadge.text} 
-              variant={statusBadge.variant} 
-              size="sm" 
-            />
-          </View>
-          
-          <Text variant="caption" color="muted" style={{ marginTop: theme.spacing.xs }}>
-            {offer.timestamp}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+          <Text variant="bodySmall" style={{ fontWeight: '600' }}>
+            💰 {offer.isOwn ? 'Your Offer' : 'Offer'}
           </Text>
-
-          {timeRemaining && isPending && (
-            <Text 
-              variant="caption" 
-              style={{ 
-                color: isExpired ? theme.colors.error : theme.colors.warning,
-                marginTop: theme.spacing.xs,
-                fontWeight: '500',
-              }}
-            >
-              ⏰ {timeRemaining}
-            </Text>
-          )}
+          <Badge 
+            text={statusBadge.text} 
+            variant={statusBadge.variant} 
+            size="sm" 
+          />
         </View>
+        
+        <Text variant="caption" color="muted">
+          {offer.timestamp}
+        </Text>
       </View>
+
+      {timeRemaining && isPending && (
+        <Text 
+          variant="caption" 
+          style={{ 
+            color: isExpired ? theme.colors.error : theme.colors.warning,
+            marginBottom: theme.spacing.sm,
+            fontWeight: '500',
+          }}
+        >
+          ⏰ {timeRemaining}
+        </Text>
+      )}
 
       {/* Buyer Info - Only show if not own offer */}
       {!offer.isOwn && (
-        <TouchableOpacity
-          onPress={onMessage}
+        <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            marginBottom: theme.spacing.lg,
-            padding: theme.spacing.md,
-            backgroundColor: theme.colors.surfaceVariant,
-            borderRadius: theme.borderRadius.md,
+            marginBottom: theme.spacing.sm,
+            paddingVertical: theme.spacing.xs,
           }}
-          activeOpacity={0.7}
         >
           <Avatar
             source={offer.buyer.avatar}
             name={offer.buyer.name}
-            size="sm"
-            style={{ marginRight: theme.spacing.md }}
+            size="xs"
+            style={{ marginRight: theme.spacing.sm }}
           />
           <View style={{ flex: 1 }}>
-            <Text variant="bodySmall" style={{ fontWeight: '600' }}>
+            <Text variant="caption" style={{ fontWeight: '600' }}>
               {offer.buyer.name}
+              {offer.buyer.rating && ` • ⭐ ${offer.buyer.rating.toFixed(1)}`}
             </Text>
-            {offer.buyer.rating && (
-              <Text variant="caption" color="muted">
-                ⭐ {offer.buyer.rating.toFixed(1)} rating
-              </Text>
-            )}
           </View>
-        </TouchableOpacity>
+        </View>
       )}
 
       {/* Offer Amount */}
       <View
         style={{
           backgroundColor: theme.colors.primary + '15',
-          borderRadius: theme.borderRadius.md,
-          padding: theme.spacing.lg,
-          marginBottom: theme.spacing.lg,
+          borderRadius: theme.borderRadius.sm,
+          padding: theme.spacing.sm,
+          marginBottom: theme.spacing.sm,
           borderWidth: 1,
           borderColor: theme.colors.primary + '30',
         }}
       >
-        <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.sm }}>
-          {offer.isOwn ? 'Offered Price' : 'Buyer\'s Offer'}
-        </Text>
-        <PriceDisplay
-          amount={offer.amount}
-          currency={offer.currency}
-          size="lg"
-          originalPrice={offer.originalPrice}
-          variant={offer.originalPrice ? 'discount' : 'default'}
-        />
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+          <Text variant="caption" color="secondary">
+            {offer.isOwn ? 'Your offer' : 'Offer'}
+          </Text>
+          <PriceDisplay
+            amount={offer.amount}
+            currency={offer.currency}
+            size="md"
+            originalPrice={offer.originalPrice}
+            variant={offer.originalPrice ? 'discount' : 'default'}
+          />
+        </View>
         
         {offer.originalPrice && (
           <Text variant="caption" style={{ 
             color: theme.colors.success, 
-            marginTop: theme.spacing.sm,
-            fontWeight: '600',
+            marginTop: theme.spacing.xs,
+            fontWeight: '500',
+            textAlign: 'right',
           }}>
-            💰 Save GHS {((offer.originalPrice || 0) - (offer.amount || 0)).toLocaleString()}
+            Save GHS {((offer.originalPrice || 0) - (offer.amount || 0)).toLocaleString()}
           </Text>
         )}
       </View>
@@ -221,17 +214,17 @@ export function OfferCard({
         <View
           style={{
             backgroundColor: theme.colors.surfaceVariant,
-            borderRadius: theme.borderRadius.md,
-            padding: theme.spacing.md,
-            marginBottom: theme.spacing.lg,
-            borderLeftWidth: 3,
+            borderRadius: theme.borderRadius.sm,
+            padding: theme.spacing.sm,
+            marginBottom: theme.spacing.sm,
+            borderLeftWidth: 2,
             borderLeftColor: theme.colors.primary,
           }}
         >
-          <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.xs }}>
-            💬 Message from {offer.isOwn ? 'you' : offer.buyer.name}:
+          <Text variant="caption" color="secondary" style={{ marginBottom: 2 }}>
+            💬 Message:
           </Text>
-          <Text variant="body" style={{ fontStyle: 'italic' }}>
+          <Text variant="bodySmall" style={{ fontStyle: 'italic' }}>
             &quot;{offer.message}&quot;
           </Text>
         </View>
@@ -239,25 +232,25 @@ export function OfferCard({
 
       {/* Actions */}
       {showActions && isPending && !isExpired && (
-        <View style={{ gap: theme.spacing.md }}>
+        <View style={{ gap: theme.spacing.sm }}>
           {!offer.isOwn ? (
             // Seller actions
             <>
-              <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
+              <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
                 <Button
                   variant="primary"
-                  icon={<Check size={18} color={theme.colors.primaryForeground} />}
+                  leftIcon={<Check size={16} color={theme.colors.primaryForeground} />}
                   onPress={onAccept}
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, minHeight: 40 }}
                 >
-                  Accept Offer
+                  Accept
                 </Button>
 
                 <Button
                   variant="tertiary"
-                  icon={<X size={18} color={theme.colors.error} />}
+                  leftIcon={<X size={16} color={theme.colors.error} />}
                   onPress={onReject}
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, minHeight: 40 }}
                 >
                   Decline
                 </Button>
@@ -266,11 +259,12 @@ export function OfferCard({
               {onCounter && (
                 <Button
                   variant="secondary"
-                  icon={<DollarSign size={18} color={theme.colors.primary} />}
+                  leftIcon={<DollarSign size={16} color={theme.colors.primary} />}
                   onPress={onCounter}
                   fullWidth
+                  style={{ minHeight: 40 }}
                 >
-                  Make Counter Offer
+                  Counter Offer
                 </Button>
               )}
             </>
@@ -279,13 +273,13 @@ export function OfferCard({
             <View
               style={{
                 backgroundColor: theme.colors.warning + '10',
-                borderRadius: theme.borderRadius.md,
-                padding: theme.spacing.md,
+                borderRadius: theme.borderRadius.sm,
+                padding: theme.spacing.sm,
                 borderWidth: 1,
                 borderColor: theme.colors.warning + '30',
               }}
             >
-              <Text variant="bodySmall" style={{ 
+              <Text variant="caption" style={{ 
                 color: theme.colors.warning,
                 textAlign: 'center',
                 fontWeight: '500',
@@ -306,8 +300,8 @@ export function OfferCard({
               : offer.status === 'rejected'
               ? theme.colors.error + '10'
               : theme.colors.surfaceVariant,
-            borderRadius: theme.borderRadius.md,
-            padding: theme.spacing.md,
+            borderRadius: theme.borderRadius.sm,
+            padding: theme.spacing.sm,
             borderWidth: 1,
             borderColor: offer.status === 'accepted' 
               ? theme.colors.success + '30'
@@ -317,7 +311,7 @@ export function OfferCard({
           }}
         >
           <Text 
-            variant="bodySmall" 
+            variant="caption" 
             style={{ 
               textAlign: 'center',
               fontWeight: '600',
@@ -328,23 +322,11 @@ export function OfferCard({
                 : theme.colors.text.secondary,
             }}
           >
-            {offer.status === 'accepted' && '✅ Offer Accepted!'}
-            {offer.status === 'rejected' && '❌ Offer Declined'}
-            {offer.status === 'countered' && '🔄 Counter Offer Made'}
-            {offer.status === 'expired' && '⏰ Offer Expired'}
+            {offer.status === 'accepted' && '✅ Accepted'}
+            {offer.status === 'rejected' && '❌ Declined'}
+            {offer.status === 'countered' && '🔄 Countered'}
+            {offer.status === 'expired' && '⏰ Expired'}
           </Text>
-          
-          {offer.status === 'accepted' && onMessage && (
-            <Button
-              variant="primary"
-              onPress={onMessage}
-              size="sm"
-              style={{ marginTop: theme.spacing.md }}
-              fullWidth
-            >
-              Continue Conversation
-            </Button>
-          )}
         </View>
       )}
 
@@ -352,11 +334,12 @@ export function OfferCard({
       {isExpired && offer.isOwn && onCounter && (
         <Button
           variant="secondary"
-          icon={<DollarSign size={18} color={theme.colors.primary} />}
+          leftIcon={<DollarSign size={16} color={theme.colors.primary} />}
           onPress={onCounter}
           fullWidth
+          style={{ minHeight: 40, marginTop: theme.spacing.sm }}
         >
-          Make New Offer
+          New Offer
         </Button>
       )}
     </View>

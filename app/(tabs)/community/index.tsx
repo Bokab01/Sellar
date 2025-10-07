@@ -6,6 +6,7 @@ import { useCommunityPosts } from '@/hooks/useCommunity';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useProfile } from '@/hooks/useProfile';
 import { useAppResume } from '@/hooks/useAppResume';
+import { useBottomTabBarSpacing } from '@/hooks/useBottomTabBarSpacing';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useFollowState } from '@/hooks/useFollowState';
@@ -31,6 +32,7 @@ export default function CommunityScreen() {
   const { user } = useAuthStore();
   const { profile } = useProfile();
   const insets = useSafeAreaInsets();
+  const { contentBottomPadding } = useBottomTabBarSpacing();
   const [sidebarVisible, setSidebarVisible] = useState(false);
   
   // Scroll-to-top FAB state
@@ -289,7 +291,7 @@ export default function CommunityScreen() {
             ref={scrollViewRef}
             contentContainerStyle={{
               padding: theme.spacing.sm,
-              paddingBottom: theme.spacing.xl,
+              paddingBottom: contentBottomPadding,
             }}
             showsVerticalScrollIndicator={false}
             onScroll={handleScroll}

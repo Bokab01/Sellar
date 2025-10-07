@@ -95,7 +95,7 @@ export function CustomImagePicker({
 
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: undefined, // Allow flexible aspect ratio
         quality: 0.8,
@@ -133,7 +133,7 @@ export function CustomImagePicker({
 
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsMultipleSelection: true, // Always allow multiple selection
         selectionLimit: Math.max(1, limit - value.length), // Only allow selecting up to remaining slots
         quality: 0.8,

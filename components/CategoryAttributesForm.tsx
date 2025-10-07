@@ -107,11 +107,11 @@ export const CategoryAttributesForm: React.FC<CategoryAttributesFormProps> = ({
             {...commonProps}
             value={value?.toString() || ''}
             onChangeText={(text: string) => {
-              const numValue = text === '' ? null : parseFloat(text);
-              onChange(attribute.slug, numValue);
+              // Allow decimal numbers by not parsing immediately
+              onChange(attribute.slug, text);
             }}
             placeholder={attribute.placeholder}
-            keyboardType="numeric"
+            keyboardType="decimal-pad"
           />
         );
 
@@ -360,9 +360,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     overflow: 'hidden',
+    minHeight: 56,
   },
   picker: {
-    height: 50,
+    height: 56,
+    paddingVertical: 4,
   },
   checkboxGroup: {
     gap: 12,

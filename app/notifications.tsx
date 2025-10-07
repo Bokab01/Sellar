@@ -3,7 +3,7 @@ import { View, ScrollView, TouchableOpacity, RefreshControl, Alert, Animated } f
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useNotificationStore } from '@/store/useNotificationStore';
-import { dbHelpers } from '@/lib/supabase';
+import { dbHelpers, supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
 import {
   Text,
@@ -184,10 +184,29 @@ export default function NotificationsScreen() {
     setBulkActionLoading(prev => ({ ...prev, markAsRead: true }));
     
     try {
-      // Mark selected notifications as read
-      for (const notificationId of selectedNotifications) {
-        await markAsRead(notificationId);
+      // Mark all selected notifications as read at once using Supabase batch update
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .in('id', Array.from(selectedNotifications));
+
+      if (error) {
+        throw error;
       }
+
+      // Update local state
+      const { notifications: currentNotifications } = useNotificationStore.getState();
+      const updatedNotifications = currentNotifications.map(n => 
+        selectedNotifications.has(n.id) 
+          ? { ...n, is_read: true, read_at: new Date().toISOString() } 
+          : n
+      );
+      const newUnreadCount = updatedNotifications.filter(n => !n.is_read).length;
+      
+      useNotificationStore.setState({ 
+        notifications: updatedNotifications,
+        unreadCount: newUnreadCount
+      });
       
       setToastMessage(`${selectedNotifications.size} notifications marked as read`);
       setShowToast(true);
@@ -210,24 +229,35 @@ export default function NotificationsScreen() {
     setBulkActionLoading(prev => ({ ...prev, markAsUnread: true }));
     
     try {
-      // Mark selected notifications as unread
-      for (const notificationId of selectedNotifications) {
-        // We need to implement markAsUnread in the store
-        // For now, we'll use a direct database call
-        const { error } = await dbHelpers.markNotificationAsUnread(notificationId);
-        if (error) {
-          console.error('Error marking notification as unread:', error);
-        }
+      // Mark all selected notifications as unread at once using Supabase batch update
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: false, read_at: null })
+        .in('id', Array.from(selectedNotifications));
+
+      if (error) {
+        throw error;
       }
+
+      // Update local state
+      const { notifications: currentNotifications } = useNotificationStore.getState();
+      const updatedNotifications = currentNotifications.map(n => 
+        selectedNotifications.has(n.id) 
+          ? { ...n, is_read: false, read_at: null } 
+          : n
+      );
+      const newUnreadCount = updatedNotifications.filter(n => !n.is_read).length;
+      
+      useNotificationStore.setState({ 
+        notifications: updatedNotifications,
+        unreadCount: newUnreadCount
+      });
       
       setToastMessage(`${selectedNotifications.size} notifications marked as unread`);
       setShowToast(true);
       
       clearSelection();
       setIsSelectionMode(false);
-      
-      // Refresh notifications to update the UI
-      await refresh();
       
     } catch (error) {
       console.error('Bulk mark as unread error:', error);
@@ -253,10 +283,27 @@ export default function NotificationsScreen() {
             setBulkActionLoading(prev => ({ ...prev, delete: true }));
             
             try {
-              // Delete selected notifications
-              for (const notificationId of selectedNotifications) {
-                await deleteNotification(notificationId);
+              // Delete all selected notifications at once using Supabase batch delete
+              const { error } = await supabase
+                .from('notifications')
+                .delete()
+                .in('id', Array.from(selectedNotifications));
+
+              if (error) {
+                throw error;
               }
+
+              // Update local state to remove deleted notifications
+              const { notifications: currentNotifications } = useNotificationStore.getState();
+              const updatedNotifications = currentNotifications.filter(
+                n => !selectedNotifications.has(n.id)
+              );
+              const newUnreadCount = updatedNotifications.filter(n => !n.is_read).length;
+              
+              useNotificationStore.setState({ 
+                notifications: updatedNotifications,
+                unreadCount: newUnreadCount
+              });
               
               setToastMessage(`${selectedNotifications.size} notifications deleted`);
               setShowToast(true);

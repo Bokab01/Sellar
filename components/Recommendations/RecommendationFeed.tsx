@@ -1,5 +1,6 @@
 import React, { useState, useEffect, memo, useCallback } from 'react';
 import { View, ScrollView, RefreshControl } from 'react-native';
+import { router } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { RecommendationSection } from './RecommendationSection';
@@ -73,7 +74,8 @@ const RecommendationFeed = memo(function RecommendationFeed({
       <View style={[{ padding: theme.spacing.lg }, style]}>
         <ErrorState
           message="Please sign in to see personalized recommendations"
-          onRetry={() => {}}
+          onRetry={() => router.push('/(auth)/sign-in')}
+          retryText="Sign In"
         />
       </View>
     );

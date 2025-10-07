@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Alert } from 'react-native';
 import { dbHelpers, supabase } from '@/lib/supabase';
 import { useCommunityRealtime } from './useRealtime';
 import { useAuthStore } from '@/store/useAuthStore';
 import { addProfileRefreshListener } from './useProfile';
 import { useRealtimeConnection } from './useRealtimeConnection';
+import { contentModerationService } from '@/lib/contentModerationService';
 
 export function useCommunityPosts(options: { 
   following?: boolean; 
@@ -148,12 +150,54 @@ export function useCommunityPosts(options: {
     if (!user) return { error: 'Not authenticated' };
 
     try {
+      // Moderate content before creating post
+      const moderationResult = await contentModerationService.moderateContent({
+        id: 'temp-post-id', // Temporary ID, will be replaced with actual post ID
+        type: 'post',
+        userId: user.id,
+        content: content,
+        images: images,
+      });
+
+      // Check if content is approved
+      if (!moderationResult.isApproved) {
+        if (moderationResult.requiresManualReview) {
+          // Content requires manual review
+          return { 
+            error: 'Your post has been submitted for review due to our content policies. You will be notified once the review is complete.' 
+          };
+        } else {
+          // Content was rejected - extract specific violations
+          const flagReasons = moderationResult.flags
+            .map(flag => {
+              if (flag.type === 'profanity') {
+                return 'Inappropriate language detected';
+              } else if (flag.type === 'personal_info') {
+                return 'Personal information detected (phone/email/address)';
+              } else if (flag.type === 'spam') {
+                return 'Spam-like content detected';
+              } else if (flag.type === 'inappropriate') {
+                return 'Inappropriate content detected';
+              } else if (flag.type === 'suspicious_links') {
+                return 'Suspicious links detected';
+              }
+              return flag.details;
+            })
+            .join('\n• ');
+          
+          return { 
+            error: `Your post cannot be published:\n\n• ${flagReasons}\n\nPlease review and modify your content.` 
+          };
+        }
+      }
+
       const postData = {
         user_id: user.id,
         content,
         images,
         listing_id: listingId,
         type: type || 'general', // Default to 'general' if no type provided
+        status: moderationResult.requiresManualReview ? 'hidden' : 'active', // Hide if requires review
       };
       
       const { data, error } = await dbHelpers.createPost(postData);
@@ -162,9 +206,26 @@ export function useCommunityPosts(options: {
         return { error: error.message };
       }
 
+      // Log moderation result with actual post ID
+      if (data && data.id) {
+        try {
+          await contentModerationService.moderateContent({
+            id: data.id,
+            type: 'post',
+            userId: user.id,
+            content: content,
+            images: images,
+          });
+        } catch (logError) {
+          console.error('Failed to log moderation result:', logError);
+          // Don't fail post creation if logging fails
+        }
+      }
+
       return { data };
     } catch (err) {
-      return { error: 'Failed to create post' };
+      console.error('Error creating post:', err);
+      return { error: 'Failed to create post. Please try again.' };
     }
   };
 

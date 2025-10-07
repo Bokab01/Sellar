@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { View, Alert } from 'react-native';
+import { View, Alert, Image } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useProfile } from '@/hooks/useProfile';
 import { Text } from '@/components/Typography/Text';
 import { Button } from '@/components/Button/Button';
 import { AppModal } from '@/components/Modal/Modal';
@@ -16,6 +17,9 @@ interface SimpleCallbackRequestButtonProps {
   sellerName: string;
   sellerPhone?: string;
   listingTitle: string;
+  listingImage?: string;
+  listingPrice?: number;
+  listingCurrency?: string;
   variant?: 'primary' | 'secondary';
   size?: 'sm' | 'md' | 'lg';
   showIcon?: boolean;
@@ -28,6 +32,9 @@ export function SimpleCallbackRequestButton({
   sellerName,
   sellerPhone,
   listingTitle,
+  listingImage,
+  listingPrice,
+  listingCurrency = 'GHS',
   variant = 'secondary',
   size = 'md',
   showIcon = true,
@@ -35,6 +42,7 @@ export function SimpleCallbackRequestButton({
 }: SimpleCallbackRequestButtonProps) {
   const { theme } = useTheme();
   const { user } = useAuthStore();
+  const { profile } = useProfile();
   
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showToast, setShowToast] = useState(false);
@@ -42,6 +50,9 @@ export function SimpleCallbackRequestButton({
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
   const [loading, setLoading] = useState(false);
   const [hasRecentCallbackRequest, setHasRecentCallbackRequest] = useState(false);
+  
+  // Get user's phone from profile (more up-to-date than auth store)
+  const userPhone = profile?.phone || user?.phone;
 
   // Don't show button if seller doesn't have phone number
   if (!sellerPhone) {
@@ -59,8 +70,21 @@ export function SimpleCallbackRequestButton({
       return;
     }
 
-    if (!user.phone) {
-      Alert.alert('Phone Required', 'Please add your phone number to your profile to request callbacks');
+    if (!userPhone) {
+      Alert.alert(
+        'Phone Required', 
+        'Please add your phone number to your profile to request callbacks',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Go to Profile', 
+            onPress: () => {
+              setShowConfirmModal(false);
+              router.push('/edit-profile');
+            }
+          }
+        ]
+      );
       return;
     }
 
@@ -116,7 +140,6 @@ export function SimpleCallbackRequestButton({
         participant_1: user!.id,
         participant_2: sellerId,
         listing_id: listingId,
-        status: 'active',
       })
       .select('id')
       .single();
@@ -127,7 +150,7 @@ export function SimpleCallbackRequestButton({
   };
 
   const sendCallbackMessage = async (conversationId: string) => {
-    const callbackMessage = `Hi ${sellerName}! Can you call me back about "${listingTitle}"? My number is ${user!.phone}. Thanks! 📞`;
+    const callbackMessage = `Hi ${sellerName}! Can you call me back about "${listingTitle}"? My number is ${userPhone}. Thanks! 📞`;
     
     const { error } = await supabase
       .from('messages')
@@ -135,25 +158,43 @@ export function SimpleCallbackRequestButton({
         conversation_id: conversationId,
         sender_id: user!.id,
         content: callbackMessage,
-        message_type: 'callback_request',
+        message_type: 'text',
         status: 'sent',
       });
 
     if (error) throw error;
   };
 
-  // Check for recent callback requests in existing conversations
+  // Check for recent callback requests in existing conversations for THIS specific listing
   React.useEffect(() => {
     const checkRecentCallbackRequest = async () => {
       if (!user || !listingId) return;
 
       try {
-        // Check for recent callback request messages in the last 24 hours
+        // First, find conversations for this specific listing
+        const { data: conversations, error: convError } = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('listing_id', listingId)
+          .or(`participant_1.eq.${user.id},participant_2.eq.${user.id}`);
+
+        if (convError) throw convError;
+
+        if (!conversations || conversations.length === 0) {
+          setHasRecentCallbackRequest(false);
+          return;
+        }
+
+        const conversationIds = conversations.map(c => c.id);
+
+        // Check for recent callback request messages in these conversations in the last 24 hours
         const { data: recentMessages, error } = await supabase
           .from('messages')
-          .select('id, created_at')
+          .select('id, created_at, content')
           .eq('sender_id', user.id)
-          .eq('message_type', 'callback_request')
+          .eq('message_type', 'text')
+          .in('conversation_id', conversationIds)
+          .ilike('content', '%call me back%')
           .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
           .limit(1);
 
@@ -206,7 +247,7 @@ export function SimpleCallbackRequestButton({
         title="Request Callback"
         size="lg"
         primaryAction={{
-          text: 'Yes, Request Callback',
+          text: 'Yes, Call Me',
           onPress: handleRequestCallback,
           loading: loading,
         }}
@@ -215,33 +256,70 @@ export function SimpleCallbackRequestButton({
           onPress: () => setShowConfirmModal(false),
         }}
       >
-        <View style={{ gap: theme.spacing.lg, alignItems: 'center', paddingVertical: theme.spacing.md }}>
-          <PhoneCall size={48} color={theme.colors.primary} />
-          
-          <View style={{ alignItems: 'center', gap: theme.spacing.sm }}>
-            <Text variant="h4" style={{ textAlign: 'center' }}>
+        <View style={{ gap: theme.spacing.md, alignItems: 'center' }}>
+
+          {/* Callback Info */}
+          <View style={{ alignItems: 'center', gap: theme.spacing.xs }}>
+            <PhoneCall size={40} color={theme.colors.primary} />
+            <Text variant="body" style={{ textAlign: 'center' }}>
               Want {sellerName} to call you back?
-            </Text>
-            <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
-              About: {listingTitle}
             </Text>
           </View>
 
+           {/* Listing Card */}
+            <View
+             style={{
+               flexDirection: 'row',
+               backgroundColor: theme.colors.surfaceVariant,
+               borderRadius: theme.borderRadius.md,
+               padding: theme.spacing.sm,
+               gap: theme.spacing.sm,
+               alignItems: 'center',
+               alignSelf: 'center',
+             }}
+           >
+            {listingImage && (
+              <Image
+                source={{ uri: listingImage }}
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: theme.borderRadius.lg,
+                }}
+                resizeMode="cover"
+              />
+            )}
+            <View style={{ justifyContent: 'center', gap: 4 }}>
+              <Text variant="bodySmall" numberOfLines={2} style={{ fontWeight: '600' }}>
+                {listingTitle}
+              </Text>
+              {listingPrice !== undefined && (
+                <Text variant="bodySmall" style={{ fontWeight: '700', color: theme.colors.primary }}>
+                  {listingCurrency} {listingPrice.toLocaleString()}
+                </Text>
+              )}
+            </View>
+          </View>
+
+          {/* Phone Number */}
           <View
             style={{
               backgroundColor: theme.colors.surfaceVariant,
               borderRadius: theme.borderRadius.md,
-              padding: theme.spacing.md,
+              padding: theme.spacing.sm,
               width: '100%',
             }}
           >
             <Text variant="bodySmall" color="secondary" style={{ textAlign: 'center' }}>
-              {sellerName} will call you at: {user?.phone || 'your phone number'}
+              {sellerName} will call you back on:{' '}
+              <Text variant="bodySmall" style={{ fontWeight: '700' }}>
+                {userPhone || 'your phone number'}
+              </Text>
             </Text>
           </View>
 
           <Text variant="caption" color="muted" style={{ textAlign: 'center' }}>
-            You can only request one callback per listing per day
+            One callback per listing per day
           </Text>
         </View>
       </AppModal>

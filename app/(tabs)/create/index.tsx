@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, Component, ErrorInfo, ReactNode } from 'react';
 import { View, ScrollView, Alert, Pressable, BackHandler, Image, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -50,6 +50,7 @@ import {
 import { router } from 'expo-router';
 import { findCategoryById as findCategoryByIdUtil, DbCategory } from '@/utils/categoryUtils';
 import { networkUtils } from '@/utils/networkUtils';
+import { reputationService } from '@/lib/reputationService';
 
 
 
@@ -61,17 +62,12 @@ interface ListingFormData {
   title: string;
   description: string;
   
-  // Category (Step 3)
+  // Category & Details (Step 2)
   categoryId: string;
   categoryAttributes: Record<string, string | string[]>;
-  
-  // Details (Step 4)
-  condition: string;
   price: string;
   quantity: number;
   acceptOffers: boolean;
-  
-  // Location (Step 5)
   location: string;
 }
 
@@ -107,15 +103,7 @@ const STEPS = [
   },
 ] as const;
 
-const CONDITIONS = [
-  { value: 'new', label: 'Brand New', description: 'Never used, in original packaging' },
-  { value: 'like_new', label: 'Like New', description: 'Barely used, excellent condition' },
-  { value: 'good', label: 'Good', description: 'Used but well maintained' },
-  { value: 'fair', label: 'Fair', description: 'Shows wear but fully functional' },
-  { value: 'poor', label: 'Poor', description: 'Significant wear, may need repairs' },
-];
-
-export default function CreateListingScreen() {
+function CreateListingScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
   const { balance, getMaxListings, spendCredits, hasUnlimitedListings, refreshCredits, hasBusinessPlan } = useMonetizationStore();
@@ -128,7 +116,6 @@ export default function CreateListingScreen() {
     description: '',
     categoryId: '',
     categoryAttributes: {},
-    condition: 'good', // Default to valid condition
     price: '',
     quantity: 1,
     acceptOffers: true,
@@ -152,8 +139,10 @@ export default function CreateListingScreen() {
   const [isValidating, setIsValidating] = useState(false);
   
   // Performance optimization refs
+  const isMountedRef = useRef(true); // Track if component is mounted
   const debouncedValidator = useRef(createDebouncedValidator(300));
   const formDataRef = useRef(formData);
+  const lastSavedDataRef = useRef<string>(''); // Track last saved data to avoid redundant saves
   
   // Autosave state
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -162,6 +151,20 @@ export default function CreateListingScreen() {
   const [hasShownDraftAlert, setHasShownDraftAlert] = useState(false);
   const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const AUTOSAVE_KEY = useMemo(() => `listing_draft_${user?.id || 'anonymous'}`, [user?.id]);
+  const [selectedCategory, setSelectedCategory] = useState<DbCategory | null>(null);
+  
+  // Cleanup on unmount to prevent memory leaks and state updates after unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      // Clear autosave timeout on unmount
+      if (autosaveTimeoutRef.current) {
+        clearTimeout(autosaveTimeoutRef.current);
+        autosaveTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   // Feature selection handler
   const handleFeaturesSelected = useCallback((features: SelectedFeature[]) => {
@@ -240,18 +243,28 @@ export default function CreateListingScreen() {
 
   // Save draft to AsyncStorage and database
   const saveDraft = useCallback(async (data: ListingFormData, isManualSave = false) => {
+    // Don't save if component is unmounted
+    if (!isMountedRef.current) return;
+    
     try {
-      setIsAutoSaving(true);
+      // Check if data actually changed to avoid redundant saves
+      const currentDataString = JSON.stringify(data);
+      if (!isManualSave && currentDataString === lastSavedDataRef.current) {
+        return; // Skip save if nothing changed
+      }
       
-      console.log('💾 Saving draft - currentDraftId:', currentDraftId, 'isManualSave:', isManualSave);
+      if (!isMountedRef.current) return; // Double check before state update
+      setIsAutoSaving(true);
       
       // Save to AsyncStorage for local persistence
       await AsyncStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
+      lastSavedDataRef.current = currentDataString;
       
-      // Only save to database if we have meaningful content
-      if (data.title?.trim() || data.description?.trim() || data.images?.length > 0) {
+      // Only save to database if we have meaningful content AND a category is selected
+      // category_id is required in the database, so we can't save without it
+      if ((data.title?.trim() || data.description?.trim() || data.images?.length > 0) && data.categoryId) {
         // CategoryId from CategoryPicker is already a valid UUID
-        const categoryUUID = data.categoryId || null;
+        const categoryUUID = data.categoryId;
 
         const draftData: any = {
           user_id: user!.id,
@@ -260,11 +273,12 @@ export default function CreateListingScreen() {
           price: data.price ? Number(data.price) : 0,
           currency: 'GHS',
           category_id: categoryUUID,
-          condition: data.condition || 'good',
+          condition: 'good', // Default condition to satisfy NOT NULL constraint
           quantity: data.quantity || 1,
           location: data.location || '',
           images: data.images?.map(img => img.uri) || [],
           accept_offers: data.acceptOffers || true,
+          attributes: data.categoryAttributes || {},
           status: 'draft'
         };
         
@@ -275,86 +289,61 @@ export default function CreateListingScreen() {
 
         // Check if we already have a draft for this session
         if (currentDraftId) {
-          console.log('Attempting to update existing draft with minimal fields to avoid trigger issues');
-          
-          // Try updating only the essential fields that shouldn't trigger the problematic function
-          const minimalUpdateData = {
+          // Update existing draft with minimal fields
+          const updateData = {
             title: draftData.title,
             description: draftData.description,
             price: draftData.price,
             location: draftData.location,
             images: draftData.images,
+            attributes: draftData.attributes,
             updated_at: new Date().toISOString()
           };
           
-          const { error: updateError } = await supabase
+          const { error } = await supabase
             .from('listings')
-            .update(minimalUpdateData)
+            .update(updateData)
             .eq('id', currentDraftId);
 
-          if (updateError) {
-            console.log('Minimal update failed, trying alternative approach:', updateError.message);
-            
-            // If minimal update fails, try updating without the problematic fields
-            const { error: simpleUpdateError } = await supabase
+          if (error) {
+            // If update fails, create new draft
+            const { data: newDraft, error: insertError } = await supabase
               .from('listings')
-              .update({
-                title: draftData.title,
-                description: draftData.description,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', currentDraftId);
-              
-            if (simpleUpdateError) {
-              console.log('Simple update also failed, creating new draft:', simpleUpdateError.message);
-              
-              // Last resort: create new draft and let the old one exist
-              const { data: newDraft, error: insertError } = await supabase
-                .from('listings')
-                .insert(draftData)
-                .select('id')
-                .single();
+              .insert(draftData)
+              .select('id')
+              .single();
 
-              if (insertError) {
-                console.error('Failed to create new draft:', insertError);
-              } else if (newDraft) {
-                console.log('Created new draft with ID:', newDraft.id, '(keeping old:', currentDraftId, ')');
-                setCurrentDraftId(newDraft.id);
-              }
-            } else {
-              console.log('Simple update succeeded, keeping same draft ID:', currentDraftId);
+            if (!insertError && newDraft) {
+              setCurrentDraftId(newDraft.id);
             }
-          } else {
-            console.log('Minimal update succeeded, keeping same draft ID:', currentDraftId);
           }
         } else {
-          // Create new draft only if none exists
-          console.log('Creating new draft (no existing draft found)');
+          // Create new draft
           const { data: newDraft, error } = await supabase
             .from('listings')
             .insert(draftData)
             .select('id')
             .single();
 
-          if (error) {
-            console.error('Failed to create draft:', error);
-          } else if (newDraft) {
-            console.log('Created new draft with ID:', newDraft.id);
+          if (!error && newDraft) {
             setCurrentDraftId(newDraft.id);
           }
         }
       }
       
+      if (!isMountedRef.current) return; // Check before state updates
       setHasUnsavedChanges(false);
       
       // Show success message only for manual saves
-      if (isManualSave) {
+      if (isManualSave && isMountedRef.current) {
         Alert.alert('Draft Saved', 'Your listing has been saved as a draft. You can continue editing it later from My Listings.');
       }
     } catch (error) {
       console.error('Failed to save draft:', error);
     } finally {
-      setIsAutoSaving(false);
+      if (isMountedRef.current) {
+        setIsAutoSaving(false);
+      }
     }
   }, [AUTOSAVE_KEY, user, currentDraftId]);
 
@@ -383,12 +372,11 @@ export default function CreateListingScreen() {
         description: '',
         price: '',
         categoryId: '',
-        condition: '',
+        categoryAttributes: {},
         quantity: 1,
         location: '',
         images: [],
         acceptOffers: true,
-        categoryAttributes: {},
       });
       
       // Reset stepper to first step
@@ -518,61 +506,88 @@ export default function CreateListingScreen() {
   };
 
   const createListing = async () => {
+    if (!isMountedRef.current) return;
     setLoading(true);
+    
     try {
-      // All connectivity and storage tests passed
-
+      // Validate user is authenticated
+      if (!user?.id) {
+        throw new Error('You must be signed in to create a listing');
+      }
       
-      // Check network connectivity first
+      // Validate form data
+      if (!formData.title?.trim()) {
+        throw new Error('Please enter a title for your listing');
+      }
+      
+      if (!formData.categoryId) {
+        throw new Error('Please select a category');
+      }
+      
+      if (!formData.price || Number(formData.price) <= 0) {
+        throw new Error('Please enter a valid price');
+      }
+      
+      // Check network connectivity first (with lenient timeout handling)
       console.log('Checking network connectivity...');
-      const networkStatus = await networkUtils.checkNetworkStatus();
-      
-      if (!networkStatus.isConnected) {
-        throw new Error('No internet connection. Please check your network and try again.');
+      try {
+        const networkStatus = await networkUtils.checkNetworkStatus();
+        
+        if (!networkStatus.isConnected) {
+          throw new Error('No internet connection. Please check your network and try again.');
+        }
+        
+        // Don't fail if Supabase check times out - we'll try the actual operation anyway
+        if (!networkStatus.canReachSupabase) {
+          console.warn('Supabase connectivity check failed, but proceeding anyway:', networkStatus.error);
+        }
+        
+        console.log('Network connectivity check passed');
+      } catch (networkError) {
+        // If network check itself fails, log but continue
+        console.warn('Network check failed, proceeding anyway:', networkError);
       }
       
-      if (!networkStatus.canReachSupabase) {
-        throw new Error(networkStatus.error || 'Cannot connect to server. Please try again.');
-      }
-      
-      // Test storage connection
-      const storageConnected = await networkUtils.testStorageConnection();
-      if (!storageConnected) {
-        throw new Error('Cannot connect to image storage. Please try again.');
-      }
-      
-      const bucketAccessible = await networkUtils.checkStorageBucket('listing-images');
-      if (!bucketAccessible) {
-        throw new Error('Image storage is not accessible. Please try again later.');
-      }
-      
-      // Skip bucket testing - just try to upload directly
-      // The RLS policies are set up, so authenticated users should be able to upload
-      console.log('Proceeding with image upload (RLS policies should allow authenticated users)...');
-
-      // Storage connectivity verified
-      
-      console.log('All connectivity and storage tests passed');
+      // Skip detailed storage checks - they're too slow and cause timeouts
+      // Just proceed with upload - if it fails, we'll get a proper error
+      console.log('Proceeding with image upload...');
       
       // Upload images first with progress tracking
       let imageUrls: string[] = [];
-      if (formData.images.length > 0) {
+      if (formData.images && formData.images.length > 0) {
         console.log(`Starting upload of ${formData.images.length} images`);
-        setUploadProgress(0);
+        if (isMountedRef.current) setUploadProgress(0);
         
         try {
+          // Validate images before upload
+          const validImages = formData.images.filter(img => img && img.uri);
+          if (validImages.length === 0) {
+            throw new Error('No valid images to upload');
+          }
+          
           // Use the updated storage helper with proper bucket
-          const imageUris = formData.images.map(img => img.uri);
+          const imageUris = validImages.map(img => img.uri);
           const uploadResults = await storageHelpers.uploadMultipleImages(
             imageUris,
             STORAGE_BUCKETS.LISTINGS,
             'listing', // folder name
             user!.id,
-            (progress) => setUploadProgress(progress)
+            (progress) => {
+              if (isMountedRef.current) setUploadProgress(progress);
+            }
           );
           
-          imageUrls = uploadResults.map(result => result.url);
-          console.log('All images uploaded successfully using simple method');
+          // Validate upload results
+          if (!uploadResults || uploadResults.length === 0) {
+            throw new Error('Image upload failed - no results returned');
+          }
+          
+          imageUrls = uploadResults.map(result => result.url).filter(url => url);
+          if (imageUrls.length === 0) {
+            throw new Error('Image upload failed - no valid URLs returned');
+          }
+          
+          console.log('All images uploaded successfully');
         } catch (uploadError) {
           console.error('Image upload failed:', uploadError);
           throw new Error(`Failed to upload images: ${uploadError instanceof Error ? uploadError.message : 'Unknown error'}`);
@@ -588,243 +603,6 @@ export default function CreateListingScreen() {
       // Create listing with optimized data including category attributes
       // CategoryId from CategoryPicker is already a valid UUID, no mapping needed
       const categoryUUID = formData.categoryId;
-      
-      /* OLD HARDCODED MAPPING - NO LONGER NEEDED
-      const categoryMapping: Record<string, string> = {
-        // Main categories
-        'electronics': '00000000-0000-4000-8000-000000000001',
-        'fashion': '00000000-0000-4000-8000-000000000002',
-        'vehicles': '00000000-0000-4000-8000-000000000003',
-        'home-garden': '00000000-0000-4000-8000-000000000004',
-        'health-sports': '00000000-0000-4000-8000-000000000005',
-        'business': '00000000-0000-4000-8000-000000000006',
-        'education': '00000000-0000-4000-8000-000000000007',
-        'entertainment': '00000000-0000-4000-8000-000000000008',
-        'food': '00000000-0000-4000-8000-000000000009',
-        'services': '00000000-0000-4000-8000-000000000010',
-        'general': '00000000-0000-4000-8000-000000000000',
-        
-        // Electronics subcategories
-        'smartphones': '00000000-0000-4000-8000-000000000001',
-        'laptops': '00000000-0000-4000-8000-000000000001',
-        'gaming-consoles': '00000000-0000-4000-8000-000000000001',
-        'audio-video': '00000000-0000-4000-8000-000000000001',
-        'computers': '00000000-0000-4000-8000-000000000001',
-        'cameras': '00000000-0000-4000-8000-000000000001',
-        'accessories': '00000000-0000-4000-8000-000000000001',
-        
-        // Electronics detailed subcategories
-        'phones-tablets': '00000000-0000-4000-8000-000000000001',
-        'feature-phones': '00000000-0000-4000-8000-000000000001',
-        'tablets': '00000000-0000-4000-8000-000000000001',
-        'phone-accessories': '00000000-0000-4000-8000-000000000001',
-        'smartwatches': '00000000-0000-4000-8000-000000000001',
-        'desktops': '00000000-0000-4000-8000-000000000001',
-        'computer-accessories': '00000000-0000-4000-8000-000000000001',
-        'software': '00000000-0000-4000-8000-000000000001',
-        'headphones-earphones': '00000000-0000-4000-8000-000000000001',
-        'speakers': '00000000-0000-4000-8000-000000000001',
-        'tv-monitors': '00000000-0000-4000-8000-000000000001',
-        'video-games': '00000000-0000-4000-8000-000000000001',
-        'gaming-accessories': '00000000-0000-4000-8000-000000000001',
-        'kitchen-appliances': '00000000-0000-4000-8000-000000000001',
-        'cleaning-appliances': '00000000-0000-4000-8000-000000000001',
-        'air-conditioning': '00000000-0000-4000-8000-000000000001',
-        
-        // Fashion subcategories
-        'clothing': '00000000-0000-4000-8000-000000000002',
-        'shoes': '00000000-0000-4000-8000-000000000002',
-        'bags': '00000000-0000-4000-8000-000000000002',
-        'jewelry': '00000000-0000-4000-8000-000000000002',
-        'watches': '00000000-0000-4000-8000-000000000002',
-        
-        // Fashion detailed subcategories
-        'mens-fashion': '00000000-0000-4000-8000-000000000002',
-        'womens-fashion': '00000000-0000-4000-8000-000000000002',
-        'kids-fashion': '00000000-0000-4000-8000-000000000002',
-        'mens-clothing': '00000000-0000-4000-8000-000000000002',
-        'womens-clothing': '00000000-0000-4000-8000-000000000002',
-        'boys-clothing': '00000000-0000-4000-8000-000000000002',
-        'girls-clothing': '00000000-0000-4000-8000-000000000002',
-        'mens-shoes': '00000000-0000-4000-8000-000000000002',
-        'womens-shoes': '00000000-0000-4000-8000-000000000002',
-        'kids-shoes': '00000000-0000-4000-8000-000000000002',
-        'mens-accessories': '00000000-0000-4000-8000-000000000002',
-        'womens-accessories': '00000000-0000-4000-8000-000000000002',
-        'bags-handbags': '00000000-0000-4000-8000-000000000002',
-        
-        // Vehicles subcategories
-        'cars': '00000000-0000-4000-8000-000000000003',
-        'motorcycles': '00000000-0000-4000-8000-000000000003',
-        'bicycles': '00000000-0000-4000-8000-000000000003',
-        'parts': '00000000-0000-4000-8000-000000000003',
-        
-        // Vehicles detailed subcategories
-        'sedans': '00000000-0000-4000-8000-000000000003',
-        'suvs': '00000000-0000-4000-8000-000000000003',
-        'hatchbacks': '00000000-0000-4000-8000-000000000003',
-        'luxury-cars': '00000000-0000-4000-8000-000000000003',
-        'sport-bikes': '00000000-0000-4000-8000-000000000003',
-        'cruiser-bikes': '00000000-0000-4000-8000-000000000003',
-        'scooters': '00000000-0000-4000-8000-000000000003',
-        'auto-parts': '00000000-0000-4000-8000-000000000003',
-        'car-parts': '00000000-0000-4000-8000-000000000003',
-        'car-accessories': '00000000-0000-4000-8000-000000000003',
-        'tires-wheels': '00000000-0000-4000-8000-000000000003',
-        
-        // Home & Garden subcategories
-        'furniture': '00000000-0000-4000-8000-000000000004',
-        'appliances': '00000000-0000-4000-8000-000000000004',
-        'decor': '00000000-0000-4000-8000-000000000004',
-        'garden': '00000000-0000-4000-8000-000000000004',
-        'tools': '00000000-0000-4000-8000-000000000004',
-        
-        // Home & Garden detailed subcategories
-        'home-decor': '00000000-0000-4000-8000-000000000004',
-        'wall-art': '00000000-0000-4000-8000-000000000004',
-        'lighting': '00000000-0000-4000-8000-000000000004',
-        'rugs-carpets': '00000000-0000-4000-8000-000000000004',
-        'plants': '00000000-0000-4000-8000-000000000004',
-        'garden-tools': '00000000-0000-4000-8000-000000000004',
-        'outdoor-furniture': '00000000-0000-4000-8000-000000000004',
-        
-        // Furniture subcategories (missing ones that were causing the error)
-        'living-room': '00000000-0000-4000-8000-000000000004',
-        'bedroom': '00000000-0000-4000-8000-000000000004',
-        'dining-room': '00000000-0000-4000-8000-000000000004',
-        'office-furniture': '00000000-0000-4000-8000-000000000004',
-        'kitchen-furniture': '00000000-0000-4000-8000-000000000004',
-        
-        // Health & Sports subcategories
-        'fitness': '00000000-0000-4000-8000-000000000005',
-        'sports': '00000000-0000-4000-8000-000000000005',
-        'health': '00000000-0000-4000-8000-000000000005',
-        'outdoor': '00000000-0000-4000-8000-000000000005',
-        
-        // Sports & Fitness detailed subcategories
-        'sports-fitness': '00000000-0000-4000-8000-000000000005',
-        'fitness-equipment': '00000000-0000-4000-8000-000000000005',
-        'sports-equipment': '00000000-0000-4000-8000-000000000005',
-        'weights': '00000000-0000-4000-8000-000000000005',
-        'cardio-equipment': '00000000-0000-4000-8000-000000000005',
-        'yoga-pilates': '00000000-0000-4000-8000-000000000005',
-        'football': '00000000-0000-4000-8000-000000000005',
-        'basketball': '00000000-0000-4000-8000-000000000005',
-        'tennis': '00000000-0000-4000-8000-000000000005',
-        
-        // Business subcategories
-        'office': '00000000-0000-4000-8000-000000000006',
-        'industrial': '00000000-0000-4000-8000-000000000006',
-        'agriculture': '00000000-0000-4000-8000-000000000006',
-        
-        // Business & Industrial detailed subcategories
-        'business-industrial': '00000000-0000-4000-8000-000000000006',
-        'office-equipment': '00000000-0000-4000-8000-000000000006',
-        'industrial-equipment': '00000000-0000-4000-8000-000000000006',
-        'restaurant-equipment': '00000000-0000-4000-8000-000000000006',
-        'printers-scanners': '00000000-0000-4000-8000-000000000006',
-        'office-supplies': '00000000-0000-4000-8000-000000000006',
-        
-        // Education subcategories
-        'books': '00000000-0000-4000-8000-000000000007',
-        'supplies': '00000000-0000-4000-8000-000000000007',
-        'instruments': '00000000-0000-4000-8000-000000000007',
-        
-        // Books & Media detailed subcategories
-        'books-media': '00000000-0000-4000-8000-000000000007',
-        'textbooks': '00000000-0000-4000-8000-000000000007',
-        'fiction': '00000000-0000-4000-8000-000000000007',
-        'non-fiction': '00000000-0000-4000-8000-000000000007',
-        'media': '00000000-0000-4000-8000-000000000007',
-        'movies': '00000000-0000-4000-8000-000000000007',
-        'music': '00000000-0000-4000-8000-000000000007',
-        
-        // Entertainment subcategories
-        'games': '00000000-0000-4000-8000-000000000008',
-        
-        // Art & Crafts detailed subcategories
-        'art-crafts': '00000000-0000-4000-8000-000000000008',
-        'artwork': '00000000-0000-4000-8000-000000000008',
-        'craft-supplies': '00000000-0000-4000-8000-000000000008',
-        'handmade-items': '00000000-0000-4000-8000-000000000008',
-        
-        // Tickets & Events detailed subcategories
-        'tickets-events': '00000000-0000-4000-8000-000000000008',
-        'event-tickets': '00000000-0000-4000-8000-000000000008',
-        'gift-vouchers': '00000000-0000-4000-8000-000000000008',
-        'concerts': '00000000-0000-4000-8000-000000000008',
-        'sports-tickets': '00000000-0000-4000-8000-000000000008',
-        'theater-shows': '00000000-0000-4000-8000-000000000008',
-        
-        // Food subcategories
-        'groceries': '00000000-0000-4000-8000-000000000009',
-        'restaurant': '00000000-0000-4000-8000-000000000009',
-        'catering': '00000000-0000-4000-8000-000000000009',
-        
-        // Food & Beverages detailed subcategories
-        'food-beverages': '00000000-0000-4000-8000-000000000009',
-        'local-food': '00000000-0000-4000-8000-000000000009',
-        'beverages': '00000000-0000-4000-8000-000000000009',
-        'specialty-foods': '00000000-0000-4000-8000-000000000009',
-        
-        // Services subcategories
-        'professional': '00000000-0000-4000-8000-000000000010',
-        'personal': '00000000-0000-4000-8000-000000000010',
-        'maintenance': '00000000-0000-4000-8000-000000000010',
-        'transport': '00000000-0000-4000-8000-000000000010',
-        
-        // Services detailed subcategories
-        'professional-services': '00000000-0000-4000-8000-000000000010',
-        'home-services': '00000000-0000-4000-8000-000000000010',
-        'consulting': '00000000-0000-4000-8000-000000000010',
-        'legal': '00000000-0000-4000-8000-000000000010',
-        'accounting': '00000000-0000-4000-8000-000000000010',
-        'cleaning': '00000000-0000-4000-8000-000000000010',
-        'repairs': '00000000-0000-4000-8000-000000000010',
-        'gardening-services': '00000000-0000-4000-8000-000000000010',
-        
-        // Baby & Kids detailed subcategories
-        'baby-kids': '00000000-0000-4000-8000-000000000010',
-        'baby-gear': '00000000-0000-4000-8000-000000000010',
-        'toys-games': '00000000-0000-4000-8000-000000000010',
-        'strollers': '00000000-0000-4000-8000-000000000010',
-        'baby-furniture': '00000000-0000-4000-8000-000000000010',
-        'feeding': '00000000-0000-4000-8000-000000000010',
-        'educational-toys': '00000000-0000-4000-8000-000000000010',
-        'outdoor-toys': '00000000-0000-4000-8000-000000000010',
-        'board-games': '00000000-0000-4000-8000-000000000010',
-        
-        // Beauty & Health detailed subcategories
-        'beauty-health': '00000000-0000-4000-8000-000000000010',
-        'skincare': '00000000-0000-4000-8000-000000000010',
-        'health-wellness': '00000000-0000-4000-8000-000000000010',
-        'makeup': '00000000-0000-4000-8000-000000000010',
-        'skincare-products': '00000000-0000-4000-8000-000000000010',
-        'fragrances': '00000000-0000-4000-8000-000000000010',
-        'supplements': '00000000-0000-4000-8000-000000000010',
-        'medical-devices': '00000000-0000-4000-8000-000000000010',
-        
-        // Pets & Animals detailed subcategories
-        'pets-animals': '00000000-0000-4000-8000-000000000010',
-        'pet-supplies': '00000000-0000-4000-8000-000000000010',
-        'pets-for-sale': '00000000-0000-4000-8000-000000000010',
-        'dog-supplies': '00000000-0000-4000-8000-000000000010',
-        'cat-supplies': '00000000-0000-4000-8000-000000000010',
-        'pet-food': '00000000-0000-4000-8000-000000000010',
-        'dogs': '00000000-0000-4000-8000-000000000010',
-        'cats': '00000000-0000-4000-8000-000000000010',
-        'birds': '00000000-0000-4000-8000-000000000010',
-        'fish-aquarium': '00000000-0000-4000-8000-000000000010',
-        
-        // Other detailed subcategories
-        'other': '00000000-0000-4000-8000-000000000000',
-        'lost-found': '00000000-0000-4000-8000-000000000000',
-        'miscellaneous': '00000000-0000-4000-8000-000000000000',
-        'coins-stamps': '00000000-0000-4000-8000-000000000000',
-        'vintage-items': '00000000-0000-4000-8000-000000000000',
-        'memorabilia': '00000000-0000-4000-8000-000000000000',
-      };
-      */
       
       const listingData = {
         user_id: user!.id,
@@ -881,21 +659,36 @@ export default function CreateListingScreen() {
 
       // Content moderation check
       console.log('Running content moderation...');
-      const moderationResult = await contentModerationService.moderateContent({
-        id: 'temp-listing-id', // Temporary ID for moderation
-        type: 'listing',
-        content: `${listingData.title}\n\n${listingData.description}`,
-        images: imageUrls,
-        userId: user!.id,
-        metadata: {
-          category: formData.categoryId,
-          price: listingData.price,
-          location: listingData.location,
-        },
-      });
+      let moderationResult;
+      try {
+        moderationResult = await contentModerationService.moderateContent({
+          id: 'temp-listing-id', // Temporary ID for moderation
+          type: 'listing',
+          content: `${listingData.title}\n\n${listingData.description}`,
+          images: imageUrls,
+          userId: user!.id,
+          metadata: {
+            category: formData.categoryId,
+            price: listingData.price,
+            location: listingData.location,
+          },
+        });
+      } catch (moderationError) {
+        console.error('Content moderation failed:', moderationError);
+        // If moderation fails due to a system error, reject the content to be safe
+        setLoading(false);
+        Alert.alert(
+          'Moderation Error',
+          'Unable to verify content at this time. Please try again or contact support if the issue persists.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
 
       // Handle moderation results
       if (!moderationResult.isApproved) {
+        setLoading(false);
+        
         if (moderationResult.requiresManualReview) {
           Alert.alert(
             'Content Under Review',
@@ -905,21 +698,45 @@ export default function CreateListingScreen() {
           // Set status to pending for manual review
           listingData.status = 'pending';
         } else {
-          // Content was rejected
-          const flagReasons = moderationResult.flags.map(flag => flag.details).join(', ');
+          // Content was rejected/flagged - extract the specific violations
+          const flagTypes = moderationResult.flags.map(flag => flag.type).join(', ');
+          const flagReasons = moderationResult.flags
+            .map(flag => {
+              // Make the error message more user-friendly
+              if (flag.type === 'profanity') {
+                return 'Inappropriate language detected';
+              } else if (flag.type === 'personal_info') {
+                return 'Personal information detected (phone/email/address)';
+              } else if (flag.type === 'spam') {
+                return 'Spam-like content detected';
+              } else if (flag.type === 'inappropriate') {
+                return 'Inappropriate content detected';
+              } else if (flag.type === 'suspicious_links') {
+                return 'Suspicious links detected';
+              }
+              return flag.details;
+            })
+            .join('\n• ');
+          
           Alert.alert(
             'Content Policy Violation',
-            `Your listing cannot be published due to: ${flagReasons}. Please review and modify your content.`,
+            `Your listing cannot be published:\n\n• ${flagReasons}\n\nPlease review and modify your content.`,
             [{ text: 'OK' }]
           );
-          setLoading(false);
           return;
         }
       }
 
       const { data: listing, error: listingError } = await dbHelpers.createListing(listingData);
 
-      if (listingError) throw listingError;
+      if (listingError) {
+        console.error('Database error creating listing:', listingError);
+        throw new Error(listingError.message || 'Failed to create listing in database');
+      }
+      
+      if (!listing || !listing.id) {
+        throw new Error('Listing was created but no data was returned');
+      }
 
       // Apply selected features to the newly created listing
       if (selectedFeatures.length > 0 && listing) {
@@ -950,64 +767,84 @@ export default function CreateListingScreen() {
         }
       }
       
+      // Award reputation points for listing creation
+      try {
+        await reputationService.awardPoints(user!.id, 'listing_created', listing.id);
+        console.log('Reputation points awarded for listing creation');
+      } catch (repError) {
+        console.error('Failed to award reputation points:', repError);
+        // Don't fail listing creation if reputation update fails
+      }
+      
       // Clear draft after successful creation
       await clearDraft();
       
+      if (!isMountedRef.current) return;
       setShowSuccess(true);
       
       // Reset form after success
       setTimeout(() => {
+        if (!isMountedRef.current) return; // Don't navigate if unmounted
+        
         try {
           // Check if router is available before navigating
           if (router && typeof router.replace === 'function') {
             router.replace('/(tabs)/home');
           } else {
             console.log('Router not available, just resetting form');
+            if (isMountedRef.current) {
+              setFormData({
+                images: [],
+                title: '',
+                description: '',
+                categoryId: '',
+                categoryAttributes: {},
+                price: '',
+                quantity: 1,
+                acceptOffers: true,
+                location: '',
+              });
+              setSelectedFeatures([]);
+              setCurrentStep(0);
+            }
+          }
+        } catch (navError) {
+          console.log('Navigation error (safe to ignore):', navError);
+          // Fallback: just reset the form without navigation
+          if (isMountedRef.current) {
             setFormData({
               images: [],
               title: '',
               description: '',
               categoryId: '',
               categoryAttributes: {},
-              condition: 'good',
               price: '',
               quantity: 1,
               acceptOffers: true,
               location: '',
             });
-            setSelectedFeatures([]);
             setCurrentStep(0);
           }
-        } catch (navError) {
-          console.log('Navigation error (safe to ignore):', navError);
-          // Fallback: just reset the form without navigation
-          setFormData({
-            images: [],
-            title: '',
-            description: '',
-            categoryId: '',
-            categoryAttributes: {},
-            condition: 'good',
-            price: '',
-            quantity: 1,
-            acceptOffers: true,
-            location: '',
-          });
-          setCurrentStep(0);
         }
       }, 2000);
     } catch (error: any) {
       console.error('Listing creation error:', error);
+      console.error('Error stack:', error?.stack);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      
+      if (!isMountedRef.current) return; // Don't show alerts if unmounted
       
       let errorMessage = 'Failed to create listing. Please try again.';
       
       if (error instanceof Error) {
         if (error.message.includes('Network request failed')) {
           errorMessage = 'Network connection failed. Please check your internet connection and try again.';
-        } else if (error.message.includes('Upload failed')) {
+        } else if (error.message.includes('Upload failed') || error.message.includes('Image upload failed')) {
           errorMessage = 'Failed to upload images. Please check your internet connection and try again.';
-        } else if (error.message.includes('No authenticated session')) {
+        } else if (error.message.includes('No authenticated session') || error.message.includes('signed in')) {
           errorMessage = 'Your session has expired. Please sign in again.';
+        } else if (error.message.includes('title') || error.message.includes('category') || error.message.includes('price')) {
+          errorMessage = error.message; // Show validation errors directly
         } else {
           errorMessage = error.message;
         }
@@ -1021,6 +858,7 @@ export default function CreateListingScreen() {
           { 
             text: 'Retry', 
             onPress: () => {
+              if (!isMountedRef.current) return;
               // Reset progress and retry
               setUploadProgress(0);
               createListing();
@@ -1029,8 +867,10 @@ export default function CreateListingScreen() {
         ]
       );
     } finally {
-      setLoading(false);
-      setUploadProgress(0);
+      if (isMountedRef.current) {
+        setLoading(false);
+        setUploadProgress(0);
+      }
     }
   };
 
@@ -1069,8 +909,6 @@ export default function CreateListingScreen() {
       Alert.alert('Error', 'Failed to process payment');
     }
   };
-
-  const [selectedCategory, setSelectedCategory] = useState<DbCategory | null>(null);
 
   // Fetch selected category details
   useEffect(() => {
@@ -1146,15 +984,12 @@ export default function CreateListingScreen() {
       
       {/* Photos Section */}
       <View>
-        <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
-          Photos
-        </Text>
-        
         <CustomImagePicker
           limit={8}
           value={formData.images}
           onChange={handleImagesChange}
           disabled={loading}
+          title="Upload Images"
         />
         
         {loading && uploadProgress > 0 && (
@@ -2086,5 +1921,79 @@ export default function CreateListingScreen() {
       />
 
     </SafeAreaWrapper>
+  );
+}
+
+// Error Boundary Component
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class CreateListingErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('CreateListing Error Boundary caught an error:', error);
+    console.error('Error info:', errorInfo);
+    console.error('Component stack:', errorInfo.componentStack);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <SafeAreaWrapper>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+            <Text variant="h3" style={{ marginBottom: 16, textAlign: 'center' }}>
+              Something went wrong
+            </Text>
+            <Text variant="body" color="secondary" style={{ marginBottom: 24, textAlign: 'center' }}>
+              We encountered an error while creating your listing. Please try again.
+            </Text>
+            <Text variant="bodySmall" color="secondary" style={{ marginBottom: 24, textAlign: 'center', fontFamily: 'monospace' }}>
+              {this.state.error?.message}
+            </Text>
+            <Button
+              variant="primary"
+              onPress={() => {
+                this.setState({ hasError: false, error: null });
+                router.replace('/(tabs)/create');
+              }}
+            >
+              Try Again
+            </Button>
+            <Button
+              variant="secondary"
+              onPress={() => router.replace('/(tabs)/home')}
+              style={{ marginTop: 12 }}
+            >
+              Go to Home
+            </Button>
+          </View>
+        </SafeAreaWrapper>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// Export wrapped component
+export default function CreateListingScreenWithErrorBoundary() {
+  return (
+    <CreateListingErrorBoundary>
+      <CreateListingScreen />
+    </CreateListingErrorBoundary>
   );
 }

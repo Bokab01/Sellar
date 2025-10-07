@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import * as ImageManipulator from 'expo-image-manipulator';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 export interface UploadResult {
   url: string;
@@ -201,49 +201,26 @@ export const storageHelpers = {
         // Create a file-like object from the URI
         const fileUri = manipulatedImage.uri;
         
-        // Try using FileSystem upload for React Native
+        // Use base64 upload method which is most reliable for React Native
         try {
-          console.log('Trying FileSystem upload method...');
-          
-          const { data: fsData, error: fsError } = await supabase.storage
-            .from(bucket)
-            .upload(filename, {
-              uri: fileUri,
-              type: 'image/jpeg',
-              name: filename.split('/').pop() || 'image.jpg'
-            } as any, {
-              contentType: 'image/jpeg',
-              upsert: true,
-            });
-
-          if (!fsError && fsData) {
-            console.log('FileSystem upload successful:', fsData.path);
-            
-            const { data: urlData } = supabase.storage
-              .from(bucket)
-              .getPublicUrl(fsData.path);
-
-            return {
-              url: urlData.publicUrl,
-              path: fsData.path,
-            };
-          }
-          
-          throw new Error(fsError?.message || 'FileSystem upload failed');
-        } catch (fsUploadError) {
-          console.log('FileSystem upload failed, trying alternative method...', fsUploadError);
-        }
-
-        // Alternative: Try reading file as base64 and uploading
-        try {
-          console.log('Trying base64 upload method...');
+          console.log('Reading file as base64...');
           
           const base64 = await FileSystem.readAsStringAsync(fileUri, {
             encoding: 'base64',
           });
           
+          if (!base64 || base64.length === 0) {
+            throw new Error('Failed to read image file - empty base64 data');
+          }
+          
+          console.log('Converting base64 to buffer...');
           const buffer = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
           
+          if (buffer.length === 0) {
+            throw new Error('Failed to convert image - empty buffer');
+          }
+          
+          console.log(`Uploading buffer (${buffer.length} bytes) to Supabase...`);
           const { data: b64Data, error: b64Error } = await supabase.storage
             .from(bucket)
             .upload(filename, buffer, {
@@ -251,27 +228,32 @@ export const storageHelpers = {
               upsert: true,
             });
 
-          if (!b64Error && b64Data) {
-            console.log('Base64 upload successful:', b64Data.path);
-            
-            const { data: urlData } = supabase.storage
-              .from(bucket)
-              .getPublicUrl(b64Data.path);
-
-            return {
-              url: urlData.publicUrl,
-              path: b64Data.path,
-            };
+          if (b64Error) {
+            console.error('Supabase upload error:', b64Error);
+            throw new Error(b64Error.message || 'Base64 upload failed');
           }
           
-          throw new Error(b64Error?.message || 'Base64 upload failed');
+          if (!b64Data) {
+            throw new Error('Upload succeeded but no data returned');
+          }
+          
+          console.log('Base64 upload successful:', b64Data.path);
+          
+          const { data: urlData } = supabase.storage
+            .from(bucket)
+            .getPublicUrl(b64Data.path);
+
+          return {
+            url: urlData.publicUrl,
+            path: b64Data.path,
+          };
         } catch (b64UploadError) {
-          console.log('Base64 upload failed, trying blob method...', b64UploadError);
+          console.error('Base64 upload failed:', b64UploadError);
+          // Throw the error to trigger retry logic in outer catch block
+          throw b64UploadError;
         }
 
-        // If we reach here, all direct upload methods failed
-        console.log('All direct upload methods failed, trying improved blob method...');
-        
+        /* UNREACHABLE CODE - Commented out as base64 upload either succeeds or throws
         // Improved fallback to blob method with better error handling
         try {
           // Try to read the file directly using FileSystem instead of fetch
@@ -453,6 +435,7 @@ export const storageHelpers = {
             throw new Error(`Upload failed: ${errorMessage}`);
           }
         }
+        */ // End of unreachable code
       } catch (error) {
         lastError = error as Error;
         console.error(`Upload attempt ${attempt} failed:`, error);

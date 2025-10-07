@@ -5,10 +5,12 @@ import { useRealtimeConnection } from './useRealtimeConnection';
 
 interface UseListingsOptions {
   category?: string;
+  categories?: string[];
   location?: string;
   priceMin?: number;
   priceMax?: number;
   condition?: string[];
+  attributeFilters?: Record<string, any>;
   search?: string;
   limit?: number;
   userId?: string;
@@ -134,6 +136,7 @@ export function useListings(options: UseListingsOptions = {}) {
     options.priceMax,
     options.search,
     JSON.stringify(options.condition),
+    JSON.stringify(options.categories), // Add categories to dependencies
   ]);
 
   // Cleanup timeout on unmount

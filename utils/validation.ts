@@ -242,25 +242,55 @@ export function validateName(name: string, fieldName: string = 'Name'): Validati
 
 /**
  * Phone number validation (Ghana format)
+ * Accepts formats: 0244002233, +233244002233, 0244 002 233
  */
 export function validatePhoneNumber(phone: string): ValidationResult {
   if (!phone || !phone.trim()) {
     return { isValid: true }; // Phone is optional
   }
 
-  const trimmedPhone = phone.trim().replace(/\s+/g, '');
+  // Remove all spaces, hyphens, and parentheses
+  const cleanedPhone = phone.trim().replace(/[\s\-()]/g, '');
 
-  // Ghana phone number patterns
-  const ghanaPhoneRegex = /^(\+233|0)(20|21|23|24|25|26|27|28|29|50|53|54|55|56|57|59)\d{7}$/;
-  
-  if (!ghanaPhoneRegex.test(trimmedPhone)) {
-    return { 
-      isValid: false, 
-      error: 'Please enter a valid Ghana phone number (e.g., 0241234567 or +233241234567)' 
-    };
+  // Check if it's empty after cleaning
+  if (!cleanedPhone) {
+    return { isValid: true }; // Empty after cleaning means optional
   }
 
-  return { isValid: true };
+  // Ghana phone number patterns - must be exactly 10 digits starting with 0
+  // OR 13 digits starting with +233
+  // Valid network prefixes: 20, 23, 24, 25, 26, 27, 28, 29, 50, 53, 54, 55, 56, 57, 59
+  const ghanaLocalFormat = /^0(20|23|24|25|26|27|28|29|50|53|54|55|56|57|59)\d{7}$/;
+  const ghanaInternationalFormat = /^\+233(20|23|24|25|26|27|28|29|50|53|54|55|56|57|59)\d{7}$/;
+  
+  // Check if it matches either format
+  if (!ghanaLocalFormat.test(cleanedPhone) && !ghanaInternationalFormat.test(cleanedPhone)) {
+    // Provide helpful error messages based on what they entered
+    if (cleanedPhone.length < 10) {
+      return { 
+        isValid: false, 
+        error: 'Phone number is too short. Ghana numbers are 10 digits (e.g., 0244002233)' 
+      };
+    } else if (cleanedPhone.length > 13) {
+      return { 
+        isValid: false, 
+        error: 'Phone number is too long. Ghana numbers are 10 digits (e.g., 0244002233)' 
+      };
+    } else if (!cleanedPhone.startsWith('0') && !cleanedPhone.startsWith('+233')) {
+      return { 
+        isValid: false, 
+        error: 'Ghana phone numbers must start with 0 or +233' 
+      };
+    } else {
+      return { 
+        isValid: false, 
+        error: 'Invalid network prefix. Please enter a valid Ghana phone number (e.g., 0244002233)' 
+      };
+    }
+  }
+
+  // Return the cleaned phone number
+  return { isValid: true, sanitizedValue: cleanedPhone };
 }
 
 /**

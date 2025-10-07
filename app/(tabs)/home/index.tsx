@@ -9,6 +9,7 @@ import { useListings } from '@/hooks/useListings';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { useProfile } from '@/hooks/useProfile';
 import { useMultipleListingStats } from '@/hooks/useListingStats';
+import { fetchMainCategories } from '@/utils/categoryUtils';
 import { useAppResume } from '@/hooks/useAppResume';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 // Temporarily disabled performance hooks to debug infinite re-render
@@ -23,7 +24,6 @@ import {
   SearchBar,
   Grid,
   Avatar,
-  FilterSheet,
   EmptyState,
   LoadingSkeleton,
   ProfessionalBadge,
@@ -81,8 +81,7 @@ export default function HomeScreen() {
     selectedCategories,
     setSelectedCategories,
     filters,
-    showFilters,
-    setShowFilters,
+    setFilters,
   } = useAppStore();
 
   // Temporarily disabled performance hooks to debug infinite re-render
@@ -108,6 +107,9 @@ export default function HomeScreen() {
   const [userCredit, setUserCredit] = useState<number>(0);
   const [creditLoading, setCreditLoading] = useState(true);
   
+  // Categories state
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
 
   // Category scroll indicator
   const categoryScrollRef = useRef<ScrollView>(null);
@@ -127,7 +129,7 @@ export default function HomeScreen() {
   const headerTranslateY = useRef(new Animated.Value(0)).current;
   const searchBarOpacity = useRef(new Animated.Value(0)).current;
   const searchBarTranslateY = useRef(new Animated.Value(-searchBarHeight)).current;
-  
+
   // Animated values for floating search input
   const floatingSearchTranslateY = useRef(new Animated.Value(0)).current;
   const floatingSearchOpacity = useRef(new Animated.Value(1)).current;
@@ -205,7 +207,7 @@ export default function HomeScreen() {
             ]).start();
           }
         }
-
+        
         // Determine scroll direction
         if (diff > 0 && currentScrollY > 50) {
           // Scrolling down
@@ -313,6 +315,64 @@ export default function HomeScreen() {
     }
   };
 
+  // Fetch categories on mount
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        setLoadingCategories(true);
+        const mainCategories = await fetchMainCategories();
+        
+        // Map categories with icons
+        const categoriesWithIcons = mainCategories.map((cat) => {
+          // Map icon names to actual icon components
+          let icon;
+          switch (cat.icon?.toLowerCase()) {
+            case 'smartphone':
+              icon = <Smartphone size={24} color={theme.colors.primary} />;
+              break;
+            case 'car':
+              icon = <Car size={24} color={theme.colors.primary} />;
+              break;
+            case 'home':
+            case 'house':
+              icon = <House size={24} color={theme.colors.primary} />;
+              break;
+            case 'shirt':
+              icon = <Shirt size={24} color={theme.colors.primary} />;
+              break;
+            case 'book':
+              icon = <Book size={24} color={theme.colors.primary} />;
+              break;
+            case 'dumbbell':
+              icon = <Dumbbell size={24} color={theme.colors.primary} />;
+              break;
+            case 'briefcase':
+              icon = <Briefcase size={24} color={theme.colors.primary} />;
+              break;
+            default:
+              icon = <Grid2X2 size={24} color={theme.colors.primary} />;
+          }
+          
+          return {
+            id: cat.id,
+            label: cat.name,
+            icon,
+          };
+        });
+        
+        setCategories(categoriesWithIcons);
+      } catch (error) {
+        console.error('Error loading categories:', error);
+        // Fallback to empty array
+        setCategories([]);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+    
+    loadCategories();
+  }, [theme.colors.primary]);
+
   // Fetch user credit balance and notifications on mount
   useEffect(() => {
     fetchUserCredit();
@@ -345,64 +405,20 @@ export default function HomeScreen() {
     }, [])
   );
 
-  // This will be handled after products is defined
-
-  const categories = [
-    { 
-      id: 'electronics', 
-      label: 'Electronics', 
-      icon: <Smartphone size={24} color={theme.colors.primary} />
-    },
-    { 
-      id: 'vehicles', 
-      label: 'Vehicles', 
-      icon: <Car size={24} color={theme.colors.primary} />
-    },
-    { 
-      id: 'home', 
-      label: 'Home & Garden', 
-      icon: <House size={24} color={theme.colors.primary} />
-    },
-    { 
-      id: 'fashion', 
-      label: 'Fashion', 
-      icon: <Shirt size={24} color={theme.colors.primary} />
-    },
-    { 
-      id: 'books', 
-      label: 'Books & Media', 
-      icon: <Book size={24} color={theme.colors.primary} />
-    },
-    { 
-      id: 'sports', 
-      label: 'Sports', 
-      icon: <Dumbbell size={24} color={theme.colors.primary} />
-    },
-    { 
-      id: 'services', 
-      label: 'Services', 
-      icon: <Briefcase size={24} color={theme.colors.primary} />
-    },
-    // "Browse All" option instead of "Other" category for better UX
-    { 
-      id: 'browse-all', 
-      label: 'Browse All', 
-      icon: <Grid2X2 size={24} color={theme.colors.primary} />
-    },
-  ];
-
-  // Home screen shows all listings without category filtering
-  // Category filtering is now handled by navigation to search screen
+  // Categories are now loaded from database via useEffect above
 
   // Memoize useListings options to prevent infinite re-renders
-  const listingsOptions = useMemo(() => ({
-    search: searchQuery,
-    // Remove category filtering - home screen shows all listings
-    location: filters.location, // Only apply location filter if explicitly set by user
-    priceMin: filters.priceRange.min,
-    priceMax: filters.priceRange.max,
-    condition: filters.condition,
-  }), [searchQuery, filters.location, filters.priceRange.min, filters.priceRange.max, filters.condition]);
+  const listingsOptions = useMemo(() => {
+    const options = {
+      search: searchQuery,
+      categories: filters.categories, // Apply category filter
+      location: filters.location, // Only apply location filter if explicitly set by user
+      priceMin: filters.priceRange.min,
+      priceMax: filters.priceRange.max,
+      condition: filters.condition,
+    };
+    return options;
+  }, [searchQuery, filters.categories, filters.location, filters.priceRange.min, filters.priceRange.max, filters.condition]);
 
   const { 
     listings: products, 
@@ -447,8 +463,10 @@ export default function HomeScreen() {
     // Determine the highest priority badge (only show ONE badge per listing)
     let primaryBadge = null;
     
-    // Priority order: Urgent > Spotlight > Boosted > Business > Verified
-    if (listing.urgent_until && new Date(listing.urgent_until) > new Date()) {
+    // Priority order: Reserved > Urgent > Spotlight > Boosted > Business > Verified
+    if (listing.status === 'reserved') {
+      primaryBadge = { text: 'Reserved', variant: 'warning' as const };
+    } else if (listing.urgent_until && new Date(listing.urgent_until) > new Date()) {
       primaryBadge = { text: 'Urgent Sale', variant: 'urgent' as const };
     } else if (listing.spotlight_until && new Date(listing.spotlight_until) > new Date()) {
       primaryBadge = { text: 'Spotlight', variant: 'spotlight' as const };
@@ -462,7 +480,7 @@ export default function HomeScreen() {
 
     // Check if listing is highlighted
     const isHighlighted = listing.highlight_until && new Date(listing.highlight_until) > new Date();
-    
+
     return {
       id: listing.id,
       isHighlighted, // Add highlight flag
@@ -499,7 +517,7 @@ export default function HomeScreen() {
   const { favorites: hookFavorites, viewCounts, refreshStats } = useMultipleListingStats({ 
     listingIds 
   });
-  
+
   // Get favorites count for header
   const { 
     incrementFavoritesCount, 
@@ -561,52 +579,29 @@ export default function HomeScreen() {
   );
 
   const handleCategoryToggle = useCallback((categoryId: string) => {
-    if (categoryId === 'all') {
-      // If "All" is selected, clear all categories and stay on home screen
-      setSelectedCategories([]);
-    } else if (categoryId === 'browse-all') {
-      // For "Browse All", navigate to search without a specific category
-      router.prefetch('/search');
-      router.push({
-        pathname: '/search',
-        params: { 
-          categoryName: 'Browse All Categories'
-        }
-      });
-    } else {
-      // Navigate to search results screen with the selected category
-      const categoryName = categories.find(cat => cat.id === categoryId)?.label;
+    // Get the category name
+    const categoryName = categories.find(cat => cat.id === categoryId)?.label;
+    
+    if (categoryName) {
+      // Toggle category filter - if already selected, remove it; otherwise, set it as the only category
+      const currentCategories = filters.categories || [];
+      const isSelected = currentCategories.includes(categoryName);
       
-      // Map category slugs to actual database UUIDs
-      const categoryIdMap: Record<string, string> = {
-        'electronics': '00000000-0000-4000-8000-000000000001', // Electronics & Technology
-        'fashion': '00000000-0000-4000-8000-000000000002', // Fashion
-        'vehicles': '00000000-0000-4000-8000-000000000003', // Vehicles
-        'sports': '00000000-0000-4000-8000-000000000005', // Sports & Fitness
-        'books': '00000000-0000-4000-8000-000000000007', // Books & Media
-        'beauty': '00000000-0000-4000-8000-000000000012', // Beauty & Health
-        'health': '00000000-0000-4000-8000-000000000012', // Beauty & Health (same as beauty)
-        'home': '00000000-0000-4000-8000-000000000004', // Home & Garden
-        'services': '00000000-0000-4000-8000-000000000010', // Services
-      };
-      
-      const mappedCategoryId = categoryIdMap[categoryId];
-      
-      if (mappedCategoryId && categoryName) {
-        // Preload search screen for better performance
-        router.prefetch('/search');
-        
-        // Navigate to search results screen
-        router.push({
-          pathname: '/search',
-          params: { 
-            category: mappedCategoryId,
-            categoryName: categoryName
-          }
+      if (isSelected) {
+        // Remove this category
+        setFilters({
+          ...filters,
+          categories: currentCategories.filter(c => c !== categoryName),
+        });
+      } else {
+        // Set this as the only category (single selection)
+        setFilters({
+          ...filters,
+          categories: [categoryName],
         });
       }
     }
-  }, [categories, setSelectedCategories]);
+  }, [categories, filters, setFilters]);
 
   const firstName = profile?.first_name || user?.user_metadata?.first_name || 'User';
   const lastName = profile?.last_name || user?.user_metadata?.last_name || '';
@@ -627,7 +622,7 @@ export default function HomeScreen() {
         <EnhancedSearchHeader
           searchQuery={searchQuery}
           onSearchPress={() => router.push('/smart-search')}
-          onFilterPress={() => setShowFilters(true)}
+          onFilterPress={() => router.push('/filter-products')}
           onAvatarPress={() => router.push('/(tabs)/more')}
           placeholder= 'Search here...'
         />
@@ -656,17 +651,23 @@ export default function HomeScreen() {
           ) : transformedProducts.length === 0 ? (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: theme.spacing.lg }}>
               <EmptyState
-                title="No listings available"
-                description={searchQuery || selectedCategories.length > 0 
+                title="No listings found"
+                description={searchQuery || filters.categories?.length > 0 || filters.location || filters.condition?.length > 0
                   ? "No listings match your current search or filters. Try adjusting your criteria or browse all listings."
                   : "Be the first to list an item! Start selling and help build our marketplace community."
                 }
                 action={{
-                  text: searchQuery || selectedCategories.length > 0 ? 'Clear Filters' : 'Create Listing',
-                  onPress: searchQuery || selectedCategories.length > 0 
+                  text: searchQuery || filters.categories?.length > 0 || filters.location || filters.condition?.length > 0 ? 'Clear Filters' : 'Create Listing',
+                  onPress: searchQuery || filters.categories?.length > 0 || filters.location || filters.condition?.length > 0
                     ? () => {
                         setSearchQuery('');
-                        setSelectedCategories([]);
+                        setFilters({
+                          categories: [],
+                          priceRange: { min: undefined, max: undefined },
+                          condition: [],
+                          location: '',
+                          sortBy: 'newest',
+                        });
                       }
                     : () => router.push('/(tabs)/create'),
                 }}
@@ -756,7 +757,7 @@ export default function HomeScreen() {
                   {searchQuery || "Search for anything..."}
                 </Text>
                 <TouchableOpacity
-                  onPress={() => setShowFilters(true)}
+                  onPress={() => router.push('/filter-products')}
                   style={{
                     padding: theme.spacing.xs,
                   }}
@@ -774,8 +775,8 @@ export default function HomeScreen() {
                       position: 'absolute',
                       top: theme.spacing.sm,
                       right: theme.spacing.lg,
-                      width: screenWidth / 3, // 1/3 of screen width
-                      height: 3,
+                      width: screenWidth / 5, // 1/3 of screen width
+                      height: 4,
                       backgroundColor: theme.colors.border,
                       borderRadius: 1.5,
                       overflow: 'hidden',
@@ -852,7 +853,9 @@ export default function HomeScreen() {
                   }}
                 >
                   {categories.map((category) => {
-                    // Remove selection state since we navigate to search screen
+                    // Check if this category is selected
+                    const isSelected = filters.categories?.includes(category.label);
+                    
                     return (
                       <TouchableOpacity
                         key={category.id}
@@ -863,9 +866,9 @@ export default function HomeScreen() {
                           paddingHorizontal: theme.spacing.lg,
                           paddingVertical: theme.spacing.md,
                           borderRadius: theme.borderRadius.full,
-                          backgroundColor: theme.colors.surface,
+                          backgroundColor: isSelected ? theme.colors.primary : theme.colors.surface,
                           borderWidth: 1,
-                          borderColor: theme.colors.border,
+                          borderColor: isSelected ? theme.colors.primary : theme.colors.border,
                           gap: theme.spacing.sm,
                           minHeight: 48,
                           shadowColor: theme.colors.text.primary,
@@ -885,7 +888,7 @@ export default function HomeScreen() {
                         }}>
                           {React.cloneElement(category.icon as React.ReactElement, {
                             size: 20,
-                            color: theme.colors.primary,
+                            color: isSelected ? theme.colors.primaryForeground : theme.colors.primary,
                           } as any)}
                         </View>
                         
@@ -893,7 +896,7 @@ export default function HomeScreen() {
                         <Text
                           variant="body"
                           style={{
-                            color: theme.colors.text.primary,
+                            color: isSelected ? theme.colors.primaryForeground : theme.colors.text.primary,
                             fontWeight: '700',
                             fontSize: 13,
                           }}
@@ -906,19 +909,21 @@ export default function HomeScreen() {
                 </ScrollView>
               </View>
 
-              {/* Featured Business Listings - USING WORKING MINIMAL VERSION */}
-              <Suspense fallback={<LoadingSkeleton width="100%" height={200} />}>
-                <CodeSplitting.FixedFeaturedListings
-                  maxItems={10}
+              {/* Featured Business Listings - Only show when no filters are active */}
+              {!searchQuery && !filters.categories?.length && !filters.location && !filters.condition?.length && (
+                <Suspense fallback={<LoadingSkeleton width="100%" height={200} />}>
+                  <CodeSplitting.FixedFeaturedListings
+                    maxItems={10}
                   layout="horizontal"
                   onViewAll={() => {
-                    navigation.home.goToBusinessListings();
-                  }}
-                />
-              </Suspense>
+                      navigation.home.goToBusinessListings();
+                    }}
+                  />
+                </Suspense>
+              )}
 
-              {/* Recommendation Feed */}
-              {user && (
+              {/* Recommendation Feed - Only show when no filters are active */}
+              {user && !searchQuery && !filters.categories?.length && !filters.location && !filters.condition?.length && (
                 <Suspense fallback={<LoadingSkeleton width="100%" height={300} />}>
                   <CodeSplitting.RecommendationFeed
                     onListingPress={handleListingPress}
@@ -929,7 +934,7 @@ export default function HomeScreen() {
                 </Suspense>
               )}
 
-              {/* All Listings Section */}
+              {/* All Listings Section - Dynamic Title */}
               <View style={{ 
                 flexDirection: 'row', 
                 alignItems: 'center', 
@@ -939,12 +944,52 @@ export default function HomeScreen() {
               }}>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-                    <Text variant="h3">More Listings From Sellers</Text>
+                    <Text variant="h3">
+                      {filters.categories?.length > 0 
+                        ? `${filters.categories[0]} Listings`
+                        : searchQuery 
+                        ? 'Search Results'
+                        : 'More Listings From Sellers'
+                      }
+                    </Text>
                   </View>
                   <Text variant="bodySmall" color="muted" style={{ marginTop: theme.spacing.xs }}>
-                    Browse all available items
+                    {filters.categories?.length > 0 
+                      ? `${transformedProducts.length} ${transformedProducts.length === 1 ? 'item' : 'items'} found in ${filters.categories[0]}`
+                      : searchQuery 
+                      ? `${transformedProducts.length} ${transformedProducts.length === 1 ? 'result' : 'results'} for "${searchQuery}"`
+                      : 'Browse all available items'
+                    }
                   </Text>
                 </View>
+
+                {/* Clear Filter Button - Show when filters are active */}
+                {(filters.categories?.length > 0 || searchQuery || filters.location || filters.condition?.length > 0) && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSearchQuery('');
+                      setFilters({
+                        categories: [],
+                        priceRange: { min: undefined, max: undefined },
+                        condition: [],
+                        location: '',
+                        sortBy: 'newest',
+                      });
+                    }}
+                    style={{
+                      paddingHorizontal: theme.spacing.md,
+                      paddingVertical: theme.spacing.sm,
+                      borderRadius: theme.borderRadius.md,
+                      backgroundColor: theme.colors.surface,
+                      borderWidth: 1,
+                      borderColor: theme.colors.border,
+                    }}
+                  >
+                    <Text variant="bodySmall" style={{ color: theme.colors.primary, fontWeight: '600' }}>
+                      Clear
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               {/* Enhanced ProductCard Grid with Professional Badges */}
@@ -1013,31 +1058,11 @@ export default function HomeScreen() {
       </View>
 
 
-      {/* Filter Sheet */}
-      <FilterSheet
-        visible={showFilters}
-        onClose={() => setShowFilters(false)}
-        filters={filters}
-        onApplyFilters={(newFilters) => {
-          useAppStore.getState().setFilters(newFilters);
-          setShowFilters(false);
-        }}
-        onClearFilters={() => {
-          useAppStore.getState().setFilters({
-            priceRange: { min: undefined, max: undefined },
-            condition: [],
-            categories: [],
-            location: '',
-            sortBy: 'Newest First',
-          });
-          setSelectedCategories([]);
-        }}
-      />
 
       {/* Scroll to Top FAB */}
       <Animated.View
-        style={{
-          position: 'absolute',
+          style={{
+            position: 'absolute',
           bottom: theme.spacing.xl,
           right: theme.spacing.lg,
           zIndex: 1000,

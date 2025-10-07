@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, ScrollView, RefreshControl } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { View, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
+import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useListings } from '@/hooks/useListings';
@@ -16,9 +16,10 @@ import {
   EmptyState,
   LoadingSkeleton,
   SearchBar,
-  FilterSheet,
+  Chip,
 } from '@/components';
 import { useAppStore } from '@/store/useAppStore';
+import { SlidersHorizontal, ArrowUpDown, Check } from 'lucide-react-native';
 
 export default function SearchResultsScreen() {
   const { theme } = useTheme();
@@ -31,42 +32,22 @@ export default function SearchResultsScreen() {
   const [searchQuery, setSearchQuery] = useState(initialQuery || '');
   const { 
     filters,
-    showFilters,
-    setShowFilters,
     setFilters,
     selectedCategories,
     setSelectedCategories,
   } = useAppStore();
 
-  // Combine search query with filter categories for better search
-  const combinedSearchQuery = React.useMemo(() => {
-    const searchTerms = [];
-    
-    // Add main search query if it exists
-    if (searchQuery && searchQuery.trim()) {
-      searchTerms.push(searchQuery.trim());
-    }
-    
-    // Add filter categories as additional search terms
-    if (filters.categories && filters.categories.length > 0) {
-      searchTerms.push(...filters.categories);
-    }
-    
-    // Return the combined search terms
-    return searchTerms.length > 0 ? searchTerms.join(' ') : '';
-  }, [searchQuery, filters.categories]);
-
   // Memoize useListings parameters to prevent unnecessary re-fetches
   const listingsParams = useMemo(() => ({
-    search: combinedSearchQuery, // Combined search query with filter categories
-    category: categoryId, // Add category filter
+    search: searchQuery?.trim() || '', // Use original search query only
+    categories: filters.categories, // Category filter handled separately
     location: filters.location,
     priceMin: filters.priceRange.min,
     priceMax: filters.priceRange.max,
-    condition: filters.condition,
+    attributeFilters: filters.attributeFilters, // Use new dynamic attribute filters
     // Add performance optimizations for "Other" category
     limit: categoryId === '00000000-0000-4000-8000-000000000000' ? 50 : undefined, // Limit results for "Other" category
-  }), [combinedSearchQuery, categoryId, filters.location, filters.priceRange.min, filters.priceRange.max, filters.condition]);
+  }), [searchQuery, filters.categories, filters.location, filters.priceRange.min, filters.priceRange.max, filters.attributeFilters, categoryId]);
 
   const { 
     listings: products, 
@@ -75,6 +56,38 @@ export default function SearchResultsScreen() {
     refreshing, 
     refresh 
   } = useListings(listingsParams);
+
+  // Track previous filters to detect changes
+  const prevFiltersRef = useRef<string>('');
+
+  // Refresh listings when screen comes into focus and filters have changed
+  useFocusEffect(
+    useCallback(() => {
+      const currentFilters = JSON.stringify(filters);
+      if (prevFiltersRef.current !== currentFilters) {
+        prevFiltersRef.current = currentFilters;
+        // Trigger refresh if filters changed
+        if (prevFiltersRef.current !== '{}') {
+          refresh();
+        }
+      }
+    }, [filters, refresh])
+  );
+
+  // Clear filters when leaving the search screen to prevent them from affecting home screen
+  useEffect(() => {
+    return () => {
+      // Cleanup: Reset filters when unmounting
+      setFilters({
+        categories: [],
+        priceRange: { min: undefined, max: undefined },
+        condition: [],
+        location: '',
+        sortBy: 'newest',
+        attributeFilters: {},
+      });
+    };
+  }, []);
 
   // Get listing IDs for stats
   const listingIds = products.map(product => product.id).filter(Boolean);
@@ -191,24 +204,8 @@ export default function SearchResultsScreen() {
   }, []);
 
   const handleFilterPress = useCallback(() => {
-    setShowFilters(true);
-  }, [setShowFilters]);
-
-  const handleApplyFilters = useCallback((newFilters: any) => {
-    setFilters(newFilters);
-    setShowFilters(false);
-  }, [setFilters, setShowFilters]);
-
-  const handleClearFilters = useCallback(() => {
-    setFilters({
-      priceRange: { min: undefined, max: undefined },
-      condition: [],
-      categories: [],
-      location: '',
-      sortBy: 'Newest First',
-    });
-    setShowFilters(false);
-  }, [setFilters, setShowFilters]);
+    router.push('/filter-products');
+  }, []);
 
   return (
     <SafeAreaWrapper>
@@ -227,15 +224,135 @@ export default function SearchResultsScreen() {
         placeholder="Search for anything..."
       />
 
+      {/* Filter Pills */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: theme.spacing.lg,
+          paddingVertical: theme.spacing.sm,
+          gap: theme.spacing.sm,
+        }}
+        style={{
+          borderBottomWidth: 1,
+          borderBottomColor: theme.colors.border,
+          maxHeight: 65,
+        }}
+      >
+        {/* Filter Button */}
+        <TouchableOpacity
+          onPress={handleFilterPress}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: theme.spacing.md,
+            paddingVertical: theme.spacing.sm,
+            borderRadius: theme.borderRadius.full,
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+            backgroundColor: theme.colors.surface,
+            gap: theme.spacing.xs,
+          }}
+        >
+          <SlidersHorizontal size={16} color={theme.colors.text.primary} />
+          <Text variant="bodySmall" style={{ fontWeight: '500' }}>
+            Filter
+          </Text>
+        </TouchableOpacity>
+
+        {/* Sort By Button */}
+        <TouchableOpacity
+          onPress={handleFilterPress}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: theme.spacing.md,
+            paddingVertical: theme.spacing.sm,
+            borderRadius: theme.borderRadius.full,
+            borderWidth: 1,
+            borderColor: filters.sortBy !== 'newest' ? theme.colors.primary : theme.colors.border,
+            backgroundColor: filters.sortBy !== 'newest' ? theme.colors.primary + '10' : theme.colors.surface,
+            gap: theme.spacing.xs,
+          }}
+        >
+          {filters.sortBy !== 'newest' && (
+            <Check size={16} color={theme.colors.primary} />
+          )}
+          <Text 
+            variant="bodySmall" 
+            style={{ 
+              fontWeight: '500',
+              color: filters.sortBy !== 'newest' ? theme.colors.primary : theme.colors.text.primary 
+            }}
+          >
+            Sort by
+          </Text>
+        </TouchableOpacity>
+
+        {/* Dynamic Attribute Filters (Brand, Model, Condition, etc.) */}
+        {filters.attributeFilters && Object.keys(filters.attributeFilters).length > 0 && 
+          Object.entries(filters.attributeFilters).map(([key, value]) => (
+            <TouchableOpacity
+              key={key}
+              onPress={handleFilterPress}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: theme.spacing.md,
+                paddingVertical: theme.spacing.sm,
+                borderRadius: theme.borderRadius.full,
+                borderWidth: 1,
+                borderColor: theme.colors.primary,
+                backgroundColor: theme.colors.primary + '10',
+                gap: theme.spacing.xs,
+              }}
+            >
+              <Check size={16} color={theme.colors.primary} />
+              <Text variant="bodySmall" style={{ fontWeight: '500', color: theme.colors.primary }}>
+                {key.charAt(0).toUpperCase() + key.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))
+        }
+
+        {/* Condition Filter */}
+        {filters.condition && filters.condition.length > 0 && (
+          <TouchableOpacity
+            onPress={handleFilterPress}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: theme.spacing.md,
+              paddingVertical: theme.spacing.sm,
+              borderRadius: theme.borderRadius.full,
+              borderWidth: 1,
+              borderColor: theme.colors.primary,
+              backgroundColor: theme.colors.primary + '10',
+              gap: theme.spacing.xs,
+            }}
+          >
+            <Check size={16} color={theme.colors.primary} />
+            <Text variant="bodySmall" style={{ fontWeight: '500', color: theme.colors.primary }}>
+              Condition
+            </Text>
+          </TouchableOpacity>
+        )}
+      </ScrollView>
+
       {/* Results Count */}
       {!loading && (
         <View style={{ 
           paddingHorizontal: theme.spacing.lg,
           paddingVertical: theme.spacing.md,
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
         }}>
+          <Text variant="body" style={{ fontWeight: '600' }}>
+            {transformedProducts.length >= 500 ? '500+' : transformedProducts.length} {transformedProducts.length === 1 ? 'result' : 'results'}
+          </Text>
           <Text variant="bodySmall" color="muted">
-            {transformedProducts.length} {transformedProducts.length === 1 ? 'result' : 'results'}
-            {searchQuery && ` for "${searchQuery}"`}
+            Search results
           </Text>
         </View>
       )}
@@ -328,15 +445,6 @@ export default function SearchResultsScreen() {
         )}
       </View>
 
-      {/* Filter Sheet */}
-      <FilterSheet
-        visible={showFilters}
-        onClose={() => setShowFilters(false)}
-        filters={filters}
-        currentCategory={categoryName} // Pass current category for smart filtering
-        onApplyFilters={handleApplyFilters}
-        onClearFilters={handleClearFilters}
-      />
     </SafeAreaWrapper>
   );
 }

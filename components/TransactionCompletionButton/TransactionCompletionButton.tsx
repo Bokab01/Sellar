@@ -148,47 +148,34 @@ export function TransactionCompletionButton({
     if (statusInfo.showReviewButton !== undefined) {
       return (
         <>
-          {statusInfo.showReviewButton ? (
-            <View style={[{ 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              width: '100%',
-              paddingHorizontal: theme.spacing.sm,
-            }]}>
-              <Button
-                variant="primary"
-                onPress={() => setShowReviewForm(true)}
-                leftIcon={statusInfo.icon}
-                style={[
-                  {
-                    backgroundColor: theme.colors.success,
-                    borderColor: theme.colors.success,
-                    minHeight: 48,
-                    paddingHorizontal: theme.spacing.lg,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  },
-                  style,
-                ]}
-              >
-                {statusInfo.text}
-              </Button>
-            </View>
-          ) : (
-            <View style={[{ 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              width: '100%',
-              paddingHorizontal: theme.spacing.sm,
-            }, style]}>
-              <Badge
-                text={statusInfo.text}
-                variant={statusInfo.variant}
-                leftIcon={statusInfo.icon}
-              />
-            </View>
-          )}
+          <View style={[{ 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            width: '100%',
+            paddingHorizontal: theme.spacing.sm,
+          }]}>
+            <Button
+              variant="primary"
+              onPress={statusInfo.showReviewButton ? () => setShowReviewForm(true) : undefined}
+              leftIcon={statusInfo.icon}
+              disabled={!statusInfo.showReviewButton}
+              style={[
+                {
+                  backgroundColor: theme.colors.success,
+                  borderColor: theme.colors.success,
+                  minHeight: 48,
+                  paddingHorizontal: theme.spacing.lg,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: statusInfo.showReviewButton ? 1 : 0.7,
+                },
+                style,
+              ]}
+            >
+              {statusInfo.text}
+            </Button>
+          </View>
 
           {statusInfo.showReviewButton && (
             <TransactionBasedReviewForm
@@ -208,18 +195,35 @@ export function TransactionCompletionButton({
       );
     }
 
+    // Show button for other statuses (waiting, etc.)
     return (
       <View style={[{ 
         alignItems: 'center', 
         justifyContent: 'center',
         width: '100%',
         paddingHorizontal: theme.spacing.sm,
-      }, style]}>
-        <Badge
-          text={statusInfo.text}
-          variant={statusInfo.variant}
+      }]}>
+        <Button
+          variant="primary"
+          onPress={undefined}
           leftIcon={statusInfo.icon}
-        />
+          disabled={true}
+          style={[
+            {
+              backgroundColor: theme.colors.info,
+              borderColor: theme.colors.info,
+              minHeight: 48,
+              paddingHorizontal: theme.spacing.lg,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: 0.7,
+            },
+            style,
+          ]}
+        >
+          {statusInfo.text}
+        </Button>
       </View>
     );
   }

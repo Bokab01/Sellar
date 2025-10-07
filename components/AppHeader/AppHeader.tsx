@@ -10,6 +10,7 @@ interface AppHeaderProps {
   showBackButton?: boolean;
   showBack?: boolean;
   onBackPress?: () => void;
+  onTitlePress?: () => void;
   leftAction?: React.ReactNode;
   rightActions?: React.ReactNode[];
   backgroundColor?: string;
@@ -22,6 +23,7 @@ export function AppHeader({
   showBackButton = false,
   showBack = false,
   onBackPress,
+  onTitlePress,
   leftAction,
   rightActions,
   backgroundColor,
@@ -75,7 +77,10 @@ export function AppHeader({
           )}
 
           {(title || subtitle) && (
-            <View
+            <TouchableOpacity
+              onPress={onTitlePress}
+              disabled={!onTitlePress}
+              activeOpacity={onTitlePress ? 0.7 : 1}
               style={{
                 flex: 1,
                 alignItems:
@@ -106,7 +111,7 @@ export function AppHeader({
                   {subtitle}
                 </Text>
               )}
-            </View>
+            </TouchableOpacity>
           )}
         </View>
 

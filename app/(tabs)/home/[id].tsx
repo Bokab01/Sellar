@@ -35,6 +35,8 @@ import {
 const ImageViewer = lazy(() => import('@/components/ImageViewer/ImageViewer').then(module => ({ default: module.ImageViewer })));
 import { useImageViewer } from '@/hooks/useImageViewer';
 import { useListingStats } from '@/hooks/useListingStats';
+import { useFavoritesStore } from '@/store/useFavoritesStore';
+import { useProfile } from '@/hooks/useProfile';
 import { Heart, Share as ShareIcon, MessageCircle, Phone, PhoneCall, DollarSign, ArrowLeft, Package, MoreVertical, Edit, Trash2, Flag, BadgeCent, RefreshCw } from 'lucide-react-native';
 import { getDisplayName } from '@/hooks/useDisplayName';
 import { ReportButton } from '@/components/ReportButton/ReportButton';
@@ -43,6 +45,7 @@ export default function ListingDetailScreen() {
   const { theme } = useTheme();
   const { id: listingId } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuthStore();
+  const { profile } = useProfile();
   const { trackInteraction } = useRecommendations();
   const { contentBottomPadding } = useBottomTabBarSpacing();
   
@@ -132,6 +135,13 @@ export default function ListingDetailScreen() {
     }
   }, [listing]);
 
+  // Pre-fill callback phone with user's profile phone when modal opens
+  useEffect(() => {
+    if (showCallbackModal && profile?.phone && !callbackPhone) {
+      setCallbackPhone(profile.phone);
+    }
+  }, [showCallbackModal, profile?.phone]);
+
   // Track listing stats (favorites and views) with proper logic
   const { 
     isFavorited: statsIsFavorited, 
@@ -143,6 +153,10 @@ export default function ListingDetailScreen() {
     sellerId: listing?.user_id,
     autoTrackView: true 
   });
+
+  // Get real-time favorites count from global store
+  const { listingFavoriteCounts } = useFavoritesStore();
+  const favoritesCount = listingFavoriteCounts[listingId || ''] ?? listing?.favorites_count ?? 0;
 
   // Refresh data when screen comes into focus (e.g., returning from edit screen)
   useFocusEffect(
@@ -746,7 +760,20 @@ export default function ListingDetailScreen() {
     }
 
     if (!callbackPhone.trim()) {
-      Alert.alert('Error', 'Please enter your phone number');
+      Alert.alert(
+        'Phone Number Required', 
+        'Please add your phone number in your profile settings to request callbacks.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Go to Profile', 
+            onPress: () => {
+              setShowCallbackModal(false);
+              router.push('/edit-profile');
+            }
+          }
+        ]
+      );
       return;
     }
 
@@ -1401,24 +1428,6 @@ export default function ListingDetailScreen() {
                 </View>
               )}
 
-              {/* Image Counter */}
-              {listing.images.length > 1 && (
-                <View
-                  style={{
-                    position: 'absolute',
-                    top: StatusBar.currentHeight ? StatusBar.currentHeight + 60 : 104,
-                    right: theme.spacing.lg,
-                    backgroundColor: 'rgba(0,0,0,0.6)',
-                    paddingHorizontal: theme.spacing.md,
-                    paddingVertical: theme.spacing.sm,
-                    borderRadius: theme.borderRadius.full,
-                  }}
-                >
-                  <Text variant="caption" style={{ color: 'white', fontWeight: '500' }}>
-                    {currentImageIndex + 1} / {listing.images.length}
-                  </Text>
-                </View>
-              )}
             </>
           ) : (
             <View
@@ -1608,30 +1617,30 @@ export default function ListingDetailScreen() {
                 </View>
               )}
 
-              {/* Boost Badge */}
+              {/* Boost Badges - Show all active boosts */}
+              
+              {/* Urgent Sale Badge */}
+              {listing.urgent_until && new Date(listing.urgent_until) > new Date() && (
+                <Badge 
+                  text="Urgent Sale" 
+                  variant="urgent"
+                />
+              )}
+
+              {/* Spotlight Badge */}
+              {listing.spotlight_until && new Date(listing.spotlight_until) > new Date() && (
+                <Badge 
+                  text="Spotlight" 
+                  variant="spotlight"
+                />
+              )}
+
+              {/* Boosted Badge */}
               {listing.boost_until && new Date(listing.boost_until) > new Date() && (
-                <View style={{
-                  backgroundColor: theme.colors.warning + '15',
-                  borderWidth: 1,
-                  borderColor: theme.colors.warning + '30',
-                  borderRadius: theme.borderRadius.full,
-                  paddingHorizontal: theme.spacing.md,
-                  paddingVertical: theme.spacing.sm,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: theme.spacing.xs,
-                }}>
-                  <Text style={{ fontSize: 14, color: theme.colors.warning }}>⚡</Text>
-                  <Text 
-                    variant="bodySmall" 
-                    style={{ 
-                      color: theme.colors.warning,
-                      fontWeight: '600'
-                    }}
-                  >
-                    Boosted
-                  </Text>
-                </View>
+                <Badge 
+                  text="Boosted" 
+                  variant="featured"
+                />
               )}
 
               {/* Verification Badge */}
@@ -1661,6 +1670,178 @@ export default function ListingDetailScreen() {
               )}
             </View>
           </View>
+
+          {/* Urgent Sale Banner */}
+          {listing.urgent_until && new Date(listing.urgent_until) > new Date() && (
+            <View
+              style={{
+                backgroundColor: theme.colors.destructive + '15',
+                borderColor: theme.colors.destructive + '40',
+                borderWidth: 2,
+                borderRadius: theme.borderRadius.lg,
+                padding: theme.spacing.sm,
+                marginBottom: theme.spacing.lg,
+                overflow: 'hidden',
+              }}
+            >
+              {/* Animated gradient background effect */}
+              <View style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: theme.colors.destructive + '08',
+              }} />
+
+              <View style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center',
+                gap: theme.spacing.md,
+                position: 'relative',
+              }}>
+                {/* Icon */}
+                <View style={{
+                  backgroundColor: theme.colors.destructive,
+                  borderRadius: theme.borderRadius.full,
+                  padding: theme.spacing.sm,
+                  elevation: 1,
+                }}>
+                  <Text style={{ fontSize: 20 }}>🔥</Text>
+                </View>
+
+                {/* Content */}
+                <View style={{ flex: 1 }}>
+                  <Text variant="h4" style={{ 
+                    fontWeight: '700', 
+                    color: theme.colors.destructive,
+                    marginBottom: theme.spacing.xs,
+                  }}>
+                    Urgent Sale!
+                  </Text>
+                  <Text variant="body" style={{ 
+                    color: theme.colors.text.primary,
+                    marginBottom: theme.spacing.xs,
+                    lineHeight: 20,
+                  }}>
+                    Seller needs to sell fast. Don't miss this opportunity!
+                  </Text>
+                  
+                  {/* Time remaining */}
+                  {/* <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: theme.spacing.xs,
+                    backgroundColor: theme.colors.surface,
+                    paddingHorizontal: theme.spacing.md,
+                    paddingVertical: theme.spacing.sm,
+                    borderRadius: theme.borderRadius.md,
+                    alignSelf: 'flex-start',
+                  }}>
+                    <Text style={{ fontSize: 14 }}>⏰</Text>
+                    <Text variant="caption" style={{ 
+                      fontWeight: '600',
+                      color: theme.colors.destructive,
+                    }}>
+                      Urgent until {new Date(listing.urgent_until).toLocaleDateString('en-GB', { 
+                        day: 'numeric', 
+                        month: 'short',
+                        year: 'numeric'
+                      })}
+                    </Text>
+                  </View> */}
+                </View>
+              </View>
+
+              {/* Bottom tip */}
+              <View style={{
+                marginTop: theme.spacing.md,
+                paddingTop: theme.spacing.md,
+                borderTopWidth: 1,
+                borderTopColor: theme.colors.destructive + '20',
+              }}>
+                <Text variant="caption" style={{ 
+                  color: theme.colors.text.secondary,
+                  fontStyle: 'italic',
+                }}>
+                  💡 Tip: Make an offer or contact the seller quickly to secure this deal
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Reserved for You Banner (when your offer was accepted) */}
+          {listing.status === 'reserved' && listing.reserved_for === user?.id && (
+            <View
+              style={{
+                backgroundColor: theme.colors.success + '15',
+                borderColor: theme.colors.success + '30',
+                borderWidth: 1,
+                borderRadius: theme.borderRadius.lg,
+                padding: theme.spacing.lg,
+                marginBottom: theme.spacing.lg,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.md,
+              }}
+            >
+              <View style={{
+                backgroundColor: theme.colors.success + '20',
+                borderRadius: theme.borderRadius.full,
+                padding: theme.spacing.sm,
+              }}>
+                <Text style={{ fontSize: 20 }}>🎉</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text variant="body" style={{ 
+                  fontWeight: '600', 
+                  color: theme.colors.success,
+                  marginBottom: theme.spacing.xs,
+                }}>
+                  Your Offer Was Accepted!
+                </Text>
+                <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.md }}>
+                  This item is reserved for you. Complete the transaction within 48 hours to secure your purchase.
+                </Text>
+                <TouchableOpacity
+                  onPress={async () => {
+                    // Navigate to existing conversation
+                    if (!user) return;
+                    
+                    try {
+                      const { data: existingConv } = await supabase
+                        .from('conversations')
+                        .select('id')
+                        .eq('listing_id', listingId)
+                        .or(`and(participant_1.eq.${user.id},participant_2.eq.${listing.user_id}),and(participant_1.eq.${listing.user_id},participant_2.eq.${user.id})`)
+                        .maybeSingle();
+
+                      if (existingConv) {
+                        router.push(`/(tabs)/inbox/${existingConv.id}`);
+                      } else {
+                        // Fallback to contact modal if no conversation exists
+                        setShowContactModal(true);
+                      }
+                    } catch (err) {
+                      console.error('Error navigating to chat:', err);
+                      setShowContactModal(true);
+                    }
+                  }}
+                  style={{
+                    backgroundColor: theme.colors.success,
+                    borderRadius: theme.borderRadius.md,
+                    paddingVertical: theme.spacing.sm,
+                    paddingHorizontal: theme.spacing.md,
+                    alignSelf: 'flex-start',
+                  }}
+                >
+                  <Text variant="bodySmall" style={{ color: theme.colors.primaryForeground, fontWeight: '600' }}>
+                    Go to Chat →
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
           {/* Pending Offer Status */}
           {pendingOffer && (
@@ -1749,7 +1930,7 @@ export default function ListingDetailScreen() {
           </View>
 
           {/* Action Buttons - Moved from bottom */}
-          {!isOwnListing && listing.status !== 'sold' && (
+          {!isOwnListing && listing.status !== 'sold' && listing.status !== 'reserved' && (
             <View style={{ marginBottom: theme.spacing.xl }}>
               <View style={{ gap: theme.spacing.md }}>
                 {/* Make an Offer Button */}
@@ -1844,6 +2025,9 @@ export default function ListingDetailScreen() {
                     sellerName={getDisplayName(listing.profiles, false).displayName}
                     sellerPhone={listing.profiles.phone}
                     listingTitle={listing.title}
+                    listingImage={listing.images?.[0]}
+                    listingPrice={listing.price}
+                    listingCurrency={listing.currency || 'GHS'}
                     variant="secondary"
                     size="md"
                   />
@@ -1869,7 +2053,11 @@ export default function ListingDetailScreen() {
 
           {/* Listing Statistics Table */}
           <View style={{ marginBottom: theme.spacing.xl }}>
-            <ListingStatsTable listing={listing} />
+            <ListingStatsTable 
+              listing={listing} 
+              viewCount={viewCount}
+              favoritesCount={favoritesCount}
+            />
           </View>
         </View>
 

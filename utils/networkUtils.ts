@@ -78,13 +78,13 @@ class NetworkUtilsService {
       isConnected = true;
       latency = Date.now() - startTime;
 
-      // Test Supabase connectivity
+      // Test Supabase connectivity with longer timeout
       try {
         const supabaseStart = Date.now();
         const { data, error: supabaseError } = await Promise.race([
           supabase.auth.getSession(),
           new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Supabase timeout')), 10000)
+            setTimeout(() => reject(new Error('Supabase timeout')), 30000) // Increased to 30s
           )
         ]) as any;
 

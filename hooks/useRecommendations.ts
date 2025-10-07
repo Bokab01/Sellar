@@ -15,6 +15,7 @@ export interface RecommendationListing {
   user_id: string;
   seller_name: string;
   seller_avatar?: string;
+  status?: string;
   recommendation_score?: number;
   recommendation_reason?: string;
   trending_score?: number;
