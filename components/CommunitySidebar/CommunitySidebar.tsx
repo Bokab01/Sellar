@@ -29,7 +29,8 @@ import {
   Coins,
   ChevronRight,
   Settings,
-  Bell
+  Bell,
+  ShieldCheck
 } from 'lucide-react-native';
 
 
@@ -244,6 +245,14 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
       label: 'Trending Topics',
       onPress: () => {
         router.push('/(tabs)/community/trending');
+        onClose();
+      }
+    },
+    {
+      icon: ShieldCheck,
+      label: 'Community Guidelines',
+      onPress: () => {
+        router.push('/(tabs)/community/guidelines');
         onClose();
       }
     },

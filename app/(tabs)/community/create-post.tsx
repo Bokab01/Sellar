@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useCommunityPosts } from '@/hooks/useCommunity';
@@ -14,6 +14,7 @@ import {
   CustomImagePicker,
   LocationPicker,
   Toast,
+  AppModal,
   LinearProgress,
   OptimizedImage,
   EmptyState,
@@ -36,6 +37,8 @@ export default function CreatePostScreen() {
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [moderationError, setModerationError] = useState('');
+  const [showModerationModal, setShowModerationModal] = useState(false);
   
   // Listing attachment functionality
   const [selectedListing, setSelectedListing] = useState<any>(null);
@@ -82,9 +85,13 @@ export default function CreatePostScreen() {
       );
 
       if (error) {
-        throw new Error(error);
+        // Show moderation error with specific issues
+        setModerationError(error);
+        setShowModerationModal(true);
+        return;
       }
 
+      // Post published successfully
       setShowSuccess(true);
       
       // Reset form and navigate back
@@ -95,7 +102,7 @@ export default function CreatePostScreen() {
         setSelectedListing(null);
         setPostType('general');
         router.back();
-      }, 2000); // Increased delay to allow real-time update to process
+      }, 2000);
     } catch (error: any) {
       console.error('Error creating post:', error);
       Alert.alert('Error', 'Failed to create post. Please try again.');
@@ -629,6 +636,21 @@ export default function CreatePostScreen() {
         onHide={() => setShowSuccess(false)}
       />
 
+      {/* Moderation Error Modal */}
+      <AppModal
+        visible={showModerationModal}
+        onClose={() => setShowModerationModal(false)}
+        title="Cannot Publish Post"
+        size="sm"
+        primaryAction={{
+          text: 'OK',
+          onPress: () => setShowModerationModal(false),
+        }}
+      >
+        <Text style={{ color: theme.colors.text.secondary, lineHeight: 22 }}>
+          {moderationError}
+        </Text>
+      </AppModal>
 
     </SafeAreaWrapper>
   );

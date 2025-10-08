@@ -124,8 +124,9 @@ export { Grid } from './Grid/Grid';
 // Performance Optimizations
 export { AdvancedImage } from './OptimizedImage/AdvancedImage';
 
-// Alert
-export { Alert } from './Alert/Alert';
+// Alert Banner
+export { AlertBanner } from './Alert/AlertBanner';
+export type { AlertBannerProps, AlertBannerVariant, AlertBannerSize } from './Alert/AlertBanner';
 
 // Auth Error Boundary
 export { AuthErrorBoundary } from './AuthErrorBoundary/AuthErrorBoundary';
@@ -226,6 +227,7 @@ export * from '../hooks/useSecureAuth';
 // Performance Components
 export { OptimizedImage, ListingImage, ProfileImage, CommunityImage } from './OptimizedImage/OptimizedImage';
 export { ImageViewer } from './ImageViewer';
+export { MediaViewer } from './MediaViewer/MediaViewer';
 export { CreditBalance } from './CreditBalance';
 export { VirtualizedList } from './VirtualizedList/VirtualizedList';
 export { LazyComponent, withLazyLoading, createLazyComponent, IntersectionLazyComponent, InteractionLazyComponent } from './LazyComponent/LazyComponent';

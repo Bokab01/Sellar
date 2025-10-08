@@ -212,22 +212,24 @@ export default function UserProfileScreen() {
     }
 
     try {
-      // Check if conversation already exists
+      // Check if conversation already exists (including those without listing_id)
       const { data: existingConv } = await supabase
         .from('conversations')
         .select('id')
+        .is('listing_id', null) // Only get direct conversations (not listing-specific)
         .or(`and(participant_1.eq.${currentUser.id},participant_2.eq.${profileId}),and(participant_1.eq.${profileId},participant_2.eq.${currentUser.id})`)
         .maybeSingle();
 
       let conversationId = existingConv?.id;
 
       if (!conversationId) {
-        // Create new conversation
+        // Create new conversation without listing_id (direct message)
         const { data: newConv, error: convError } = await supabase
           .from('conversations')
           .insert({
             participant_1: currentUser.id,
             participant_2: profileId!,
+            listing_id: null, // Explicitly set to null for direct messages
           })
           .select('id')
           .single();
@@ -236,8 +238,8 @@ export default function UserProfileScreen() {
         conversationId = newConv.id;
       }
 
-      // Navigate to chat
-      router.push(`/(tabs)/inbox/${conversationId}`);
+      // Navigate to chat (using push to maintain back navigation)
+      router.push(`/chat-detail/${conversationId}` as any);
     } catch (err: any) {
       Alert.alert('Error', 'Failed to start conversation');
     }

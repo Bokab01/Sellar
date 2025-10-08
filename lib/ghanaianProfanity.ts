@@ -28,12 +28,12 @@ export function normalizeGhanaianText(text: string): string {
 
 export const ghanaianProfanityWords = [
   // Twi profanity (with ɛ and ɔ characters)
-  'kwasia', 'kwasea', 'kwasɛa', 'gyimi', 'gyimii', 'aboa', 'kwaseampanin',
-  'obaa kwasia', 'ɔbaa kwasia', 'tw3', 'twɛ', 'kasee', 'kokoo', 'kokɔɔ',
+  'kwasia', 'kwasea', 'kwasɛa', 'sia', 'gyimi', 'gyimii', 'aboa', 'kwaseampanin',
+  'obaa kwasia', 'ɔbaa kwasia', 'tw3', 'twɛ', 'wotwɛ', 'wo maame twɛ', 'kasee', 'kokoo', 'kokɔɔ',
   'abrabo', 'abrabɔ', 'abodam', 'abɔdam', 'kente', 'ashawo', 'ashewo',
   'serwaa', 'ntoro', 'ntɔrɔ', 'kwasɛa', 'gyimifɔ', 'gyimifo', 'gyimifoɔ',
-  'aboɔ', 'ɔkwasea', 'ɔgyimii', 'ɔbaa', 'ɔbarima kwasia', 'ɔkraman',
-  'kwaseafoɔ', 'kwaseafoo', 'ɔkwaseani', 'kwaseani',
+  'aboɔ', 'ɔkwasea', 'ɔgyimii', 'ɔbaa', 'ɔbarima kwasia', 'ɔkraman', 'wo maame aboa',
+  'kwaseafoɔ', 'kwaseafoo', 'ɔkwaseani', 'kwaseani', 'yarefo', 'yarefoɔ', 'wo nkontonkon', 'yaafoɔ',
   
   // More Twi insults with special characters
   'ɔtɛ', 'ote', 'ɔdwan', 'odwan', 'ɔkraman', 'okraman',

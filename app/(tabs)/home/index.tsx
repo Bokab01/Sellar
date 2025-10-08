@@ -914,8 +914,8 @@ export default function HomeScreen() {
                 <Suspense fallback={<LoadingSkeleton width="100%" height={200} />}>
                   <CodeSplitting.FixedFeaturedListings
                     maxItems={10}
-                  layout="horizontal"
-                  onViewAll={() => {
+                layout="horizontal"
+                onViewAll={() => {
                       navigation.home.goToBusinessListings();
                     }}
                   />

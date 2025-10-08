@@ -396,7 +396,7 @@ export function usePushNotifications() {
         case 'message': {
           const messageData = data as MessageNotificationData;
           if (messageData.conversation_id) {
-            router.push(`/(tabs)/inbox/${messageData.conversation_id}` as any);
+            router.push(`/chat-detail/${messageData.conversation_id}` as any);
           } else {
             router.push('/(tabs)/inbox');
           }
@@ -411,7 +411,7 @@ export function usePushNotifications() {
           if (offerData.listing_id) {
             router.push(`/(tabs)/home/${offerData.listing_id}` as any);
           } else if (offerData.conversation_id) {
-            router.push(`/(tabs)/inbox/${offerData.conversation_id}` as any);
+            router.push(`/chat-detail/${offerData.conversation_id}` as any);
           } else {
             router.push('/(tabs)/inbox');
           }

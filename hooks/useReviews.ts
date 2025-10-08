@@ -332,23 +332,25 @@ export function useCreateReview() {
 
       // Check if content is approved
       if (!moderationResult.isApproved) {
-        if (moderationResult.requiresManualReview) {
-          throw new Error('Your review has been submitted for review due to our content policies. You will be notified once the review is complete.');
-        } else {
-          // Content was rejected
-          const flagReasons = moderationResult.flags
-            .map(flag => {
-              if (flag.type === 'profanity') return 'Inappropriate language detected';
-              if (flag.type === 'personal_info') return 'Personal information detected';
-              if (flag.type === 'spam') return 'Spam-like content detected';
-              if (flag.type === 'inappropriate') return 'Inappropriate content detected';
-              if (flag.type === 'suspicious_links') return 'Suspicious links detected';
-              return flag.details;
-            })
-            .join('\n• ');
-          
-          throw new Error(`Your review cannot be published:\n\n• ${flagReasons}\n\nPlease review and modify your content.`);
-        }
+        // Extract specific violations with user-friendly messages
+        const flagReasons = moderationResult.flags
+          .map(flag => {
+            if (flag.type === 'profanity') {
+              return 'Inappropriate language detected';
+            } else if (flag.type === 'personal_info') {
+              return 'Too much personal information (multiple phone numbers/emails)';
+            } else if (flag.type === 'spam') {
+              return 'Spam-like content detected';
+            } else if (flag.type === 'inappropriate') {
+              return 'Inappropriate content detected';
+            } else if (flag.type === 'suspicious_links') {
+              return 'Suspicious or shortened links detected';
+            }
+            return flag.details;
+          })
+          .join('\n• ');
+        
+        throw new Error(`Your review cannot be published:\n\n• ${flagReasons}\n\nPlease review and modify your content, then try again.`);
       }
 
       const { data, error: createError } = await supabase

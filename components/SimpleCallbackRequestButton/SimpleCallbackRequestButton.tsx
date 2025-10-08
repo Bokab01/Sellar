@@ -104,7 +104,7 @@ export function SimpleCallbackRequestButton({
       
       // Navigate to chat after a brief delay
       setTimeout(() => {
-        router.push(`/(tabs)/inbox/${conversationId}`);
+        router.push(`/chat-detail/${conversationId}` as any);
       }, 1500);
       
     } catch (error) {

@@ -371,14 +371,17 @@ export default function InboxScreen() {
         image: conv.listing.images?.[0],
       } : null,
       isTyping: isOtherUserTyping,
+      lastMessage: lastMessage, // Include lastMessage for filtering
     };
   });
 
-  const filteredConversations = transformedConversations.filter(conv =>
-    conv.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    conv.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (conv.listing?.title && conv.listing.title.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredConversations = transformedConversations
+    .filter(conv => conv.lastMessage) // Filter out conversations without messages
+    .filter(conv =>
+      conv.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      conv.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (conv.listing?.title && conv.listing.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
 
   return (
     <SafeAreaWrapper>
@@ -386,7 +389,7 @@ export default function InboxScreen() {
         title={isSelectionMode ? `${selectedConversations.size} selected` : "Inbox"}
         subtitle={isSelectionMode ? "Tap conversations to select" : undefined}
         showBackButton={true}
-        onBackPress={() => router.back()}
+        onBackPress={() => router.push('/(tabs)/home')}
         rightActions={isSelectionMode ? [
           // Selection mode actions
           selectedConversations.size > 0 && (
@@ -574,10 +577,10 @@ export default function InboxScreen() {
                     <TouchableOpacity
                       onPress={() => {
                         if (isSelectionMode) {
-                          toggleConversationSelection(conversation.id);
-                        } else {
-                          router.push(`/(tabs)/inbox/${conversation.id}`);
-                        }
+                        toggleConversationSelection(conversation.id);
+                      } else {
+                        router.push(`/chat-detail/${conversation.id}` as any);
+                      }
                       }}
                       onLongPress={() => handleLongPress(conversation.id)}
                       delayLongPress={500}

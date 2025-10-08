@@ -1,0 +1,25 @@
+# Ignore the Next.js admin dashboard
+sellar-admin/
+
+# Ignore documentation
+docs/
+*.md
+
+# Ignore test files
+__tests__/
+e2e/
+*.test.ts
+*.test.tsx
+*.test.js
+
+# Ignore scripts
+scripts/
+
+# Ignore SQL files
+*.sql
+
+# Ignore Python scripts
+*.py
+
+# Ignore other admin/backend files
+ADMIN_DASHBOARD_SETUP_COMPLETE.md

@@ -117,7 +117,7 @@ export { SplashScreenManager, useSplashScreen } from './SplashScreen';
 export { Grid } from './Grid/Grid';
 
 // Alert
-export { Alert } from './Alert/Alert';
+export { AlertBanner } from './Alert/AlertBanner';
 
 // Auth Error Boundary
 export { AuthErrorBoundary } from './AuthErrorBoundary/AuthErrorBoundary';

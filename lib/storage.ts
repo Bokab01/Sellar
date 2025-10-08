@@ -61,6 +61,13 @@ const checkBucketAccess = async (bucket: string): Promise<{ accessible: boolean;
   }
 };
 
+// Helper to detect if file is a video
+const isVideoFile = (uri: string): boolean => {
+  const videoExtensions = ['.mp4', '.mov', '.m4v', '.avi', '.wmv', '.flv', '.webm'];
+  const lowerUri = uri.toLowerCase();
+  return videoExtensions.some(ext => lowerUri.includes(ext));
+};
+
 export const storageHelpers = {
   async uploadImage(
     uri: string, 
@@ -72,6 +79,12 @@ export const storageHelpers = {
   ): Promise<UploadResult> {
     console.log(`🚀 Starting upload to bucket: ${bucket}, folder: ${folder}, user: ${userId}`);
     
+    // Check if this is a video file
+    if (isVideoFile(uri)) {
+      console.log(`🎬 Detected video file, using video upload method`);
+      return this.uploadVideo(uri, bucket, folder, userId, retries);
+    }
+    
     // Use the specified bucket directly - no fallbacks to maintain clean bucket structure
     try {
       console.log(`🎯 Uploading to specified bucket: ${bucket}`);
@@ -82,6 +95,149 @@ export const storageHelpers = {
       console.error(`❌ Upload failed to bucket ${bucket}:`, error);
       throw error;
     }
+  },
+
+  async uploadVideo(
+    uri: string,
+    bucket: string = STORAGE_BUCKETS.LISTINGS,
+    folder: string = '',
+    userId?: string,
+    retries: number = 3
+  ): Promise<UploadResult> {
+    console.log(`🎬 Starting video upload to bucket: ${bucket}, folder: ${folder}, user: ${userId}`);
+    
+    let lastError: Error | null = null;
+    
+    // Check network connectivity
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      await fetch('https://www.google.com/favicon.ico', { 
+        method: 'HEAD', 
+        signal: controller.signal 
+      });
+      clearTimeout(timeoutId);
+    } catch (networkError) {
+      throw new Error('No internet connection. Please check your network and try again.');
+    }
+
+    // Check bucket access
+    const bucketCheck = await checkBucketAccess(bucket);
+    if (!bucketCheck.accessible) {
+      console.error('🚫 Bucket access failed:', bucketCheck);
+      throw new Error(`Storage access failed: ${bucketCheck.error || 'Unknown error'}`);
+    }
+
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        console.log(`Video upload attempt ${attempt}/${retries} for: ${uri}`);
+        
+        // Get file extension
+        const uriParts = uri.split('.');
+        const fileExtension = uriParts[uriParts.length - 1].toLowerCase();
+        
+        // Generate unique filename
+        const timestamp = Date.now();
+        const randomId = Math.random().toString(36).substring(2);
+        
+        let filename: string;
+        if (bucket === STORAGE_BUCKETS.LISTINGS) {
+          filename = `${userId || 'anonymous'}/${folder || 'listing'}/${timestamp}_${randomId}.${fileExtension}`;
+        } else if (bucket === STORAGE_BUCKETS.COMMUNITY) {
+          filename = `posts/${userId || 'anonymous'}/${folder || timestamp}/${timestamp}_${randomId}.${fileExtension}`;
+        } else if (bucket === STORAGE_BUCKETS.CHAT) {
+          filename = `${folder}/${userId || 'anonymous'}/${timestamp}_${randomId}.${fileExtension}`;
+        } else {
+          filename = `${userId || 'anonymous'}/${timestamp}_${randomId}.${fileExtension}`;
+        }
+
+        // Check session
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          throw new Error('No authenticated session found');
+        }
+
+        // Get original file info for comparison
+        const fileInfo = await FileSystem.getInfoAsync(uri);
+        const originalSizeBytes = (fileInfo.exists && 'size' in fileInfo) ? fileInfo.size : 0;
+        const originalSizeMB = (originalSizeBytes / (1024 * 1024)).toFixed(2);
+        console.log(`📹 Original video size: ${originalSizeMB} MB (${originalSizeBytes} bytes)`);
+        
+        console.log('Reading video file as base64...');
+        const base64 = await FileSystem.readAsStringAsync(uri, {
+          encoding: 'base64',
+        });
+        
+        if (!base64 || base64.length === 0) {
+          throw new Error('Failed to read video file - empty base64 data');
+        }
+        
+        console.log('Converting base64 to buffer...');
+        const buffer = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+        const compressedSizeMB = (buffer.length / (1024 * 1024)).toFixed(2);
+        const compressionRatio = originalSizeBytes > 0 
+          ? ((1 - buffer.length / originalSizeBytes) * 100).toFixed(1)
+          : '0';
+        console.log(`📦 Compressed video size: ${compressedSizeMB} MB (${buffer.length} bytes)`);
+        console.log(`🎯 Compression: ${compressionRatio}% size reduction`);
+        
+        if (buffer.length === 0) {
+          throw new Error('Failed to convert video - empty buffer');
+        }
+        
+        // Determine content type
+        const contentTypeMap: Record<string, string> = {
+          'mp4': 'video/mp4',
+          'mov': 'video/quicktime',
+          'm4v': 'video/x-m4v',
+          'avi': 'video/x-msvideo',
+          'wmv': 'video/x-ms-wmv',
+          'flv': 'video/x-flv',
+          'webm': 'video/webm',
+        };
+        const contentType = contentTypeMap[fileExtension] || 'video/mp4';
+        
+        console.log(`Uploading video buffer (${buffer.length} bytes) to Supabase...`);
+        const { data, error } = await supabase.storage
+          .from(bucket)
+          .upload(filename, buffer, {
+            contentType,
+            upsert: true,
+          });
+
+        if (error) {
+          console.error('Supabase video upload error:', error);
+          throw new Error(error.message || 'Video upload failed');
+        }
+        
+        if (!data) {
+          throw new Error('Upload succeeded but no data returned');
+        }
+        
+        console.log('✅ Video upload successful:', data.path);
+        
+        const { data: urlData } = supabase.storage
+          .from(bucket)
+          .getPublicUrl(data.path);
+
+        return {
+          url: urlData.publicUrl,
+          path: data.path,
+        };
+        
+      } catch (error) {
+        console.error(`Video upload attempt ${attempt} failed:`, error);
+        lastError = error instanceof Error ? error : new Error(String(error));
+        
+        if (attempt < retries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+          console.log(`Retrying video upload in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    throw lastError || new Error('Video upload failed after all retries');
   },
 
   async uploadToSpecificBucket(

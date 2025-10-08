@@ -211,6 +211,44 @@ export function useMessages(conversationId: string) {
     console.log('📤 Sending message:', { content, messageType, conversationId, senderId: user.id, images });
 
     try {
+      // Only moderate text messages (not system messages, offers, etc.)
+      if (messageType === 'text' && content.trim()) {
+        const { contentModerationService } = await import('@/lib/contentModerationService');
+        
+        const moderationResult = await contentModerationService.moderateContent({
+          id: 'temp-message-id',
+          type: 'comment', // Messages are similar to comments
+          userId: user.id,
+          content: content,
+          images: images,
+        });
+
+        // Check if content is approved
+        if (!moderationResult.isApproved) {
+          // Extract specific violations with user-friendly messages
+          const flagReasons = moderationResult.flags
+            .map(flag => {
+              if (flag.type === 'profanity') {
+                return 'Inappropriate language detected';
+              } else if (flag.type === 'personal_info') {
+                return 'Too much personal information (multiple phone numbers/emails)';
+              } else if (flag.type === 'spam') {
+                return 'Spam-like content detected';
+              } else if (flag.type === 'inappropriate') {
+                return 'Inappropriate content detected';
+              } else if (flag.type === 'suspicious_links') {
+                return 'Suspicious or shortened links detected';
+              }
+              return flag.details;
+            })
+            .join('\n• ');
+          
+          return { 
+            error: `Your message cannot be sent:\n\n• ${flagReasons}\n\nPlease review and modify your content, then try again.` 
+          };
+        }
+      }
+
       const messageData: any = {
         conversation_id: conversationId,
         sender_id: user.id,

@@ -7,14 +7,17 @@ import { AppModal } from '@/components/Modal/Modal';
 import { LinearProgress } from '@/components/ProgressIndicator/ProgressIndicator';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import * as ImagePicker from 'expo-image-picker';
+import { VideoView, useVideoPlayer } from 'expo-video';
 
-import { Camera, Image as ImageIcon, X, Plus } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, X, Plus, Play } from 'lucide-react-native';
 
 export interface SelectedImage {
   uri: string;
   id: string;
   type?: string;
   name?: string;
+  mediaType?: 'image' | 'video'; // Track if it's an image or video
+  duration?: number; // Video duration in milliseconds
 }
 
 interface ImagePickerProps {
@@ -30,6 +33,143 @@ interface ImagePickerProps {
   disabled?: boolean;
   style?: any;
   title?: string;
+  allowVideos?: boolean; // New prop to enable video selection
+  maxVideoDuration?: number; // Max video duration in seconds (default 60)
+}
+
+// Video Preview Item Component
+function VideoPreviewItem({ 
+  image, 
+  index, 
+  theme, 
+  onRemove 
+}: { 
+  image: SelectedImage; 
+  index: number; 
+  theme: any; 
+  onRemove: (id: string) => void;
+}) {
+  const player = image.mediaType === 'video' 
+    ? useVideoPlayer(image.uri, (player) => {
+        player.pause();
+      })
+    : null;
+
+  return (
+    <View
+      style={{
+        position: 'relative',
+        width: 100,
+        height: 100,
+      }}
+    >
+      {image.mediaType === 'video' && player ? (
+        <>
+          {/* Video Preview */}
+          <VideoView
+            player={player}
+            style={{
+              width: '100%',
+              height: '100%',
+              borderRadius: theme.borderRadius.md,
+              backgroundColor: theme.colors.surfaceVariant,
+            }}
+            contentFit="cover"
+            nativeControls={false}
+          />
+          {/* Video Play Icon Overlay */}
+          <View style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+            borderRadius: theme.borderRadius.md,
+          }}>
+            <Play size={32} color="#FFFFFF" fill="#FFFFFF" />
+          </View>
+          {/* Video Duration Badge */}
+          {image.duration && (
+            <View style={{
+              position: 'absolute',
+              bottom: theme.spacing.xs,
+              right: theme.spacing.xs,
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              paddingHorizontal: theme.spacing.xs,
+              paddingVertical: 2,
+              borderRadius: theme.borderRadius.sm,
+            }}>
+              <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '600' }}>
+                {Math.floor(image.duration / 1000)}s
+              </Text>
+            </View>
+          )}
+        </>
+      ) : (
+        /* Image Preview */
+        <Image
+          source={{ uri: image.uri }}
+          style={{
+            width: '100%',
+            height: '100%',
+            borderRadius: theme.borderRadius.md,
+            backgroundColor: theme.colors.surfaceVariant,
+          }}
+          resizeMode="cover"
+        />
+      )}
+
+      {/* Remove Button */}
+      <TouchableOpacity
+        onPress={() => onRemove(image.id)}
+        style={{
+          position: 'absolute',
+          top: -theme.spacing.xs,
+          right: -theme.spacing.xs,
+          backgroundColor: theme.colors.error,
+          borderRadius: theme.borderRadius.full,
+          width: 28,
+          height: 28,
+          justifyContent: 'center',
+          alignItems: 'center',
+          ...theme.shadows.sm,
+          borderWidth: 2,
+          borderColor: theme.colors.surface,
+        }}
+      >
+        <X size={16} color={theme.colors.errorForeground} />
+      </TouchableOpacity>
+
+      {/* Image Number */}
+      <View
+        style={{
+          position: 'absolute',
+          bottom: theme.spacing.xs,
+          left: theme.spacing.xs,
+          backgroundColor: theme.colors.primary,
+          borderRadius: theme.borderRadius.sm,
+          paddingHorizontal: theme.spacing.sm,
+          paddingVertical: theme.spacing.xs,
+          minWidth: 20,
+          alignItems: 'center',
+        }}
+      >
+        <Text
+          variant="caption"
+          style={{
+            color: theme.colors.primaryForeground,
+            fontSize: 10,
+            fontWeight: '600',
+          }}
+        >
+          {index + 1}
+        </Text>
+      </View>
+    </View>
+  );
 }
 
 export function CustomImagePicker({
@@ -45,6 +185,8 @@ export function CustomImagePicker({
   disabled = false,
   style,
   title = "Product Images",
+  allowVideos = false,
+  maxVideoDuration = 60,
 }: ImagePickerProps) {
   const { theme } = useTheme();
   const { uploading, progress, error: uploadError, uploadMultiple } = useImageUpload({
@@ -89,25 +231,56 @@ export function CustomImagePicker({
     if (!hasPermission) return;
 
     if (value.length >= limit) {
-      showError(`Maximum ${limit} images allowed`);
+      showError(`Maximum ${limit} ${allowVideos ? 'items' : 'images'} allowed`);
       return;
     }
 
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: undefined, // Allow flexible aspect ratio
+        mediaTypes: allowVideos ? ['images', 'videos'] : ['images'],
+        allowsEditing: !allowVideos, // Disable editing for videos
+        aspect: allowVideos ? undefined : undefined, // Allow flexible aspect ratio
+        videoMaxDuration: allowVideos ? maxVideoDuration : undefined,
+        videoQuality: allowVideos ? 0 : undefined, // 0 = low quality (compressed), 1 = high quality
         quality: 0.8,
         exif: false, // Don't include EXIF data to reduce file size
       });
 
       if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        const isVideo = asset.type === 'video';
+        
+        // Log video info for verification
+        if (isVideo) {
+          console.log('📹 Video selected:', {
+            duration: asset.duration ? `${(asset.duration / 1000).toFixed(1)}s` : 'unknown',
+            width: asset.width,
+            height: asset.height,
+            fileSize: asset.fileSize ? `${(asset.fileSize / (1024 * 1024)).toFixed(2)} MB` : 'unknown',
+          });
+        }
+        
+        // Check video duration if it's a video
+        if (isVideo && asset.duration && asset.duration > maxVideoDuration * 1000) {
+          showError(`Video must be ${maxVideoDuration} seconds or less`);
+          return;
+        }
+        
+        // Check video file size (max 50 MB to prevent memory issues)
+        const MAX_VIDEO_SIZE_MB = 50;
+        const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
+        if (isVideo && asset.fileSize && asset.fileSize > MAX_VIDEO_SIZE_BYTES) {
+          showError(`Video is too large (${(asset.fileSize / (1024 * 1024)).toFixed(1)} MB). Maximum size is ${MAX_VIDEO_SIZE_MB} MB. Please record a shorter video or reduce quality.`);
+          return;
+        }
+        
         const newImage: SelectedImage = {
-          uri: result.assets[0].uri,
+          uri: asset.uri,
           id: Date.now().toString(),
-          type: result.assets[0].type,
-          name: result.assets[0].fileName || `image_${Date.now()}.jpg`,
+          type: asset.type,
+          name: asset.fileName || `${isVideo ? 'video' : 'image'}_${Date.now()}.${isVideo ? 'mp4' : 'jpg'}`,
+          mediaType: isVideo ? 'video' : 'image',
+          duration: asset.duration || undefined,
         };
 
         onChange([...value, newImage]);
@@ -119,7 +292,7 @@ export function CustomImagePicker({
         // Photo captured successfully
       }
     } catch (error) {
-      showError('Failed to capture photo');
+      showError(`Failed to capture ${allowVideos ? 'media' : 'photo'}`);
     }
   };
 
@@ -127,34 +300,63 @@ export function CustomImagePicker({
     if (!(await requestPermissions('library'))) return;
 
     if (value.length >= limit) {
-      showError(`Maximum ${limit} images already selected`);
+      showError(`Maximum ${limit} ${allowVideos ? 'items' : 'images'} already selected`);
       return;
     }
 
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: allowVideos ? ['images', 'videos'] : ['images'],
         allowsMultipleSelection: true, // Always allow multiple selection
         selectionLimit: Math.max(1, limit - value.length), // Only allow selecting up to remaining slots
         quality: 0.8,
+        videoQuality: allowVideos ? 0 : undefined, // 0 = low quality (compressed), 1 = high quality
         allowsEditing: false, // Disable editing to allow multiple selection and flexible cropping
         exif: false, // Don't include EXIF data to reduce file size
+        videoMaxDuration: allowVideos ? maxVideoDuration : undefined,
       });
 
       if (!result.canceled && result.assets.length > 0) {
-        const newImages: SelectedImage[] = result.assets.map((asset, index) => ({
-          uri: asset.uri,
-          id: `${Date.now()}_${index}`,
-          type: 'image',
-          name: asset.fileName || `image_${Date.now()}_${index}.jpg`,
-        }));
+        const MAX_VIDEO_SIZE_MB = 50;
+        const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
+        
+        const newImages: SelectedImage[] = result.assets
+          .filter((asset) => {
+            const isVideo = asset.type === 'video';
+            
+            // Check video duration
+            if (isVideo && asset.duration && asset.duration > maxVideoDuration * 1000) {
+              showError(`Video must be ${maxVideoDuration} seconds or less`);
+              return false;
+            }
+            
+            // Check video file size
+            if (isVideo && asset.fileSize && asset.fileSize > MAX_VIDEO_SIZE_BYTES) {
+              showError(`Video is too large (${(asset.fileSize / (1024 * 1024)).toFixed(1)} MB). Maximum size is ${MAX_VIDEO_SIZE_MB} MB.`);
+              return false;
+            }
+            
+            return true;
+          })
+          .map((asset, index) => {
+            const isVideo = asset.type === 'video';
+            
+            return {
+              uri: asset.uri,
+              id: `${Date.now()}_${index}`,
+              type: asset.type || 'image',
+              name: asset.fileName || `${isVideo ? 'video' : 'image'}_${Date.now()}_${index}.${isVideo ? 'mp4' : 'jpg'}`,
+              mediaType: isVideo ? 'video' as const : 'image' as const,
+              duration: asset.duration || undefined,
+            };
+          });
 
         // Check if adding new images would exceed the limit
         const totalImages = value.length + newImages.length;
         if (totalImages > limit) {
           const availableSlots = limit - value.length;
           if (availableSlots <= 0) {
-            showError(`Maximum ${limit} images allowed`);
+            showError(`Maximum ${limit} ${allowVideos ? 'items' : 'images'} allowed`);
             return;
           }
           const imagesToAdd = newImages.slice(0, availableSlots);
@@ -174,7 +376,7 @@ export function CustomImagePicker({
         }
       }
     } catch (error) {
-      showError('Failed to select images from library');
+      showError(`Failed to select ${allowVideos ? 'media' : 'images'} from library`);
     }
     
     setShowPicker(false);
@@ -241,7 +443,7 @@ export function CustomImagePicker({
             color={uploadError ? "error" : "muted"}
             style={{ textAlign: 'center', marginTop: theme.spacing.sm }}
           >
-            {uploadError || `Uploading images... ${Math.round(progress * 100)}%`}
+            {uploadError || `Uploading ${allowVideos ? 'media' : 'images'}... ${Math.round(progress * 100)}%`}
           </Text>
         </View>
       )}
@@ -283,74 +485,15 @@ export function CustomImagePicker({
             paddingRight: theme.spacing.md,
           }}
         >
-        {/* Selected Images */}
+        {/* Selected Images and Videos */}
         {value.map((image, index) => (
-          <View
+          <VideoPreviewItem 
             key={image.id}
-            style={{
-              position: 'relative',
-              width: 100,
-              height: 100,
-            }}
-          >
-            <Image
-              source={{ uri: image.uri }}
-              style={{
-                width: '100%',
-                height: '100%',
-                borderRadius: theme.borderRadius.md,
-                backgroundColor: theme.colors.surfaceVariant,
-              }}
-              resizeMode="cover"
-            />
-
-            {/* Remove Button */}
-            <TouchableOpacity
-              onPress={() => removeImage(image.id)}
-              style={{
-                position: 'absolute',
-                top: -theme.spacing.xs,
-                right: -theme.spacing.xs,
-                backgroundColor: theme.colors.error,
-                borderRadius: theme.borderRadius.full,
-                width: 28,
-                height: 28,
-                justifyContent: 'center',
-                alignItems: 'center',
-                ...theme.shadows.sm,
-                borderWidth: 2,
-                borderColor: theme.colors.surface,
-              }}
-            >
-              <X size={16} color={theme.colors.errorForeground} />
-            </TouchableOpacity>
-
-            {/* Image Number */}
-            <View
-              style={{
-                position: 'absolute',
-                bottom: theme.spacing.xs,
-                left: theme.spacing.xs,
-                backgroundColor: theme.colors.primary,
-                borderRadius: theme.borderRadius.sm,
-                paddingHorizontal: theme.spacing.sm,
-                paddingVertical: theme.spacing.xs,
-                minWidth: 20,
-                alignItems: 'center',
-              }}
-            >
-              <Text
-                variant="caption"
-                style={{
-                  color: theme.colors.primaryForeground,
-                  fontSize: 10,
-                  fontWeight: '600',
-                }}
-              >
-                {index + 1}
-              </Text>
-            </View>
-          </View>
+            image={image}
+            index={index}
+            theme={theme}
+            onRemove={removeImage}
+          />
         ))}
 
         {/* Add Image Button */}
@@ -412,7 +555,7 @@ export function CustomImagePicker({
                 fontSize: 12,
               }}
             >
-              {value.length === 0 ? 'Add Images' : 'Add More'}
+              {value.length === 0 ? (allowVideos ? 'Add Media' : 'Add Images') : 'Add More'}
             </Text>
           </TouchableOpacity>
         )}
@@ -429,10 +572,10 @@ export function CustomImagePicker({
           }}
         >
           {value.length === 0
-            ? `Add up to ${limit} images to showcase your product`
+            ? `Add up to ${limit} ${allowVideos ? 'photos or videos' : 'images'} to showcase your product`
             : value.length === limit
-            ? 'Maximum images reached'
-            : `Add ${limit - value.length} more image${limit - value.length > 1 ? 's' : ''}`}
+            ? `Maximum ${allowVideos ? 'media' : 'images'} reached`
+            : `Add ${limit - value.length} more ${allowVideos ? 'item' : 'image'}${limit - value.length > 1 ? 's' : ''}`}
         </Text>
       </View>
 
@@ -440,7 +583,7 @@ export function CustomImagePicker({
       <AppModal
         visible={showPicker}
         onClose={() => setShowPicker(false)}
-        title="Add Images"
+        title={allowVideos ? "Add Media" : "Add Images"}
         size="sm"
         position="bottom"
       >
@@ -451,8 +594,8 @@ export function CustomImagePicker({
             marginBottom: theme.spacing.md,
           }}>
             {limit > 1 
-              ? `Choose how you'd like to add images (up to ${limit - value.length} more)`
-              : "Choose how you'd like to add an image"
+              ? `Choose how you'd like to add ${allowVideos ? 'photos or videos' : 'images'} (up to ${limit - value.length} more)`
+              : `Choose how you'd like to add ${allowVideos ? 'a photo or video' : 'an image'}`
             }
           </Text>
 
@@ -468,7 +611,7 @@ export function CustomImagePicker({
                 ...theme.shadows.md,
               }}
             >
-              Take Photo
+              {allowVideos ? 'Take Photo or Video' : 'Take Photo'}
             </Button>
 
             <Button
@@ -482,7 +625,9 @@ export function CustomImagePicker({
                 ...theme.shadows.sm,
               }}
             >
-              {limit > 1 ? 'Select Multiple Images' : 'Choose from Gallery'}
+              {limit > 1 
+                ? `Select Multiple ${allowVideos ? 'Items' : 'Images'}` 
+                : 'Choose from Gallery'}
             </Button>
           </View>
 
@@ -502,7 +647,7 @@ export function CustomImagePicker({
                 color: theme.colors.primary,
                 fontWeight: '500',
               }}>
-                📸 {limit - value.length} more image{limit - value.length !== 1 ? 's' : ''} can be added
+                {allowVideos ? '📸🎥' : '📸'} {limit - value.length} more {allowVideos ? 'item' : 'image'}{limit - value.length !== 1 ? 's' : ''} can be added
               </Text>
             </View>
           )}

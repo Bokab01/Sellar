@@ -161,34 +161,36 @@ export function useCommunityPosts(options: {
 
       // Check if content is approved
       if (!moderationResult.isApproved) {
-        if (moderationResult.requiresManualReview) {
-          // Content requires manual review
-          return { 
-            error: 'Your post has been submitted for review due to our content policies. You will be notified once the review is complete.' 
-          };
-        } else {
-          // Content was rejected - extract specific violations
-          const flagReasons = moderationResult.flags
-            .map(flag => {
-              if (flag.type === 'profanity') {
-                return 'Inappropriate language detected';
-              } else if (flag.type === 'personal_info') {
-                return 'Personal information detected (phone/email/address)';
-              } else if (flag.type === 'spam') {
-                return 'Spam-like content detected';
-              } else if (flag.type === 'inappropriate') {
-                return 'Inappropriate content detected';
-              } else if (flag.type === 'suspicious_links') {
-                return 'Suspicious links detected';
-              }
-              return flag.details;
-            })
-            .join('\n• ');
-          
-          return { 
-            error: `Your post cannot be published:\n\n• ${flagReasons}\n\nPlease review and modify your content.` 
-          };
-        }
+        // Log moderation details for debugging
+        console.log('🚨 Post moderation failed:', {
+          requiresManualReview: moderationResult.requiresManualReview,
+          suggestedAction: moderationResult.suggestedAction,
+          confidence: moderationResult.confidence,
+          flags: moderationResult.flags,
+          content: content.substring(0, 100) + '...' // Log first 100 chars
+        });
+
+        // Extract specific violations with user-friendly messages
+        const flagReasons = moderationResult.flags
+          .map(flag => {
+            if (flag.type === 'profanity') {
+              return 'Inappropriate language detected';
+            } else if (flag.type === 'personal_info') {
+              return 'Too much personal information (multiple phone numbers/emails)';
+            } else if (flag.type === 'spam') {
+              return 'Spam-like content detected';
+            } else if (flag.type === 'inappropriate') {
+              return 'Inappropriate content detected';
+            } else if (flag.type === 'suspicious_links') {
+              return 'Suspicious or shortened links detected';
+            }
+            return flag.details;
+          })
+          .join('\n• ');
+        
+        return { 
+          error: `Your post cannot be published:\n\n• ${flagReasons}\n\nPlease review and modify your content, then try again.` 
+        };
       }
 
       const postData = {

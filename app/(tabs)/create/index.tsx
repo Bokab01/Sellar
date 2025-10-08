@@ -129,6 +129,7 @@ function CreateListingScreen() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [userListingsCount, setUserListingsCount] = useState(0);
   const [showPhotoTips, setShowPhotoTips] = useState(false);
+  const [showListingTipsModal, setShowListingTipsModal] = useState(false);
   
   // Feature selector state
   const [showFeatureSelector, setShowFeatureSelector] = useState(false);
@@ -150,8 +151,13 @@ function CreateListingScreen() {
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
   const [hasShownDraftAlert, setHasShownDraftAlert] = useState(false);
   const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastAutosaveTimeRef = useRef<number>(0); // Track last autosave time for throttling
   const AUTOSAVE_KEY = useMemo(() => `listing_draft_${user?.id || 'anonymous'}`, [user?.id]);
   const [selectedCategory, setSelectedCategory] = useState<DbCategory | null>(null);
+  
+  // Autosave configuration
+  const AUTOSAVE_DEBOUNCE_MS = 3000; // Wait 3 seconds after user stops typing
+  const AUTOSAVE_THROTTLE_MS = 15000; // Minimum 15 seconds between database saves
   
   // Cleanup on unmount to prevent memory leaks and state updates after unmount
   useEffect(() => {
@@ -256,13 +262,20 @@ function CreateListingScreen() {
       if (!isMountedRef.current) return; // Double check before state update
       setIsAutoSaving(true);
       
-      // Save to AsyncStorage for local persistence
+      // Always save to AsyncStorage for instant local persistence (fast, no cost)
       await AsyncStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
       lastSavedDataRef.current = currentDataString;
       
-      // Only save to database if we have meaningful content AND a category is selected
-      // category_id is required in the database, so we can't save without it
-      if ((data.title?.trim() || data.description?.trim() || data.images?.length > 0) && data.categoryId) {
+      // Throttle database saves to reduce costs and network requests
+      const now = Date.now();
+      const timeSinceLastSave = now - lastAutosaveTimeRef.current;
+      const shouldSaveToDatabase = isManualSave || timeSinceLastSave >= AUTOSAVE_THROTTLE_MS;
+      
+      // Only save to database if:
+      // 1. Manual save OR throttle period has passed
+      // 2. Has meaningful content AND category is selected
+      if (shouldSaveToDatabase && (data.title?.trim() || data.description?.trim() || data.images?.length > 0) && data.categoryId) {
+        lastAutosaveTimeRef.current = now; // Update last save time
         // CategoryId from CategoryPicker is already a valid UUID
         const categoryUUID = data.categoryId;
 
@@ -455,11 +468,11 @@ function CreateListingScreen() {
         clearTimeout(autosaveTimeoutRef.current);
       }
       
-      // Set new timeout for autosave
+      // Set new timeout for autosave (debounced)
       autosaveTimeoutRef.current = setTimeout(() => {
         const currentData = formDataRef.current;
         saveDraft(currentData, false); // false = autosave, not manual save
-      }, 2000) as any;
+      }, AUTOSAVE_DEBOUNCE_MS) as any;
       
       // Debounced validation with proper async handling
       setIsValidating(true);
@@ -482,15 +495,19 @@ function CreateListingScreen() {
 
   const nextStep = useCallback(() => {
     if (currentStep < STEPS.length - 1 && canProceed) {
+      // Save draft immediately when moving to next step (important milestone)
+      saveDraft(formDataRef.current, true); // true = manual save (bypasses throttle)
       setCurrentStep(currentStep + 1);
     }
-  }, [currentStep, canProceed]);
+  }, [currentStep, canProceed, saveDraft]);
 
   const previousStep = useCallback(() => {
     if (currentStep > 0) {
+      // Save draft when going back (user might leave)
+      saveDraft(formDataRef.current, true); // true = manual save (bypasses throttle)
       setCurrentStep(currentStep - 1);
     }
-  }, [currentStep]);
+  }, [currentStep, saveDraft]);
 
   const handleSubmit = async () => {
     // Check if payment is needed for additional listings
@@ -689,42 +706,30 @@ function CreateListingScreen() {
       if (!moderationResult.isApproved) {
         setLoading(false);
         
-        if (moderationResult.requiresManualReview) {
-          Alert.alert(
-            'Content Under Review',
-            'Your listing has been submitted for review due to our content policies. You will be notified once the review is complete.',
-            [{ text: 'OK' }]
-          );
-          // Set status to pending for manual review
-          listingData.status = 'pending';
-        } else {
-          // Content was rejected/flagged - extract the specific violations
-          const flagTypes = moderationResult.flags.map(flag => flag.type).join(', ');
-          const flagReasons = moderationResult.flags
-            .map(flag => {
-              // Make the error message more user-friendly
-              if (flag.type === 'profanity') {
-                return 'Inappropriate language detected';
-              } else if (flag.type === 'personal_info') {
-                return 'Personal information detected (phone/email/address)';
-              } else if (flag.type === 'spam') {
-                return 'Spam-like content detected';
-              } else if (flag.type === 'inappropriate') {
-                return 'Inappropriate content detected';
-              } else if (flag.type === 'suspicious_links') {
-                return 'Suspicious links detected';
-              }
-              return flag.details;
-            })
-            .join('\n• ');
-          
-          Alert.alert(
-            'Content Policy Violation',
-            `Your listing cannot be published:\n\n• ${flagReasons}\n\nPlease review and modify your content.`,
-            [{ text: 'OK' }]
-          );
-          return;
-        }
+        // Extract specific violations with user-friendly messages
+        const flagReasons = moderationResult.flags
+          .map(flag => {
+            if (flag.type === 'profanity') {
+              return 'Inappropriate language detected';
+            } else if (flag.type === 'personal_info') {
+              return 'Too much personal information (multiple phone numbers/emails)';
+            } else if (flag.type === 'spam') {
+              return 'Spam-like content detected';
+            } else if (flag.type === 'inappropriate') {
+              return 'Inappropriate content detected';
+            } else if (flag.type === 'suspicious_links') {
+              return 'Suspicious or shortened links detected';
+            }
+            return flag.details;
+          })
+          .join('\n• ');
+        
+        Alert.alert(
+          'Cannot Publish Listing',
+          `Your listing cannot be published:\n\n• ${flagReasons}\n\nPlease review and modify your content, then try again.`,
+          [{ text: 'OK' }]
+        );
+        return;
       }
 
       const { data: listing, error: listingError } = await dbHelpers.createListing(listingData);
@@ -981,15 +986,44 @@ function CreateListingScreen() {
 
   const BasicInfoStep = useMemo(() => (
     <View style={{ gap: theme.spacing.lg }}>
-      
-      {/* Photos Section */}
+      <View style={{
+            backgroundColor: theme.colors.success + '10',
+            borderRadius: theme.borderRadius.md,
+            padding: theme.spacing.sm,
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: theme.spacing.xs, padding: theme.spacing.sm }}>
+              <Text variant="bodySmall" style={{ color: theme.colors.text.secondary }}>
+                Great photos & details get 5x more views!
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowListingTipsModal(true)}
+                style={{
+                  paddingHorizontal: theme.spacing.xs,
+                  paddingVertical: 2,
+                  borderWidth: 2,
+                  borderColor: theme.colors.success + '30',
+                  borderRadius: theme.borderRadius.sm,
+                  backgroundColor: theme.colors.success + '10',
+                }}
+              >
+                <Text 
+                  variant="caption" 
+                  style={{ color: theme.colors.success, fontWeight: '600' }}>
+                  Learn More
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+      {/* Photos & Videos Section */}
       <View>
         <CustomImagePicker
           limit={8}
           value={formData.images}
           onChange={handleImagesChange}
           disabled={loading}
-          title="Upload Images"
+          title="Upload Media"
+          allowVideos={true}
+          maxVideoDuration={30}
         />
         
         {loading && uploadProgress > 0 && (
@@ -1028,7 +1062,7 @@ function CreateListingScreen() {
             marginTop: theme.spacing.sm,
           }}>
             <Text variant="bodySmall" style={{ color: theme.colors.warning, textAlign: 'center' }}>
-              📸 At least one photo is required
+              📸 At least one photo or video is required
             </Text>
           </View>
         )}
@@ -1061,15 +1095,6 @@ function CreateListingScreen() {
             error={validationResults[0]?.errors.description}
           />
 
-          <View style={{
-            backgroundColor: theme.colors.success + '10',
-            borderRadius: theme.borderRadius.md,
-            padding: theme.spacing.sm,
-          }}>
-            <Text variant="bodySmall" style={{ color: theme.colors.success, textAlign: 'center' }}>
-              💡 Great photos & details get 5x more views!
-            </Text>
-          </View>
         </View>
       </View>
     </View>
@@ -1149,7 +1174,7 @@ function CreateListingScreen() {
 
           <View style={{ gap: theme.spacing.lg }}>
             <Input
-              label="Price (GHS)"
+              label="Price (GH₵)"
               placeholder="0.00"
               value={formData.price}
               onChangeText={handlePriceChange}
@@ -1919,6 +1944,444 @@ function CreateListingScreen() {
         onFeaturesSelected={handleFeaturesSelected}
         listingTitle={formData.title || 'your listing'}
       />
+
+      {/* Listing Tips Modal */}
+      <AppModal
+        visible={showListingTipsModal}
+        onClose={() => setShowListingTipsModal(false)}
+        title="Get 5x More Views"
+        size="lg"
+        position='bottom'
+      >
+        <ScrollView 
+          style={{ maxHeight: 500 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={{ gap: theme.spacing.md }}>
+            {/* Introduction */}
+            <Text variant="bodySmall" color="secondary" style={{ lineHeight: 20 }}>
+              Follow these proven tips to make your listing stand out and attract more buyers
+            </Text>
+
+            {/* Photos Section */}
+            <View style={{
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.borderRadius.lg,
+              padding: theme.spacing.md,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
+                <View style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: theme.colors.primary + '15',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: theme.spacing.sm,
+                }}>
+                  <Text style={{ fontSize: 20 }}>📸</Text>
+                </View>
+                <Text variant="body" style={{ fontWeight: '700', flex: 1 }}>
+                  High-Quality Photos
+                </Text>
+              </View>
+              <View style={{ gap: theme.spacing.xs }}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: theme.colors.primary,
+                    marginTop: 6,
+                    marginRight: theme.spacing.sm,
+                  }} />
+                  <Text variant="bodySmall" color="secondary" style={{ flex: 1, lineHeight: 20 }}>
+                    Use natural lighting - take photos near windows or outdoors
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: theme.colors.primary,
+                    marginTop: 6,
+                    marginRight: theme.spacing.sm,
+                  }} />
+                  <Text variant="bodySmall" color="secondary" style={{ flex: 1, lineHeight: 20 }}>
+                    Show multiple angles - front, back, sides, and close-ups
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: theme.colors.primary,
+                    marginTop: 6,
+                    marginRight: theme.spacing.sm,
+                  }} />
+                  <Text variant="bodySmall" color="secondary" style={{ flex: 1, lineHeight: 20 }}>
+                    Clean background - remove clutter to make item stand out
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: theme.colors.primary,
+                    marginTop: 6,
+                    marginRight: theme.spacing.sm,
+                  }} />
+                  <Text variant="bodySmall" color="secondary" style={{ flex: 1, lineHeight: 20 }}>
+                    Include defects - show any scratches or wear honestly
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Title Section */}
+            <View style={{
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.borderRadius.lg,
+              padding: theme.spacing.md,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
+                <View style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: theme.colors.success + '15',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: theme.spacing.sm,
+                }}>
+                  <Text style={{ fontSize: 20 }}>✍️</Text>
+                </View>
+                <Text variant="body" style={{ fontWeight: '700', flex: 1 }}>
+                  Clear, Descriptive Title
+                </Text>
+              </View>
+              <View style={{ gap: theme.spacing.xs }}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: theme.colors.success,
+                    marginTop: 6,
+                    marginRight: theme.spacing.sm,
+                  }} />
+                  <Text variant="bodySmall" color="secondary" style={{ flex: 1, lineHeight: 20 }}>
+                    Include brand, model, and key features
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: theme.colors.success,
+                    marginTop: 6,
+                    marginRight: theme.spacing.sm,
+                  }} />
+                  <Text variant="bodySmall" color="secondary" style={{ flex: 1, lineHeight: 20 }}>
+                    Mention condition (e.g., "Like New", "Gently Used")
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: theme.colors.success,
+                    marginTop: 6,
+                    marginRight: theme.spacing.sm,
+                  }} />
+                  <Text variant="bodySmall" color="secondary" style={{ flex: 1, lineHeight: 20 }}>
+                    Add size, color, or year if relevant
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: theme.colors.success,
+                    marginTop: 6,
+                    marginRight: theme.spacing.sm,
+                  }} />
+                  <Text variant="bodySmall" color="secondary" style={{ flex: 1, lineHeight: 20 }}>
+                    Keep it concise - 50-70 characters is ideal
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Description Section */}
+            <View style={{
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.borderRadius.lg,
+              padding: theme.spacing.md,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
+                <View style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: theme.colors.info + '15',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: theme.spacing.sm,
+                }}>
+                  <Text style={{ fontSize: 20 }}>📝</Text>
+                </View>
+                <Text variant="body" style={{ fontWeight: '700', flex: 1 }}>
+                  Detailed Description
+                </Text>
+              </View>
+              <View style={{ gap: theme.spacing.xs }}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: theme.colors.info,
+                    marginTop: 6,
+                    marginRight: theme.spacing.sm,
+                  }} />
+                  <Text variant="bodySmall" color="secondary" style={{ flex: 1, lineHeight: 20 }}>
+                    Explain why you're selling and how long you've owned it
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: theme.colors.info,
+                    marginTop: 6,
+                    marginRight: theme.spacing.sm,
+                  }} />
+                  <Text variant="bodySmall" color="secondary" style={{ flex: 1, lineHeight: 20 }}>
+                    List what's included (accessories, box, warranty)
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: theme.colors.info,
+                    marginTop: 6,
+                    marginRight: theme.spacing.sm,
+                  }} />
+                  <Text variant="bodySmall" color="secondary" style={{ flex: 1, lineHeight: 20 }}>
+                    Mention any issues or repairs honestly
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: theme.colors.info,
+                    marginTop: 6,
+                    marginRight: theme.spacing.sm,
+                  }} />
+                  <Text variant="bodySmall" color="secondary" style={{ flex: 1, lineHeight: 20 }}>
+                    Add your location and delivery options
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Pricing Section */}
+            <View style={{
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.borderRadius.lg,
+              padding: theme.spacing.md,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
+                <View style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: theme.colors.warning + '15',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: theme.spacing.sm,
+                }}>
+                  <Text style={{ fontSize: 20 }}>💰</Text>
+                </View>
+                  <Text variant="body" style={{ fontWeight: '700', flex: 1 }}>
+                  Competitive Pricing
+                </Text>
+              </View>
+              <View style={{ gap: theme.spacing.xs }}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: theme.colors.warning,
+                    marginTop: 6,
+                    marginRight: theme.spacing.sm,
+                  }} />
+                  <Text variant="bodySmall" color="secondary" style={{ flex: 1, lineHeight: 20 }}>
+                    Research similar items on Sellar to price competitively
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: theme.colors.warning,
+                    marginTop: 6,
+                    marginRight: theme.spacing.sm,
+                  }} />
+                  <Text variant="bodySmall" color="secondary" style={{ flex: 1, lineHeight: 20 }}>
+                    Consider condition, age, and market demand
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: theme.colors.warning,
+                    marginTop: 6,
+                    marginRight: theme.spacing.sm,
+                  }} />
+                  <Text variant="bodySmall" color="secondary" style={{ flex: 1, lineHeight: 20 }}>
+                    Enable "Accept Offers" to attract more buyers
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: theme.colors.warning,
+                    marginTop: 6,
+                    marginRight: theme.spacing.sm,
+                  }} />
+                  <Text variant="bodySmall" color="secondary" style={{ flex: 1, lineHeight: 20 }}>
+                    Price slightly higher if you're open to negotiation
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Response Time Section */}
+            <View style={{
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.borderRadius.lg,
+              padding: theme.spacing.md,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
+                <View style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: theme.colors.error + '15',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: theme.spacing.sm,
+                }}>
+                  <Text style={{ fontSize: 20 }}>⚡</Text>
+                </View>
+                <Text variant="body" style={{ fontWeight: '700', flex: 1 }}>
+                  Quick Responses
+                </Text>
+              </View>
+              <View style={{ gap: theme.spacing.xs }}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: theme.colors.error,
+                    marginTop: 6,
+                    marginRight: theme.spacing.sm,
+                  }} />
+                  <Text variant="bodySmall" color="secondary" style={{ flex: 1, lineHeight: 20 }}>
+                    Reply to messages within 24 hours
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: theme.colors.error,
+                    marginTop: 6,
+                    marginRight: theme.spacing.sm,
+                  }} />
+                  <Text variant="bodySmall" color="secondary" style={{ flex: 1, lineHeight: 20 }}>
+                    Be polite and professional in all communications
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: theme.colors.error,
+                    marginTop: 6,
+                    marginRight: theme.spacing.sm,
+                  }} />
+                  <Text variant="bodySmall" color="secondary" style={{ flex: 1, lineHeight: 20 }}>
+                    Answer questions honestly and thoroughly
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Success Banner */}
+            <View style={{
+              backgroundColor: theme.colors.success + '10',
+              borderRadius: theme.borderRadius.lg,
+              padding: theme.spacing.lg,
+              borderWidth: 1,
+              borderColor: theme.colors.success + '30',
+             
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.sm }}>
+                <View style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  backgroundColor: theme.colors.success + '20',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: theme.spacing.sm,
+                }}>
+                  <Text style={{ fontSize: 16 }}>🎯</Text>
+                </View>
+                <Text variant="body" style={{ color: theme.colors.success, fontWeight: '700' }}>
+                  Pro Tip
+                </Text>
+              </View>
+              <Text variant="bodySmall" style={{ color: theme.colors.success, lineHeight: 20 }}>
+                Listings with 5+ photos, detailed descriptions, and competitive pricing get <Text style={{ fontWeight: '700' }}>5x more views</Text> and sell <Text style={{ fontWeight: '700' }}>3x faster</Text>!
+              </Text>
+            </View>
+          </View>
+        </ScrollView>
+      </AppModal>
 
     </SafeAreaWrapper>
   );

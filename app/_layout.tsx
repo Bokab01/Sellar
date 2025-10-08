@@ -23,6 +23,7 @@ import { recoverFromCorruptedSession } from '@/utils/authErrorHandler';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { initializeWebOptimizations } from '@/lib/webOptimizations';
 import { useRefreshTokenError } from '@/hooks/useRefreshTokenError';
+import { setupAuthErrorInterceptor } from '@/lib/authErrorInterceptor';
 import * as Sentry from '@sentry/react-native';
 
 Sentry.init({
@@ -87,6 +88,10 @@ function AppContent() {
       startRender();
 
       try {
+        // Setup global auth error interceptor first
+        setupAuthErrorInterceptor();
+        console.log('✅ Auth error interceptor initialized');
+
         // Recover from any corrupted sessions first (with timeout)
         try {
           const recoveryPromise = recoverFromCorruptedSession();
@@ -206,6 +211,7 @@ function AppContent() {
         <Stack.Screen name="reviews"  />
         <Stack.Screen name="transactions"  />
         <Stack.Screen name="+not-found" />
+        <Stack.Screen name="chat-detail/[id]" />
       </Stack>
       <StatusBar 
         style={isDarkMode ? 'light' : 'dark'} 

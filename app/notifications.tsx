@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, ScrollView, TouchableOpacity, RefreshControl, Alert, Animated } from 'react-native';
+import { View, ScrollView, TouchableOpacity, RefreshControl, Animated } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useNotificationStore } from '@/store/useNotificationStore';
@@ -9,6 +9,7 @@ import {
   Text,
   SafeAreaWrapper,
   AppHeader,
+  AppModal,
   Container,
   ListItem,
   Button,
@@ -93,26 +94,23 @@ export default function NotificationsScreen() {
     setRefreshing(false);
   };
 
+  const [deleteAlertVisible, setDeleteAlertVisible] = useState(false);
+  const [notificationToDelete, setNotificationToDelete] = useState<string | null>(null);
+  const [bulkDeleteAlertVisible, setBulkDeleteAlertVisible] = useState(false);
+
   const handleDeleteNotification = async (notificationId: string) => {
-    Alert.alert(
-      'Delete Notification',
-      'Are you sure you want to delete this notification?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteNotification(notificationId);
-            setToastMessage('Notification deleted');
-            setShowToast(true);
-          },
-        },
-      ]
-    );
+    setNotificationToDelete(notificationId);
+    setDeleteAlertVisible(true);
+  };
+
+  const confirmDelete = async () => {
+    if (notificationToDelete) {
+      await deleteNotification(notificationToDelete);
+      setToastMessage('Notification deleted');
+      setShowToast(true);
+      setNotificationToDelete(null);
+    }
+    setDeleteAlertVisible(false);
   };
 
   const getNotificationIcon = (type: string) => {
@@ -270,58 +268,49 @@ export default function NotificationsScreen() {
 
   const handleBulkDelete = async () => {
     if (selectedNotifications.size === 0) return;
+    setBulkDeleteAlertVisible(true);
+  };
 
-    Alert.alert(
-      'Delete Notifications',
-      `Are you sure you want to delete ${selectedNotifications.size} notification${selectedNotifications.size > 1 ? 's' : ''}? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            setBulkActionLoading(prev => ({ ...prev, delete: true }));
-            
-            try {
-              // Delete all selected notifications at once using Supabase batch delete
-              const { error } = await supabase
-                .from('notifications')
-                .delete()
-                .in('id', Array.from(selectedNotifications));
+  const confirmBulkDelete = async () => {
+    setBulkDeleteAlertVisible(false);
+    setBulkActionLoading(prev => ({ ...prev, delete: true }));
+    
+    try {
+      // Delete all selected notifications at once using Supabase batch delete
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .in('id', Array.from(selectedNotifications));
 
-              if (error) {
-                throw error;
-              }
+      if (error) {
+        throw error;
+      }
 
-              // Update local state to remove deleted notifications
-              const { notifications: currentNotifications } = useNotificationStore.getState();
-              const updatedNotifications = currentNotifications.filter(
-                n => !selectedNotifications.has(n.id)
-              );
-              const newUnreadCount = updatedNotifications.filter(n => !n.is_read).length;
-              
-              useNotificationStore.setState({ 
-                notifications: updatedNotifications,
-                unreadCount: newUnreadCount
-              });
-              
-              setToastMessage(`${selectedNotifications.size} notifications deleted`);
-              setShowToast(true);
-              
-              clearSelection();
-              setIsSelectionMode(false);
-              
-            } catch (error) {
-              console.error('Bulk delete error:', error);
-              setToastMessage('Failed to delete notifications');
-              setShowToast(true);
-            } finally {
-              setBulkActionLoading(prev => ({ ...prev, delete: false }));
-            }
-          },
-        },
-      ]
-    );
+      // Update local state to remove deleted notifications
+      const { notifications: currentNotifications } = useNotificationStore.getState();
+      const updatedNotifications = currentNotifications.filter(
+        n => !selectedNotifications.has(n.id)
+      );
+      const newUnreadCount = updatedNotifications.filter(n => !n.is_read).length;
+      
+      useNotificationStore.setState({ 
+        notifications: updatedNotifications,
+        unreadCount: newUnreadCount
+      });
+      
+      setToastMessage(`${selectedNotifications.size} notifications deleted`);
+      setShowToast(true);
+      
+      clearSelection();
+      setIsSelectionMode(false);
+      
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      setToastMessage('Failed to delete notifications');
+      setShowToast(true);
+    } finally {
+      setBulkActionLoading(prev => ({ ...prev, delete: false }));
+    }
   };
 
   if (loading) {
@@ -676,6 +665,48 @@ export default function NotificationsScreen() {
         variant="success"
         onHide={() => setShowToast(false)}
       />
+
+      {/* Delete Confirmation Modal */}
+      <AppModal
+        visible={deleteAlertVisible}
+        onClose={() => setDeleteAlertVisible(false)}
+        title="Delete Notification"
+        size="sm"
+        primaryAction={{
+          text: 'Delete',
+          onPress: confirmDelete,
+          variant: 'destructive',
+        }}
+        secondaryAction={{
+          text: 'Cancel',
+          onPress: () => setDeleteAlertVisible(false),
+        }}
+      >
+        <Text style={{ color: theme.colors.text.secondary }}>
+          Are you sure you want to delete this notification?
+        </Text>
+      </AppModal>
+
+      {/* Bulk Delete Confirmation Modal */}
+      <AppModal
+        visible={bulkDeleteAlertVisible}
+        onClose={() => setBulkDeleteAlertVisible(false)}
+        title="Delete Notifications"
+        size="sm"
+        primaryAction={{
+          text: 'Delete',
+          onPress: confirmBulkDelete,
+          variant: 'destructive',
+        }}
+        secondaryAction={{
+          text: 'Cancel',
+          onPress: () => setBulkDeleteAlertVisible(false),
+        }}
+      >
+        <Text style={{ color: theme.colors.text.secondary }}>
+          Are you sure you want to delete {selectedNotifications.size} notification{selectedNotifications.size > 1 ? 's' : ''}? This action cannot be undone.
+        </Text>
+      </AppModal>
     </SafeAreaWrapper>
   );
 }

@@ -117,7 +117,7 @@ export default function NotificationDetailScreen() {
       switch (notification.type) {
         case 'message':
           if (data.conversation_id) {
-            router.push(`/(tabs)/inbox/${data.conversation_id}`);
+            router.push(`/chat-detail/${data.conversation_id}` as any);
           } else {
             router.push('/(tabs)/inbox');
           }
@@ -125,7 +125,7 @@ export default function NotificationDetailScreen() {
 
         case 'offer':
           if (data.conversation_id) {
-            router.push(`/(tabs)/inbox/${data.conversation_id}`);
+            router.push(`/chat-detail/${data.conversation_id}` as any);
           } else if (data.listing_id) {
             router.push(`/(tabs)/home/${data.listing_id}` as any);
           } else {
@@ -212,7 +212,7 @@ export default function NotificationDetailScreen() {
           if (data.listing_id) {
             router.push(`/(tabs)/home/${data.listing_id}` as any);
           } else if (data.conversation_id) {
-            router.push(`/(tabs)/inbox/${data.conversation_id}`);
+            router.push(`/chat-detail/${data.conversation_id}` as any );
           } else {
             router.push('/(tabs)/home');
           }

@@ -41,7 +41,7 @@ export const navigation = {
   // Inbox navigation
   inbox: {
     goTo: () => router.push('/(tabs)/inbox'),
-    goToChat: (id: string) => router.push(`/(tabs)/inbox/${id}`),
+    goToChat: (id: string) => router.push(`/chat-detail/${id}` as any),
   },
 
   // Create navigation
@@ -94,7 +94,7 @@ export type RouteParams = {
 
   // Inbox routes
   '/(tabs)/inbox': undefined;
-  '/(tabs)/inbox/[id]': { id: string };
+  '/chat-detail/[id]': { id: string };
 
   // Create routes
   '/(tabs)/create': undefined;

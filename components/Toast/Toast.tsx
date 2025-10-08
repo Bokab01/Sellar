@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Animated, Dimensions, Platform, TouchableOpacity } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
-import { CircleCheck as CheckCircle, CircleAlert as AlertCircle, Circle as XCircle, Info } from 'lucide-react-native';
+import { CircleCheck as CheckCircle, CircleAlert as AlertCircle, CircleX as XCircle, Info, X } from 'lucide-react-native';
 
 type ToastVariant = 'success' | 'error' | 'warning' | 'info';
 type ToastPosition = 'top' | 'bottom';
@@ -24,7 +24,7 @@ export function Toast({
   visible,
   message,
   variant = 'info',
-  position = 'bottom',
+  position = 'top',
   duration = 4000,
   onHide,
   action,
@@ -84,28 +84,36 @@ export function Toast({
     switch (variant) {
       case 'success':
         return {
-          backgroundColor: theme.colors.success,
-          textColor: theme.colors.successForeground,
-          icon: <CheckCircle size={20} color={theme.colors.successForeground} />,
+          backgroundColor: theme.colors.surfaceVariant,
+          borderColor: theme.colors.success + '40',
+          textColor: theme.colors.text.primary,
+          iconColor: theme.colors.success,
+          icon: <CheckCircle size={20} color={theme.colors.success} />,
         };
       case 'error':
         return {
-          backgroundColor: theme.colors.error,
-          textColor: theme.colors.errorForeground,
-          icon: <XCircle size={20} color={theme.colors.errorForeground} />,
+          backgroundColor: theme.colors.surfaceVariant,
+          borderColor: theme.colors.error + '40',
+          textColor: theme.colors.text.primary,
+          iconColor: theme.colors.error,
+          icon: <XCircle size={20} color={theme.colors.error} />,
         };
       case 'warning':
         return {
-          backgroundColor: theme.colors.warning,
-          textColor: theme.colors.warningForeground,
-          icon: <AlertCircle size={20} color={theme.colors.warningForeground} />,
+          backgroundColor: theme.colors.surfaceVariant,
+          borderColor: theme.colors.warning + '40',
+          textColor: theme.colors.text.primary,
+          iconColor: theme.colors.warning,
+          icon: <AlertCircle size={20} color={theme.colors.warning} />,
         };
       case 'info':
       default:
         return {
-          backgroundColor: theme.colors.primary,
-          textColor: theme.colors.primaryForeground,
-          icon: <Info size={20} color={theme.colors.primaryForeground} />,
+          backgroundColor: theme.colors.surfaceVariant,
+          borderColor: theme.colors.primary + '40',
+          textColor: theme.colors.text.primary,
+          iconColor: theme.colors.primary,
+          icon: <Info size={20} color={theme.colors.primary} />,
         };
     }
   };
@@ -150,51 +158,88 @@ export function Toast({
       <View
         style={{
           backgroundColor: colors.backgroundColor,
-          borderRadius: theme.borderRadius.lg,
-          padding: theme.spacing.lg,
+          borderRadius: theme.borderRadius.xl,
+          borderWidth: 1,
+          borderLeftWidth: 4,
+          borderLeftColor: colors.iconColor,
+          borderColor: colors.borderColor,
+          paddingVertical: theme.spacing.md,
+          paddingHorizontal: theme.spacing.lg,
           flexDirection: 'row',
           alignItems: 'center',
-          ...theme.shadows.lg,
+          ...theme.shadows.md,
           maxWidth: screenWidth - (theme.spacing.lg * 2),
         }}
       >
+        {/* Icon with background */}
         {colors.icon && (
-          <View style={{ marginRight: theme.spacing.md }}>
+          <View 
+            style={{ 
+              marginRight: theme.spacing.md,
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              backgroundColor: colors.iconColor + '15',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
             {colors.icon}
           </View>
         )}
 
-        <View style={{ flex: 1 }}>
+        {/* Content */}
+        <View style={{ flex: 1, marginRight: theme.spacing.sm }}>
           <Text
             variant="body"
             style={{
               color: colors.textColor,
               fontWeight: '500',
+              fontSize: 14,
+              lineHeight: 20,
             }}
           >
             {message}
           </Text>
         </View>
 
-        {action && (
+        {/* Action or Dismiss Button */}
+        {action ? (
           <TouchableOpacity
             onPress={action.onPress}
             style={{
-              marginLeft: theme.spacing.md,
               paddingVertical: theme.spacing.xs,
               paddingHorizontal: theme.spacing.sm,
+              backgroundColor: colors.iconColor + '15',
+              borderRadius: theme.borderRadius.md,
             }}
           >
             <Text
               variant="button"
               style={{
-                color: colors.textColor,
+                color: colors.iconColor,
                 fontWeight: '600',
-                textDecorationLine: 'underline',
+                fontSize: 13,
               }}
             >
               {action.text}
             </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            onPress={hideToast}
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 14,
+              backgroundColor: theme.colors.surfaceVariant,
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginLeft: theme.spacing.xs,
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <X size={14} color={theme.colors.text.secondary} />
           </TouchableOpacity>
         )}
       </View>

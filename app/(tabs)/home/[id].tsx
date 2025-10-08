@@ -1,5 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense, useCallback, useMemo, useRef } from 'react';
-import { View, ScrollView, Image, TouchableOpacity, Alert, Linking, Dimensions, StatusBar, FlatList, Share } from 'react-native';
+import { View, ScrollView, Image, TouchableOpacity, Alert, Linking, Dimensions, StatusBar, FlatList, Share, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -31,15 +31,84 @@ import {
   SimpleCallbackRequestButton,
 } from '@/components';
 
-// Lazy load heavy ImageViewer component
-const ImageViewer = lazy(() => import('@/components/ImageViewer/ImageViewer').then(module => ({ default: module.ImageViewer })));
-import { useImageViewer } from '@/hooks/useImageViewer';
+// Lazy load heavy MediaViewer component (supports images and videos)
+const MediaViewer = lazy(() => import('@/components/MediaViewer/MediaViewer').then(module => ({ default: module.MediaViewer })));
+import { useMediaViewer } from '@/hooks/useMediaViewer';
 import { useListingStats } from '@/hooks/useListingStats';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useProfile } from '@/hooks/useProfile';
-import { Heart, Share as ShareIcon, MessageCircle, Phone, PhoneCall, DollarSign, ArrowLeft, Package, MoreVertical, Edit, Trash2, Flag, BadgeCent, RefreshCw } from 'lucide-react-native';
+import { Heart, Share as ShareIcon, MessageCircle, Phone, PhoneCall, DollarSign, ArrowLeft, Package, MoreVertical, Edit, Trash2, Flag, BadgeCent, RefreshCw, Play } from 'lucide-react-native';
 import { getDisplayName } from '@/hooks/useDisplayName';
 import { ReportButton } from '@/components/ReportButton/ReportButton';
+import { VideoView, useVideoPlayer } from 'expo-video';
+
+// Helper function to detect if URL is a video
+const isVideoUrl = (url: string): boolean => {
+  const videoExtensions = ['.mp4', '.mov', '.m4v', '.avi', '.wmv', '.flv', '.webm'];
+  const lowerUrl = url.toLowerCase();
+  return videoExtensions.some(ext => lowerUrl.includes(ext));
+};
+
+// Video player component for carousel
+interface MediaItemVideoProps {
+  videoUrl: string;
+  isActive: boolean;
+  width: number;
+  height: number;
+  theme: any;
+}
+
+function MediaItemVideo({ videoUrl, isActive, width, height, theme }: MediaItemVideoProps) {
+  const player = useVideoPlayer(videoUrl, (player) => {
+    player.loop = true;
+    player.muted = true;
+  });
+
+  useEffect(() => {
+    if (isActive) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [isActive, player]);
+
+  return (
+    <View style={{ width, height, backgroundColor: theme.colors.surfaceVariant }}>
+      <VideoView
+        player={player}
+        style={{ width, height }}
+        contentFit="cover"
+        nativeControls={false}
+      />
+      {/* Play indicator overlay */}
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          justifyContent: 'center',
+          alignItems: 'center',
+          pointerEvents: 'none',
+        }}
+      >
+        <View
+          style={{
+            width: 60,
+            height: 60,
+            borderRadius: 30,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <Play size={30} color="#FFFFFF" fill="#FFFFFF" />
+        </View>
+      </View>
+    </View>
+  );
+}
 
 export default function ListingDetailScreen() {
   const { theme } = useTheme();
@@ -90,6 +159,10 @@ export default function ListingDetailScreen() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
   
+  // Moderation modal
+  const [moderationError, setModerationError] = useState('');
+  const [showModerationModal, setShowModerationModal] = useState(false);
+  
   // Popup menu
   const [showMenu, setShowMenu] = useState(false);
 
@@ -100,16 +173,14 @@ export default function ListingDetailScreen() {
   const [sellerListingsLoading, setSellerListingsLoading] = useState(false);
   const [similarListingsLoading, setSimilarListingsLoading] = useState(false);
 
-  // Image viewer
-  const images = listing?.images || [];
+  // Media viewer (supports images and videos)
+  const media = listing?.images || [];
   const {
-    visible: imageViewerVisible,
-    currentIndex: imageViewerIndex,
-    openViewer: openImageViewer,
-    closeViewer: closeImageViewer,
-    // shareImage,
-    // downloadImage,
-  } = useImageViewer({ images, initialIndex: currentImageIndex });
+    visible: mediaViewerVisible,
+    currentIndex: mediaViewerIndex,
+    openViewer: openMediaViewer,
+    closeViewer: closeMediaViewer,
+  } = useMediaViewer({ media, initialIndex: currentImageIndex });
 
   useEffect(() => {
     if (listingId) {
@@ -226,7 +297,7 @@ export default function ListingDetailScreen() {
           if (listingError.code === 'PGRST116' || listingError.message.includes('0 rows')) {
             setError('Listing not found or has been removed');
           } else {
-            setError(listingError.message);
+          setError(listingError.message);
           }
           return;
         }
@@ -256,7 +327,7 @@ export default function ListingDetailScreen() {
         if (fetchError.code === 'PGRST116' || fetchError.message.includes('0 rows')) {
           setError('Listing not found or has been removed');
         } else {
-          setError(fetchError.message);
+        setError(fetchError.message);
         }
       } else {
         setListing(data);
@@ -701,6 +772,43 @@ export default function ListingDetailScreen() {
 
     setSendingMessage(true);
     try {
+      // Moderate message content before sending
+      const { contentModerationService } = await import('@/lib/contentModerationService');
+      
+      const moderationResult = await contentModerationService.moderateContent({
+        id: 'temp-contact-message-id',
+        type: 'comment',
+        userId: user.id,
+        content: messageText.trim(),
+      });
+
+      // Check if content is approved
+      if (!moderationResult.isApproved) {
+        setSendingMessage(false);
+        
+        // Extract specific violations with user-friendly messages
+        const flagReasons = moderationResult.flags
+          .map(flag => {
+            if (flag.type === 'profanity') {
+              return 'Inappropriate language detected';
+            } else if (flag.type === 'personal_info') {
+              return 'Too much personal information (multiple phone numbers/emails)';
+            } else if (flag.type === 'spam') {
+              return 'Spam-like content detected';
+            } else if (flag.type === 'inappropriate') {
+              return 'Inappropriate content detected';
+            } else if (flag.type === 'suspicious_links') {
+              return 'Suspicious or shortened links detected';
+            }
+            return flag.details;
+          })
+          .join('\n• ');
+        
+        setModerationError(`Your message cannot be sent:\n\n• ${flagReasons}\n\nPlease review and modify your content, then try again.`);
+        setShowModerationModal(true);
+        return;
+      }
+
       // Check if conversation already exists
       const { data: existingConv } = await supabase
         .from('conversations')
@@ -744,7 +852,7 @@ export default function ListingDetailScreen() {
 
       // Navigate to chat after a brief delay
       setTimeout(() => {
-        router.push(`/(tabs)/inbox/${conversationId}`);
+        router.push(`/chat-detail/${conversationId}` as any);
       }, 1000);
     } catch (err: any) {
       showErrorToast('Failed to send message');
@@ -1174,7 +1282,7 @@ export default function ListingDetailScreen() {
               <Heart 
                 size={20} 
                 color={statsIsFavorited ? theme.colors.error : "white"} 
-                fill={statsIsFavorited ? theme.colors.error : 'none'}
+                fill={statsIsFavorited ? theme.colors.error : 'none'} 
                 strokeWidth={2}
               />
             </TouchableOpacity>
@@ -1252,7 +1360,7 @@ export default function ListingDetailScreen() {
                 <Text variant="body" style={{ color: theme.colors.text.primary, fontSize: 14 }}>
                   Edit Listing
                 </Text>
-              </TouchableOpacity>
+          </TouchableOpacity>
             )}
 
             {/* Relist Button - Only for own sold listings */}
@@ -1324,8 +1432,8 @@ export default function ListingDetailScreen() {
                 </Text>
               </TouchableOpacity>
             )}
-          </View>
         </View>
+      </View>
       )}
 
       <ScrollView 
@@ -1352,27 +1460,41 @@ export default function ListingDetailScreen() {
                   setCurrentImageIndex(index);
                 }}
                 keyExtractor={(item, index) => `${index}`}
-                renderItem={({ item: imageUrl, index }) => (
-                  <TouchableOpacity
-                    onPress={() => openImageViewer(index)}
-                    activeOpacity={0.9}
-                    style={{ width: screenWidth }}
-                  >
-                    <Image
-                      source={{ uri: imageUrl }}
-                      style={{
-                        width: screenWidth,
-                        height: imageHeight,
-                        backgroundColor: theme.colors.surfaceVariant,
-                      }}
-                      resizeMode="cover"
-                      // Performance optimizations
-                      loadingIndicatorSource={{ uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' }}
-                      onLoadStart={() => console.log(`Loading image ${index}`)}
-                      onLoadEnd={() => console.log(`Loaded image ${index}`)}
-                    />
-                  </TouchableOpacity>
-                )}
+                renderItem={({ item: mediaUrl, index }) => {
+                  const isVideo = isVideoUrl(mediaUrl);
+                  
+                  return (
+                    <TouchableOpacity
+                      onPress={() => openMediaViewer(index)}
+                      activeOpacity={0.9}
+                      style={{ width: screenWidth }}
+                    >
+                      {isVideo ? (
+                        <MediaItemVideo 
+                          videoUrl={mediaUrl} 
+                          isActive={index === currentImageIndex}
+                          width={screenWidth}
+                          height={imageHeight}
+                          theme={theme}
+                        />
+                      ) : (
+                        <Image
+                          source={{ uri: mediaUrl }}
+                          style={{
+                            width: screenWidth,
+                            height: imageHeight,
+                            backgroundColor: theme.colors.surfaceVariant,
+                          }}
+                          resizeMode="cover"
+                          // Performance optimizations
+                          loadingIndicatorSource={{ uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' }}
+                          onLoadStart={() => console.log(`Loading media ${index}`)}
+                          onLoadEnd={() => console.log(`Loaded media ${index}`)}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  );
+                }}
                 // Performance optimizations
                 removeClippedSubviews={true}
                 maxToRenderPerBatch={2}
@@ -1399,31 +1521,50 @@ export default function ListingDetailScreen() {
                   }}
                 >
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {listing.images.map((imageUrl: string, index: number) => (
-                      <TouchableOpacity
-                        key={index}
-                        onPress={() => {
-                          setCurrentImageIndex(index);
-                          // Scroll main image to selected thumbnail
-                          imageScrollViewRef.current?.scrollToIndex({ index, animated: true });
-                        }}
-                        style={{
-                          width: 60,
-                          height: 60,
-                          borderRadius: theme.borderRadius.md,
-                          overflow: 'hidden',
-                          borderWidth: currentImageIndex === index ? 2 : 0,
-                          borderColor: theme.colors.primary,
-                          opacity: currentImageIndex === index ? 1 : 0.7,
-                        }}
-                      >
-                        <Image
-                          source={{ uri: imageUrl }}
-                          style={{ width: '100%', height: '100%' }}
-                          resizeMode="cover"
-                        />
-                      </TouchableOpacity>
-                    ))}
+                    {listing.images.map((mediaUrl: string, index: number) => {
+                      const isVideo = isVideoUrl(mediaUrl);
+                      return (
+                        <TouchableOpacity
+                          key={index}
+                          onPress={() => {
+                            setCurrentImageIndex(index);
+                            // Scroll main image to selected thumbnail
+                            imageScrollViewRef.current?.scrollToIndex({ index, animated: true });
+                          }}
+                          style={{
+                            width: 60,
+                            height: 60,
+                            borderRadius: theme.borderRadius.md,
+                            overflow: 'hidden',
+                            borderWidth: currentImageIndex === index ? 2 : 0,
+                            borderColor: theme.colors.primary,
+                            opacity: currentImageIndex === index ? 1 : 0.7,
+                          }}
+                        >
+                          <Image
+                            source={{ uri: mediaUrl }}
+                            style={{ width: '100%', height: '100%' }}
+                            resizeMode="cover"
+                          />
+                          {isVideo && (
+                            <View
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                              }}
+                            >
+                              <Play size={20} color="#FFFFFF" fill="#FFFFFF" />
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
                   </ScrollView>
                 </View>
               )}
@@ -1685,7 +1826,7 @@ export default function ListingDetailScreen() {
               }}
             >
               {/* Animated gradient background effect */}
-              <View style={{
+                <View style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
@@ -1729,9 +1870,9 @@ export default function ListingDetailScreen() {
                   
                   {/* Time remaining */}
                   {/* <View style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: theme.spacing.xs,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: theme.spacing.xs,
                     backgroundColor: theme.colors.surface,
                     paddingHorizontal: theme.spacing.md,
                     paddingVertical: theme.spacing.sm,
@@ -1773,7 +1914,7 @@ export default function ListingDetailScreen() {
           {/* Reserved for You Banner (when your offer was accepted) */}
           {listing.status === 'reserved' && listing.reserved_for === user?.id && (
             <View
-              style={{
+                    style={{ 
                 backgroundColor: theme.colors.success + '15',
                 borderColor: theme.colors.success + '30',
                 borderWidth: 1,
@@ -1795,7 +1936,7 @@ export default function ListingDetailScreen() {
               <View style={{ flex: 1 }}>
                 <Text variant="body" style={{ 
                   fontWeight: '600', 
-                  color: theme.colors.success,
+                      color: theme.colors.success,
                   marginBottom: theme.spacing.xs,
                 }}>
                   Your Offer Was Accepted!
@@ -1817,7 +1958,7 @@ export default function ListingDetailScreen() {
                         .maybeSingle();
 
                       if (existingConv) {
-                        router.push(`/(tabs)/inbox/${existingConv.id}`);
+                        router.push(`/chat-detail/${existingConv.id}` as any);
                       } else {
                         // Fallback to contact modal if no conversation exists
                         setShowContactModal(true);
@@ -1839,7 +1980,7 @@ export default function ListingDetailScreen() {
                     Go to Chat →
                   </Text>
                 </TouchableOpacity>
-              </View>
+                </View>
             </View>
           )}
 
@@ -2145,17 +2286,17 @@ export default function ListingDetailScreen() {
                       keyExtractor={(item) => item.id}
                       renderItem={({ item }) => (
                         <View style={{ flex: 1, margin: 2 }}>
-                          <ProductCard
-                            image={item.image}
-                            title={item.title}
-                            price={item.price}
-                            seller={item.seller}
-                            badge={item.badge}
-                            location={item.location}
-                            layout="grid"
-                            fullWidth={true}
-                            onPress={() => router.push(`/(tabs)/home/${item.id}`)}
-                          />
+                        <ProductCard
+                          image={item.image}
+                          title={item.title}
+                          price={item.price}
+                          seller={item.seller}
+                          badge={item.badge}
+                          location={item.location}
+                          layout="grid"
+                          fullWidth={true}
+                          onPress={() => router.push(`/(tabs)/home/${item.id}`)}
+                        />
                         </View>
                       )}
                       // Performance optimizations
@@ -2216,17 +2357,17 @@ export default function ListingDetailScreen() {
                       keyExtractor={(item) => item.id}
                       renderItem={({ item }) => (
                         <View style={{ flex: 1, margin: 2 }}>
-                          <ProductCard
-                            image={item.image}
-                            title={item.title}
-                            price={item.price}
-                            seller={item.seller}
-                            badge={item.badge}
-                            location={item.location}
-                            layout="grid"
-                            fullWidth={true}
-                            onPress={() => router.push(`/(tabs)/home/${item.id}`)}
-                          />
+                        <ProductCard
+                          image={item.image}
+                          title={item.title}
+                          price={item.price}
+                          seller={item.seller}
+                          badge={item.badge}
+                          location={item.location}
+                          layout="grid"
+                          fullWidth={true}
+                          onPress={() => router.push(`/(tabs)/home/${item.id}`)}
+                        />
                         </View>
                       )}
                       // Performance optimizations
@@ -2387,7 +2528,7 @@ export default function ListingDetailScreen() {
 
       {/* Make Offer Modal */}
       <AppModal
-        size='lg'
+      size='lg'
         position="bottom"
         visible={showOfferModal}
         onClose={() => setShowOfferModal(false)}
@@ -2454,13 +2595,29 @@ export default function ListingDetailScreen() {
         onHide={() => setShowToast(false)}
       />
 
-      {/* Image Viewer */}
+      {/* Moderation Error Modal */}
+      <AppModal
+        visible={showModerationModal}
+        onClose={() => setShowModerationModal(false)}
+        title="Cannot Send Message"
+        size="sm"
+        primaryAction={{
+          text: 'OK',
+          onPress: () => setShowModerationModal(false),
+        }}
+      >
+        <Text style={{ color: theme.colors.text.secondary, lineHeight: 22 }}>
+          {moderationError}
+        </Text>
+      </AppModal>
+
+      {/* Media Viewer (Images & Videos) */}
       <Suspense fallback={null}>
-        <ImageViewer
-          visible={imageViewerVisible}
-          images={images}
-          initialIndex={imageViewerIndex}
-          onClose={closeImageViewer}
+        <MediaViewer
+          visible={mediaViewerVisible}
+          media={media}
+          initialIndex={mediaViewerIndex}
+          onClose={closeMediaViewer}
         />
       </Suspense>
 

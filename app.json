@@ -77,7 +77,8 @@
           "project": "sellar-ghana",
           "organization": "sellar-n6"
         }
-      ]
+      ],
+      "expo-video"
     ],
     "notification": {
       "icon": "./assets/icon/icon-light.png",

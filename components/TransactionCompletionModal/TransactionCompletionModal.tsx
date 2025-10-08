@@ -141,7 +141,7 @@ export function TransactionCompletionModal({
           [confirmationField]: new Date().toISOString(),
         })
         .eq('id', createdTransactionId)
-        .select('buyer_confirmed_at, seller_confirmed_at, listing_id')
+        .select('buyer_confirmed_at, seller_confirmed_at, listing_id, buyer_id, seller_id')
         .single();
 
       if (error) throw error;

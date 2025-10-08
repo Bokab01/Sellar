@@ -10,12 +10,12 @@ import {
   X 
 } from 'lucide-react-native';
 
-type AlertVariant = 'info' | 'success' | 'warning' | 'error';
-type AlertSize = 'sm' | 'md' | 'lg';
+export type AlertBannerVariant = 'info' | 'success' | 'warning' | 'error';
+export type AlertBannerSize = 'sm' | 'md' | 'lg';
 
-interface AlertProps {
-  variant?: AlertVariant;
-  size?: AlertSize;
+export interface AlertBannerProps {
+  variant?: AlertBannerVariant;
+  size?: AlertBannerSize;
   title?: string;
   message: string;
   dismissible?: boolean;
@@ -28,7 +28,7 @@ interface AlertProps {
   style?: any;
 }
 
-export function Alert({
+export function AlertBanner({
   variant = 'info',
   size = 'md',
   title,
@@ -38,7 +38,7 @@ export function Alert({
   action,
   showIcon = true,
   style,
-}: AlertProps) {
+}: AlertBannerProps) {
   const { theme } = useTheme();
 
   const getAlertColors = () => {

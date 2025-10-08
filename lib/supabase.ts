@@ -631,10 +631,11 @@ export const dbHelpers = {
   // Chat operations
   async getConversations(userId: string) {
     try {
-      // Get conversations with basic data first
+      // Get conversations with basic data first (only those with messages)
       const { data: conversations, error: convError } = await db.conversations
         .select('*')
         .or(`participant_1.eq.${userId},participant_2.eq.${userId}`)
+        .not('last_message_at', 'is', null) // Only show conversations with at least one message
         .order('last_message_at', { ascending: false });
 
       if (convError) {

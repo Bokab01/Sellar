@@ -34,6 +34,7 @@ interface AppModalProps {
     loading?: boolean;
     disabled?: boolean;
     icon?: React.ReactNode;
+    variant?: 'primary' | 'destructive';
   };
   secondaryAction?: {
     text: string;
@@ -122,7 +123,7 @@ export function AppModal({
       case 'sm':
         return {
           width: Math.min(320, maxWidth),
-          maxHeight: 280,
+          maxHeight: screenHeight * 0.6, // More flexible height
         };
       case 'lg':
         return {
@@ -139,7 +140,7 @@ export function AppModal({
       default:
         return {
           width: Math.min(480, maxWidth),
-          maxHeight: screenHeight * 0.4,
+          maxHeight: screenHeight * 0.6,
         };
     }
   };
@@ -213,16 +214,18 @@ export function AppModal({
               style={[
                 {
                   backgroundColor: theme.colors.surface,
-                  borderRadius: (size === 'full' || fullScreen) ? 0 : theme.borderRadius.lg,
+                  borderRadius: (size === 'full' || fullScreen) ? 0 : theme.borderRadius.xl,
                   ...theme.shadows.lg,
                   overflow: 'hidden',
                   alignSelf: position === 'center' ? 'center' : 'stretch',
                   transform: position === 'bottom' ? [{ translateY: modalTranslateY }] : undefined,
+                  borderWidth: 1,
+                  borderColor: theme.colors.border + '20',
                 },
                 modalSize,
                 position === 'bottom' && {
-                  borderTopLeftRadius: theme.borderRadius.xl,
-                  borderTopRightRadius: theme.borderRadius.xl,
+                  borderTopLeftRadius: theme.borderRadius.xl * 1.5,
+                  borderTopRightRadius: theme.borderRadius.xl * 1.5,
                   borderBottomLeftRadius: 0,
                   borderBottomRightRadius: 0,
                 },
@@ -235,11 +238,9 @@ export function AppModal({
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      paddingHorizontal: theme.spacing.xl,
-                      paddingTop: position === 'bottom' ? theme.spacing.md : theme.spacing.lg,
-                      paddingBottom: theme.spacing.lg,
-                      borderBottomWidth: 1,
-                      borderBottomColor: theme.colors.border,
+                      paddingHorizontal: theme.spacing.lg,
+                      paddingTop: position === 'bottom' ? theme.spacing.lg : theme.spacing.lg,
+                      paddingBottom: theme.spacing.sm,
                       backgroundColor: theme.colors.surface,
                     }}
                   >
@@ -260,7 +261,16 @@ export function AppModal({
                     )}
                     
                     {title ? (
-                      <Text variant="h3" style={{ flex: 1, fontWeight: '600', color: theme.colors.text.primary }}>
+                      <Text 
+                        variant="h4" 
+                        style={{ 
+                          flex: 1, 
+                          fontWeight: '600',
+                          
+                          letterSpacing: -0.3,
+                          color: theme.colors.text.primary 
+                        }}
+                      >
                         {title}
                       </Text>
                     ) : (
@@ -271,16 +281,16 @@ export function AppModal({
                       <TouchableOpacity
                         onPress={onClose}
                         style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 18,
-                          backgroundColor: theme.colors.surfaceVariant,
+                          width: 32,
+                          height: 32,
+                          borderRadius: 16,
+                          backgroundColor: theme.colors.surfaceVariant + '80',
                           justifyContent: 'center',
                           alignItems: 'center',
                         }}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
-                        <X size={20} color={theme.colors.text.secondary} />
+                        <X size={18} color={theme.colors.text.secondary} />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -289,7 +299,9 @@ export function AppModal({
               {/* Content */}
               <View
                 style={{
-                  padding: fullScreen ? 0 : theme.spacing.lg,
+                  paddingHorizontal: fullScreen ? 0 : theme.spacing.lg,
+                  paddingTop: theme.spacing.sm,
+                  paddingBottom: (primaryAction || secondaryAction) ? theme.spacing.md : theme.spacing.lg,
                   flex: fullScreen ? 1 : undefined,
                   flexGrow: position === 'bottom' ? 1 : undefined,
                 }}
@@ -302,11 +314,10 @@ export function AppModal({
                   <View
                     style={{
                       flexDirection: 'row',
-                      gap: theme.spacing.md,
-                      padding: theme.spacing.xl,
-                      paddingBottom: position === 'bottom' ? theme.spacing.xl : theme.spacing.lg,
-                      borderTopWidth: 1,
-                      borderTopColor: theme.colors.border,
+                      gap: theme.spacing.sm,
+                      paddingHorizontal: theme.spacing.lg,
+                      paddingTop: theme.spacing.md,
+                      paddingBottom: position === 'bottom' ? theme.spacing.lg : theme.spacing.lg,
                       backgroundColor: theme.colors.surface,
                     }}
                   >
@@ -314,7 +325,10 @@ export function AppModal({
                       <Button
                         variant="secondary"
                         onPress={secondaryAction.onPress}
-                        style={{ flex: 1 }}
+                        style={{ 
+                          flex: 1,
+                          height: 44,
+                        }}
                       >
                         {secondaryAction.text}
                       </Button>
@@ -326,7 +340,15 @@ export function AppModal({
                         onPress={primaryAction.onPress}
                         loading={primaryAction.loading}
                         disabled={primaryAction.disabled}
-                        style={{ flex: 1 }}
+                        style={[
+                          { 
+                            flex: 1,
+                            height: 44,
+                          },
+                          primaryAction.variant === 'destructive' && {
+                            backgroundColor: theme.colors.error,
+                          }
+                        ]}
                         leftIcon={primaryAction.icon}
                       >
                         {primaryAction.text}

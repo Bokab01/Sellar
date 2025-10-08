@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, RefreshControl, Alert, Platform, TouchableOpacity, Keyboard, TouchableWithoutFeedback, Animated } from 'react-native';
+import { View, RefreshControl, Platform, TouchableOpacity, Keyboard, TouchableWithoutFeedback, Animated } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -23,6 +23,7 @@ import {
   ErrorState,
   LoadingSkeleton,
   Toast,
+  AppModal,
   MessageInput,
 } from '@/components';
 import { MessageCircle, MoreVertical } from 'lucide-react-native';
@@ -47,6 +48,8 @@ export default function PostDetailScreen() {
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [moderationError, setModerationError] = useState('');
+  const [showModerationModal, setShowModerationModal] = useState(false);
   
   // Reply state
   const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
@@ -397,35 +400,27 @@ export default function PostDetailScreen() {
         if (!moderationResult.isApproved) {
           setSubmittingComment(false);
           
-          if (moderationResult.requiresManualReview) {
-            Alert.alert(
-              'Content Under Review',
-              'Your comment has been submitted for review due to our content policies. You will be notified once the review is complete.',
-              [{ text: 'OK' }]
-            );
-            setCommentText('');
-            setReplyingTo(null);
-            return;
-          } else {
-            // Content was rejected
-            const flagReasons = moderationResult.flags
-              .map(flag => {
-                if (flag.type === 'profanity') return 'Inappropriate language detected';
-                if (flag.type === 'personal_info') return 'Personal information detected';
-                if (flag.type === 'spam') return 'Spam-like content detected';
-                if (flag.type === 'inappropriate') return 'Inappropriate content detected';
-                if (flag.type === 'suspicious_links') return 'Suspicious links detected';
-                return flag.details;
-              })
-              .join('\n• ');
-            
-            Alert.alert(
-              'Content Policy Violation',
-              `Your comment cannot be published:\n\n• ${flagReasons}\n\nPlease review and modify your content.`,
-              [{ text: 'OK' }]
-            );
-            return;
-          }
+          // Extract specific violations with user-friendly messages
+          const flagReasons = moderationResult.flags
+            .map(flag => {
+              if (flag.type === 'profanity') {
+                return 'Inappropriate language detected';
+              } else if (flag.type === 'personal_info') {
+                return 'Too much personal information (multiple phone numbers/emails)';
+              } else if (flag.type === 'spam') {
+                return 'Spam-like content detected';
+              } else if (flag.type === 'inappropriate') {
+                return 'Inappropriate content detected';
+              } else if (flag.type === 'suspicious_links') {
+                return 'Suspicious or shortened links detected';
+              }
+              return flag.details;
+            })
+            .join('\n• ');
+          
+          setModerationError(`Your comment cannot be published:\n\n• ${flagReasons}\n\nPlease review and modify your content, then try again.`);
+          setShowModerationModal(true);
+          return;
         }
 
         // Add new comment or reply
@@ -480,7 +475,9 @@ export default function PostDetailScreen() {
       console.error('Failed to add/edit comment:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       const actionText = editingComment ? 'edit comment' : (replyingTo ? 'add reply' : 'add comment');
-      Alert.alert('Error', `Failed to ${actionText}: ${errorMessage}`);
+      setToastMessage(`Failed to ${actionText}: ${errorMessage}`);
+      setToastVariant('error');
+      setShowToast(true);
       setCommentText(commentText); // Restore comment text on error
     } finally {
       setSubmittingComment(false);
@@ -928,9 +925,25 @@ export default function PostDetailScreen() {
       <Toast
         visible={showToast}
         message={toastMessage}
-        variant="success"
+        variant={toastVariant}
         onHide={() => setShowToast(false)}
       />
+
+      {/* Moderation Error Modal */}
+      <AppModal
+        visible={showModerationModal}
+        onClose={() => setShowModerationModal(false)}
+        title="Cannot Publish Comment"
+        size="sm"
+        primaryAction={{
+          text: 'OK',
+          onPress: () => setShowModerationModal(false),
+        }}
+      >
+        <Text style={{ color: theme.colors.text.secondary, lineHeight: 22 }}>
+          {moderationError}
+        </Text>
+      </AppModal>
     </SafeAreaWrapper>
   );
 }

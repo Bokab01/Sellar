@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Tabs } from 'expo-router';
+import { router, Tabs } from 'expo-router';
 import { View, Text, Image, Platform, useColorScheme } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { MessageCircle, Plus, Users, EllipsisVertical, House, BadgePlus, CirclePlus } from 'lucide-react-native';
@@ -110,6 +110,13 @@ export default function TabLayout() {
               )}
             </View>
           ),
+        }}
+        listeners={{
+          tabPress: (e) => {
+            // Always reset to inbox index when tab is pressed
+            // This ensures tapping the tab always shows the chat list
+            router.push('/(tabs)/inbox');
+          },
         }}
       />
 

@@ -356,7 +356,12 @@ export default function ChatScreen() {
 
     const { error } = await sendMessage(content);
     if (error) {
-      showErrorToast('Failed to send message');
+      // Show alert for moderation errors, toast for other errors
+      if (error.includes('cannot be sent:') || error.includes('detected')) {
+        Alert.alert('Cannot Send Message', error);
+      } else {
+        showErrorToast('Failed to send message');
+      }
       setMessageText(content); // Restore message on error
     }
   };
@@ -838,7 +843,7 @@ export default function ChatScreen() {
         <AppHeader
           title="Conversation"
           showBackButton
-          onBackPress={() => router.push('/(tabs)/inbox')}
+          onBackPress={() => router.back()}
         />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: theme.spacing.xl }}>
           <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
@@ -855,7 +860,7 @@ export default function ChatScreen() {
         <AppHeader
           title="Loading..."
           showBackButton
-          onBackPress={() => router.push('/(tabs)/inbox')}
+          onBackPress={() => router.back()}
         />
         <View style={{ flex: 1, padding: theme.spacing.lg }}>
           {Array.from({ length: 5 }).map((_, index) => (
@@ -881,7 +886,7 @@ export default function ChatScreen() {
         <AppHeader
           title="Chat"
           showBackButton
-          onBackPress={() => router.push('/(tabs)/inbox')}
+          onBackPress={() => router.back()}
         />
         <ErrorState
           message={error}
@@ -954,7 +959,7 @@ export default function ChatScreen() {
         title={otherUser ? getDisplayName(otherUser, false).displayName : 'Chat'}
         subtitle={otherUser ? lastSeenText : ''}
         showBackButton
-        onBackPress={() => router.push('/(tabs)/inbox')}
+        onBackPress={() => router.back()}
         onTitlePress={otherUser ? () => router.push(`/profile/${otherUser.id}`) : undefined}
         leftAction={
           otherUser ? (
