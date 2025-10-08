@@ -13,6 +13,7 @@ interface LocationPickerProps {
   onLocationSelect: (location: string) => void;
   placeholder?: string;
   style?: any;
+  showAllOptions?: boolean; // Show "All Regions" and "All [Region]" options (for filtering)
 }
 
 type SelectionStep = 'region' | 'city' | 'custom';
@@ -22,6 +23,7 @@ export function LocationPicker({
   onLocationSelect,
   placeholder = "Select location",
   style,
+  showAllOptions = true, // Default to true for backward compatibility
 }: LocationPickerProps) {
   const { theme } = useTheme();
   const [showPicker, setShowPicker] = useState(false);
@@ -40,8 +42,8 @@ export function LocationPicker({
   };
 
   const handleRegionSelect = (region: string) => {
-    // Check if "All Regions" was selected
-    if (region === 'All Regions') {
+    // Check if "All Regions" was selected (only if showAllOptions is true)
+    if (showAllOptions && region === 'All Regions') {
       onLocationSelect('All Regions');
       setShowPicker(false);
       resetPicker();
@@ -54,8 +56,8 @@ export function LocationPicker({
   };
 
   const handleCitySelect = (city: string) => {
-    // Check if "All [Region]" was selected
-    if (city === `All ${selectedRegion}`) {
+    // Check if "All [Region]" was selected (only if showAllOptions is true)
+    if (showAllOptions && city === `All ${selectedRegion}`) {
       onLocationSelect(`All ${selectedRegion}`);
       setShowPicker(false);
       resetPicker();
@@ -166,27 +168,29 @@ export function LocationPicker({
           {currentStep === 'region' && (
             <ScrollView style={{ maxHeight: 400 }}>
               <View style={{ gap: theme.spacing.xs }}>
-                {/* All Regions Option */}
-                <TouchableOpacity
-                  onPress={() => handleRegionSelect('All Regions')}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingVertical: theme.spacing.md,
-                    paddingHorizontal: theme.spacing.lg,
-                    borderRadius: theme.borderRadius.md,
-                    backgroundColor: theme.colors.primary + '10',
-                    borderWidth: 1,
-                    borderColor: theme.colors.primary + '30',
-                    marginBottom: theme.spacing.sm,
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text variant="body" style={{ fontWeight: '600', color: theme.colors.primary }}>
-                    All Regions
-                  </Text>
-                </TouchableOpacity>
+                {/* All Regions Option (only show if showAllOptions is true) */}
+                {showAllOptions && (
+                  <TouchableOpacity
+                    onPress={() => handleRegionSelect('All Regions')}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingVertical: theme.spacing.md,
+                      paddingHorizontal: theme.spacing.lg,
+                      borderRadius: theme.borderRadius.md,
+                      backgroundColor: theme.colors.primary + '10',
+                      borderWidth: 1,
+                      borderColor: theme.colors.primary + '30',
+                      marginBottom: theme.spacing.sm,
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text variant="body" style={{ fontWeight: '600', color: theme.colors.primary }}>
+                      All Regions
+                    </Text>
+                  </TouchableOpacity>
+                )}
 
                 {/* Individual Regions */}
                 {GHANA_REGIONS
@@ -221,24 +225,26 @@ export function LocationPicker({
             <>
               <ScrollView style={{ maxHeight: 350 }}>
                 <View style={{ gap: theme.spacing.xs }}>
-                  {/* All [Region] Option */}
-                  <TouchableOpacity
-                    onPress={() => handleCitySelect(`All ${selectedRegion}`)}
-                    style={{
-                      paddingVertical: theme.spacing.md,
-                      paddingHorizontal: theme.spacing.lg,
-                      borderRadius: theme.borderRadius.md,
-                      backgroundColor: theme.colors.primary + '10',
-                      borderWidth: 1,
-                      borderColor: theme.colors.primary + '30',
-                      marginBottom: theme.spacing.sm,
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text variant="body" style={{ fontWeight: '600', color: theme.colors.primary }}>
-                      All {selectedRegion}
-                    </Text>
-                  </TouchableOpacity>
+                  {/* All [Region] Option (only show if showAllOptions is true) */}
+                  {showAllOptions && (
+                    <TouchableOpacity
+                      onPress={() => handleCitySelect(`All ${selectedRegion}`)}
+                      style={{
+                        paddingVertical: theme.spacing.md,
+                        paddingHorizontal: theme.spacing.lg,
+                        borderRadius: theme.borderRadius.md,
+                        backgroundColor: theme.colors.primary + '10',
+                        borderWidth: 1,
+                        borderColor: theme.colors.primary + '30',
+                        marginBottom: theme.spacing.sm,
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text variant="body" style={{ fontWeight: '600', color: theme.colors.primary }}>
+                        All {selectedRegion}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
 
                   {/* Individual Cities */}
                   {MAJOR_CITIES[selectedRegion]

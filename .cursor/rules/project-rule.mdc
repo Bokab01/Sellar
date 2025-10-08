@@ -1,5 +1,5 @@
 ---
-description: Always use custom components in the apps design system and treat the sellar-admin dashboard and mobile app as independent repo
+description: Always use custom components in the apps design system, use custom AppModal for any alert, and treat the sellar-admin dashboard and mobile app as independent repo
 globs:
 alwaysApply: true
 ---

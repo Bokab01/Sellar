@@ -11,8 +11,16 @@ import { ListingImage } from '@/components/OptimizedImage/OptimizedImage';
 import { useMemoryManager } from '@/utils/memoryManager';
 import { ImageViewer } from '@/components/ImageViewer/ImageViewer';
 import { useImageViewer } from '@/hooks/useImageViewer';
-import { Heart, Eye, MoreVertical } from 'lucide-react-native';
+import { Heart, Eye, MoreVertical, Play } from 'lucide-react-native';
 import { ReportButton } from '@/components/ReportButton/ReportButton';
+
+// Helper function to detect if URL is a video
+const isVideoUrl = (url: string): boolean => {
+  if (!url || typeof url !== 'string') return false;
+  const videoExtensions = ['.mp4', '.mov', '.m4v', '.avi', '.wmv', '.flv', '.webm'];
+  const lowerUrl = url.toLowerCase();
+  return videoExtensions.some(ext => lowerUrl.includes(ext));
+};
 
 interface ProductCardProps {
   image: ImageSourcePropType | string | string[];
@@ -91,7 +99,25 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
     ? [image] 
     : [];
   
-  const displayImage = Array.isArray(image) ? image[0] : image;
+  // Determine display image - if first item is video, try to find first image
+  let displayImage = Array.isArray(image) ? image[0] : image;
+  let hasVideo = false;
+  
+  if (Array.isArray(image) && image.length > 0) {
+    const firstItem = typeof image[0] === 'string' ? image[0] : '';
+    hasVideo = isVideoUrl(firstItem);
+    
+    // If first item is a video, try to find first image for thumbnail
+    if (hasVideo && image.length > 1) {
+      const firstImageIndex = image.findIndex(item => 
+        typeof item === 'string' && !isVideoUrl(item)
+      );
+      if (firstImageIndex !== -1) {
+        displayImage = image[firstImageIndex];
+      }
+    }
+  }
+  
   const imageSource = typeof displayImage === 'string' ? { uri: displayImage } : displayImage;
 
   // Initialize ImageViewer hook
@@ -166,6 +192,35 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
             }}
             resizeMode="cover"
           />
+        )}
+        
+        {/* Video Play Icon Overlay */}
+        {hasVideo && (
+          <View style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.2)',
+          }}>
+            <View style={{
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              borderRadius: 50,
+              width: isGridLayout ? 50 : 60,
+              height: isGridLayout ? 50 : 60,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}>
+              <Play 
+                size={isGridLayout ? 24 : 28} 
+                color="#FFFFFF" 
+                fill="#FFFFFF" 
+              />
+            </View>
+          </View>
         )}
         
         {badge && (

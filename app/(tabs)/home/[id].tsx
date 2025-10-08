@@ -59,53 +59,98 @@ interface MediaItemVideoProps {
 }
 
 function MediaItemVideo({ videoUrl, isActive, width, height, theme }: MediaItemVideoProps) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  
   const player = useVideoPlayer(videoUrl, (player) => {
-    player.loop = true;
+    player.loop = false;
     player.muted = true;
   });
+
+  // Track playing state
+  useEffect(() => {
+    if (!player) return;
+    
+    const interval = setInterval(() => {
+      const playing = player.playing;
+      setIsPlaying(playing);
+      
+      // If video ended (not playing and at end), show play icon
+      if (!playing && player.currentTime >= player.duration - 0.1) {
+        setIsPlaying(false);
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [player]);
 
   useEffect(() => {
     if (isActive) {
       player.play();
+      setIsPlaying(true);
     } else {
       player.pause();
+      setIsPlaying(false);
     }
   }, [isActive, player]);
 
   return (
-    <View style={{ width, height, backgroundColor: theme.colors.surfaceVariant }}>
-      <VideoView
-        player={player}
-        style={{ width, height }}
-        contentFit="cover"
-        nativeControls={false}
-      />
-      {/* Play indicator overlay */}
+    <View 
+      style={{ 
+        width, 
+        height, 
+        backgroundColor: theme.colors.surfaceVariant,
+        position: 'relative',
+      }}
+      pointerEvents="box-none"
+    >
+      {/* Video layer - positioned absolutely to not block touches */}
       <View
         style={{
           position: 'absolute',
           top: 0,
           left: 0,
-          right: 0,
-          bottom: 0,
-          justifyContent: 'center',
-          alignItems: 'center',
-          pointerEvents: 'none',
+          width,
+          height,
         }}
+        pointerEvents="none"
       >
+        <VideoView
+          player={player}
+          style={{ width, height }}
+          contentFit="cover"
+          nativeControls={false}
+          pointerEvents="none"
+        />
+      </View>
+      
+      {/* Play indicator overlay - only show when not playing */}
+      {!isPlaying && (
         <View
           style={{
-            width: 60,
-            height: 60,
-            borderRadius: 30,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
             justifyContent: 'center',
             alignItems: 'center',
+            pointerEvents: 'none',
           }}
         >
-          <Play size={30} color="#FFFFFF" fill="#FFFFFF" />
+          <View
+            style={{
+              width: 60,
+              height: 60,
+              borderRadius: 30,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Play size={30} color="#FFFFFF" fill="#FFFFFF" />
+          </View>
         </View>
-      </View>
+      )}
     </View>
   );
 }
@@ -1455,6 +1500,7 @@ export default function ListingDetailScreen() {
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
+                scrollEnabled={true}
                 onMomentumScrollEnd={(event) => {
                   const index = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
                   setCurrentImageIndex(index);

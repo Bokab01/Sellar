@@ -519,7 +519,22 @@ function CreateListingScreen() {
       return;
     }
 
-    await createListing();
+    // For free users (no payment), still wrap in try-catch for feature refunds
+    try {
+      await createListing();
+    } catch (listingError) {
+      console.log('🔄 Listing creation failed, checking for refunds...');
+      console.log(`Selected features: ${selectedFeatures.length}`);
+      
+      // If features were selected, refund them
+      if (selectedFeatures.length > 0) {
+        console.log('💰 Refunding features for free user...');
+        await refundAllCredits(0, 'listing_creation_failed', listingError);
+      } else {
+        console.log('ℹ️ No features to refund');
+      }
+      // Error already logged and shown to user in createListing
+    }
   };
 
   const createListing = async () => {
@@ -747,6 +762,8 @@ function CreateListingScreen() {
       if (selectedFeatures.length > 0 && listing) {
         console.log(`Applying ${selectedFeatures.length} features to listing ${listing.id}`);
         
+        const failedFeatures: Array<{ feature: SelectedFeature; error: string }> = [];
+        
         try {
           for (const feature of selectedFeatures) {
             const { data, error: featureError } = await supabase.rpc('purchase_feature', {
@@ -758,10 +775,82 @@ function CreateListingScreen() {
 
             if (featureError) {
               console.error(`Failed to apply feature ${feature.key}:`, featureError);
-              // Continue with other features even if one fails
+              failedFeatures.push({ 
+                feature, 
+                error: featureError.message || 'Unknown error' 
+              });
             } else if (data?.success) {
               console.log(`Successfully applied feature ${feature.key} to listing`);
+            } else {
+              // Feature purchase returned success: false
+              const errorMsg = data?.error || 'Feature purchase failed';
+              console.error(`Feature ${feature.key} purchase failed:`, errorMsg);
+              failedFeatures.push({ feature, error: errorMsg });
             }
+          }
+          
+          // If any features failed, refund them
+          if (failedFeatures.length > 0) {
+            console.log(`Refunding ${failedFeatures.length} failed features`);
+            
+            for (const { feature, error } of failedFeatures) {
+              try {
+                // Get current balance for transaction record
+                const { data: userCredits } = await supabase
+                  .from('user_credits')
+                  .select('balance')
+                  .eq('user_id', user!.id)
+                  .single();
+                
+                const currentBalance = userCredits?.balance || 0;
+                
+                // Create refund transaction for each failed feature
+                await supabase
+                  .from('credit_transactions')
+                  .insert({
+                    user_id: user!.id,
+                    amount: feature.credits,
+                    type: 'refunded',
+                    balance_before: currentBalance,
+                    balance_after: currentBalance + feature.credits,
+                    reference_id: listing.id,
+                    reference_type: 'feature_purchase',
+                    metadata: {
+                      description: `Refund for failed feature: ${feature.name}`,
+                      reason: 'feature_purchase_failed',
+                      feature_key: feature.key,
+                      feature_name: feature.name,
+                      listing_id: listing.id,
+                      error: error,
+                      timestamp: new Date().toISOString(),
+                    },
+                  });
+                
+                // Increment balance
+                await supabase.rpc('increment_field', {
+                  table_name: 'user_credits',
+                  field_name: 'balance',
+                  increment_by: feature.credits,
+                  match_column: 'user_id',
+                  match_value: user!.id,
+                });
+                
+                console.log(`Refunded ${feature.credits} credits for failed feature: ${feature.name}`);
+              } catch (refundError) {
+                console.error(`Failed to refund feature ${feature.name}:`, refundError);
+              }
+            }
+            
+            // Show alert about failed features
+            const failedFeaturesList = failedFeatures
+              .map(f => `• ${f.feature.name} (${f.feature.credits} credits refunded)`)
+              .join('\n');
+            
+            Alert.alert(
+              'Some Features Failed',
+              `Your listing was created successfully, but some features could not be applied:\n\n${failedFeaturesList}\n\nCredits have been refunded.`,
+              [{ text: 'OK' }]
+            );
           }
           
           // Refresh credits after feature application
@@ -769,6 +858,7 @@ function CreateListingScreen() {
         } catch (featureError) {
           console.error('Error applying features:', featureError);
           // Don't fail the entire listing creation if features fail
+          // The listing is already created, so we just log the error
         }
       }
       
@@ -871,6 +961,9 @@ function CreateListingScreen() {
           }
         ]
       );
+      
+      // Re-throw error so it can be caught by handleSubmit/handlePayForListing for refund
+      throw error;
     } finally {
       if (isMountedRef.current) {
         setLoading(false);
@@ -900,18 +993,124 @@ function CreateListingScreen() {
     }
 
     try {
+      // First, deduct the credits
       const result = await spendCredits(requiredCredits, 'Additional listing fee', {
         referenceType: 'listing_creation',
       });
       
       if (result.success) {
         setShowPaymentModal(false);
-        await createListing();
+        
+        // Try to create the listing
+        try {
+          await createListing();
+          // Success! Credits were spent and listing was created
+        } catch (listingError) {
+          // Listing creation failed - refund the credits
+          console.log('🔄 Listing creation failed after payment, refunding credits...');
+          console.log(`Listing fee: ${requiredCredits} credits`);
+          console.log(`Selected features: ${selectedFeatures.length}`);
+          
+          await refundAllCredits(requiredCredits, 'listing_creation_failed', listingError);
+          
+          // Re-throw the error to prevent further processing
+          throw listingError;
+        }
       } else {
         Alert.alert('Error', result.error || 'Failed to process payment');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to process payment');
+      console.error('Payment/listing error:', error);
+      // Error already handled above, just log it
+    }
+  };
+
+  // Comprehensive refund function for any listing creation failure
+  const refundAllCredits = async (
+    listingFeeCredits: number,
+    reason: string,
+    error: any
+  ) => {
+    try {
+      // Calculate total credits to refund (listing fee + selected features)
+      const featureCredits = selectedFeatures.reduce((sum, feature) => sum + (feature.credits || 0), 0);
+      const totalCreditsToRefund = listingFeeCredits + featureCredits;
+      
+      console.log(`Refunding ${totalCreditsToRefund} credits (${listingFeeCredits} listing fee + ${featureCredits} features)`);
+      
+      // Get current balance for transaction record
+      const { data: userCredits } = await supabase
+        .from('user_credits')
+        .select('balance')
+        .eq('user_id', user!.id)
+        .single();
+      
+      const currentBalance = userCredits?.balance || 0;
+      
+      // Create refund transaction
+      const { error: refundError } = await supabase
+        .from('credit_transactions')
+        .insert({
+          user_id: user!.id,
+          amount: totalCreditsToRefund,
+          type: 'refunded',
+          balance_before: currentBalance,
+          balance_after: currentBalance + totalCreditsToRefund,
+          reference_type: 'listing_creation',
+          metadata: {
+            description: `Refund for failed listing creation (${listingFeeCredits} listing fee + ${featureCredits} features)`,
+            reason,
+            listing_fee: listingFeeCredits,
+            features: selectedFeatures.map(f => ({ key: f.key, name: f.name, credits: f.credits })),
+            total_refunded: totalCreditsToRefund,
+            error: error instanceof Error ? error.message : String(error),
+            timestamp: new Date().toISOString(),
+          },
+        });
+      
+      if (refundError) {
+        console.error('Failed to create refund transaction:', refundError);
+        Alert.alert(
+          'Error',
+          'Listing creation failed and we could not automatically refund your credits. Please contact support with this error.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
+      // Use RPC to increment the balance atomically
+      const { error: updateError } = await supabase.rpc('increment_field', {
+        table_name: 'user_credits',
+        field_name: 'balance',
+        increment_by: totalCreditsToRefund,
+        match_column: 'user_id',
+        match_value: user!.id,
+      });
+      
+      if (updateError) {
+        console.error('Failed to update balance:', updateError);
+      }
+      
+      // Refresh the balance to show the refunded credits
+      await refreshCredits();
+      
+      // Show user-friendly alert
+      const featuresList = selectedFeatures.length > 0 
+        ? `\n\nFeatures refunded:\n${selectedFeatures.map(f => `• ${f.name} (${f.credits} credits)`).join('\n')}`
+        : '';
+      
+      Alert.alert(
+        'Listing Failed',
+        `We couldn't create your listing. Your ${totalCreditsToRefund} credits have been refunded.${featuresList}\n\nPlease try again.`,
+        [{ text: 'OK' }]
+      );
+    } catch (refundError) {
+      console.error('Refund process error:', refundError);
+      Alert.alert(
+        'Error',
+        'Listing creation failed. Please contact support to restore your credits.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -1147,6 +1346,7 @@ function CreateListingScreen() {
             value={formData.location}
             onLocationSelect={handleLocationSelect}
             placeholder="Select your location"
+            showAllOptions={false}
           />
 
           {formData.location && (

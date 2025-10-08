@@ -71,9 +71,11 @@ function VideoPlayer({ videoUrl, isActive, onSingleTap }: VideoPlayerProps) {
   const { theme } = useTheme();
   const [isMuted, setIsMuted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [showControls, setShowControls] = useState(true);
+  const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const player = useVideoPlayer(videoUrl, (player) => {
-    player.loop = true;
+    player.loop = false;
     player.muted = isMuted;
   });
 
@@ -81,9 +83,14 @@ function VideoPlayer({ videoUrl, isActive, onSingleTap }: VideoPlayerProps) {
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
 
-  // Pause video when it becomes inactive
+  // Auto-play when active, pause when inactive
   useEffect(() => {
-    if (!isActive && player) {
+    if (!player) return;
+    
+    if (isActive) {
+      player.play();
+      setIsPlaying(true);
+    } else {
       player.pause();
       setIsPlaying(false);
     }
@@ -111,6 +118,55 @@ function VideoPlayer({ videoUrl, isActive, onSingleTap }: VideoPlayerProps) {
     return () => clearInterval(interval);
   }, [player]);
 
+  // Auto-hide controls after 3 seconds when playing
+  const startControlsTimeout = useCallback(() => {
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    
+    controlsTimeoutRef.current = setTimeout(() => {
+      setShowControls(false);
+    }, 3000);
+  }, []);
+
+  const resetControlsTimeout = useCallback(() => {
+    // Always show controls when this is called
+    setShowControls(true);
+    
+    // Clear any existing timeout
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    
+    // Start new timeout to hide controls (will be set after state updates)
+  }, []);
+
+  // Auto-hide controls when playing
+  useEffect(() => {
+    if (showControls && isPlaying) {
+      startControlsTimeout();
+    }
+  }, [showControls, isPlaying, startControlsTimeout]);
+
+  // Always show controls when paused
+  useEffect(() => {
+    if (!isPlaying) {
+      setShowControls(true);
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+    }
+  }, [isPlaying]);
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const togglePlayPause = () => {
     if (player) {
       if (player.playing) {
@@ -120,6 +176,13 @@ function VideoPlayer({ videoUrl, isActive, onSingleTap }: VideoPlayerProps) {
       }
       setIsPlaying(player.playing);
     }
+    resetControlsTimeout();
+  };
+  
+  const handleTap = () => {
+    // Only toggle video controls visibility, don't call onSingleTap
+    // onSingleTap is for toggling MediaViewer controls (close/nav buttons)
+    resetControlsTimeout();
   };
 
   const toggleMute = () => {
@@ -138,18 +201,21 @@ function VideoPlayer({ videoUrl, isActive, onSingleTap }: VideoPlayerProps) {
 
   return (
     <View style={styles.videoWrapper}>
+      {/* Video layer */}
+      <VideoView
+        player={player}
+        style={styles.video}
+        contentFit="contain"
+        nativeControls={false}
+        pointerEvents="none"
+      />
+
+      {/* Touchable overlay - always present to capture taps */}
       <TouchableOpacity 
-        style={styles.videoTouchable} 
-        onPress={onSingleTap}
+        style={styles.videoTouchableOverlay} 
+        onPress={handleTap}
         activeOpacity={1}
       >
-        <VideoView
-          player={player}
-          style={styles.video}
-          contentFit="contain"
-          nativeControls={false}
-        />
-
         {/* Loading indicator */}
         {isLoading && (
           <View style={styles.videoLoadingContainer}>
@@ -157,9 +223,9 @@ function VideoPlayer({ videoUrl, isActive, onSingleTap }: VideoPlayerProps) {
           </View>
         )}
 
-        {/* Video controls overlay */}
-        {!isLoading && (
-          <View style={styles.videoControlsOverlay}>
+        {/* Video controls overlay - auto-hide when playing */}
+        {!isLoading && showControls && (
+          <View style={styles.videoControlsOverlay} pointerEvents="box-none">
             {/* Play/Pause button */}
             <TouchableOpacity
               style={styles.playPauseButton}
@@ -174,7 +240,7 @@ function VideoPlayer({ videoUrl, isActive, onSingleTap }: VideoPlayerProps) {
             </TouchableOpacity>
 
             {/* Bottom controls */}
-            <View style={styles.videoBottomControls}>
+            <View style={styles.videoBottomControls} pointerEvents="box-none">
               {/* Time display */}
               <Text style={styles.videoTimeText}>
                 {formatTime(position)} / {formatTime(duration)}
@@ -195,7 +261,7 @@ function VideoPlayer({ videoUrl, isActive, onSingleTap }: VideoPlayerProps) {
             </View>
 
             {/* Progress bar */}
-            <View style={styles.progressBarContainer}>
+            <View style={styles.progressBarContainer} pointerEvents="none">
               <View style={styles.progressBarBackground}>
                 <View 
                   style={[
@@ -498,9 +564,11 @@ export function MediaViewer({
                   <Text style={styles.mediaCounter}>
                     {currentIndex + 1} of {mediaItems.length}
                   </Text>
-                  {currentMedia.type === 'video' && (
-                    <Text style={styles.mediaTypeLabel}>VIDEO</Text>
-                  )}
+                  <View style={styles.mediaTypeLabelContainer}>
+                    {currentMedia.type === 'video' && (
+                      <Text style={styles.mediaTypeLabel}>VIDEO</Text>
+                    )}
+                  </View>
                 </View>
               </SafeAreaView>
 
@@ -582,6 +650,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
   },
   videoTouchable: {
+    width: '100%',
+    height: '100%',
+  },
+  videoTouchableOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     width: '100%',
     height: '100%',
   },
@@ -691,11 +768,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
+  mediaTypeLabelContainer: {
+    height: 20,
+    marginTop: 2,
+    alignItems: 'flex-end',
+  },
   mediaTypeLabel: {
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
-    marginTop: 2,
     backgroundColor: 'rgba(255, 0, 0, 0.6)',
     paddingHorizontal: 8,
     paddingVertical: 2,

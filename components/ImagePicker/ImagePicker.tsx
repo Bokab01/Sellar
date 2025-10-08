@@ -266,11 +266,11 @@ export function CustomImagePicker({
           return;
         }
         
-        // Check video file size (max 50 MB to prevent memory issues)
-        const MAX_VIDEO_SIZE_MB = 50;
+        // Check video file size (max 100 MB - now using blob upload instead of base64)
+        const MAX_VIDEO_SIZE_MB = 100;
         const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
         if (isVideo && asset.fileSize && asset.fileSize > MAX_VIDEO_SIZE_BYTES) {
-          showError(`Video is too large (${(asset.fileSize / (1024 * 1024)).toFixed(1)} MB). Maximum size is ${MAX_VIDEO_SIZE_MB} MB. Please record a shorter video or reduce quality.`);
+          showError(`Video is too large (${(asset.fileSize / (1024 * 1024)).toFixed(1)} MB). Maximum size is ${MAX_VIDEO_SIZE_MB} MB. Please record a shorter video.`);
           return;
         }
         
@@ -317,7 +317,7 @@ export function CustomImagePicker({
       });
 
       if (!result.canceled && result.assets.length > 0) {
-        const MAX_VIDEO_SIZE_MB = 50;
+        const MAX_VIDEO_SIZE_MB = 100;
         const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
         
         const newImages: SelectedImage[] = result.assets
