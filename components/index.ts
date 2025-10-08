@@ -127,6 +127,8 @@ export { AdvancedImage } from './OptimizedImage/AdvancedImage';
 // Alert Banner
 export { AlertBanner } from './Alert/AlertBanner';
 export type { AlertBannerProps, AlertBannerVariant, AlertBannerSize } from './Alert/AlertBanner';
+export { TrialBadge } from './TrialBadge/TrialBadge';
+export { TrialEndingModal } from './TrialEndingModal/TrialEndingModal';
 
 // Auth Error Boundary
 export { AuthErrorBoundary } from './AuthErrorBoundary/AuthErrorBoundary';

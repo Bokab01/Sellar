@@ -35,6 +35,7 @@ interface ImagePickerProps {
   title?: string;
   allowVideos?: boolean; // New prop to enable video selection
   maxVideoDuration?: number; // Max video duration in seconds (default 60)
+  isSellarPro?: boolean; // Whether user is Sellar Pro (required for videos)
 }
 
 // Video Preview Item Component
@@ -187,6 +188,7 @@ export function CustomImagePicker({
   title = "Product Images",
   allowVideos = false,
   maxVideoDuration = 60,
+  isSellarPro = false,
 }: ImagePickerProps) {
   const { theme } = useTheme();
   const { uploading, progress, error: uploadError, uploadMultiple } = useImageUpload({
@@ -194,11 +196,12 @@ export function CustomImagePicker({
   });
   const [showPicker, setShowPicker] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
 
 
   const showError = (message: string) => {
     setError(message);
-    setTimeout(() => setError(null), 4000);
+    setShowErrorModal(true);
   };
 
 
@@ -237,7 +240,7 @@ export function CustomImagePicker({
 
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: allowVideos ? ['images', 'videos'] : ['images'],
+        mediaTypes: allowVideos && isSellarPro ? ['images', 'videos'] : ['images'],
         allowsEditing: !allowVideos, // Disable editing for videos
         aspect: allowVideos ? undefined : undefined, // Allow flexible aspect ratio
         videoMaxDuration: allowVideos ? maxVideoDuration : undefined,
@@ -249,6 +252,19 @@ export function CustomImagePicker({
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
         const isVideo = asset.type === 'video';
+        
+        // Check if user is trying to add video without Sellar Pro
+        if (isVideo && !isSellarPro) {
+          showError('Video uploads are only available for Sellar Pro members. Upgrade to add videos to your listings!');
+          return;
+        }
+        
+        // Check if user already has 1 video (max limit)
+        const existingVideos = value.filter(item => item.mediaType === 'video');
+        if (isVideo && existingVideos.length >= 1) {
+          showError('Maximum 1 video per listing. Remove the existing video to add a new one.');
+          return;
+        }
         
         // Log video info for verification
         if (isVideo) {
@@ -266,8 +282,8 @@ export function CustomImagePicker({
           return;
         }
         
-        // Check video file size (max 100 MB - now using blob upload instead of base64)
-        const MAX_VIDEO_SIZE_MB = 100;
+        // Check video file size (max 50 MB - Supabase limit)
+        const MAX_VIDEO_SIZE_MB = 50;
         const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
         if (isVideo && asset.fileSize && asset.fileSize > MAX_VIDEO_SIZE_BYTES) {
           showError(`Video is too large (${(asset.fileSize / (1024 * 1024)).toFixed(1)} MB). Maximum size is ${MAX_VIDEO_SIZE_MB} MB. Please record a shorter video.`);
@@ -306,7 +322,7 @@ export function CustomImagePicker({
 
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: allowVideos ? ['images', 'videos'] : ['images'],
+        mediaTypes: allowVideos && isSellarPro ? ['images', 'videos'] : ['images'],
         allowsMultipleSelection: true, // Always allow multiple selection
         selectionLimit: Math.max(1, limit - value.length), // Only allow selecting up to remaining slots
         quality: 0.8,
@@ -317,8 +333,31 @@ export function CustomImagePicker({
       });
 
       if (!result.canceled && result.assets.length > 0) {
-        const MAX_VIDEO_SIZE_MB = 100;
+        const MAX_VIDEO_SIZE_MB = 50; // Supabase limit
         const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
+        
+        // Count existing videos
+        const existingVideoCount = value.filter(item => item.mediaType === 'video').length;
+        const selectedVideos = result.assets.filter(asset => asset.type === 'video');
+        
+        // Check if non-Pro user is trying to add videos
+        if (selectedVideos.length > 0 && !isSellarPro) {
+          showError('Video uploads are only available for Sellar Pro members. Upgrade to add videos to your listings!');
+          // Filter out all videos for non-Pro users
+          result.assets = result.assets.filter(asset => asset.type !== 'video');
+        }
+        
+        // Enforce 1 video limit for Pro users
+        if (isSellarPro && existingVideoCount + selectedVideos.length > 1) {
+          showError('Maximum 1 video per listing. You can only add 1 video total.');
+          // Filter out videos if limit exceeded
+          result.assets = result.assets.filter(asset => {
+            if (asset.type === 'video') {
+              return existingVideoCount === 0 && selectedVideos.indexOf(asset) === 0; // Only keep first video if no existing
+            }
+            return true; // Keep all images
+          });
+        }
         
         const newImages: SelectedImage[] = result.assets
           .filter((asset) => {
@@ -448,23 +487,7 @@ export function CustomImagePicker({
         </View>
       )}
 
-      {/* Error Display */}
-      {error && (
-        <View
-          style={{
-            backgroundColor: theme.colors.error + '10',
-            borderColor: theme.colors.error,
-            borderWidth: 1,
-            borderRadius: theme.borderRadius.md,
-            padding: theme.spacing.md,
-            marginBottom: theme.spacing.lg,
-          }}
-        >
-          <Text variant="bodySmall" style={{ color: theme.colors.error }}>
-            {error}
-          </Text>
-        </View>
-      )}
+      {/* Error Display - Removed inline error, using modal instead */}
 
       {/* Image Grid */}
       <View
@@ -611,7 +634,7 @@ export function CustomImagePicker({
                 ...theme.shadows.md,
               }}
             >
-              {allowVideos ? 'Take Photo or Video' : 'Take Photo'}
+              {allowVideos && isSellarPro ? 'Take Photo or Video' : 'Take Photo'}
             </Button>
 
             <Button
@@ -626,7 +649,7 @@ export function CustomImagePicker({
               }}
             >
               {limit > 1 
-                ? `Select Multiple ${allowVideos ? 'Items' : 'Images'}` 
+                ? (allowVideos && isSellarPro ? 'Choose Photos & Video' : 'Choose Photos')
                 : 'Choose from Gallery'}
             </Button>
           </View>
@@ -654,8 +677,28 @@ export function CustomImagePicker({
         </View>
       </AppModal>
 
-
-
+      {/* Error Modal */}
+      <AppModal
+        visible={showErrorModal}
+        onClose={() => {
+          setShowErrorModal(false);
+          setError(null);
+        }}
+        title="Unable to Add Media"
+        size="sm"
+        position="center"
+        primaryAction={{
+          text: 'OK',
+          onPress: () => {
+            setShowErrorModal(false);
+            setError(null);
+          },
+        }}
+      >
+        <Text variant="body" style={{ textAlign: 'center', lineHeight: 22 }}>
+          {error}
+        </Text>
+      </AppModal>
 
     </View>
   );

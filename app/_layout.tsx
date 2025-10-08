@@ -15,6 +15,7 @@ import { RewardsProvider } from '@/components/RewardsProvider/RewardsProvider';
 import { SplashScreenManager, useSplashScreen } from '@/components/SplashScreen';
 import { AuthErrorBoundary } from '@/components/AuthErrorBoundary/AuthErrorBoundary';
 import { FollowProvider } from '@/hooks/useFollowState';
+import { TrialEndingModal } from '@/components/TrialEndingModal/TrialEndingModal';
 import { useEffect } from 'react';
 import { securityService } from '@/lib/securityService';
 import { offlineStorage } from '@/lib/offlineStorage';
@@ -229,6 +230,9 @@ function AppContent() {
           onAnimationComplete={handleAnimationComplete}
         />
       )}
+      
+      {/* Trial Ending Modal - Global */}
+      <TrialEndingModal />
         </RewardsProvider>
       </FollowProvider>
     </AuthErrorBoundary>

@@ -31,7 +31,8 @@ export const STORAGE_BUCKETS = {
   PROFILES: 'profile-images', 
   COMMUNITY: 'community-images',
   CHAT: 'chat-attachments',
-  VERIFICATION: 'verification-documents'
+  VERIFICATION: 'verification-documents',
+  PRO_VIDEOS: 'sellar-pro-videos' // Separate bucket for Sellar Pro videos
 } as const;
 
 // Helper function to check storage bucket accessibility with detailed diagnostics
@@ -117,7 +118,7 @@ export const storageHelpers = {
 
   async uploadVideo(
     uri: string,
-    bucket: string = STORAGE_BUCKETS.LISTINGS,
+    bucket: string = STORAGE_BUCKETS.PRO_VIDEOS, // Use PRO_VIDEOS bucket by default
     folder: string = '',
     userId?: string,
     retries: number = 3
@@ -151,29 +152,29 @@ export const storageHelpers = {
         throw new Error(`Storage access failed: ${bucketCheck.error || 'Unknown error'}`);
       }
 
-      // Validate file size BEFORE attempting upload
-      try {
-        const fileInfo = await FileSystem.getInfoAsync(uri);
-        const fileSizeBytes = (fileInfo.exists && 'size' in fileInfo) ? fileInfo.size : 0;
-        const fileSizeMB = fileSizeBytes / (1024 * 1024);
-        
-        console.log(`📹 Video file size: ${fileSizeMB.toFixed(2)} MB`);
-        
-        // Hard limit: 100MB to prevent OOM
-        if (fileSizeMB > 100) {
-          throw new Error(`Video file too large (${fileSizeMB.toFixed(1)}MB). Maximum size is 100MB. Please use a shorter video or reduce quality.`);
-        }
-        
-        // Warning for large files
-        if (fileSizeMB > 50) {
-          console.warn(`⚠️ Large video file (${fileSizeMB.toFixed(2)}MB) - upload may take time`);
-        }
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('too large')) {
-          throw error;
-        }
-        console.warn('Could not check file size:', error);
+    // Validate file size BEFORE attempting upload
+    try {
+      const fileInfo = await FileSystem.getInfoAsync(uri);
+      const fileSizeBytes = (fileInfo.exists && 'size' in fileInfo) ? fileInfo.size : 0;
+      const fileSizeMB = fileSizeBytes / (1024 * 1024);
+      
+      console.log(`📹 Video file size: ${fileSizeMB.toFixed(2)} MB`);
+      
+      // Hard limit: 50MB (Supabase limit)
+      if (fileSizeMB > 50) {
+        throw new Error(`Video file too large (${fileSizeMB.toFixed(1)}MB). Maximum size is 50MB. Please use a shorter video or reduce quality.`);
       }
+      
+      // Warning for large files
+      if (fileSizeMB > 30) {
+        console.warn(`⚠️ Large video file (${fileSizeMB.toFixed(2)}MB) - upload may take time`);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('too large')) {
+        throw error;
+      }
+      console.warn('Could not check file size:', error);
+    }
 
       for (let attempt = 1; attempt <= retries; attempt++) {
         try {
@@ -188,7 +189,11 @@ export const storageHelpers = {
           const randomId = Math.random().toString(36).substring(2);
           
           let filename: string;
-          if (bucket === STORAGE_BUCKETS.LISTINGS) {
+          if (bucket === STORAGE_BUCKETS.PRO_VIDEOS) {
+            // Pro videos: organized by user and date for easy tracking
+            const date = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+            filename = `${userId || 'anonymous'}/${date}/${timestamp}_${randomId}.${fileExtension}`;
+          } else if (bucket === STORAGE_BUCKETS.LISTINGS) {
             filename = `${userId || 'anonymous'}/${folder || 'listing'}/${timestamp}_${randomId}.${fileExtension}`;
           } else if (bucket === STORAGE_BUCKETS.COMMUNITY) {
             filename = `posts/${userId || 'anonymous'}/${folder || timestamp}/${timestamp}_${randomId}.${fileExtension}`;

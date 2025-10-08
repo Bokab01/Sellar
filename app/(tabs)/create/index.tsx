@@ -1223,6 +1223,7 @@ function CreateListingScreen() {
           title="Upload Media"
           allowVideos={true}
           maxVideoDuration={30}
+          isSellarPro={hasBusinessPlan()}
         />
         
         {loading && uploadProgress > 0 && (

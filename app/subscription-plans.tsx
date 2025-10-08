@@ -18,6 +18,8 @@ import {
   LinearProgress,
   PaymentModal,
   BusinessBadge,
+  TrialBadge,
+  AppModal,
 } from '@/components';
 import type { PaymentRequest } from '@/components';
 import { Building, Star, Crown, Check, Zap, ChartBar as BarChart, Headphones, Award } from 'lucide-react-native';
@@ -36,6 +38,14 @@ export default function SubscriptionPlansScreen() {
     getBusinessPlanCreditCost,
     cancelSubscription,
     refreshCredits,
+    // Trial functions
+    isOnTrial,
+    trialEndsAt,
+    hasUsedTrial,
+    startTrial,
+    checkTrialEligibility,
+    convertTrialToPaid,
+    cancelTrial,
   } = useMonetizationStore();
   
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
@@ -45,10 +55,13 @@ export default function SubscriptionPlansScreen() {
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentRequest, setPaymentRequest] = useState<PaymentRequest | null>(null);
+  const [isEligibleForTrial, setIsEligibleForTrial] = useState(false);
+  const [showTrialConfirmModal, setShowTrialConfirmModal] = useState(false);
 
   useEffect(() => {
     refreshSubscription();
     refreshCredits();
+    checkTrialEligibility().then(setIsEligibleForTrial);
   }, []);
 
   const getPlanIcon = (planId: string) => {
@@ -193,6 +206,75 @@ export default function SubscriptionPlansScreen() {
     );
   };
 
+  const handleStartTrialClick = () => {
+    setShowTrialConfirmModal(true);
+  };
+
+  const handleStartTrial = async () => {
+    setShowTrialConfirmModal(false);
+    setSubscribing(true);
+    setSelectedPlan('sellar_pro');
+
+    try {
+      const result = await startTrial('Sellar Pro');
+      
+      if (result.success) {
+        setToastMessage('🎉 Welcome to your 14-day free trial! Enjoy all premium features.');
+        setToastVariant('success');
+        setShowToast(true);
+        
+        // Refresh subscription to show trial status
+        await refreshSubscription();
+      } else {
+        setToastMessage(result.error || 'Failed to start trial');
+        setToastVariant('error');
+        setShowToast(true);
+      }
+    } catch (error: any) {
+      setToastMessage(error.message || 'An unexpected error occurred');
+      setToastVariant('error');
+      setShowToast(true);
+    } finally {
+      setSubscribing(false);
+      setSelectedPlan(null);
+    }
+  };
+
+  const handleConvertTrial = async () => {
+    setSubscribing(true);
+
+    try {
+      const result = await convertTrialToPaid();
+      
+      if (result.success && result.paymentUrl) {
+        // Open payment URL
+        const request: PaymentRequest = {
+          amount: BUSINESS_PLANS[0].priceMonthly,
+          email: user?.email || 'user@example.com',
+          purpose: 'subscription' as const,
+          purpose_id: currentPlan?.id || '',
+          metadata: {
+            subscription_id: currentPlan?.id,
+            is_trial_conversion: true,
+          },
+        };
+
+        setPaymentRequest(request);
+        setShowPaymentModal(true);
+      } else {
+        setToastMessage(result.error || 'Failed to initialize payment');
+        setToastVariant('error');
+        setShowToast(true);
+      }
+    } catch (error: any) {
+      setToastMessage(error.message || 'An unexpected error occurred');
+      setToastVariant('error');
+      setShowToast(true);
+    } finally {
+      setSubscribing(false);
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaWrapper>
@@ -224,8 +306,18 @@ export default function SubscriptionPlansScreen() {
 
       <ScrollView contentContainerStyle={{ paddingBottom: theme.spacing.xl }}>
         <Container>
+          {/* Trial Badge */}
+          {isOnTrial && trialEndsAt && (
+            <TrialBadge
+              trialEndsAt={trialEndsAt}
+              onUpgradePress={handleConvertTrial}
+              variant="full"
+              style={{ marginBottom: theme.spacing.xl }}
+            />
+          )}
+
           {/* Current Plan Status */}
-          {currentPlan && (
+          {currentPlan && !isOnTrial && (
             console.log('📋 Rendering current plan:', currentPlan),
             <View
               style={{
@@ -294,9 +386,10 @@ export default function SubscriptionPlansScreen() {
                   borderRadius: theme.borderRadius.lg,
                   borderWidth: 2,
                   borderColor: plan.popular ? theme.colors.primary : theme.colors.border,
+                  marginBottom: theme.spacing.xl,
                   overflow: 'hidden',
                   position: 'relative',
-                  ...theme.shadows.lg,
+                  ...theme.shadows.sm,
                 }}
               >
                 {/* Dynamic Badges */}
@@ -329,7 +422,7 @@ export default function SubscriptionPlansScreen() {
                     );
                   }
 
-                  if (shouldShowRecommended) {
+                  /* if (shouldShowRecommended) {
                     return (
                       <View
                         style={{
@@ -350,7 +443,7 @@ export default function SubscriptionPlansScreen() {
                         </Text>
                       </View>
                     );
-                  }
+                  } */
 
                   return null;
                 })()}
@@ -413,24 +506,52 @@ export default function SubscriptionPlansScreen() {
 
                   {/* Action Buttons */}
                   <View style={{ gap: theme.spacing.md }}>
-                    <Button
-                      variant={isCurrentPlan(plan.id) ? "tertiary" : "primary"}
-                      onPress={isCurrentPlan(plan.id) ? undefined : () => handleSubscribe(plan.id)}
-                      loading={subscribing && selectedPlan === plan.id}
-                      disabled={subscribing || isCurrentPlan(plan.id)}
-                      fullWidth
-                      size="lg"
-                    >
-                      {isCurrentPlan(plan.id) 
-                        ? 'Current Plan' 
-                        : subscribing && selectedPlan === plan.id 
-                        ? 'Processing...' 
-                        : `Subscribe for GHS ${plan.priceGHS}/month`
-                      }
-                    </Button>
+                    {/* Trial Button - Show if eligible and not on trial */}
+                    {isEligibleForTrial && !isOnTrial && !currentPlan && (
+                      <Button
+                        variant="primary"
+                        onPress={handleStartTrialClick}
+                        loading={subscribing && selectedPlan === plan.id}
+                        disabled={subscribing}
+                        fullWidth
+                        size="lg"
+                      >
+                        {subscribing && selectedPlan === plan.id 
+                          ? 'Starting Trial...' 
+                          : '🎉 Start 14-Day Free Trial'
+                        }
+                      </Button>
+                    )}
 
-                    {/* Credit Upgrade Option */}
-                    {!isCurrentPlan(plan.id) && (
+                    {/* Subscribe Button - Show if on trial or not eligible for trial */}
+                    {(!isEligibleForTrial || isOnTrial || currentPlan) && (
+                      <Button
+                        variant={isCurrentPlan(plan.id) ? "tertiary" : isOnTrial ? "primary" : "secondary"}
+                        onPress={
+                          isCurrentPlan(plan.id) 
+                            ? undefined 
+                            : isOnTrial 
+                            ? handleConvertTrial 
+                            : () => handleSubscribe(plan.id)
+                        }
+                        loading={subscribing && selectedPlan === plan.id}
+                        disabled={subscribing || (isCurrentPlan(plan.id) && !isOnTrial)}
+                        fullWidth
+                        size="lg"
+                      >
+                        {isCurrentPlan(plan.id) && !isOnTrial
+                          ? 'Current Plan' 
+                          : isOnTrial
+                          ? 'Upgrade to Paid Subscription'
+                          : subscribing && selectedPlan === plan.id 
+                          ? 'Processing...' 
+                          : `Subscribe for GHS ${plan.priceGHS}/month`
+                        }
+                      </Button>
+                    )}
+
+                    {/* Credit Upgrade Option - Hide if on trial */}
+                    {!isCurrentPlan(plan.id) && !isOnTrial && (
                       <View
                         style={{
                           backgroundColor: theme.colors.surfaceVariant,
@@ -497,7 +618,7 @@ export default function SubscriptionPlansScreen() {
                   Can I cancel anytime?
                 </Text>
                 <Text variant="bodySmall" color="secondary">
-                  Yes, you can cancel your subscription at any time. You&apos;ll keep access to premium features until the end of your current billing period.
+                  Yes, you can cancel your subscription at any time. You&apos;ll keep access to Sellar Pro features until the end of your current billing period.
                 </Text>
               </View>
               
@@ -515,13 +636,101 @@ export default function SubscriptionPlansScreen() {
                   Can I upgrade or downgrade?
                 </Text>
                 <Text variant="bodySmall" color="secondary">
-                  Yes, you can change your plan at any time. Changes take effect immediately with prorated billing.
+                  No, you cannot upgrade or downgrade your plan. You can only cancel your subscription since it the only premium plan available.
                 </Text>
               </View>
             </View>
           </View>
         </Container>
       </ScrollView>
+
+      {/* Trial Confirmation Modal */}
+      <AppModal
+        visible={showTrialConfirmModal}
+        onClose={() => setShowTrialConfirmModal(false)}
+        title="Start Your Free Trial?"
+        size="lg"
+        position="bottom"
+        primaryAction={{
+          text: 'Yes, Start Free Trial',
+          onPress: handleStartTrial,
+          loading: subscribing,
+        }}
+        secondaryAction={{
+          text: 'Cancel',
+          onPress: () => setShowTrialConfirmModal(false),
+        }}
+      >
+        <View style={{ gap: theme.spacing.lg }}>
+          {/* Icon */}
+          <View style={{ alignItems: 'center' }}>
+            <View
+              style={{
+                width: 80,
+                height: 80,
+                borderRadius: theme.borderRadius.full,
+                backgroundColor: theme.colors.primary + '20',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <Crown size={40} color={theme.colors.primary} />
+            </View>
+          </View>
+
+          {/* Message */}
+          <View style={{ gap: theme.spacing.sm }}>
+            <Text variant="body" style={{ textAlign: 'center', lineHeight: 22 }}>
+              You're about to start a <Text style={{ fontWeight: '600' }}>14-day free trial</Text> of Sellar Pro.
+            </Text>
+            
+            <Text variant="bodySmall" color="secondary" style={{ textAlign: 'center', lineHeight: 20 }}>
+              No payment required now. You'll get instant access to all premium features.
+            </Text>
+          </View>
+
+          {/* Features Preview */}
+          <View
+            style={{
+              backgroundColor: theme.colors.surfaceVariant,
+              borderRadius: theme.borderRadius.md,
+              padding: theme.spacing.lg,
+              gap: theme.spacing.sm,
+            }}
+          >
+            <Text variant="bodySmall" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
+              What's included:
+            </Text>
+            
+            {[
+              '✨ Video uploads for listings',
+              '🔄 Auto-refresh every 2 hours',
+              '📊 Advanced analytics',
+              '⚡ Priority support',
+              '♾️ Unlimited active listings',
+            ].map((feature, index) => (
+              <Text key={index} variant="caption" color="secondary">
+                {feature}
+              </Text>
+            ))}
+          </View>
+
+          {/* Important Note */}
+          <View
+            style={{
+              backgroundColor: theme.colors.warning + '10',
+              borderColor: theme.colors.warning + '30',
+              borderWidth: 1,
+              borderRadius: theme.borderRadius.md,
+              padding: theme.spacing.md,
+            }}
+          >
+            <Text variant="caption" style={{ textAlign: 'center', lineHeight: 18 }}>
+              ⚠️ You can only use the free trial once. After 14 days, you can subscribe to continue enjoying premium features.
+            </Text>
+          </View>
+        </View>
+      </AppModal>
 
       {/* Payment Modal */}
       <PaymentModal

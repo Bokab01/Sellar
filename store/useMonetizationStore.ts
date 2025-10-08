@@ -17,6 +17,10 @@ interface SubscriptionState {
   entitlements: any;
   loading: boolean;
   error: string | null;
+  // Trial state
+  isOnTrial: boolean;
+  trialEndsAt: string | null;
+  hasUsedTrial: boolean;
 }
 
 interface MonetizationState extends CreditState, SubscriptionState {
@@ -38,6 +42,12 @@ interface MonetizationState extends CreditState, SubscriptionState {
   subscribeToPlan: (planId: string) => Promise<{ success: boolean; error?: string; paymentUrl?: string }>;
   upgradeToBusinessWithCredits: () => Promise<{ success: boolean; error?: string; creditsRequired?: number }>;
   cancelSubscription: () => Promise<{ success: boolean; error?: string }>;
+  
+  // Trial actions
+  startTrial: (planId: string) => Promise<{ success: boolean; error?: string; trialEndsAt?: string }>;
+  checkTrialEligibility: () => Promise<boolean>;
+  convertTrialToPaid: () => Promise<{ success: boolean; error?: string; paymentUrl?: string }>;
+  cancelTrial: (reason?: string) => Promise<{ success: boolean; error?: string }>;
   
   // Entitlements
   getMaxListings: () => number;
@@ -62,6 +72,11 @@ export const useMonetizationStore = create<MonetizationState>()(
   // Subscription state
   currentPlan: null,
   entitlements: {},
+  
+  // Trial state
+  isOnTrial: false,
+  trialEndsAt: null,
+  hasUsedTrial: false,
   
   // Loading states
   loading: false,
@@ -288,15 +303,18 @@ export const useMonetizationStore = create<MonetizationState>()(
       if (subError) throw subError;
 
       // Get entitlements
-      const { data: entitlements, error: entError } = await supabase.rpc('get_user_entitlements', {
+      const { data: entitlements, error: entError} = await supabase.rpc('get_user_entitlements', {
         p_user_id: user.id,
       } as any);
 
       if (entError) throw entError;
 
+      // Update state with trial information
       set({
         currentPlan: subscription,
         entitlements: entitlements || {},
+        isOnTrial: subscription?.is_trial || false,
+        trialEndsAt: subscription?.trial_ends_at || null,
       });
     } catch (error: any) {
       set({ error: error.message });
@@ -538,6 +556,172 @@ export const useMonetizationStore = create<MonetizationState>()(
     }
   },
 
+  // Trial functions
+  startTrial: async (planId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Get plan details - use maybeSingle to avoid error on 0 rows
+      const { data: plan, error: planError } = await supabase
+        .from('subscription_plans')
+        .select('*')
+        .eq('name', planId)
+        .maybeSingle();
+
+      if (planError) {
+        console.error('Error fetching plan:', planError);
+        throw planError;
+      }
+
+      if (!plan) {
+        console.error('Plan not found:', planId);
+        throw new Error(`Plan "${planId}" not found. Please contact support.`);
+      }
+
+      // Start trial using RPC function
+      const { data, error } = await supabase.rpc('start_trial', {
+        p_user_id: user.id,
+        p_plan_id: plan.id,
+      });
+
+      if (error) throw error;
+
+      // The RPC returns an array of results
+      if (!data || data.length === 0) {
+        throw new Error('No response from trial creation');
+      }
+
+      const result = data[0];
+      
+      if (!result || !result.success) {
+        throw new Error(result?.error || 'Failed to start trial');
+      }
+
+      // Update local state
+      set({
+        isOnTrial: true,
+        trialEndsAt: result.trial_ends_at,
+        hasUsedTrial: true,
+      });
+
+      // Refresh subscription to get entitlements
+      await get().refreshSubscription();
+
+      return {
+        success: true,
+        trialEndsAt: result.trial_ends_at,
+      };
+    } catch (error: any) {
+      console.error('Trial start error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  checkTrialEligibility: async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+
+      // Check if user has used trial
+      const { data, error } = await supabase.rpc('has_used_trial', {
+        p_user_id: user.id,
+        p_plan_id: null, // Check for any trial
+      });
+
+      if (error) throw error;
+
+      return !data; // Eligible if hasn't used trial
+    } catch (error) {
+      console.error('Error checking trial eligibility:', error);
+      return false;
+    }
+  },
+
+  convertTrialToPaid: async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { currentPlan } = get();
+      if (!currentPlan || !currentPlan.is_trial) {
+        throw new Error('No active trial found');
+      }
+
+      // Get plan details for payment
+      const { data: plan, error: planError } = await supabase
+        .from('subscription_plans')
+        .select('*')
+        .eq('id', currentPlan.plan_id)
+        .single();
+
+      if (planError) throw planError;
+
+      // Initialize payment
+      const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
+        'paystack-initialize',
+        {
+          body: {
+            amount: plan.price_ghs * 100, // Convert to pesewas
+            email: user.email,
+            reference: `trial_convert_${currentPlan.id}`,
+            purpose: 'trial_conversion',
+            purpose_id: currentPlan.id,
+          },
+        }
+      );
+
+      if (paymentError) throw paymentError;
+
+      return {
+        success: true,
+        paymentUrl: paymentData.authorization_url,
+      };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  cancelTrial: async (reason?: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { currentPlan } = get();
+      if (!currentPlan || !currentPlan.is_trial) {
+        throw new Error('No active trial found');
+      }
+
+      // Cancel trial using RPC function
+      const { data, error } = await supabase.rpc('cancel_trial', {
+        p_subscription_id: currentPlan.id,
+        p_user_id: user.id,
+        p_reason: reason || null,
+      });
+
+      if (error) throw error;
+
+      const result = data[0];
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to cancel trial');
+      }
+
+      // Update local state
+      set({
+        isOnTrial: false,
+        trialEndsAt: null,
+        currentPlan: null,
+      });
+
+      // Refresh subscription
+      await get().refreshSubscription();
+
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  },
+
   // Entitlement helpers
   getMaxListings: () => {
     const { entitlements } = get();
@@ -570,7 +754,12 @@ export const useMonetizationStore = create<MonetizationState>()(
   },
 
   hasBusinessPlan: () => {
-    const { currentPlan, entitlements } = get();
+    const { currentPlan, entitlements, isOnTrial } = get();
+    
+    // Check if user is on trial - trial users get full business plan access
+    if (isOnTrial && currentPlan?.is_trial) {
+      return true;
+    }
     
     // Check if user has a business plan subscription (active OR cancelled but still within period)
     if (currentPlan && (currentPlan.status === 'active' || currentPlan.status === 'cancelled')) {

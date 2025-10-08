@@ -20,6 +20,8 @@ import { Text } from '@/components/Typography/Text';
 import { Container } from '@/components/Layout';
 import { Button } from '@/components/Button/Button';
 import { Badge } from '@/components/Badge/Badge';
+import { TrialBadge } from '@/components/TrialBadge/TrialBadge';
+import { useMonetizationStore } from '@/store/useMonetizationStore';
 import type { QuickStats } from '@/lib/analyticsService';
 
 interface FreeUserDashboardProps {
@@ -33,6 +35,7 @@ export const FreeUserDashboard: React.FC<FreeUserDashboardProps> = ({
 }) => {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const { isOnTrial, trialEndsAt, convertTrialToPaid } = useMonetizationStore();
 
   return (
     <Container style={{ paddingTop: theme.spacing.lg }}>
@@ -40,6 +43,15 @@ export const FreeUserDashboard: React.FC<FreeUserDashboardProps> = ({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + theme.spacing.xl }}
       >
+        {/* Trial Badge - Show if user is on trial */}
+        {isOnTrial && trialEndsAt && (
+          <TrialBadge
+            trialEndsAt={trialEndsAt}
+            onUpgradePress={() => router.push('/subscription-plans')}
+            variant="full"
+            style={{ marginBottom: theme.spacing.lg }}
+          />
+        )}
         {/* Premium Upgrade Hero Card */}
         <View style={{
           backgroundColor: theme.colors.surface,
