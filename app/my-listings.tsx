@@ -135,6 +135,8 @@ export default function MyListingsScreen() {
         .from('listings')
         .select(`
           *,
+          views_count,
+          favorites_count,
           categories (
             name,
             icon
@@ -800,27 +802,29 @@ export default function MyListingsScreen() {
                        borderRadius: theme.borderRadius.lg,
                        overflow: 'hidden'
                      }}>
-                       <ProductCard
-                         image={listing.image}
-                         title={listing.title}
-                         price={listing.price}
-                         seller={listing.seller}
-                         badge={listing.badge}
-                         location={listing.location}
-                         layout="grid"
-                         fullWidth={true}
-                         onPress={() => {
-                           if (isSelectionMode) {
-                             toggleListingSelection(listing.id);
-                           } else if (listing.status === 'hidden') {
-                             // Don't navigate to hidden listings
-                             return;
-                           } else {
-                             router.push(`/(tabs)/home/${listing.id}`);
-                           }
-                         }}
-                         enableImageViewer={!isSelectionMode && listing.status !== 'hidden'}
-                       />
+                      <ProductCard
+                        image={listing.image}
+                        title={listing.title}
+                        price={listing.price}
+                        seller={listing.seller}
+                        badge={listing.badge}
+                        location={listing.location}
+                        layout="grid"
+                        fullWidth={true}
+                        viewCount={listing.views}
+                        favoritesCount={listing.favorites}
+                        onPress={() => {
+                          if (isSelectionMode) {
+                            toggleListingSelection(listing.id);
+                          } else if (listing.status === 'hidden') {
+                            // Don't navigate to hidden listings
+                            return;
+                          } else {
+                            router.push(`/(tabs)/home/${listing.id}`);
+                          }
+                        }}
+                        enableImageViewer={!isSelectionMode && listing.status !== 'hidden'}
+                      />
                      </View>
                      
                      {/* Hidden Listing Message - positioned above all content */}

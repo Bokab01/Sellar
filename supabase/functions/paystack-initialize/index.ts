@@ -97,6 +97,7 @@ Deno.serve(async (req: Request) => {
         email,
         reference,
         channels: channels || ['card', 'mobile_money'],
+        callback_url: `https://sellar.app/payment/callback?reference=${reference}&status=success`,
         metadata: {
           purpose,
           purpose_id,

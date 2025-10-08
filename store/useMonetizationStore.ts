@@ -10,6 +10,7 @@ interface CreditState {
   transactions: any[];
   loading: boolean;
   error: string | null;
+  lastCreditsFetch: number | null; // Timestamp of last fetch
 }
 
 interface SubscriptionState {
@@ -21,6 +22,7 @@ interface SubscriptionState {
   isOnTrial: boolean;
   trialEndsAt: string | null;
   hasUsedTrial: boolean;
+  lastSubscriptionFetch: number | null; // Timestamp of last fetch
 }
 
 interface MonetizationState extends CreditState, SubscriptionState {
@@ -68,10 +70,12 @@ export const useMonetizationStore = create<MonetizationState>()(
   lifetimeEarned: 0,
   lifetimeSpent: 0,
   transactions: [],
+  lastCreditsFetch: null,
   
   // Subscription state
   currentPlan: null,
   entitlements: {},
+  lastSubscriptionFetch: null,
   
   // Trial state
   isOnTrial: false,
@@ -91,8 +95,18 @@ export const useMonetizationStore = create<MonetizationState>()(
   },
 
   // Credit actions
-  refreshCredits: async () => {
+  refreshCredits: async (force = false) => {
     try {
+      const state = get();
+      const now = Date.now();
+      const CACHE_DURATION = 30 * 1000; // 30 seconds cache
+      
+      // Use cached data if available and fresh (unless forced)
+      if (!force && state.lastCreditsFetch && (now - state.lastCreditsFetch) < CACHE_DURATION) {
+        console.log('Using cached credits data');
+        return;
+      }
+      
       set({ loading: true, error: null });
       
       const { data: { user } } = await supabase.auth.getUser();
@@ -109,7 +123,7 @@ export const useMonetizationStore = create<MonetizationState>()(
         throw creditsError;
       }
 
-      // Get recent transactions
+      // Get recent transactions (limit to 20 for performance)
       const { data: transactions, error: transError } = await supabase
         .from('credit_transactions')
         .select('*')
@@ -124,6 +138,7 @@ export const useMonetizationStore = create<MonetizationState>()(
         lifetimeEarned: (credits as any)?.lifetime_earned || 0,
         lifetimeSpent: (credits as any)?.lifetime_spent || 0,
         transactions: transactions || [],
+        lastCreditsFetch: now,
         loading: false,
       });
     } catch (error: any) {
@@ -814,10 +829,14 @@ export const useMonetizationStore = create<MonetizationState>()(
         lifetimeEarned: state.lifetimeEarned,
         lifetimeSpent: state.lifetimeSpent,
         transactions: state.transactions,
+        lastCreditsFetch: state.lastCreditsFetch,
         currentPlan: state.currentPlan,
         entitlements: state.entitlements,
-        loading: state.loading,
-        error: state.error,
+        lastSubscriptionFetch: state.lastSubscriptionFetch,
+        isOnTrial: state.isOnTrial,
+        trialEndsAt: state.trialEndsAt,
+        hasUsedTrial: state.hasUsedTrial,
+        // Don't persist loading/error states
       }),
     }
   )

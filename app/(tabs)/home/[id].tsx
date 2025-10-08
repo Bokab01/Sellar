@@ -229,11 +229,15 @@ export default function ListingDetailScreen() {
 
   useEffect(() => {
     if (listingId) {
-      fetchListing();
-      checkIfFavorited();
-      checkCallbackStatus();
-      checkPendingOffer();
-      fetchRelatedItems();
+      // Fetch all data in parallel for better performance
+      Promise.all([
+        fetchListing(),
+        checkIfFavorited(),
+        checkCallbackStatus(),
+        checkPendingOffer(),
+      ]).then(() => {
+        // fetchRelatedItems will be called after listing is set
+      });
       
       // Track view interaction
       if (user) {
@@ -245,11 +249,12 @@ export default function ListingDetailScreen() {
     }
   }, [listingId]);
 
+  // Fetch related items only once after listing is loaded
   useEffect(() => {
     if (listing) {
       fetchRelatedItems();
     }
-  }, [listing]);
+  }, [listing?.id]); // Only re-run if listing ID changes, not on every listing update
 
   // Pre-fill callback phone with user's profile phone when modal opens
   useEffect(() => {
@@ -274,15 +279,30 @@ export default function ListingDetailScreen() {
   const { listingFavoriteCounts } = useFavoritesStore();
   const favoritesCount = listingFavoriteCounts[listingId || ''] ?? listing?.favorites_count ?? 0;
 
+  // Cache for smart refresh - only refresh if needed
+  const lastFetchTime = useRef(0);
+  const FETCH_COOLDOWN = 30000; // 30 seconds
+
   // Refresh data when screen comes into focus (e.g., returning from edit screen)
   useFocusEffect(
     React.useCallback(() => {
-      if (listingId) {
-        fetchListing();
-        checkIfFavorited();
-        checkCallbackStatus();
-        checkPendingOffer();
+      const now = Date.now();
+      const timeSinceLastFetch = now - lastFetchTime.current;
+      
+      // Only refresh if it's been more than 30 seconds since last fetch
+      if (listingId && (timeSinceLastFetch > FETCH_COOLDOWN || lastFetchTime.current === 0)) {
+        console.log('🔄 Listing detail: Refreshing data on focus');
+        lastFetchTime.current = now;
+        
+        Promise.all([
+          fetchListing(),
+          checkIfFavorited(),
+          checkCallbackStatus(),
+          checkPendingOffer(),
+        ]);
         // Don't increment view count on focus refresh
+      } else {
+        console.log('⏭️ Listing detail: Using cached data on focus');
       }
     }, [listingId])
   );
@@ -467,10 +487,13 @@ export default function ListingDetailScreen() {
   const fetchRelatedItems = useCallback(async () => {
     if (!listing) return;
 
-    // Fetch seller's other items
+    // Fetch both seller and similar items in parallel for better performance
     setSellerListingsLoading(true);
-    try {
-      let { data: sellerData, error: sellerError }: { data: any[] | null, error: any } = await supabase
+    setSimilarListingsLoading(true);
+    
+    const [sellerResult, similarResult] = await Promise.allSettled([
+      // Fetch seller's other items
+      supabase
         .from('listings')
         .select(`
           *,
@@ -488,23 +511,55 @@ export default function ListingDetailScreen() {
         .eq('status', 'active')
         .neq('id', listingId)
         .order('created_at', { ascending: false })
-        .limit(8);
+        .limit(8),
+      
+      // Fetch similar items (same category, different seller)
+      supabase
+        .from('listings')
+        .select(`
+          *,
+          profiles!listings_seller_fkey (
+            id,
+            first_name,
+            last_name,
+            avatar_url,
+            rating,
+            is_verified,
+            account_type
+          )
+        `)
+        .eq('category_id', listing.category_id)
+        .eq('status', 'active')
+        .neq('user_id', listing.user_id)
+        .neq('id', listingId)
+        .order('created_at', { ascending: false })
+        .limit(8)
+    ]);
 
-      // Fallback for schema cache issues
-      if (sellerError && sellerError.message.includes('schema cache')) {
-        const { data: basicSellerData } = await supabase
-          .from('listings')
-          .select('*')
-          .eq('user_id', listing.user_id)
-          .eq('status', 'active')
-          .neq('id', listingId)
-          .order('created_at', { ascending: false })
-          .limit(8);
+    // Process seller listings
+    try {
+      let sellerData = null;
+      if (sellerResult.status === 'fulfilled') {
+        let { data, error: sellerError } = sellerResult.value;
         
-        sellerData = (basicSellerData as any[] || []).map(item => ({
-          ...item,
-          profiles: listing.profiles // Use the main listing's profile data
-        })) || [];
+        // Fallback for schema cache issues
+        if (sellerError && sellerError.message.includes('schema cache')) {
+          const { data: basicSellerData } = await supabase
+            .from('listings')
+            .select('*')
+            .eq('user_id', listing.user_id)
+            .eq('status', 'active')
+            .neq('id', listingId)
+            .order('created_at', { ascending: false })
+            .limit(8);
+          
+          sellerData = (basicSellerData as any[] || []).map(item => ({
+            ...item,
+            profiles: listing.profiles // Use the main listing's profile data
+          })) || [];
+        } else {
+          sellerData = data;
+        }
       }
 
       if (sellerData) {
@@ -531,46 +586,31 @@ export default function ListingDetailScreen() {
       setSellerListingsLoading(false);
     }
 
-    // Fetch similar items (same category, different seller)
-    setSimilarListingsLoading(true);
+    // Process similar listings
     try {
-      let { data: similarData, error: similarError }: { data: any[] | null, error: any } = await supabase
-        .from('listings')
-        .select(`
-          *,
-          profiles!listings_seller_fkey (
-            id,
-            first_name,
-            last_name,
-            avatar_url,
-            rating,
-            is_verified,
-            account_type
-          )
-        `)
-        .eq('category_id', listing.category_id)
-        .eq('status', 'active')
-        .neq('user_id', listing.user_id)
-        .neq('id', listingId)
-        .order('created_at', { ascending: false })
-        .limit(8);
-
-      // Fallback for schema cache issues
-      if (similarError && similarError.message.includes('schema cache')) {
-        const { data: basicSimilarData } = await supabase
-          .from('listings')
-          .select('*')
-          .eq('category_id', listing.category_id)
-          .eq('status', 'active')
-          .neq('user_id', listing.user_id)
-          .neq('id', listingId)
-          .order('created_at', { ascending: false })
-          .limit(8);
+      let similarData = null;
+      if (similarResult.status === 'fulfilled') {
+        let { data, error: similarError } = similarResult.value;
         
-        similarData = (basicSimilarData as any[] || []).map(item => ({
-          ...item,
-          profiles: null // We don't have profile data for similar items in fallback
-        })) || [];
+        // Fallback for schema cache issues
+        if (similarError && similarError.message.includes('schema cache')) {
+          const { data: basicSimilarData } = await supabase
+            .from('listings')
+            .select('*')
+            .eq('category_id', listing.category_id)
+            .eq('status', 'active')
+            .neq('user_id', listing.user_id)
+            .neq('id', listingId)
+            .order('created_at', { ascending: false })
+            .limit(8);
+          
+          similarData = (basicSimilarData as any[] || []).map(item => ({
+            ...item,
+            profiles: null // We don't have profile data for similar items in fallback
+          })) || [];
+        } else {
+          similarData = data;
+        }
       }
 
       if (similarData) {

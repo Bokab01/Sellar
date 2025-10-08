@@ -14,6 +14,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { Button } from '@/components/Button/Button';
 import { X } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type ModalSize = 'sm' | 'md' | 'lg' | 'full';
 type ModalPosition = 'center' | 'bottom' | 'top';
@@ -233,67 +234,116 @@ export function AppModal({
             >
                 {/* Header */}
                 {(title || showCloseButton) && (
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      paddingHorizontal: theme.spacing.lg,
-                      paddingTop: position === 'bottom' ? theme.spacing.lg : theme.spacing.lg,
-                      paddingBottom: theme.spacing.sm,
-                      backgroundColor: theme.colors.surface,
-                    }}
-                  >
-                    {/* Handle bar for bottom sheets */}
-                    {position === 'bottom' && (
+                  fullScreen ? (
+                    <SafeAreaView edges={['top']} style={{ backgroundColor: theme.colors.surface }}>
                       <View
                         style={{
-                          position: 'absolute',
-                          top: theme.spacing.sm,
-                          left: '50%',
-                          marginLeft: -20,
-                          width: 40,
-                          height: 4,
-                          borderRadius: 2,
-                          backgroundColor: theme.colors.border,
-                        }}
-                      />
-                    )}
-                    
-                    {title ? (
-                      <Text 
-                        variant="h4" 
-                        style={{ 
-                          flex: 1, 
-                          fontWeight: '600',
-                          
-                          letterSpacing: -0.3,
-                          color: theme.colors.text.primary 
-                        }}
-                      >
-                        {title}
-                      </Text>
-                    ) : (
-                      <View style={{ flex: 1 }} />
-                    )}
-
-                    {showCloseButton && (
-                      <TouchableOpacity
-                        onPress={onClose}
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: 16,
-                          backgroundColor: theme.colors.surfaceVariant + '80',
-                          justifyContent: 'center',
+                          flexDirection: 'row',
                           alignItems: 'center',
+                          justifyContent: 'space-between',
+                          paddingHorizontal: theme.spacing.lg,
+                          paddingTop: theme.spacing.sm,
+                          paddingBottom: theme.spacing.sm,
+                          backgroundColor: theme.colors.surface,
                         }}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
-                        <X size={18} color={theme.colors.text.secondary} />
-                      </TouchableOpacity>
-                    )}
-                  </View>
+                        {title ? (
+                          <Text 
+                            variant="h4" 
+                            style={{ 
+                              flex: 1, 
+                              fontWeight: '600',
+                              letterSpacing: -0.3,
+                              color: theme.colors.text.primary 
+                            }}
+                          >
+                            {title}
+                          </Text>
+                        ) : (
+                          <View style={{ flex: 1 }} />
+                        )}
+
+                        {showCloseButton && (
+                          <TouchableOpacity
+                            onPress={onClose}
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: 16,
+                              backgroundColor: theme.colors.surfaceVariant + '80',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                            }}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <X size={18} color={theme.colors.text.secondary} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </SafeAreaView>
+                  ) : (
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingHorizontal: theme.spacing.lg,
+                        paddingTop: position === 'bottom' ? theme.spacing.lg : theme.spacing.lg,
+                        paddingBottom: theme.spacing.sm,
+                        backgroundColor: theme.colors.surface,
+                      }}
+                    >
+                      {/* Handle bar for bottom sheets */}
+                      {position === 'bottom' && (
+                        <View
+                          style={{
+                            position: 'absolute',
+                            top: theme.spacing.sm,
+                            left: '50%',
+                            marginLeft: -20,
+                            width: 40,
+                            height: 4,
+                            borderRadius: 2,
+                            backgroundColor: theme.colors.border,
+                          }}
+                        />
+                      )}
+                      
+                      {title ? (
+                        <Text 
+                          variant="h4" 
+                          style={{ 
+                            flex: 1, 
+                            fontWeight: '600',
+                            
+                            letterSpacing: -0.3,
+                            color: theme.colors.text.primary 
+                          }}
+                        >
+                          {title}
+                        </Text>
+                      ) : (
+                        <View style={{ flex: 1 }} />
+                      )}
+
+                      {showCloseButton && (
+                        <TouchableOpacity
+                          onPress={onClose}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 16,
+                            backgroundColor: theme.colors.surfaceVariant + '80',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                          }}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <X size={18} color={theme.colors.text.secondary} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )
                 )}
 
               {/* Content */}

@@ -55,11 +55,27 @@ export interface QuickStats {
 }
 
 class AnalyticsService {
+  // ✅ PERFORMANCE FIX: Add caching for analytics data
+  private analyticsCache = new Map<string, { data: AnalyticsData; timestamp: number }>();
+  private readonly CACHE_DURATION = 60000; // 60 seconds cache for analytics
+
   /**
    * Get comprehensive analytics data for business users
    */
   async getBusinessAnalytics(userId: string, timeRange: '7d' | '30d' | '90d' = '30d'): Promise<AnalyticsData> {
     try {
+      // ✅ Check cache first
+      const cacheKey = `${userId}-${timeRange}`;
+      const cached = this.analyticsCache.get(cacheKey);
+      const now = Date.now();
+      
+      if (cached && (now - cached.timestamp) < this.CACHE_DURATION) {
+        console.log('📊 Using cached analytics data');
+        return cached.data;
+      }
+
+      console.log('📊 Fetching fresh analytics data');
+      
       // Get all analytics data in parallel
       const [
         listingsData,
@@ -79,7 +95,7 @@ class AnalyticsService {
         this.getCategoryAnalytics(userId)
       ]);
 
-      return {
+      const analyticsData: AnalyticsData = {
         // Overview metrics
         totalListings: listingsData.total,
         activeListings: listingsData.active,
@@ -104,9 +120,26 @@ class AnalyticsService {
         dailyViews: trendsData,
         categoryPerformance: categoryData,
       };
+      
+      // ✅ Store in cache
+      this.analyticsCache.set(cacheKey, { data: analyticsData, timestamp: now });
+      
+      return analyticsData;
     } catch (error) {
       console.error('Error fetching business analytics:', error);
       throw error;
+    }
+  }
+  
+  /**
+   * Clear analytics cache (useful for manual refresh)
+   */
+  clearCache(userId?: string, timeRange?: '7d' | '30d' | '90d') {
+    if (userId && timeRange) {
+      const cacheKey = `${userId}-${timeRange}`;
+      this.analyticsCache.delete(cacheKey);
+    } else {
+      this.analyticsCache.clear();
     }
   }
 
@@ -173,7 +206,14 @@ class AnalyticsService {
   }
 
   private async getViewsAnalytics(userId: string, timeRange: '7d' | '30d' | '90d' = '30d') {
-    // Get user's listing IDs first
+    // ✅ PERFORMANCE FIX: Get user's listing IDs and all view data in parallel
+    const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
+    const currentPeriodStart = new Date();
+    currentPeriodStart.setDate(currentPeriodStart.getDate() - days);
+    
+    const previousPeriodStart = new Date();
+    previousPeriodStart.setDate(previousPeriodStart.getDate() - (days * 2));
+    
     const { data: userListings, error: listingsError } = await supabase
       .from('listings')
       .select('id')
@@ -182,46 +222,38 @@ class AnalyticsService {
     if (listingsError) throw listingsError;
 
     const listingIds = userListings?.map(l => l.id) || [];
-
-    // Get total views for user's listings
-    const { data: totalViews, error: totalError } = await supabase
-      .from('listing_views')
-      .select('id', { count: 'exact' })
-      .in('listing_id', listingIds);
-
-    if (totalError) throw totalError;
-
-    // Calculate time periods based on timeRange
-    const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
-    const currentPeriodStart = new Date();
-    currentPeriodStart.setDate(currentPeriodStart.getDate() - days);
     
-    const previousPeriodStart = new Date();
-    previousPeriodStart.setDate(previousPeriodStart.getDate() - (days * 2));
-    
-    // Get views for current period
-    const { data: currentPeriodViews, error: currentError } = await supabase
-      .from('listing_views')
-      .select('id', { count: 'exact' })
-      .in('listing_id', listingIds)
-      .gte('created_at', currentPeriodStart.toISOString());
+    if (listingIds.length === 0) {
+      return { total: 0, thisWeek: 0, lastWeek: 0 };
+    }
 
-    if (currentError) throw currentError;
+    // ✅ Fetch all view queries in parallel instead of sequentially
+    const [totalResult, currentResult, previousResult] = await Promise.all([
+      supabase
+        .from('listing_views')
+        .select('id', { count: 'exact' })
+        .in('listing_id', listingIds),
+      supabase
+        .from('listing_views')
+        .select('id', { count: 'exact' })
+        .in('listing_id', listingIds)
+        .gte('created_at', currentPeriodStart.toISOString()),
+      supabase
+        .from('listing_views')
+        .select('id', { count: 'exact' })
+        .in('listing_id', listingIds)
+        .gte('created_at', previousPeriodStart.toISOString())
+        .lt('created_at', currentPeriodStart.toISOString())
+    ]);
 
-    // Get views for previous period
-    const { data: previousPeriodViews, error: previousError } = await supabase
-      .from('listing_views')
-      .select('id', { count: 'exact' })
-      .in('listing_id', listingIds)
-      .gte('created_at', previousPeriodStart.toISOString())
-      .lt('created_at', currentPeriodStart.toISOString());
-
-    if (previousError) throw previousError;
+    if (totalResult.error) throw totalResult.error;
+    if (currentResult.error) throw currentResult.error;
+    if (previousResult.error) throw previousResult.error;
 
     return {
-      total: totalViews?.length || 0,
-      thisWeek: currentPeriodViews?.length || 0,
-      lastWeek: previousPeriodViews?.length || 0,
+      total: totalResult.data?.length || 0,
+      thisWeek: currentResult.data?.length || 0,
+      lastWeek: previousResult.data?.length || 0,
     };
   }
 

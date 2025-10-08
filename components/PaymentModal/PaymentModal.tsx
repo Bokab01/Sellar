@@ -40,6 +40,9 @@ export function PaymentModal({
   const [loading, setLoading] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [paymentReference, setPaymentReference] = useState<string | null>(null);
+  const [showVerifyButton, setShowVerifyButton] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const paystackWebViewRef = useRef<any>(null);
 
   // Get Paystack public key from environment
@@ -95,22 +98,41 @@ export function PaymentModal({
   };
 
   const handlePaymentSuccess = async (response: any) => {
+    // Prevent duplicate processing
+    if (isProcessing) {
+      console.log('⏭️  Payment already being processed, skipping duplicate');
+      return;
+    }
+
     try {
+      setIsProcessing(true);
+      console.log('🎉 handlePaymentSuccess called with:', response);
       const reference = response.reference || paymentReference;
       
       if (!reference) {
+        console.error('❌ No payment reference found');
         throw new Error('Payment reference not found');
       }
 
+      console.log('🔄 Verifying payment with reference:', reference);
       // Verify payment via webhook (automatic) or direct verification
       // The webhook should handle the verification, but we can also verify directly
-      await verifyPayment(reference);
+      const verifyResult = await verifyPayment(reference);
+      console.log('✅ Payment verified:', verifyResult);
       
+      console.log('📞 Calling onSuccess callback');
       onSuccess(reference);
-      handleClose();
+      
+      // Delay closing to allow success message to be seen
+      console.log('⏱️ Waiting 2 seconds before closing modal...');
+      setTimeout(() => {
+        console.log('🚪 Closing payment modal');
+        handleClose();
+      }, 2500); // Increased to 2.5 seconds
     } catch (error: any) {
-      console.error('Payment success handling error:', error);
+      console.error('❌ Payment success handling error:', error);
       onError(error.message || 'Payment verification failed');
+      setIsProcessing(false); // Reset on error so user can retry
     }
   };
 
@@ -131,17 +153,33 @@ export function PaymentModal({
 
   const verifyPayment = async (reference: string) => {
     try {
+      console.log('🔍 Calling paystack-verify with reference:', reference);
       const { data, error } = await supabase.functions.invoke('paystack-verify', {
         body: { reference },
       });
 
+      console.log('📦 Verify response data:', data);
+      console.log('❌ Verify response error:', error);
+
       if (error) {
+        console.error('❌ Edge Function error:', error);
         throw new Error(error.message);
       }
 
+      if (!data) {
+        console.error('❌ No data returned from verification');
+        throw new Error('No data returned from verification');
+      }
+
+      if (data.error) {
+        console.error('❌ Verification failed:', data.error, data.details);
+        throw new Error(data.error);
+      }
+
+      console.log('✅ Verification successful:', data);
       return data;
     } catch (error: any) {
-      console.error('Payment verification error:', error);
+      console.error('❌ Payment verification error:', error);
       throw error;
     }
   };
@@ -156,12 +194,43 @@ export function PaymentModal({
     setPaymentUrl(null);
     setPaymentReference(null);
     setLoading(false);
+    setIsProcessing(false); // Reset processing flag
+    setShowVerifyButton(false); // Reset verify button
     onClose();
+  };
+
+  const handleManualVerify = async () => {
+    if (!paymentReference) {
+      onError('Payment reference not found');
+      return;
+    }
+
+    setVerifying(true);
+    try {
+      console.log('🔄 Manual verification triggered for:', paymentReference);
+      await verifyPayment(paymentReference);
+      onSuccess(paymentReference);
+      handleClose();
+    } catch (error: any) {
+      console.error('❌ Manual verification failed:', error);
+      onError(error.message || 'Verification failed');
+    } finally {
+      setVerifying(false);
+    }
   };
 
   React.useEffect(() => {
     if (visible && paymentRequest) {
+      setIsProcessing(false); // Reset when opening modal
       initializePayment();
+      // Show verify button after 30 seconds
+      const timer = setTimeout(() => {
+        setShowVerifyButton(true);
+      }, 30000);
+      return () => clearTimeout(timer);
+    } else {
+      setShowVerifyButton(false);
+      setIsProcessing(false);
     }
   }, [visible, paymentRequest]);
 
@@ -246,15 +315,57 @@ export function PaymentModal({
               source={{ uri: paymentUrl }}
               style={{ flex: 1 }}
               onNavigationStateChange={(navState) => {
+                // Ignore navigation events if already processing payment
+                if (isProcessing) {
+                  console.log('⏭️  Ignoring navigation - payment already being processed');
+                  return;
+                }
+
+                console.log('🔍 WebView navigation:', navState.url);
+                console.log('🔍 Can go back:', navState.canGoBack);
+                console.log('🔍 Loading:', navState.loading);
+                console.log('🔍 Title:', navState.title);
+                
                 // Handle navigation changes to detect success/failure
-                if (navState.url.includes('callback') || navState.url.includes('success')) {
-                  // Payment completed - you can extract reference from URL
+                const url = navState.url.toLowerCase();
+                const title = navState.title?.toLowerCase() || '';
+                
+                // Check for our custom callback URL (most reliable)
+                if (url.includes('sellar.app/payment/callback') && url.includes('status=success')) {
+                  console.log('✅ Payment success detected via callback URL!');
+                  // Extract reference from URL
                   const urlParams = new URLSearchParams(navState.url.split('?')[1]);
                   const reference = urlParams.get('reference') || paymentReference;
                   if (reference) {
+                    console.log('📝 Payment reference from callback:', reference);
                     handlePaymentSuccess({ reference });
                   }
-                } else if (navState.url.includes('cancel') || navState.url.includes('error')) {
+                  return;
+                }
+                
+                // Fallback: Check other success indicators
+                if (
+                  url.includes('callback') || 
+                  url.includes('success') ||
+                  url.includes('checkout/paycomplete') ||
+                  url.includes('trxref=') ||
+                  url.includes('reference=') ||
+                  title.includes('success') ||
+                  title.includes('successful') ||
+                  title.includes('complete')
+                ) {
+                  console.log('✅ Payment success detected via fallback detection');
+                  // Payment completed - extract reference from URL
+                  const urlParams = new URLSearchParams(navState.url.split('?')[1]);
+                  const reference = urlParams.get('reference') || 
+                                   urlParams.get('trxref') || 
+                                   paymentReference;
+                  if (reference) {
+                    console.log('📝 Payment reference:', reference);
+                    handlePaymentSuccess({ reference });
+                  }
+                } else if (url.includes('cancel') || url.includes('error') || title.includes('cancel')) {
+                  console.log('❌ Payment cancelled/error');
                   handlePaymentCancel();
                 }
               }}
@@ -276,6 +387,34 @@ export function PaymentModal({
               )}
             />
           ) : null}
+
+          {/* Manual Verify Button - shows after 30 seconds */}
+          {showVerifyButton && paymentUrl && (
+            <View
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                padding: theme.spacing.lg,
+                backgroundColor: theme.colors.background,
+                borderTopWidth: 1,
+                borderTopColor: theme.colors.border,
+              }}
+            >
+              <Text variant="bodySmall" color="secondary" style={{ textAlign: 'center', marginBottom: theme.spacing.sm }}>
+                Already completed payment?
+              </Text>
+              <Button
+                variant="primary"
+                onPress={handleManualVerify}
+                loading={verifying}
+                disabled={verifying}
+              >
+                {verifying ? 'Verifying Payment...' : 'I\'ve Paid - Verify Now'}
+              </Button>
+            </View>
+          )}
         </View>
       </SafeAreaWrapper>
     </Modal>

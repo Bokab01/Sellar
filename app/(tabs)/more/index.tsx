@@ -51,24 +51,11 @@ export default function MoreScreen() {
   // Use selective subscriptions to prevent unnecessary re-renders
   const balance = useMonetizationStore(state => state.balance);
   const currentPlan = useMonetizationStore(state => state.currentPlan);
-  const transactions = useMonetizationStore(state => state.transactions);
+  // Only subscribe to transaction COUNT, not the entire array to prevent re-renders
+  const transactionCount = useMonetizationStore(state => state.transactions.length);
   const refreshCredits = useMonetizationStore(state => state.refreshCredits);
   const refreshSubscription = useMonetizationStore(state => state.refreshSubscription);
   const hasBusinessPlan = useMonetizationStore(state => state.hasBusinessPlan);
-
-  // Debug: Track what's changing (disabled for production)
-  // const renderCount = React.useRef(0);
-  // renderCount.current += 1;
-  
-  // React.useEffect(() => {
-  //   console.log(`MoreScreen render #${renderCount.current}`, {
-  //     balance,
-  //     currentPlan: currentPlan?.id,
-  //     themeColors: theme.colors.primary,
-  //     userId: user?.id,
-  //   });
-  // });
-
   
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -78,13 +65,12 @@ export default function MoreScreen() {
   
   // Track if we've already loaded data to prevent unnecessary refreshes
   const hasLoadedData = React.useRef(false);
+  const isInitialMount = React.useRef(true);
 
-  const fetchUserData = React.useCallback(async () => {
+  const fetchUserData = React.useCallback(async (isInitialLoad = false) => {
     if (!user) return;
 
     try {
-      setLoading(true);
-      
       // Fetch user profile
       const { data: profileData, error: profileError } = await dbHelpers.getProfile(user.id);
       if (profileData) {
@@ -94,41 +80,50 @@ export default function MoreScreen() {
     } catch (error) {
       console.error('Failed to fetch user data:', error);
     } finally {
-      setLoading(false);
+      // Only set loading to false on initial load
+      if (isInitialLoad) {
+        setLoading(false);
+      }
     }
   }, [user]);
 
   // Single effect to handle initial data loading
   useEffect(() => {
-    if (user && !hasLoadedData.current) {
-      fetchUserData();
+    if (user && isInitialMount.current) {
+      isInitialMount.current = false;
+      fetchUserData(true);
     } else if (!user) {
       // Reset when user logs out
       hasLoadedData.current = false;
+      isInitialMount.current = true;
       setProfile(null);
+      setLoading(true);
     }
   }, [user, fetchUserData]);
 
   // Refresh data when screen comes into focus (only refresh credits/subscription, not profile)
   useFocusEffect(
     React.useCallback(() => {
-      if (user) {
+      if (user && hasLoadedData.current) {
+        // Use getState to avoid dependencies on store functions
+        const { balance: currentBalance, currentPlan: currentSub, refreshCredits: doRefreshCredits, refreshSubscription: doRefreshSub } = useMonetizationStore.getState();
+        
         // Only refresh credits if balance is 0 or we don't have transaction data
-        if (balance === 0 || transactions.length === 0) {
-          refreshCredits();
+        if (currentBalance === 0 || transactionCount === 0) {
+          doRefreshCredits();
         }
         // Only refresh subscription if we don't have current plan data
-        if (!currentPlan) {
-          refreshSubscription();
+        if (!currentSub) {
+          doRefreshSub();
         }
       }
-    }, [user, balance, transactions.length, currentPlan, refreshCredits, refreshSubscription])
+    }, [user, transactionCount]) // Minimal dependencies
   );
 
   const handleRefresh = async () => {
     setRefreshing(true);
     await Promise.all([
-      fetchUserData(),
+      fetchUserData(false),
       refreshCredits(),
       refreshSubscription()
     ]);
@@ -161,26 +156,43 @@ export default function MoreScreen() {
     );
   };
 
-  if (loading) {
-    return (
-      <SafeAreaWrapper>
-        <ScrollView contentContainerStyle={{ padding: theme.spacing.lg }}>
-          <LoadingSkeleton width="100%" height={120} borderRadius={theme.borderRadius.lg} style={{ marginBottom: theme.spacing.xl }} />
-          {Array.from({ length: 4 }).map((_, index) => (
-            <LoadingSkeleton key={index} width="100%" height={200} borderRadius={theme.borderRadius.lg} style={{ marginBottom: theme.spacing.lg }} />
-          ))}
-        </ScrollView>
-      </SafeAreaWrapper>
-    );
-  }
-
+  // Pre-compute values to prevent recalculation flash
   const firstName = user?.user_metadata?.first_name || profile?.first_name || 'User';
   const lastName = user?.user_metadata?.last_name || profile?.last_name || '';
   const fullName = `${firstName || 'User'} ${lastName || ''}`.trim() || 'User';
   const walletBalance = profile?.wallet_balance || 0;
   const creditBalance = balance; // Use monetization store balance
 
-  const menuSections = [
+  // Memoize helper functions
+  const getVerificationSubtitle = React.useCallback(() => {
+    switch (profile?.verification_status) {
+      case 'verified': return 'Account verified ✓';
+      case 'pending': return 'Verification in progress...';
+      case 'rejected': return 'Verification failed - retry available';
+      default: return 'Verify your account for more features';
+    }
+  }, [profile?.verification_status]);
+
+  const getVerificationColor = React.useCallback(() => {
+    switch (profile?.verification_status) {
+      case 'verified': return theme.colors.success;
+      case 'pending': return theme.colors.warning;
+      case 'rejected': return theme.colors.error;
+      default: return theme.colors.text.muted;
+    }
+  }, [profile?.verification_status, theme.colors]);
+
+  const getVerificationBadge = React.useCallback(() => {
+    switch (profile?.verification_status) {
+      case 'verified': return { text: 'Verified', variant: 'success' as const };
+      case 'pending': return { text: 'Pending', variant: 'warning' as const };
+      case 'rejected': return { text: 'Failed', variant: 'error' as const };
+      default: return undefined;
+    }
+  }, [profile?.verification_status]);
+
+  // Memoize menu sections to prevent unnecessary re-renders
+  const menuSections = React.useMemo(() => [
     {
       title: 'Account',
       items: [
@@ -261,7 +273,7 @@ export default function MoreScreen() {
         },
         {
           title: 'Transaction History',
-          subtitle: `${transactions.length} recent transactions`,
+          subtitle: `${transactionCount} recent transactions`,
           icon: <CreditCard size={20} color={theme.colors.text.primary} />,
           onPress: () => router.push('/transactions'),
         },
@@ -296,40 +308,36 @@ export default function MoreScreen() {
         },
       ],
     },
-  ];
+  ], [profile?.total_reviews, profile?.rating, transactionCount, theme.colors, getVerificationSubtitle, getVerificationColor, getVerificationBadge]);
 
-  function getVerificationSubtitle() {
-    switch (profile?.verification_status) {
-      case 'verified': return 'Account verified ✓';
-      case 'pending': return 'Verification in progress...';
-      case 'rejected': return 'Verification failed - retry available';
-      default: return 'Verify your account for more features';
-    }
-  }
-
-  function getVerificationColor() {
-    switch (profile?.verification_status) {
-      case 'verified': return theme.colors.success;
-      case 'pending': return theme.colors.warning;
-      case 'rejected': return theme.colors.error;
-      default: return theme.colors.text.muted;
-    }
-  }
-
-  function getVerificationBadge() {
-    switch (profile?.verification_status) {
-      case 'verified': return { text: 'Verified', variant: 'success' as const };
-      case 'pending': return { text: 'Pending', variant: 'warning' as const };
-      case 'rejected': return { text: 'Failed', variant: 'error' as const };
-      default: return undefined;
-    }
+  // Render loading state
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <SafeAreaWrapper style={{ backgroundColor: theme.colors.background }}>
+          <ScrollView 
+            contentContainerStyle={{ 
+              padding: theme.spacing.lg,
+              flexGrow: 1 
+            }}
+            style={{ backgroundColor: theme.colors.background }}
+          >
+            <LoadingSkeleton width="100%" height={120} borderRadius={theme.borderRadius.lg} style={{ marginBottom: theme.spacing.xl }} />
+            {Array.from({ length: 4 }).map((_, index) => (
+              <LoadingSkeleton key={index} width="100%" height={200} borderRadius={theme.borderRadius.lg} style={{ marginBottom: theme.spacing.lg }} />
+            ))}
+          </ScrollView>
+        </SafeAreaWrapper>
+      </View>
+    );
   }
 
   return (
-    <SafeAreaWrapper>
-
-      <ScrollView 
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <SafeAreaWrapper style={{ backgroundColor: theme.colors.background }}>
+        <ScrollView 
         contentContainerStyle={{ flexGrow: 1, paddingBottom: contentBottomPadding }}
+        style={{ backgroundColor: theme.colors.background }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -420,7 +428,7 @@ export default function MoreScreen() {
               </View>
               <View style={{ alignItems: 'center' }}>
                 <Text variant="h4" style={{ fontWeight: '700' }}>
-                  {transactions.length}
+                  {transactionCount}
                 </Text>
                 <Text variant="caption" color="muted">
                   Transactions
@@ -514,13 +522,14 @@ export default function MoreScreen() {
         </Container>
       </ScrollView>
 
-      {/* Toast */}
-      <Toast
-        visible={showToast}
-        message={toastMessage}
-        variant="success"
-        onHide={() => setShowToast(false)}
-      />
-    </SafeAreaWrapper>
+        {/* Toast */}
+        <Toast
+          visible={showToast}
+          message={toastMessage}
+          variant="success"
+          onHide={() => setShowToast(false)}
+        />
+      </SafeAreaWrapper>
+    </View>
   );
 }

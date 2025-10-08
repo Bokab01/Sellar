@@ -7,6 +7,7 @@ import { supabase, dbHelpers } from '@/lib/supabase';
 import { useListings } from '@/hooks/useListings';
 import { useCommunityPosts } from '@/hooks/useCommunity';
 import { getDisplayName } from '@/hooks/useDisplayName';
+import { useReviewStats } from '@/hooks/useReviews';
 import {
   Text,
   SafeAreaWrapper,
@@ -93,7 +94,8 @@ export default function UserProfileScreen() {
     // TODO: Add user filter to useCommunityPosts hook
   });
 
-  // Reviews are now handled by ReviewsList component
+  // Get review stats to conditionally show review summary
+  const { stats: reviewStats } = useReviewStats(profileId || '');
 
   useEffect(() => {
     if (profileId) {
@@ -361,11 +363,13 @@ export default function UserProfileScreen() {
       case 'reviews':
         return (
           <View>
-            {/* Review Summary */}
-            <ReviewSummary 
-              userId={profileId!} 
-              style={{ marginBottom: theme.spacing.lg }} 
-            />
+            {/* Review Summary - Only show when there are reviews */}
+            {reviewStats && reviewStats.total_reviews > 0 && (
+              <ReviewSummary 
+                userId={profileId!} 
+                style={{ marginBottom: theme.spacing.lg }} 
+              />
+            )}
             
             {/* Reviews List */}
             <ReviewsList

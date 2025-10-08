@@ -218,9 +218,20 @@ export default function AutoBoostDashboard() {
   const [loadingMore, setLoadingMore] = useState(false);
   
   const ITEMS_PER_PAGE = 10;
+  
+  // ✅ PERFORMANCE FIX: Add caching to prevent unnecessary refetches
+  const lastFetchTime = React.useRef(0);
+  const FETCH_COOLDOWN = 30000; // 30 seconds cache
 
   useEffect(() => {
-    fetchAutoRefreshSettings();
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchTime.current;
+    
+    // Only fetch if cache is stale or first load
+    if (timeSinceLastFetch > FETCH_COOLDOWN || lastFetchTime.current === 0) {
+      lastFetchTime.current = now;
+      fetchAutoRefreshSettings();
+    }
   }, []);
 
   const fetchAutoRefreshSettings = async (page = 1, isRefresh = false) => {
@@ -238,13 +249,23 @@ export default function AutoBoostDashboard() {
       const from = (page - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
       
-      const { data: listings, error: listingsError } = await supabase
-        .from('listings')
-        .select('id, title, status, boost_until, updated_at')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .order('updated_at', { ascending: false })
-        .range(from, to);
+      // ✅ PERFORMANCE FIX: Fetch listings and auto-refresh settings in parallel
+      const [listingsResult, autoRefreshResult] = await Promise.all([
+        supabase
+          .from('listings')
+          .select('id, title, status, boost_until, updated_at')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .order('updated_at', { ascending: false })
+          .range(from, to),
+        supabase
+          .from('business_auto_refresh')
+          .select('listing_id, is_active, last_refresh_at, next_refresh_at, created_at')
+          .eq('user_id', user.id)
+      ]);
+
+      const { data: listings, error: listingsError } = listingsResult;
+      const { data: autoRefreshData, error: autoRefreshError } = autoRefreshResult;
 
       if (listingsError) {
         console.error('Error fetching listings:', listingsError);
@@ -262,14 +283,6 @@ export default function AutoBoostDashboard() {
         setHasMoreData(newListings.length === ITEMS_PER_PAGE);
         setCurrentPage(page);
       }
-
-      const { data: autoRefreshData, error: autoRefreshError } = await supabase
-        .from('business_auto_refresh')
-        .select(`
-          *,
-          listings!inner(id, title, status, boost_until, updated_at)
-        `)
-        .eq('user_id', user.id);
 
       if (autoRefreshError) {
         console.error('Error fetching auto-refresh settings:', autoRefreshError);
@@ -314,6 +327,8 @@ export default function AutoBoostDashboard() {
   }, [currentPage, loadingMore, hasMoreData]);
 
   const onRefresh = useCallback(() => {
+    // ✅ Reset cache on manual refresh
+    lastFetchTime.current = Date.now();
     setCurrentPage(1);
     setHasMoreData(true);
     fetchAutoRefreshSettings(1, true);

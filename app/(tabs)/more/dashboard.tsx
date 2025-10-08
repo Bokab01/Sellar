@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
@@ -24,10 +24,9 @@ import { BusinessOverview } from '@/components/Dashboard/BusinessOverview';
 import { BusinessAnalytics } from '@/components/Dashboard/BusinessAnalytics';
 import { BusinessSupport } from '@/components/Dashboard/BusinessSupport';
 
-// Lazy load only heavy components that are not frequently accessed
-const BusinessBoostManager = lazy(() => import('@/components/Dashboard/BusinessBoostManager').then(module => ({ default: module.BusinessBoostManager })));
-const FreeUserDashboard = lazy(() => import('@/components/Dashboard/FreeUserDashboard').then(module => ({ default: module.FreeUserDashboard })));
-const AutoBoostDashboard = lazy(() => import('@/components/AutoBoostDashboard/AutoBoostDashboard'));
+// Import components directly - no lazy loading to prevent flash
+import { FreeUserDashboard } from '@/components/Dashboard/FreeUserDashboard';
+import AutoBoostDashboard from '@/components/AutoBoostDashboard/AutoBoostDashboard';
 
 type DashboardTab = 'overview' | 'boost' | 'analytics' | 'support';
 
@@ -48,7 +47,6 @@ export default function BusinessDashboardScreen() {
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
   const [quickStats, setQuickStats] = useState<QuickStats>({
     profileViews: 0,
     totalMessages: 0,
@@ -57,14 +55,10 @@ export default function BusinessDashboardScreen() {
   });
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
 
-  // Determine if user has business plan
-  const isBusinessUser = useMemo(() => {
-    return hasBusinessPlan();
-  }, [hasBusinessPlan, currentSubscription]);
+  // Determine if user has business plan - stable reference
+  const isBusinessUser = hasBusinessPlan();
   
-  const currentTier = useMemo((): 'free' | 'business' => {
-    return isBusinessUser ? 'business' : 'free';
-  }, [isBusinessUser]);
+  const currentTier: 'free' | 'business' = isBusinessUser ? 'business' : 'free';
 
   // Available tabs for business users only
   const availableTabs = useMemo((): TabConfig[] => {
@@ -96,24 +90,9 @@ export default function BusinessDashboardScreen() {
     ];
   }, [currentTier]);
 
-  // Load dashboard data
+  // Load dashboard data - only once on mount
   useEffect(() => {
-    const initializeDashboard = async () => {
-      try {
-        setSubscriptionLoading(true);
-        // First, refresh subscription data to ensure we have the latest info
-        await useMonetizationStore.getState().refreshSubscription();
-        setSubscriptionLoading(false);
-        
-        // Then load dashboard data
-        await loadDashboardData();
-      } catch (error) {
-        console.error('Error initializing dashboard:', error);
-        setSubscriptionLoading(false);
-      }
-    };
-    
-    initializeDashboard();
+    loadDashboardData();
   }, []);
 
   const loadDashboardData = async () => {
@@ -136,8 +115,6 @@ export default function BusinessDashboardScreen() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      // Force refresh subscription data
-      await useMonetizationStore.getState().refreshSubscription();
       await loadDashboardData();
     } catch (error) {
       console.error('Error refreshing dashboard:', error);
@@ -150,8 +127,11 @@ export default function BusinessDashboardScreen() {
     setActiveTab(tab);
   }, []);
 
-  // Render tab bar for business users
-  const renderTabBar = useMemo(() => (
+  // Render tab bar for business users - memoized to prevent re-renders
+  const renderTabBar = useMemo(() => {
+    if (availableTabs.length === 0) return null;
+    
+    return (
     <View style={{
       backgroundColor: theme.colors.surface,
       borderBottomWidth: 1,
@@ -205,71 +185,52 @@ export default function BusinessDashboardScreen() {
       </View>
       </ScrollView>
     </View>
-  ), [availableTabs, activeTab, theme]);
+    );
+  }, [availableTabs, activeTab, theme]);
 
-  // Render tab content for business users
+  // Render tab content for business users - no Suspense to prevent flash
   const renderTabContent = useMemo(() => {
     switch (activeTab) {
       case 'overview':
         return (
-          <Suspense fallback={<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-            <Text>Loading dashboard...</Text>
-          </View>}>
-            <BusinessOverview
-              loading={loading}
-              quickStats={quickStats}
-              analyticsData={analyticsData}
-              onTabChange={handleTabChange}
-            />
-          </Suspense>
+          <BusinessOverview
+            loading={loading}
+            quickStats={quickStats}
+            analyticsData={analyticsData}
+            onTabChange={handleTabChange}
+          />
         );
-        case 'boost':
-          return (
-            <Suspense fallback={<DashboardSkeleton type="auto-refresh" />}>
-              <AutoBoostDashboard />
-            </Suspense>
-          );
-        case 'analytics':
-          return (
-            <BusinessAnalytics
-              onTabChange={handleTabChange}
-            />
-          );
-        case 'support':
-          return (
-            <BusinessSupport
-              onTabChange={handleTabChange}
-            />
-          );
-        default:
-      return (
-            <BusinessOverview
-              loading={loading}
-              quickStats={quickStats}
-              analyticsData={analyticsData}
-              onTabChange={handleTabChange}
-            />
-          );
+      case 'boost':
+        return <AutoBoostDashboard />;
+      case 'analytics':
+        return (
+          <BusinessAnalytics
+            onTabChange={handleTabChange}
+          />
+        );
+      case 'support':
+        return (
+          <BusinessSupport
+            onTabChange={handleTabChange}
+          />
+        );
+      default:
+        return (
+          <BusinessOverview
+            loading={loading}
+            quickStats={quickStats}
+            analyticsData={analyticsData}
+            onTabChange={handleTabChange}
+          />
+        );
     }
   }, [activeTab, loading, quickStats, analyticsData, handleTabChange]);
 
-  // Show loading while subscription data is being fetched
-  if (subscriptionLoading) {
-    return (
-      <SafeAreaWrapper>
-        <View style={{ flex: 1, marginTop: theme.spacing.md }}>
-          {/* <AppHeader title="Sellar Pro Dashboard" /> */}
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <Text variant="body" color="secondary">Loading subscription data...</Text>
-          </View>
-        </View>
-      </SafeAreaWrapper>
-    );
-  }
-
-  // Free user dashboard (single screen, no tabs)
-  if (currentTier === 'free') {
-      return (
+  // Wrap everything in View with background to prevent flash
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      {currentTier === 'free' ? (
+        // Free user dashboard (single screen, no tabs)
         <View style={{ flex: 1, marginTop: 0, backgroundColor: theme.colors.background }}>
           {/* <AppHeader title="Sellar Pro Dashboard" /> */}
           <FreeUserDashboard
@@ -277,22 +238,19 @@ export default function BusinessDashboardScreen() {
             quickStats={quickStats}
           />
         </View>
-      );
-    }
-
-  // Business user dashboard (with tabs)
-  return (
+      ) : (
+        // Business user dashboard (with tabs)
       <View style={{ flex: 1, marginTop: theme.spacing.md, backgroundColor: theme.colors.background }}>
         {renderTabBar}
         {activeTab === 'boost' ? (
           // Use View for boost tab to avoid nested virtualized lists
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
             {renderTabContent}
           </View>
         ) : (
           // Use ScrollView for other tabs
         <ScrollView
-          style={{ flex: 1 }}
+          style={{ flex: 1, backgroundColor: theme.colors.background }}
           contentContainerStyle={{ paddingBottom: contentBottomPadding }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
@@ -302,5 +260,7 @@ export default function BusinessDashboardScreen() {
         </ScrollView>
         )}
       </View>
+      )}
+    </View>
   );
 }

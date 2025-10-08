@@ -83,10 +83,10 @@ export function CreditBalance({
   const progressPercentage = Math.min((balance / maxCredits) * 100, 100);
   
   useEffect(() => {
-    // Animate entrance
-    scaleValue.value = withDelay(200, withSpring(1, { damping: 15, stiffness: 150 }));
-    fadeValue.value = withDelay(100, withSpring(1, { damping: 20, stiffness: 100 }));
-    progressValue.value = withDelay(400, withSpring(progressPercentage, { damping: 20, stiffness: 80 }));
+    // Animate entrance with smooth, non-springy animation
+    scaleValue.value = withDelay(100, withTiming(1, { duration: 400 }));
+    fadeValue.value = withDelay(50, withTiming(1, { duration: 300 }));
+    progressValue.value = withDelay(200, withTiming(progressPercentage, { duration: 600 }));
   }, [balance]); // Remove progressPercentage from dependencies as it's derived from balance
 
   // Animated styles

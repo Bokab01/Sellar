@@ -154,10 +154,12 @@ export const BusinessOverview: React.FC<BusinessOverviewProps> = ({
               onPress={handleAutoRefresh}
               style={{ flex: 1 }}
             >
-              <Zap size={18} color={theme.colors.warning} />
-              <Text variant="body" style={{ color: theme.colors.warning, marginLeft: theme.spacing.sm, fontWeight: '600' }}>
-                Auto-Refresh
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                <Zap size={18} color={theme.colors.warning} />
+                <Text variant="body" style={{ color: theme.colors.warning, marginLeft: theme.spacing.sm, fontWeight: '600' }}>
+                  Auto-Refresh
+                </Text>
+              </View>
             </Button>
             
             <Button
@@ -165,10 +167,12 @@ export const BusinessOverview: React.FC<BusinessOverviewProps> = ({
               onPress={handleCancelSubscription}
               style={{ flex: 1 }}
             >
-              <Settings size={18} color={theme.colors.text.secondary} />
-              <Text variant="body" style={{ color: theme.colors.text.secondary, marginLeft: theme.spacing.sm, fontWeight: '600' }}>
-                {currentSubscription?.status === 'cancelled' ? 'View Details' : 'Manage Plan'}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                <Settings size={18} color={theme.colors.text.secondary} />
+                <Text variant="body" style={{ color: theme.colors.text.secondary, marginLeft: theme.spacing.sm, fontWeight: '600' }}>
+                  {currentSubscription?.status === 'cancelled' ? 'View Details' : 'Manage Plan'}
+                </Text>
+              </View>
             </Button>
           </View>
         </View>

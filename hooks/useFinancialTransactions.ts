@@ -83,11 +83,14 @@ export function useFinancialTransactions(options: {
 
   const { filters = {}, limit = 20, offset = 0 } = options;
 
-  // Stabilize filters and user ID to prevent infinite re-renders
-  const stableFilters = useMemo(() => filters, [JSON.stringify(filters)]);
-  const stableUserId = useMemo(() => user?.id, [user?.id]);
-  const stableLimit = useMemo(() => limit, [limit]);
-  const stableOffset = useMemo(() => offset, [offset]);
+  // Stabilize user ID and pagination params
+  const stableUserId = user?.id;
+  const stableLimit = limit;
+  const stableOffset = offset;
+  
+  // Stabilize filters with proper dependency tracking
+  const filterKey = `${filters.type || ''}-${filters.reference_type || ''}-${filters.dateFrom || ''}-${filters.dateTo || ''}-${filters.minAmount || ''}-${filters.maxAmount || ''}`;
+  const stableFilters = useMemo(() => filters, [filterKey]);
 
   const fetchTransactions = useCallback(async () => {
     if (!stableUserId) return;

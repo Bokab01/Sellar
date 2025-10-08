@@ -114,7 +114,8 @@ export function useReviews(options: {
             full_name,
             avatar_url,
             username
-          )
+          ),
+          listing:listings(id, title, images)
         `)
         .eq('status', 'published')
         .order('created_at', { ascending: false });
@@ -134,13 +135,23 @@ export function useReviews(options: {
       const startIndex = reset ? 0 : offset;
       query = query.range(startIndex, startIndex + limit - 1);
 
-      const { data, error: fetchError } = await query;
+      // Fetch reviews and votes in parallel for better performance
+      const [reviewsResult, votesResult] = await Promise.all([
+        query,
+        user ? supabase
+          .from('review_helpful_votes')
+          .select('review_id')
+          .eq('user_id', user.id)
+          .in('review_id', []) // Will be updated after getting review IDs
+        : Promise.resolve({ data: null, error: null })
+      ]);
 
+      const { data, error: fetchError } = reviewsResult;
       if (fetchError) throw fetchError;
 
-      // Check if user has voted on each review (if logged in)
+      // If we have reviews and a user, fetch their votes
       let reviewsWithVotes = data || [];
-      if (user && data) {
+      if (user && data && data.length > 0) {
         const reviewIds = data.map(r => r.id);
         const { data: votes } = await supabase
           .from('review_helpful_votes')
@@ -153,30 +164,6 @@ export function useReviews(options: {
           ...review,
           user_helpful_vote: userVotes.has(review.id)
         }));
-      }
-
-      // Fetch listing information separately if needed
-      if (data && data.length > 0) {
-        const listingIds = data.filter(r => r.listing_id).map(r => r.listing_id);
-        if (listingIds.length > 0) {
-          try {
-            const { data: listings } = await supabase
-              .from('listings')
-              .select('id, title, images')
-              .in('id', listingIds);
-
-            if (listings) {
-              const listingsMap = new Map(listings.map(l => [l.id, l]));
-              reviewsWithVotes = reviewsWithVotes.map(review => ({
-                ...review,
-                listing: review.listing_id ? listingsMap.get(review.listing_id) : null
-              }));
-            }
-          } catch (listingError) {
-            console.warn('Could not fetch listing information:', listingError);
-            // Continue without listing info - this is not critical
-          }
-        }
       }
 
       if (reset) {

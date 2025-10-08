@@ -60,6 +60,10 @@ export const BusinessAnalytics: React.FC<BusinessAnalyticsProps> = ({ onTabChang
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
+      // ✅ Clear cache and fetch fresh data
+      const { analyticsService } = await import('@/lib/analyticsService');
+      analyticsService.clearCache();
+      
       const data = await getBusinessAnalytics(timeRange);
       setAnalyticsData(data);
     } catch (error) {

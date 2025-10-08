@@ -248,14 +248,16 @@ function CreateListingScreen() {
   }, [checkListingLimits, loadDraft]);
 
   // Save draft to AsyncStorage and database
-  const saveDraft = useCallback(async (data: ListingFormData, isManualSave = false) => {
+  // showAlert: whether to show "Draft Saved" alert (only for explicit manual saves)
+  // bypassThrottle: whether to bypass the throttle timer (for step changes)
+  const saveDraft = useCallback(async (data: ListingFormData, showAlert = false, bypassThrottle = false) => {
     // Don't save if component is unmounted
     if (!isMountedRef.current) return;
     
     try {
       // Check if data actually changed to avoid redundant saves
       const currentDataString = JSON.stringify(data);
-      if (!isManualSave && currentDataString === lastSavedDataRef.current) {
+      if (!showAlert && !bypassThrottle && currentDataString === lastSavedDataRef.current) {
         return; // Skip save if nothing changed
       }
       
@@ -269,7 +271,7 @@ function CreateListingScreen() {
       // Throttle database saves to reduce costs and network requests
       const now = Date.now();
       const timeSinceLastSave = now - lastAutosaveTimeRef.current;
-      const shouldSaveToDatabase = isManualSave || timeSinceLastSave >= AUTOSAVE_THROTTLE_MS;
+      const shouldSaveToDatabase = bypassThrottle || timeSinceLastSave >= AUTOSAVE_THROTTLE_MS;
       
       // Only save to database if:
       // 1. Manual save OR throttle period has passed
@@ -347,8 +349,8 @@ function CreateListingScreen() {
       if (!isMountedRef.current) return; // Check before state updates
       setHasUnsavedChanges(false);
       
-      // Show success message only for manual saves
-      if (isManualSave && isMountedRef.current) {
+      // Show success message only for explicit manual saves (not step transitions)
+      if (showAlert && isMountedRef.current) {
         Alert.alert('Draft Saved', 'Your listing has been saved as a draft. You can continue editing it later from My Listings.');
       }
     } catch (error) {
@@ -495,16 +497,16 @@ function CreateListingScreen() {
 
   const nextStep = useCallback(() => {
     if (currentStep < STEPS.length - 1 && canProceed) {
-      // Save draft immediately when moving to next step (important milestone)
-      saveDraft(formDataRef.current, true); // true = manual save (bypasses throttle)
+      // Save draft silently when moving to next step (important milestone, but no alert needed)
+      saveDraft(formDataRef.current, false, true); // false = no alert, true = bypass throttle
       setCurrentStep(currentStep + 1);
     }
   }, [currentStep, canProceed, saveDraft]);
 
   const previousStep = useCallback(() => {
     if (currentStep > 0) {
-      // Save draft when going back (user might leave)
-      saveDraft(formDataRef.current, true); // true = manual save (bypasses throttle)
+      // Save draft silently when going back (no need to annoy user with alert)
+      saveDraft(formDataRef.current, false, true); // false = no alert, true = bypass throttle
       setCurrentStep(currentStep - 1);
     }
   }, [currentStep, saveDraft]);

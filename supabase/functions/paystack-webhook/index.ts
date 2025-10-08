@@ -60,6 +60,64 @@ Deno.serve(async (req: Request) => {
   }
 });
 
+// Helper function to validate payment amount against package
+async function validatePaymentAmount(transaction: any, paystackData: any) {
+  console.log('🔒 Validating payment amount (webhook)...');
+  
+  // Only validate for credit packages
+  if (transaction.purchase_type === 'credit_package') {
+    const packageId = transaction.purchase_id;
+    
+    // Define package prices in pesewas (MUST match CREDIT_PACKAGES)
+    const packagePrices: Record<string, number> = {
+      'starter': 15 * 100,  // GHS 15 = 1500 pesewas
+      'seller': 25 * 100,   // GHS 25 = 2500 pesewas
+      'plus': 50 * 100,     // GHS 50 = 5000 pesewas
+      'max': 100 * 100,     // GHS 100 = 10000 pesewas
+    };
+    
+    const expectedAmount = packagePrices[packageId];
+    
+    if (!expectedAmount) {
+      throw new Error(`Unknown package ID: ${packageId}`);
+    }
+    
+    // Verify actual payment amount matches expected amount
+    const actualAmount = paystackData.amount; // Already in pesewas
+    
+    if (actualAmount !== expectedAmount) {
+      console.error('💀 FRAUD ALERT (Webhook): Amount mismatch!', {
+        expected: expectedAmount,
+        actual: actualAmount,
+        packageId,
+        difference: actualAmount - expectedAmount,
+      });
+      
+      throw new Error(
+        `Payment amount mismatch. Expected GHS ${expectedAmount / 100} but received GHS ${actualAmount / 100}.`
+      );
+    }
+    
+    console.log('✅ Webhook payment amount validated:', {
+      packageId,
+      amount: actualAmount / 100,
+      status: 'VALID',
+    });
+  }
+  
+  // For subscriptions, validate against stored amount
+  if (transaction.purchase_type === 'subscription') {
+    const expectedAmount = transaction.amount; // Already in pesewas from initialization
+    const actualAmount = paystackData.amount;
+    
+    if (actualAmount !== expectedAmount) {
+      throw new Error(
+        `Subscription payment mismatch. Expected GHS ${expectedAmount / 100} but received GHS ${actualAmount / 100}.`
+      );
+    }
+  }
+}
+
 async function processSuccessfulPayment(supabase: any, paymentData: any) {
   const reference = paymentData.reference;
   const amount = paymentData.amount / 100; // Convert from pesewas to GHS
@@ -84,6 +142,37 @@ async function processSuccessfulPayment(supabase: any, paymentData: any) {
     }
 
     console.log('Processing successful payment for:', transaction.purchase_type);
+
+    // SECURITY: Validate payment amount
+    try {
+      await validatePaymentAmount(transaction, paymentData);
+    } catch (validationError: any) {
+      console.error('❌ Webhook payment validation failed:', validationError.message);
+      
+      // Mark transaction as fraudulent
+      await supabase
+        .from('paystack_transactions')
+        .update({
+          status: 'failed',
+          fraud_detected: true,
+          fraud_reason: validationError.message,
+          fraud_detected_at: new Date().toISOString(),
+        })
+        .eq('reference', reference);
+      
+      // Alert admin (create notification)
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: transaction.user_id,
+          type: 'payment_failed',
+          title: '⚠️ Payment Verification Failed',
+          body: 'There was an issue verifying your payment. Please contact support.',
+          data: { reference, reason: 'Amount mismatch' },
+        });
+      
+      return; // Stop processing
+    }
 
     // Process based on purchase type
     if (transaction.purchase_type === 'credit_package') {

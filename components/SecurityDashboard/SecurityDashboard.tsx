@@ -174,7 +174,13 @@ export function SecurityDashboard({ onSecurityEventPress }: SecurityDashboardPro
         .limit(10);
 
       if (error) {
-        console.error('Error loading security events:', error);
+        // Table doesn't exist yet - silently return empty array
+        // This is expected for new apps or during development
+        if (error.code === 'PGRST204' || error.code === 'PGRST205' || error.message?.includes('Could not find')) {
+          console.log('SecurityDashboard: security_events table not found, using mock data');
+          return [];
+        }
+        console.warn('SecurityDashboard: Error loading security events:', error.message);
         return [];
       }
 
@@ -190,8 +196,13 @@ export function SecurityDashboard({ onSecurityEventPress }: SecurityDashboardPro
         metadata: event.metadata,
       }));
 
-    } catch (error) {
-      console.error('Error loading security events:', error);
+    } catch (error: any) {
+      // Silently handle missing table - this is expected
+      if (error?.code === 'PGRST204' || error?.code === 'PGRST205' || error?.message?.includes('Could not find')) {
+        console.log('SecurityDashboard: security_events table not found, using mock data');
+      } else {
+        console.warn('SecurityDashboard: Unexpected error loading security events:', error?.message || error);
+      }
       return [];
     }
   };

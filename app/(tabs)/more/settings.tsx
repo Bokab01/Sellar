@@ -200,13 +200,18 @@ export default function SettingsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaWrapper>
-        <ScrollView contentContainerStyle={{ padding: theme.spacing.lg }}>
-          {Array.from({ length: 6 }).map((_, index) => (
-            <LoadingSkeleton key={index} width="100%" height={200} borderRadius={theme.borderRadius.lg} style={{ marginBottom: theme.spacing.lg }} />
-          ))}
-        </ScrollView>
-      </SafeAreaWrapper>
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <SafeAreaWrapper style={{ backgroundColor: theme.colors.background }}>
+          <ScrollView 
+            contentContainerStyle={{ padding: theme.spacing.lg }}
+            style={{ backgroundColor: theme.colors.background }}
+          >
+            {Array.from({ length: 6 }).map((_, index) => (
+              <LoadingSkeleton key={index} width="100%" height={200} borderRadius={theme.borderRadius.lg} style={{ marginBottom: theme.spacing.lg }} />
+            ))}
+          </ScrollView>
+        </SafeAreaWrapper>
+      </View>
     );
   }
 
@@ -455,17 +460,19 @@ export default function SettingsScreen() {
   }
 
   return (
-    <SafeAreaWrapper>
-      <ScrollView 
-        contentContainerStyle={{ paddingBottom: theme.spacing.xl }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={theme.colors.primary}
-          />
-        }
-      >
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <SafeAreaWrapper style={{ backgroundColor: theme.colors.background }}>
+        <ScrollView 
+          contentContainerStyle={{ paddingBottom: theme.spacing.xl }}
+          style={{ backgroundColor: theme.colors.background }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.colors.primary}
+            />
+          }
+        >
         <Container>
           {settingSections.map((section, sectionIndex) => (
             <View key={section.title} style={{ marginBottom: theme.spacing.xl }}>
@@ -800,13 +807,14 @@ export default function SettingsScreen() {
         </View>
       </AppModal>
 
-      {/* Toast */}
-      <Toast
-        visible={showToast}
-        message={toastMessage}
-        variant="success"
-        onHide={() => setShowToast(false)}
-      />
-    </SafeAreaWrapper>
+        {/* Toast */}
+        <Toast
+          visible={showToast}
+          message={toastMessage}
+          variant="success"
+          onHide={() => setShowToast(false)}
+        />
+      </SafeAreaWrapper>
+    </View>
   );
 }

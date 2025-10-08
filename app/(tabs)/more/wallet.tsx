@@ -201,31 +201,38 @@ export default function WalletScreen() {
 
   if (loading) {
     return (
-      <SafeAreaWrapper>
-        <ScrollView contentContainerStyle={{ padding: theme.spacing.lg }}>
-          <LoadingSkeleton width="100%" height={150} borderRadius={theme.borderRadius.lg} style={styles.loadingMain} />
-          <LoadingSkeleton width="100%" height={200} borderRadius={theme.borderRadius.lg} style={styles.loadingSecondary} />
-          {Array.from({ length: 5 }).map((_, index) => (
-            <LoadingSkeleton key={index} width="100%" height={60} style={styles.loadingItem} />
-          ))}
-        </ScrollView>
-      </SafeAreaWrapper>
+      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+        <SafeAreaWrapper style={{ backgroundColor: theme.colors.background }}>
+          <ScrollView 
+            contentContainerStyle={{ padding: theme.spacing.lg }}
+            style={{ backgroundColor: theme.colors.background }}
+          >
+            <LoadingSkeleton width="100%" height={150} borderRadius={theme.borderRadius.lg} style={styles.loadingMain} />
+            <LoadingSkeleton width="100%" height={200} borderRadius={theme.borderRadius.lg} style={styles.loadingSecondary} />
+            {Array.from({ length: 5 }).map((_, index) => (
+              <LoadingSkeleton key={index} width="100%" height={60} style={styles.loadingItem} />
+            ))}
+          </ScrollView>
+        </SafeAreaWrapper>
+      </View>
     );
   }
 
 
   return (
-    <SafeAreaWrapper>
-      <ScrollView 
-        contentContainerStyle={styles.scrollContentContainer}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={theme.colors.primary}
-          />
-        }
-      >
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <SafeAreaWrapper style={{ backgroundColor: theme.colors.background }}>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContentContainer}
+          style={{ backgroundColor: theme.colors.background }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.colors.primary}
+            />
+          }
+        >
         <Container>
           {/* Credit Balance Component */}
           <CreditBalance
@@ -528,13 +535,14 @@ export default function WalletScreen() {
 
 
 
-      {/* Toast */}
-      <Toast
-        visible={showToast}
-        message={toastMessage}
-        variant={toastVariant}
-        onHide={() => setShowToast(false)}
-      />
-    </SafeAreaWrapper>
+        {/* Toast */}
+        <Toast
+          visible={showToast}
+          message={toastMessage}
+          variant={toastVariant}
+          onHide={() => setShowToast(false)}
+        />
+      </SafeAreaWrapper>
+    </View>
   );
 }

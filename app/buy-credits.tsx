@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { CREDIT_PACKAGES } from '@/constants/monetization';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { supabase } from '@/lib/supabase';
 import {
   Text,
   SafeAreaWrapper,
@@ -16,10 +17,8 @@ import {
   LoadingSkeleton,
   Toast,
   LinearProgress,
-  PaymentModal,
-
+  AppModal,
 } from '@/components';
-import type { PaymentRequest } from '@/components';
 import { Zap, Star, Crown, Building, CreditCard, Smartphone } from 'lucide-react-native';
 
 export default function BuyCreditsScreen() {
@@ -37,13 +36,20 @@ export default function BuyCreditsScreen() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentRequest, setPaymentRequest] = useState<PaymentRequest | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingPackage, setPendingPackage] = useState<typeof CREDIT_PACKAGES[number] | null>(null);
 
 
   useEffect(() => {
     refreshCredits();
   }, []);
+
+  // Refresh credits when returning to this screen (after payment)
+  useFocusEffect(
+    useCallback(() => {
+      refreshCredits();
+    }, [])
+  );
 
   const getPackageIcon = (packageId: string) => {
     switch (packageId) {
@@ -56,62 +62,79 @@ export default function BuyCreditsScreen() {
   };
 
   const handlePurchase = async (packageId: string) => {
+    // Find the selected package
+    const selectedPkg = CREDIT_PACKAGES.find(pkg => pkg.id === packageId);
+    if (!selectedPkg) {
+      setToastMessage('Package not found');
+      setToastVariant('error');
+      setShowToast(true);
+      return;
+    }
+
+    // Show confirmation modal
+    setPendingPackage(selectedPkg);
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmPurchase = async () => {
+    if (!pendingPackage) return;
+
+    setShowConfirmModal(false);
     setPurchasing(true);
-    setSelectedPackage(packageId);
+    setSelectedPackage(pendingPackage.id);
 
     try {
-      // Find the selected package
-      const selectedPkg = CREDIT_PACKAGES.find(pkg => pkg.id === packageId);
-      if (!selectedPkg) {
-        throw new Error('Package not found');
+      // Initialize payment with Paystack
+      const reference = `sellar_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+      
+      const { data, error } = await supabase.functions.invoke('paystack-initialize', {
+        body: {
+          amount: pendingPackage.priceGHS * 100, // Convert to pesewas
+          email: user?.email || 'user@example.com',
+          reference,
+          purpose: 'credit_purchase',
+          purpose_id: pendingPackage.id,
+          metadata: {
+            package_id: pendingPackage.id,
+            credits: pendingPackage.credits,
+            package_name: pendingPackage.name,
+          },
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      console.log('✅ Payment initialized:', data);
+
+      if (!data?.authorization_url) {
+        throw new Error('Payment URL not received from Paystack');
       }
 
-      // Create payment request
-      const request: PaymentRequest = {
-        amount: selectedPkg.priceGHS,
-        email: user?.email || 'user@example.com',
-        purpose: 'credit_purchase',
-        purpose_id: packageId,
-        metadata: {
-          package_id: packageId,
-          credits: selectedPkg.credits,
-          package_name: selectedPkg.name,
+      // Navigate to payment screen with the payment URL
+      router.push({
+        pathname: `/payment/${reference}`,
+        params: {
+          paymentUrl: data.authorization_url,
+          amount: pendingPackage.priceGHS.toString(),
+          purpose: 'credit_purchase',
+          purpose_id: pendingPackage.id,
+          credits: pendingPackage.credits.toString(),
+          packageName: pendingPackage.name,
         },
-      };
-
-      setPaymentRequest(request);
-      setShowPaymentModal(true);
+      } as any);
     } catch (error: any) {
-      setToastMessage('Failed to initialize payment');
+      console.error('Failed to initialize payment:', error);
+      setToastMessage(error.message || 'Failed to initialize payment');
       setToastVariant('error');
       setShowToast(true);
     } finally {
       setPurchasing(false);
       setSelectedPackage(null);
+      setPendingPackage(null);
     }
   };
 
-  const handlePaymentSuccess = (reference: string) => {
-    setToastMessage('Payment successful! Credits will be added to your account shortly.');
-    setToastVariant('success');
-    setShowToast(true);
-    
-    // Refresh credits after a short delay to allow webhook processing
-    setTimeout(() => {
-      refreshCredits();
-    }, 2000);
-  };
-
-  const handlePaymentError = (error: string) => {
-    setToastMessage(error || 'Payment failed. Please try again.');
-    setToastVariant('error');
-    setShowToast(true);
-  };
-
-  const handlePaymentClose = () => {
-    setShowPaymentModal(false);
-    setPaymentRequest(null);
-  };
 
   if (loading) {
     return (
@@ -468,14 +491,62 @@ export default function BuyCreditsScreen() {
         </Container>
       </ScrollView>
 
-      {/* Payment Modal */}
-      <PaymentModal
-        visible={showPaymentModal}
-        onClose={handlePaymentClose}
-        paymentRequest={paymentRequest}
-        onSuccess={handlePaymentSuccess}
-        onError={handlePaymentError}
-      />
+      {/* Confirmation Modal */}
+      <AppModal
+        visible={showConfirmModal}
+        onClose={() => {
+          setShowConfirmModal(false);
+          setPendingPackage(null);
+        }}
+        title="Confirm Purchase"
+        primaryAction={{
+          text: 'Confirm Payment',
+          onPress: handleConfirmPurchase,
+        }}
+        secondaryAction={{
+          text: 'Cancel',
+          onPress: () => {
+            setShowConfirmModal(false);
+            setPendingPackage(null);
+          },
+        }}
+      >
+        {pendingPackage && (
+          <View style={{ gap: theme.spacing.md }}>
+            <View style={{ alignItems: 'center', marginBottom: theme.spacing.sm }}>
+              <Text style={{ fontSize: 48 }}>💳</Text>
+            </View>
+            
+            <Text variant="body" style={{ textAlign: 'center' }}>
+              You're about to purchase:
+            </Text>
+            
+            <View
+              style={{
+                backgroundColor: theme.colors.surface,
+                borderRadius: theme.borderRadius.md,
+                padding: theme.spacing.lg,
+                borderWidth: 1,
+                borderColor: theme.colors.primary + '20',
+              }}
+            >
+              <Text variant="h3" style={{ fontWeight: '700', textAlign: 'center', marginBottom: theme.spacing.sm }}>
+                {pendingPackage.name}
+              </Text>
+              <Text variant="h2" style={{ color: theme.colors.primary, textAlign: 'center', marginBottom: theme.spacing.sm }}>
+                {pendingPackage.credits.toLocaleString()} Credits
+              </Text>
+              <Text variant="h4" style={{ textAlign: 'center' }}>
+                GHS {pendingPackage.priceGHS.toFixed(2)}
+              </Text>
+            </View>
+            
+            <Text variant="bodySmall" color="secondary" style={{ textAlign: 'center' }}>
+              You'll be redirected to Paystack to complete your payment securely.
+            </Text>
+          </View>
+        )}
+      </AppModal>
 
       {/* Toast */}
       <Toast
