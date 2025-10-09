@@ -372,6 +372,7 @@ export default function InboxScreen() {
       } : null,
       isTyping: isOtherUserTyping,
       lastMessage: lastMessage, // Include lastMessage for filtering
+      is_sellar_pro: Boolean(otherParticipant?.is_sellar_pro), // ✅ Sellar Pro status
     };
   });
 
@@ -593,6 +594,7 @@ export default function InboxScreen() {
                         timestamp={conversation.timestamp}
                         unreadCount={conversation.unreadCount}
                         avatar={conversation.avatar}
+                        badge={conversation.is_sellar_pro ? { text: '⭐ PRO', variant: 'info' as const } : undefined}
                         showChevron={!isSelectionMode}
                         onPress={undefined} // Remove onPress from ListItem since TouchableOpacity handles it
                         style={{

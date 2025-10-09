@@ -14,6 +14,7 @@ interface UseListingsOptions {
   search?: string;
   limit?: number;
   userId?: string;
+  sortBy?: string;
 }
 
 export function useListings(options: UseListingsOptions = {}) {
@@ -135,6 +136,7 @@ export function useListings(options: UseListingsOptions = {}) {
     options.priceMin,
     options.priceMax,
     options.search,
+    options.sortBy, // Add sortBy to dependencies
     JSON.stringify(options.condition),
     JSON.stringify(options.categories), // Add categories to dependencies
   ]);

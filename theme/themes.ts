@@ -80,7 +80,7 @@ export const lightTheme: Theme = {
     primaryForeground: '#ffffff',
     secondary: colorPalette.secondary[100],
     secondaryForeground: colorPalette.secondary[700],
-    background: colorPalette.secondary[50],
+    background: '#F8F9FA', // Professional light gray background
     surface: '#ffffff',
     surfaceVariant: colorPalette.neutral[50],
     border: colorPalette.neutral[200],
@@ -206,6 +206,76 @@ export const darkTheme: Theme = {
       shadowColor: '#000000',
       shadowOffset: { width: 0, height: 8 },
       shadowOpacity: 0.5,
+      shadowRadius: 16,
+      elevation: 5,
+    },
+  },
+};
+
+// AMOLED Dark Theme (Pure Black) - Better for OLED screens
+export const amoledTheme: Theme = {
+  colors: {
+    primary: colorPalette.primary[300],
+    primaryForeground: '#ffffff',
+    secondary: colorPalette.secondary[800],
+    secondaryForeground: colorPalette.secondary[300],
+    background: colorPalette.neutral[900], // Pure black
+    surface: colorPalette.neutral[900], // Pure black cards for AMOLED
+    surfaceVariant: '#0A0A0A', // Slightly lighter than pure black
+    border: '#1A1A1A', // Very dark gray borders
+    text: {
+      primary: '#ffffff',
+      secondary: colorPalette.neutral[300],
+      muted: colorPalette.neutral[400],
+      inverse: colorPalette.neutral[900],
+    },
+    error: colorPalette.error[500],
+    errorForeground: '#ffffff',
+    success: colorPalette.success[500],
+    successForeground: '#ffffff',
+    warning: colorPalette.warning[500],
+    warningForeground: '#ffffff',
+    
+    // Additional color properties
+    primaryContainer: colorPalette.primary[800],
+    secondaryContainer: colorPalette.secondary[800],
+    errorContainer: colorPalette.error[800],
+    successContainer: colorPalette.success[800],
+    warningContainer: colorPalette.warning[800],
+    textMuted: colorPalette.neutral[400],
+    textSecondary: colorPalette.neutral[400],
+    
+    // Additional colors used in components
+    card: colorPalette.neutral[900],
+    purple: colorPalette.primary[400],
+    onErrorContainer: '#ffffff',
+    destructive: colorPalette.error[500],
+    outline: '#1A1A1A',
+    onPrimary: '#ffffff',
+    info: colorPalette.primary[400],
+  },
+  typography: baseTypography,
+  spacing: baseSpacing,
+  borderRadius: baseBorderRadius,
+  shadows: {
+    sm: {
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.5,
+      shadowRadius: 2,
+      elevation: 1,
+    },
+    md: {
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.6,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    lg: {
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.7,
       shadowRadius: 16,
       elevation: 5,
     },

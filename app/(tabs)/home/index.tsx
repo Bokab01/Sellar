@@ -460,10 +460,24 @@ export default function HomeScreen() {
     // Handle both joined and simple listing data
     const seller = listing.profiles || null;
     
+    // ✅ Use pre-computed is_sellar_pro flag from database view (optimal performance)
+    const isSellarPro = listing.is_sellar_pro === true;
+    
+    // Debug logging for first listing
+    if (products.indexOf(listing) === 0) {
+      console.log('🔍 Debug listing data:', {
+        listingId: listing.id,
+        userId: listing.user_id,
+        isSellarPro: listing.is_sellar_pro,
+        subscriptionPlan: listing.subscription_plan_name,
+        subscriptionStatus: listing.subscription_status,
+      });
+    }
+    
     // Determine the highest priority badge (only show ONE badge per listing)
     let primaryBadge = null;
     
-    // Priority order: Reserved > Urgent > Spotlight > Boosted > Business > Verified
+    // Priority order: Reserved > Urgent > Spotlight > Boosted > PRO > Business > Verified
     if (listing.status === 'reserved') {
       primaryBadge = { text: 'Reserved', variant: 'warning' as const };
     } else if (listing.urgent_until && new Date(listing.urgent_until) > new Date()) {
@@ -472,6 +486,8 @@ export default function HomeScreen() {
       primaryBadge = { text: 'Spotlight', variant: 'spotlight' as const };
     } else if (listing.boost_until && new Date(listing.boost_until) > new Date()) {
       primaryBadge = { text: 'Boosted', variant: 'featured' as const };
+    } else if (isSellarPro) {
+      primaryBadge = { text: '⭐ PRO', variant: 'primary' as const };
     } else if (seller?.account_type === 'business') {
       primaryBadge = { text: 'Business', variant: 'info' as const };
     } else if (seller?.verification_status === 'verified') {

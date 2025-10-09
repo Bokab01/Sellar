@@ -4,7 +4,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 
 type BadgeVariant = 'new' | 'sold' | 'featured' | 'discount' | 'success' | 'warning' | 'error' | 'info' | 'neutral' | 'primary' | 'secondary' | 'default' | 'premium' | 'urgent' | 'spotlight';
-type BadgeSize = 'sm' | 'md' | 'lg' | 'small' | 'large';
+type BadgeSize = 'xs' | 'sm' | 'md' | 'lg' | 'small' | 'large';
 
 interface BadgeProps {
   text: string;
@@ -106,6 +106,13 @@ export function Badge({
 
   const getSizeStyles = () => {
     switch (size) {
+      case 'xs':
+        return {
+          paddingHorizontal: theme.spacing.xs,
+          paddingVertical: 0,
+          borderRadius: theme.borderRadius.md,
+          marginLeft: theme.spacing.xs,
+        };
       case 'sm':
       case 'small':
         return {
@@ -148,7 +155,7 @@ export function Badge({
         variant="caption"
         style={{
           color: colors.textColor,
-          fontSize: (size === 'sm' || size === 'small') ? 8 : (size === 'lg' || size === 'large') ? 14 : 12,
+          fontSize: size === 'xs' ? 7 : (size === 'sm' || size === 'small') ? 8 : (size === 'lg' || size === 'large') ? 14 : 12,
           fontWeight: '700',
           textTransform: 'uppercase',
           textAlign: 'center',

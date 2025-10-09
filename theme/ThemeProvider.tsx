@@ -1,15 +1,17 @@
 import React, { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 import { Theme } from './types';
-import { lightTheme, darkTheme } from './themes';
+import { lightTheme, darkTheme, amoledTheme } from './themes';
 import { ThemeStorage } from './ThemeStorage';
+
+export type ThemeMode = 'light' | 'dark' | 'amoled' | 'system';
 
 interface ThemeContextType {
   theme: Theme;
   isDarkMode: boolean;
   toggleTheme: () => void;
-  setThemeMode: (mode: 'light' | 'dark' | 'system') => void;
-  themeMode: 'light' | 'dark' | 'system';
+  setThemeMode: (mode: ThemeMode) => void;
+  themeMode: ThemeMode;
   isThemeReady: boolean;
 }
 
@@ -23,8 +25,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const systemColorScheme = useColorScheme();
   
   // Initialize with cached theme for immediate availability
-  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>(() => {
-    return ThemeStorage.getThemeSync();
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+    return ThemeStorage.getThemeSync() as ThemeMode;
   });
   
   const [isThemeReady, setIsThemeReady] = useState(() => {
@@ -35,7 +37,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   useEffect(() => {
     if (!ThemeStorage.isReady()) {
       ThemeStorage.initialize().then(() => {
-        const cachedTheme = ThemeStorage.getThemeSync();
+        const cachedTheme = ThemeStorage.getThemeSync() as ThemeMode;
         setThemeMode(cachedTheme);
         setIsThemeReady(true);
       });
@@ -53,19 +55,27 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
   const isDarkMode = themeMode === 'system' 
     ? systemColorScheme === 'dark'
-    : themeMode === 'dark';
+    : (themeMode === 'dark' || themeMode === 'amoled');
   
-  const theme = isDarkMode ? darkTheme : lightTheme;
+  // Select theme based on mode
+  const theme = useMemo(() => {
+    if (themeMode === 'amoled') return amoledTheme;
+    if (themeMode === 'system') {
+      return systemColorScheme === 'dark' ? darkTheme : lightTheme;
+    }
+    return themeMode === 'dark' ? darkTheme : lightTheme;
+  }, [themeMode, systemColorScheme]);
 
   const toggleTheme = useCallback(() => {
     setThemeMode(current => {
       if (current === 'light') return 'dark';
-      if (current === 'dark') return 'system';
+      if (current === 'dark') return 'amoled';
+      if (current === 'amoled') return 'system';
       return 'light';
     });
   }, []);
 
-  const handleSetThemeMode = useCallback((mode: 'light' | 'dark' | 'system') => {
+  const handleSetThemeMode = useCallback((mode: ThemeMode) => {
     setThemeMode(mode);
   }, []);
 

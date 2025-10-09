@@ -1691,7 +1691,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- Drop existing function first to avoid return type conflicts
 DROP FUNCTION IF EXISTS process_business_auto_refresh();
 
--- Update the auto-refresh function to set the session variable
+-- ✅ FIXED: Auto-refresh function now checks for Sellar Pro subscription
 CREATE OR REPLACE FUNCTION process_business_auto_refresh()
 RETURNS TABLE(
     processed_count INTEGER,
@@ -1704,11 +1704,12 @@ DECLARE
     errors INTEGER := 0;
     deactivated INTEGER := 0;
     has_active_boost BOOLEAN;
+    has_active_subscription BOOLEAN;
 BEGIN
     -- Set session variable to indicate we're doing auto-refresh
     PERFORM set_config('app.is_auto_refresh', 'true', true);
     
-    -- Process all due auto-refreshes, but only for listings with active boosts
+    -- Process all due auto-refreshes
     FOR refresh_record IN 
         SELECT bar.id, bar.user_id, bar.listing_id, bar.refresh_interval_hours
         FROM business_auto_refresh bar
@@ -1718,7 +1719,17 @@ BEGIN
         AND l.status = 'active'
     LOOP
         BEGIN
-            -- Check if listing has any active boost features
+            -- ✅ CRITICAL FIX: Check if user has active Sellar Pro subscription
+            SELECT EXISTS(
+                SELECT 1 FROM user_subscriptions us
+                JOIN subscription_plans sp ON us.plan_id = sp.id
+                WHERE us.user_id = refresh_record.user_id
+                AND us.status = 'active'
+                AND sp.name = 'Sellar Pro'
+                AND us.current_period_end > NOW()
+            ) INTO has_active_subscription;
+
+            -- Check if listing has any active boost features (for non-Sellar Pro users)
             SELECT EXISTS(
                 SELECT 1 FROM feature_purchases fp
                 WHERE fp.listing_id = refresh_record.listing_id
@@ -1727,8 +1738,8 @@ BEGIN
                 AND fp.feature_key IN ('pulse_boost_24h', 'mega_pulse_7d', 'category_spotlight_3d', 'ad_refresh')
             ) INTO has_active_boost;
 
-            -- Only refresh if listing has active boost
-            IF has_active_boost THEN
+            -- ✅ CRITICAL FIX: Refresh if user has Sellar Pro subscription OR active boost
+            IF has_active_subscription OR has_active_boost THEN
                 -- Update listing's updated_at to refresh its position
                 UPDATE listings 
                 SET updated_at = NOW()
@@ -1745,9 +1756,13 @@ BEGIN
                 processed := processed + 1;
                 
                 -- Log successful refresh
-                RAISE NOTICE 'Auto-refreshed listing % for user %', refresh_record.listing_id, refresh_record.user_id;
+                RAISE NOTICE 'Auto-refreshed listing % for user % (Subscription: %, Boost: %)', 
+                    refresh_record.listing_id, 
+                    refresh_record.user_id,
+                    has_active_subscription,
+                    has_active_boost;
             ELSE
-                -- Deactivate auto-refresh for listings without active boosts
+                -- ✅ Only deactivate if user has NO subscription AND NO active boosts
                 UPDATE business_auto_refresh
                 SET 
                     is_active = false,
@@ -1755,6 +1770,9 @@ BEGIN
                 WHERE id = refresh_record.id;
                 
                 deactivated := deactivated + 1;
+                
+                RAISE NOTICE 'Deactivated auto-refresh for listing % (no subscription or boost)', 
+                    refresh_record.listing_id;
             END IF;
 
         EXCEPTION WHEN OTHERS THEN
@@ -1770,6 +1788,54 @@ BEGIN
     RETURN QUERY SELECT processed, errors, deactivated;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =============================================
+-- AUTO-ENABLE AUTO-REFRESH FOR NEW LISTINGS
+-- =============================================
+
+-- ✅ Function to automatically enable auto-refresh when Sellar Pro user creates a listing
+CREATE OR REPLACE FUNCTION auto_enable_sellar_pro_auto_refresh()
+RETURNS TRIGGER AS $$
+DECLARE
+    has_active_subscription BOOLEAN;
+BEGIN
+    -- Only process for new active listings
+    IF TG_OP = 'INSERT' AND NEW.status = 'active' THEN
+        -- Check if user has active Sellar Pro subscription
+        SELECT EXISTS(
+            SELECT 1 FROM user_subscriptions us
+            JOIN subscription_plans sp ON us.plan_id = sp.id
+            WHERE us.user_id = NEW.user_id
+            AND us.status = 'active'
+            AND sp.name = 'Sellar Pro'
+            AND us.current_period_end > NOW()
+        ) INTO has_active_subscription;
+
+        -- ✅ Auto-enable auto-refresh for Sellar Pro users
+        IF has_active_subscription THEN
+            INSERT INTO business_auto_refresh (user_id, listing_id)
+            VALUES (NEW.user_id, NEW.id)
+            ON CONFLICT (user_id, listing_id) 
+            DO UPDATE SET 
+                is_active = true,
+                next_refresh_at = NOW() + INTERVAL '2 hours',
+                last_refresh_at = NOW(),
+                updated_at = NOW();
+            
+            RAISE NOTICE 'Auto-enabled auto-refresh for Sellar Pro user % listing %', NEW.user_id, NEW.id;
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ✅ Create trigger to auto-enable auto-refresh for new listings
+DROP TRIGGER IF EXISTS trigger_auto_enable_sellar_pro_auto_refresh ON listings;
+CREATE TRIGGER trigger_auto_enable_sellar_pro_auto_refresh
+    AFTER INSERT ON listings
+    FOR EACH ROW
+    EXECUTE FUNCTION auto_enable_sellar_pro_auto_refresh();
 
 -- =============================================
 -- AUTO-REFRESH CLEANUP AND SAFE FUNCTIONS

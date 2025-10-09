@@ -55,6 +55,7 @@ interface PostCardProps {
       isVerified?: boolean;
       location?: string;
       profile?: any; // Full profile object for display name logic
+      is_sellar_pro?: boolean; // ✅ Sellar Pro status
     };
     timestamp: string;
     content: string;
@@ -377,13 +378,19 @@ export function PostCard({
                 activeOpacity={isOwnPost ? 1 : 0.7}
                 disabled={isOwnPost}
               >
-                <UserDisplayName
-                  profile={post.author.profile}
-                  variant="full"
-                  showBadge={true}
-                  textVariant="body"
-                  style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}
-                />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs, flexWrap: 'wrap' }}>
+                  <UserDisplayName
+                    profile={post.author.profile}
+                    variant="full"
+                    showBadge={true}
+                    textVariant="body"
+                    style={{ fontWeight: '600' }}
+                  />
+                  {/* ✅ PRO Badge after name */}
+                  {post.author.is_sellar_pro && (
+                    <Badge text="⭐ PRO" variant="primary" size="xs" />
+                  )}
+                </View>
               </TouchableOpacity>
               
               {/* Rating Section */}

@@ -47,7 +47,19 @@ export function EnhancedSearchBar({
       searchTimeoutRef.current = setTimeout(async () => {
         try {
           const data = await getSearchSuggestions(query.trim(), 8);
-          setSuggestions(data);
+          
+          // Deduplicate suggestions by suggestion_text (case-insensitive)
+          const uniqueSuggestions = data.reduce((acc, current) => {
+            const exists = acc.find(
+              item => item.suggestion_text.toLowerCase() === current.suggestion_text.toLowerCase()
+            );
+            if (!exists) {
+              acc.push(current);
+            }
+            return acc;
+          }, [] as typeof data);
+          
+          setSuggestions(uniqueSuggestions);
           setShowSuggestions(true);
         } catch (error) {
           console.error('Error fetching search suggestions:', error);
@@ -86,14 +98,16 @@ export function EnhancedSearchBar({
     setQuery(suggestion);
     setShowSuggestions(false);
     
-    // Record search history
-    await recordSearchHistory(suggestion);
-    
-    // Trigger search
-    onSearch(suggestion);
-    
-    // Call optional callback
-    onSuggestionPress?.(suggestion);
+    // If onSuggestionPress is provided, call it instead of onSearch
+    // This prevents double navigation when parent handles suggestions
+    if (onSuggestionPress) {
+      // Let parent handle search history recording to avoid duplicate records
+      onSuggestionPress(suggestion);
+    } else {
+      // Only record search history if parent doesn't handle it
+      await recordSearchHistory(suggestion);
+      onSearch(suggestion);
+    }
   };
 
   const clearSearch = () => {
@@ -233,7 +247,7 @@ export function EnhancedSearchBar({
             <FlatList
               data={suggestions}
               renderItem={renderSuggestion}
-              keyExtractor={(item) => item.suggestion_id}
+              keyExtractor={(item, index) => `${item.suggestion_id}-${item.suggestion_text}-${index}`}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             />

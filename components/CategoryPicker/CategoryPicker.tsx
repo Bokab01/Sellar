@@ -459,9 +459,11 @@ export function CategoryPicker({
         visible={isVisible}
         onClose={handleClose}
         title="Select Category"
-        size="lg"
+        size="full"
+        position="bottom"
+        avoidKeyboard={false}
       >
-        <View style={{ maxHeight: 500 }}>
+        <View style={{ height: 600 }}>
           {/* Search Bar */}
           <View style={{
             paddingHorizontal: theme.spacing.lg,

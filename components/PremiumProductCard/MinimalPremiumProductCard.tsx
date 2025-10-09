@@ -23,6 +23,7 @@ interface MinimalPremiumProductCardProps {
   onPress?: () => void;
   // New props for view count and favorites
   viewCount?: number;
+  favoritesCount?: number;
   isFavorited?: boolean;
   onFavoritePress?: () => void;
   listingId?: string;
@@ -37,6 +38,7 @@ const MinimalPremiumProductCard = memo(function MinimalPremiumProductCard({
   location,
   onPress,
   viewCount = 0,
+  favoritesCount = 0,
   isFavorited = false,
   onFavoritePress,
   listingId,
@@ -121,12 +123,12 @@ const MinimalPremiumProductCard = memo(function MinimalPremiumProductCard({
         }}
         activeOpacity={0.8}
       >
-        {/* Premium Business Indicator */}
+        {/* Premium Business Indicator - Moved to top-left */}
         {seller.isBusinessUser && (
           <View style={{
             position: 'absolute',
             top: theme.spacing.sm,
-            right: theme.spacing.sm,
+            left: theme.spacing.sm,
             backgroundColor: theme.colors.primary,
             paddingHorizontal: theme.spacing.sm,
             paddingVertical: theme.spacing.xs,
@@ -192,46 +194,91 @@ const MinimalPremiumProductCard = memo(function MinimalPremiumProductCard({
               }}
             />
             
-            {/* View Count */}
+            {/* Heart/Favorite Icon - Top right to match main product cards */}
+            {onFavoritePress && (
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation(); // Prevent triggering card press
+                  onFavoritePress();
+                }}
+                style={{
+                  position: 'absolute',
+                  top: theme.spacing.xs,
+                  right: theme.spacing.xs,
+                  backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                  borderRadius: 16, // Match main product card
+                  padding: 6,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 11, // Above PRO badge
+                }}
+                activeOpacity={0.7}
+              >
+                <Heart 
+                  size={14} 
+                  color={isFavorited ? '#ff4757' : '#ffffff'} 
+                  fill={isFavorited ? '#ff4757' : 'transparent'}
+                />
+              </TouchableOpacity>
+            )}
+
+            {/* View Count - Bottom right (BELOW heart) to match main product cards */}
             {viewCount > 0 && (
+              <TouchableOpacity
+                style={{
+                  position: 'absolute',
+                  bottom: theme.spacing.xs,
+                  right: theme.spacing.xs,
+                  backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                  borderRadius: 8, // Match main product card grid layout
+                  paddingHorizontal: 6,
+                  paddingVertical: 2,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 2,
+                }}
+                activeOpacity={0.7}
+              >
+                <Eye size={10} color="#ffffff" />
+                <Text 
+                  variant="caption" 
+                  style={{ 
+                    color: '#ffffff', 
+                    fontSize: 9,
+                    fontWeight: '600'
+                  }}
+                >
+                  {viewCount > 999 ? `${Math.floor(viewCount / 1000)}k` : viewCount.toString()}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Favorites Count - Bottom left to match main product cards */}
+            {favoritesCount > 0 && (
               <View style={{
                 position: 'absolute',
-                top: theme.spacing.sm,
-                left: theme.spacing.sm,
-                backgroundColor: 'rgba(0,0,0,0.6)',
-                paddingHorizontal: theme.spacing.xs,
+                bottom: theme.spacing.xs,
+                left: theme.spacing.xs,
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                borderRadius: 8, // Match main product card grid layout
+                paddingHorizontal: 6,
                 paddingVertical: 2,
-                borderRadius: theme.borderRadius.sm,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 2,
               }}>
-                <Eye size={12} color="white" />
-                <Text variant="caption" style={{ color: 'white', fontSize: 10 }}>
-                  {viewCount}
+                <Heart size={10} color="#ff4757" />
+                <Text 
+                  variant="caption" 
+                  style={{ 
+                    color: '#ffffff', 
+                    fontSize: 9,
+                    fontWeight: '600'
+                  }}
+                >
+                  {favoritesCount > 999 ? `${Math.floor(favoritesCount / 1000)}k` : favoritesCount.toString()}
                 </Text>
               </View>
-            )}
-
-            {/* Heart/Favorite Icon */}
-            {onFavoritePress && (
-              <TouchableOpacity
-                onPress={onFavoritePress}
-                style={{
-                  position: 'absolute',
-                  bottom: theme.spacing.sm,
-                  right: theme.spacing.sm,
-                  backgroundColor: 'rgba(0,0,0,0.6)',
-                  padding: theme.spacing.xs,
-                  borderRadius: theme.borderRadius.full,
-                }}
-              >
-                <Heart 
-                  size={16} 
-                  color={isFavorited ? theme.colors.error : 'white'} 
-                  fill={isFavorited ? theme.colors.error : 'transparent'}
-                />
-              </TouchableOpacity>
             )}
           </TouchableOpacity>
         ) : (

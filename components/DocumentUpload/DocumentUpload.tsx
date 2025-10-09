@@ -183,26 +183,63 @@ export function DocumentUpload({
 
   const handleFileUpload = async (asset: any) => {
     try {
-      // Validate file
-      if (!validateFile({ size: asset.size || 0, type: asset.mimeType, name: asset.name })) {
-        return;
-      }
-
       // Create File object for web or use asset for mobile
       let file: File;
+      let fileSize = asset.size || 0;
+      
+      // Helper function to get correct MIME type from file extension
+      const getMimeTypeFromExtension = (filename: string): string => {
+        const ext = filename.split('.').pop()?.toLowerCase();
+        const mimeTypes: Record<string, string> = {
+          'jpg': 'image/jpeg',
+          'jpeg': 'image/jpeg',
+          'png': 'image/png',
+          'webp': 'image/webp',
+          'pdf': 'application/pdf',
+        };
+        return mimeTypes[ext || ''] || 'image/jpeg'; // Default to jpeg
+      };
+
+      // Determine file name and extension
+      const fileName = asset.name || asset.fileName || `document_${Date.now()}.jpg`;
+      
+      // Get MIME type from extension (more reliable than asset.mimeType which can be incorrect)
+      const mimeType = getMimeTypeFromExtension(fileName);
+      
       if (Platform.OS === 'web') {
         // For web, we need to create a File object
         const response = await fetch(asset.uri);
         const blob = await response.blob();
-        file = new (File as any)([blob], asset.name || `document.${asset.type?.split('/')[1] || 'jpg'}`);
+        fileSize = blob.size;
+        // Create File with correct MIME type
+        const correctBlob = new Blob([blob], { type: mimeType });
+        file = new (File as any)([correctBlob], fileName, { type: mimeType });
       } else {
-        // For mobile, create a File-like object
+        // For mobile, get file size from URI if not provided
+        if (!fileSize && asset.uri) {
+          try {
+            const response = await fetch(asset.uri);
+            const blob = await response.blob();
+            fileSize = blob.size;
+          } catch (err) {
+            console.warn('Could not fetch file size, using estimated size');
+            // Estimate size based on image dimensions if available
+            fileSize = asset.width && asset.height ? (asset.width * asset.height * 3) : 1024 * 1024; // Fallback to 1MB estimate
+          }
+        }
+        
+        // Create a File-like object for mobile with correct MIME type
         file = {
           uri: asset.uri,
-          name: asset.name || `document_${Date.now()}.${asset.type?.split('/')[1] || 'jpg'}`,
-          type: asset.mimeType || asset.type,
-          size: asset.size || 0,
+          name: fileName,
+          type: mimeType,
+          size: fileSize,
         } as any;
+      }
+
+      // Validate file after getting actual size
+      if (!validateFile({ size: fileSize, type: file.type, name: file.name })) {
+        return;
       }
 
       // Process document with verification service

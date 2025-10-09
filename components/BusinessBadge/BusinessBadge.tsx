@@ -28,8 +28,8 @@ export function BusinessBadge({
     switch (type) {
       case 'business':
         return {
-          text: 'PRO',
-          icon: Building,
+          text: 'Pro',
+          icon: '⭐',
           color: theme.colors.primary,
           backgroundColor: theme.colors.primary + '20',
           borderColor: theme.colors.primary,
@@ -198,12 +198,7 @@ export function BusinessBadge({
         paddingVertical: sizeConfig.paddingVertical,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: theme.spacing.xs,
-        shadowColor: badgeConfig.color,
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
-        elevation: 2,
+        gap: theme.spacing.xs
       },
       style
     ]}>

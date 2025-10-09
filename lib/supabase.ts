@@ -254,6 +254,35 @@ export const dbHelpers = {
     }
 
     const { data, error } = await query.range(offset, offset + limit - 1);
+    
+    // ✅ Enrich posts with Sellar Pro status
+    if (data && data.length > 0) {
+      const userIds = [...new Set(data.map((post: any) => post.user_id))];
+      
+      // Fetch subscriptions for all post authors
+      const { data: subscriptions } = await supabase
+        .from('user_subscriptions')
+        .select('user_id, status, current_period_end, subscription_plans(name)')
+        .in('user_id', userIds)
+        .in('status', ['active', 'trialing', 'cancelled']);
+      
+      // Map subscriptions to users
+      const sellarProUsers = new Set(
+        subscriptions?.filter((sub: any) => 
+          sub.subscription_plans?.name === 'Sellar Pro' &&
+          (sub.current_period_end ? new Date(sub.current_period_end) > new Date() : true)
+        ).map((sub: any) => sub.user_id) || []
+      );
+      
+      // Add is_sellar_pro to each post's author
+      const enrichedData = data.map((post: any) => ({
+        ...post,
+        author_is_sellar_pro: sellarProUsers.has(post.user_id)
+      }));
+      
+      return { data: enrichedData, error };
+    }
+    
     return { data, error };
   },
 
@@ -552,11 +581,15 @@ export const dbHelpers = {
   },
 
   async getNotificationPreferences(userId: string) {
-    return await rpc.get_user_notification_preferences({ p_user_id: userId });
+    const { data, error } = await rpc.get_user_notification_preferences({ p_user_id: userId });
+    // RPC returns array, get first element
+    return { data: data?.[0] || null, error };
   },
 
   async updateNotificationPreferences(userId: string, preferences: any) {
-    return await rpc.update_notification_preferences({ p_user_id: userId, p_preferences: preferences });
+    const { data, error } = await rpc.update_notification_preferences({ p_user_id: userId, p_preferences: preferences });
+    // RPC returns array, get first element
+    return { data: data?.[0] || null, error };
   },
 
   async claimReferralBonus(referrerId: string, refereeId: string, referralCode: string) {
@@ -666,6 +699,26 @@ export const dbHelpers = {
 
       // Create profiles map
       const profilesMap = new Map(profiles?.map((p: any) => [p.id, p]) || []);
+
+      // ✅ Fetch Sellar Pro subscriptions for all participants
+      const { data: subscriptions } = await supabase
+        .from('user_subscriptions')
+        .select('user_id, status, current_period_end, subscription_plans(name)')
+        .in('user_id', Array.from(participantIds))
+        .in('status', ['active', 'trialing', 'cancelled']);
+
+      // Map subscriptions to Sellar Pro users
+      const sellarProUsers = new Set(
+        subscriptions?.filter((sub: any) => 
+          sub.subscription_plans?.name === 'Sellar Pro' &&
+          (sub.current_period_end ? new Date(sub.current_period_end) > new Date() : true)
+        ).map((sub: any) => sub.user_id) || []
+      );
+
+      // Add is_sellar_pro to profiles
+      profilesMap.forEach((profile, userId) => {
+        profile.is_sellar_pro = sellarProUsers.has(userId);
+      });
 
       // Get all listing IDs
       const listingIds = conversations
@@ -836,8 +889,9 @@ export const dbHelpers = {
     try {
       console.log('📊 getListings called with options:', options);
       
-      // Use the full query with joins for all categories
-      let query = db.listings
+      // Use optimized view that includes pre-computed Sellar Pro status
+      let query = supabase
+        .from('listings_with_pro_status')
         .select(`
           *,
           profiles!listings_user_id_fkey(*),
@@ -937,8 +991,32 @@ export const dbHelpers = {
         }
       }
 
-      // Order by creation date (newest first)
-      query = query.order('created_at', { ascending: false });
+      // Apply sorting based on sortBy option
+      if (options.sortBy) {
+        switch (options.sortBy) {
+          case 'newest':
+            query = query.order('created_at', { ascending: false });
+            break;
+          case 'oldest':
+            query = query.order('created_at', { ascending: true });
+            break;
+          case 'price_low':
+            query = query.order('price', { ascending: true });
+            break;
+          case 'price_high':
+            query = query.order('price', { ascending: false });
+            break;
+          case 'popular':
+            // Sort by views_count (most popular first)
+            query = query.order('views_count', { ascending: false });
+            break;
+          default:
+            query = query.order('created_at', { ascending: false });
+        }
+      } else {
+        // Default: Order by creation date (newest first)
+        query = query.order('created_at', { ascending: false });
+      }
       
       // Apply limit
       query = query.limit(options.limit || 20);
@@ -1002,7 +1080,9 @@ export const dbHelpers = {
         const statuses = data.map((l: any) => l.status);
         console.log('📊 Listing statuses:', statuses);
         const reservedCount = statuses.filter((s: string) => s === 'reserved').length;
+        const proCount = data.filter((l: any) => l.is_sellar_pro).length;
         console.log(`📊 Reserved listings: ${reservedCount}`);
+        console.log(`⭐ Sellar Pro listings: ${proCount}`);
       }
       
       return { data, error };

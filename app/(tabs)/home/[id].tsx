@@ -314,8 +314,9 @@ export default function ListingDetailScreen() {
       setError(null);
 
       // First, try the joined query with explicit relationship naming
+      // ✅ Use listings_with_pro_status view for optimized Sellar Pro badge
       let { data, error: fetchError } = await supabase
-        .from('listings')
+        .from('listings_with_pro_status')
         .select(`
           *,
           profiles!listings_seller_fkey (
@@ -350,9 +351,9 @@ export default function ListingDetailScreen() {
       if (fetchError && fetchError.message.includes('schema cache')) {
         console.log('🔄 Falling back to separate queries for listing detail');
         
-        // Get listing without joins
+        // Get listing without joins - ✅ Use view for PRO status
         const { data: listingData, error: listingError } = await supabase
-          .from('listings')
+          .from('listings_with_pro_status')
           .select('*')
           .eq('id', listingId)
           .single();
@@ -1702,6 +1703,10 @@ export default function ListingDetailScreen() {
                   <Text variant="bodySmall" style={{ fontWeight: '600' }}>
                     {getDisplayName(listing.profiles, false).displayName}
                   </Text>
+                  {/* ✅ PRO Badge after name using Badge component */}
+                  {listing.is_sellar_pro && (
+                    <Badge text="⭐ PRO" variant="primary" size="sm" />
+                  )}
                   <CompactUserBadges
                     isBusinessUser={listing.profiles.is_business_user}
                     isVerified={listing.profiles.is_verified}

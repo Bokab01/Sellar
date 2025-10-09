@@ -95,9 +95,8 @@ export function LocationPicker({
           borderWidth: 1,
           borderColor: theme.colors.border,
           borderRadius: theme.borderRadius.md,
-          paddingHorizontal: theme.spacing.md,
-          paddingVertical: theme.spacing.md,
-          minHeight: 48,
+          paddingHorizontal: theme.spacing.lg,
+          paddingVertical: theme.spacing.lg,
         }}
         activeOpacity={0.7}
       >
@@ -129,8 +128,9 @@ export function LocationPicker({
             : "Add Custom City"
         }
         size="lg"
+        position="bottom"
       >
-        <View style={{ gap: theme.spacing.lg }}>
+        <View style={{ maxHeight: 600, gap: theme.spacing.lg }}>
           {/* Back Button for City/Custom Steps */}
           {currentStep !== 'region' && (
             <Button

@@ -5,7 +5,7 @@ import { Text } from '@/components/Typography/Text';
 import { ArrowLeft } from 'lucide-react-native';
 
 interface AppHeaderProps {
-  title?: string;
+  title?: string | React.ReactNode;
   subtitle?: string;
   showBackButton?: boolean;
   showBack?: boolean;
@@ -88,15 +88,19 @@ export function AppHeader({
               }}
             >
               {title && (
-                <Text
-                  variant="h4"
-                  numberOfLines={1}
-                  style={{
-                    textAlign: showBackButton || leftAction ? 'left' : 'center',
-                  }}
-                >
-                  {title}
-                </Text>
+                typeof title === 'string' ? (
+                  <Text
+                    variant="h4"
+                    numberOfLines={1}
+                    style={{
+                      textAlign: showBackButton || leftAction ? 'left' : 'center',
+                    }}
+                  >
+                    {title}
+                  </Text>
+                ) : (
+                  title
+                )
               )}
               {subtitle && (
                 <Text

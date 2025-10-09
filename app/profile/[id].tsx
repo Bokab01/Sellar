@@ -109,6 +109,7 @@ export default function UserProfileScreen() {
       setLoading(true);
       setError(null);
 
+      // ✅ Fetch profile with Sellar Pro subscription status
       const { data, error: fetchError } = await supabase
         .from('profiles')
         .select('*')
@@ -118,7 +119,19 @@ export default function UserProfileScreen() {
       if (fetchError) {
         setError(fetchError.message);
       } else {
-        setProfile(data);
+        // Check if user has active Sellar Pro subscription
+        const { data: subscription } = await supabase
+          .from('user_subscriptions')
+          .select('status, current_period_end, plan_id, subscription_plans(name)')
+          .eq('user_id', profileId)
+          .in('status', ['active', 'trialing', 'cancelled'])
+          .single();
+
+        const isSellarPro = subscription && 
+          (subscription as any).subscription_plans?.name === 'Sellar Pro' &&
+          (subscription.current_period_end ? new Date(subscription.current_period_end) > new Date() : true);
+
+        setProfile({ ...data, is_sellar_pro: isSellarPro });
       }
     } catch (err) {
       setError('Failed to load profile');
@@ -657,6 +670,15 @@ export default function UserProfileScreen() {
             <View style={{ alignItems: 'center', marginBottom: theme.spacing.md }}>
               {/* Name and Rating */}
               <View style={{ alignItems: 'center', marginBottom: theme.spacing.sm }}>
+                {/* ✅ PRO Badge above name using Badge component */}
+                {profile.is_sellar_pro && (
+                  <Badge 
+                    text="⭐ PRO SELLER" 
+                    variant="primary"
+                    size="sm" 
+                    style={{ marginBottom: theme.spacing.sm, }}
+                  />
+                )}
                 <UserDisplayName
                   profile={profile}
                   variant="full"

@@ -29,6 +29,7 @@ interface AppModalProps {
   showCloseButton?: boolean;
   dismissOnBackdrop?: boolean;
   fullScreen?: boolean;
+  avoidKeyboard?: boolean; // Whether to push modal up when keyboard appears
   primaryAction?: {
     text: string;
     onPress: () => void;
@@ -53,6 +54,7 @@ export function AppModal({
   showCloseButton = true,
   dismissOnBackdrop = true,
   fullScreen = false,
+  avoidKeyboard = true,
   primaryAction,
   secondaryAction,
 }: AppModalProps) {
@@ -64,7 +66,7 @@ export function AppModal({
 
   // Listen to keyboard events to get exact keyboard height
   useEffect(() => {
-    if (!visible || position !== 'bottom') return;
+    if (!visible || position !== 'bottom' || !avoidKeyboard) return;
 
     const keyboardWillShowListener = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
@@ -99,7 +101,7 @@ export function AppModal({
       keyboardWillShowListener.remove();
       keyboardWillHideListener.remove();
     };
-  }, [visible, position]);
+  }, [visible, position, avoidKeyboard]);
 
   const getModalSize = () => {
     if (fullScreen) {
@@ -349,9 +351,6 @@ export function AppModal({
               {/* Content */}
               <View
                 style={{
-                  paddingHorizontal: fullScreen ? 0 : theme.spacing.lg,
-                  paddingTop: theme.spacing.sm,
-                  paddingBottom: (primaryAction || secondaryAction) ? theme.spacing.md : theme.spacing.lg,
                   flex: fullScreen ? 1 : undefined,
                   flexGrow: position === 'bottom' ? 1 : undefined,
                 }}

@@ -26,6 +26,16 @@ export interface RecommendationListing {
   boost_weight?: number;
   boost_type?: string;
   favorites_count?: number;
+  // ✅ Boost feature fields for badge display
+  boost_until?: string;
+  spotlight_until?: string;
+  urgent_until?: string;
+  highlight_until?: string;
+  // ✅ Simplified: Use pre-computed fields from view
+  is_sellar_pro?: boolean;
+  subscription_status?: string;
+  subscription_plan_name?: string;
+  subscription_end?: string;
 }
 
 export interface RecommendationOptions {

@@ -3,6 +3,8 @@ import { View, ScrollView, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useAuthStore } from '@/store/useAuthStore';
+import { supabase } from '@/lib/supabase';
 import {
   Text,
   SafeAreaWrapper,
@@ -24,12 +26,14 @@ import {
   TestTube,
   BellRing,
   BellOff,
+  Mail,
 } from 'lucide-react-native';
 
 export default function NotificationSettingsScreen() {
   const { theme } = useTheme();
+  const { user } = useAuthStore();
   const {
-    preferences,
+    preferences: hookPreferences,
     loading,
     error,
     hasPermission,
@@ -43,6 +47,81 @@ export default function NotificationSettingsScreen() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
+  
+  // Local state for immediate UI updates
+  const [localPreferences, setLocalPreferences] = useState(hookPreferences);
+  
+  // Email notification state
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [loadingEmailSettings, setLoadingEmailSettings] = useState(true);
+
+  // Sync local state with hook preferences
+  useEffect(() => {
+    setLocalPreferences(hookPreferences);
+  }, [hookPreferences]);
+
+  // Fetch email notification settings
+  useEffect(() => {
+    if (user) {
+      fetchEmailSettings();
+    }
+  }, [user]);
+
+  const fetchEmailSettings = async () => {
+    if (!user) return;
+    
+    try {
+      setLoadingEmailSettings(true);
+      const { data, error } = await supabase
+        .from('user_settings')
+        .select('email_notifications')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching email settings:', error);
+      } else if (data) {
+        setEmailNotifications(data.email_notifications ?? true);
+      }
+    } catch (err) {
+      console.error('Error fetching email settings:', err);
+    } finally {
+      setLoadingEmailSettings(false);
+    }
+  };
+
+  const updateEmailNotifications = async (value: boolean) => {
+    if (!user) return;
+
+    // Optimistic update
+    setEmailNotifications(value);
+
+    try {
+      const { error } = await supabase
+        .from('user_settings')
+        .upsert({
+          user_id: user.id,
+          email_notifications: value,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id'
+        });
+
+      if (error) {
+        console.error('Error updating email settings:', error);
+        showErrorToast('Failed to update email notifications');
+        // Revert on failure
+        setEmailNotifications(!value);
+      } else {
+        showSuccessToast('Email notifications updated successfully');
+      }
+    } catch (err) {
+      console.error('Error updating email settings:', err);
+      showErrorToast('Failed to update email notifications');
+      // Revert on failure
+      setEmailNotifications(!value);
+    }
+  };
 
   useEffect(() => {
     if (isInitialized) {
@@ -63,12 +142,21 @@ export default function NotificationSettingsScreen() {
   };
 
   const handleTogglePreference = async (key: string, value: boolean) => {
+    // Optimistic update - update UI immediately
+    if (localPreferences) {
+      setLocalPreferences({ ...localPreferences, [key]: value });
+    }
+    
     const success = await updatePreferences({ [key]: value });
     
     if (success) {
       showSuccessToast('Preferences updated successfully');
     } else {
       showErrorToast('Failed to update preferences');
+      // Revert on failure
+      if (localPreferences) {
+        setLocalPreferences({ ...localPreferences, [key]: !value });
+      }
     }
   };
 
@@ -92,8 +180,14 @@ export default function NotificationSettingsScreen() {
   };
 
   const handleSendTestNotification = async () => {
-    await sendTestNotification();
-    showSuccessToast('Test notification sent!');
+    try {
+      await sendTestNotification();
+      // Success - user will see the actual push notification
+    } catch (error) {
+      // Show error if notifications are disabled
+      const message = error instanceof Error ? error.message : 'Failed to send test notification';
+      showErrorToast(message);
+    }
   };
 
   if (loading) {
@@ -176,7 +270,7 @@ export default function NotificationSettingsScreen() {
         )}
 
         {/* Main Settings */}
-        {hasPermission && preferences && (
+        {hasPermission && localPreferences && (
           <>
             {/* General Settings */}
             <View
@@ -200,7 +294,7 @@ export default function NotificationSettingsScreen() {
                 description="Receive notifications on your device"
                 leftIcon={<Bell size={20} color={theme.colors.primary} />}
                 toggle={{
-                  value: preferences.push_enabled,
+                  value: localPreferences.push_enabled,
                   onToggle: (value) => handleTogglePreference('push_enabled', value),
                 }}
               />
@@ -210,8 +304,18 @@ export default function NotificationSettingsScreen() {
                 description="Receive notifications immediately"
                 leftIcon={<BellRing size={20} color={theme.colors.primary} />}
                 toggle={{
-                  value: preferences.instant_notifications,
+                  value: localPreferences.instant_notifications,
                   onToggle: (value) => handleTogglePreference('instant_notifications', value),
+                }}
+              />
+
+              <ListItem
+                title="Email Notifications"
+                description="Receive important updates via email"
+                leftIcon={<Mail size={20} color={theme.colors.primary} />}
+                toggle={{
+                  value: emailNotifications,
+                  onToggle: updateEmailNotifications,
                 }}
                 style={{ borderBottomWidth: 0 }}
               />
@@ -239,7 +343,7 @@ export default function NotificationSettingsScreen() {
                 description="New chat messages and conversations"
                 leftIcon={<MessageCircle size={20} color={theme.colors.primary} />}
                 toggle={{
-                  value: preferences.messages_enabled,
+                  value: localPreferences.messages_enabled,
                   onToggle: (value) => handleTogglePreference('messages_enabled', value),
                 }}
               />
@@ -249,7 +353,7 @@ export default function NotificationSettingsScreen() {
                 description="Offer updates and transaction notifications"
                 leftIcon={<DollarSign size={20} color={theme.colors.success} />}
                 toggle={{
-                  value: preferences.offers_enabled,
+                  value: localPreferences.offers_enabled,
                   onToggle: (value) => handleTogglePreference('offers_enabled', value),
                 }}
               />
@@ -259,7 +363,7 @@ export default function NotificationSettingsScreen() {
                 description="Likes, comments, and follows"
                 leftIcon={<Users size={20} color={theme.colors.primary} />}
                 toggle={{
-                  value: preferences.community_enabled,
+                  value: localPreferences.community_enabled,
                   onToggle: (value) => handleTogglePreference('community_enabled', value),
                 }}
               />
@@ -269,7 +373,7 @@ export default function NotificationSettingsScreen() {
                 description="App updates and important announcements"
                 leftIcon={<Settings size={20} color={theme.colors.text.muted} />}
                 toggle={{
-                  value: preferences.system_enabled,
+                  value: localPreferences.system_enabled,
                   onToggle: (value) => handleTogglePreference('system_enabled', value),
                 }}
                 style={{ borderBottomWidth: 0 }}
@@ -295,10 +399,10 @@ export default function NotificationSettingsScreen() {
 
               <ListItem
                 title="Enable Quiet Hours"
-                description={`No notifications from ${preferences.quiet_start_time} to ${preferences.quiet_end_time}`}
+                description={`No notifications from ${localPreferences.quiet_start_time} to ${localPreferences.quiet_end_time}`}
                 leftIcon={<Clock size={20} color={theme.colors.primary} />}
                 toggle={{
-                  value: preferences.quiet_hours_enabled,
+                  value: localPreferences.quiet_hours_enabled,
                   onToggle: (value) => handleTogglePreference('quiet_hours_enabled', value),
                 }}
                 style={{ borderBottomWidth: 0 }}
@@ -327,7 +431,7 @@ export default function NotificationSettingsScreen() {
                 description="Summary of daily activity"
                 leftIcon={<Bell size={20} color={theme.colors.primary} />}
                 toggle={{
-                  value: preferences.daily_digest,
+                  value: localPreferences.daily_digest,
                   onToggle: (value) => handleTogglePreference('daily_digest', value),
                 }}
               />
@@ -337,7 +441,7 @@ export default function NotificationSettingsScreen() {
                 description="Weekly overview of your activity"
                 leftIcon={<Bell size={20} color={theme.colors.primary} />}
                 toggle={{
-                  value: preferences.weekly_summary,
+                  value: localPreferences.weekly_summary,
                   onToggle: (value) => handleTogglePreference('weekly_summary', value),
                 }}
                 style={{ borderBottomWidth: 0 }}

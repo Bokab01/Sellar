@@ -74,7 +74,19 @@ export default function MoreScreen() {
       // Fetch user profile
       const { data: profileData, error: profileError } = await dbHelpers.getProfile(user.id);
       if (profileData) {
-        setProfile(profileData);
+        // ✅ Check if user has active Sellar Pro subscription
+        const { data: subscription } = await supabase
+          .from('user_subscriptions')
+          .select('status, current_period_end, plan_id, subscription_plans(name)')
+          .eq('user_id', user.id)
+          .in('status', ['active', 'trialing', 'cancelled'])
+          .single();
+
+        const isSellarPro = subscription && 
+          (subscription as any).subscription_plans?.name === 'Sellar Pro' &&
+          (subscription.current_period_end ? new Date(subscription.current_period_end) > new Date() : true);
+
+        setProfile({ ...profileData, is_sellar_pro: isSellarPro });
         hasLoadedData.current = true;
       }
     } catch (error) {
@@ -141,12 +153,17 @@ export default function MoreScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              // ✅ FIX: Reset monetization store before signing out
+              useMonetizationStore.getState().resetStore();
+              
               await signOut();
               
               // Navigate to auth screen immediately
               router.replace('/(auth)/onboarding');
             } catch (error) {
               console.error('Sign out error:', error);
+              // ✅ FIX: Still reset store even if sign out fails
+              useMonetizationStore.getState().resetStore();
               // Still navigate even if sign out fails
               router.replace('/(auth)/onboarding');
             }
@@ -370,6 +387,10 @@ export default function MoreScreen() {
                   <Text variant="h3" style={{ fontWeight: '600' }}>
                     {fullName}
                   </Text>
+                  {/* ✅ PRO Badge after name */}
+                  {profile?.is_sellar_pro && (
+                    <Badge text="⭐ PRO" variant="primary" size="sm" />
+                  )}
                   <CompactUserBadges
                     isBusinessUser={profile?.is_business_user}
                     isVerified={profile?.is_verified}

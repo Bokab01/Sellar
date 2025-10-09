@@ -8,7 +8,7 @@ import {
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 
-type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'ghost' | 'icon' | 'fab';
+type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'outline' | 'ghost' | 'icon' | 'fab';
 type ButtonSize = 'sm' | 'md' | 'lg' | 'small' | 'large';
 
 interface ButtonProps extends TouchableOpacityProps {
@@ -97,6 +97,13 @@ export function Button({
           borderColor: isDisabled ? theme.colors.border : theme.colors.primary,
         };
         break;
+      case 'outline':
+        variantStyles = {
+          backgroundColor: 'transparent',
+          borderWidth: 1,
+          borderColor: isDisabled ? theme.colors.border : theme.colors.text.secondary,
+        };
+        break;
       case 'ghost':
         variantStyles = {
           backgroundColor: 'transparent',
@@ -152,6 +159,8 @@ export function Button({
       case 'tertiary':
       case 'ghost':
         return theme.colors.primary;
+      case 'outline':
+        return theme.colors.text.primary;
       case 'icon':
         return theme.colors.text.primary;
       default:

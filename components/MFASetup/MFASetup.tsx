@@ -55,7 +55,7 @@ export function MFASetup({ onMFAStatusChange }: MFASetupProps) {
       
       // Check if MFA is enabled for this user
       const { data, error } = await supabase
-        .from('user_privacy_settings')
+        .from('user_settings')
         .select('two_factor_enabled')
         .eq('user_id', user.id)
         .single();
@@ -140,11 +140,13 @@ export function MFASetup({ onMFAStatusChange }: MFASetupProps) {
     try {
       // Save MFA settings to database
       const { error } = await supabase
-        .from('user_privacy_settings')
+        .from('user_settings')
         .upsert({
           user_id: user.id,
           two_factor_enabled: true,
           updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id'
         });
 
       if (error) {
@@ -175,11 +177,13 @@ export function MFASetup({ onMFAStatusChange }: MFASetupProps) {
 
     try {
       const { error } = await supabase
-        .from('user_privacy_settings')
+        .from('user_settings')
         .upsert({
           user_id: user.id,
           two_factor_enabled: false,
           updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id'
         });
 
       if (error) {

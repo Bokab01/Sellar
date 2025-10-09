@@ -299,7 +299,7 @@ class DataProtectionService {
         supabase.from('comments').select('*').eq('user_id', userId),
         supabase.from('credit_transactions').select('*').eq('user_id', userId),
         supabase.from('notifications').select('*').eq('user_id', userId),
-        supabase.from('user_privacy_settings').select('*').eq('user_id', userId).single(),
+        supabase.from('user_settings').select('*').eq('user_id', userId).single(),
       ]);
 
       return {
@@ -515,7 +515,7 @@ class DataProtectionService {
     try {
       // Delete from tables with CASCADE relationships
       const tablesToDelete = [
-        'user_privacy_settings',
+        'user_settings',
         'device_tokens',
         'security_events',
         'notifications',
@@ -591,7 +591,7 @@ class DataProtectionService {
   }> {
     try {
       const { data } = await supabase
-        .from('user_privacy_settings')
+        .from('user_settings')
         .select('data_processing_consent, marketing_consent, analytics_consent, updated_at')
         .eq('user_id', userId)
         .single();

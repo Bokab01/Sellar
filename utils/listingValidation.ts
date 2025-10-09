@@ -19,7 +19,20 @@ export interface ValidationResult {
   warnings: Record<string, string>;
 }
 
-export const validateListingStep = (step: number, formData: ListingFormData): ValidationResult => {
+// Database category attribute interface (matches CategoryAttributesForm)
+export interface DbCategoryAttribute {
+  id: string;
+  slug: string;
+  label: string;
+  field_type: string;
+  is_required: boolean;
+}
+
+export const validateListingStep = (
+  step: number, 
+  formData: ListingFormData, 
+  dbAttributes?: DbCategoryAttribute[]
+): ValidationResult => {
   const errors: Record<string, string> = {};
   const warnings: Record<string, string> = {};
 
@@ -80,13 +93,19 @@ export const validateListingStep = (step: number, formData: ListingFormData): Va
       
       // Validate required category attributes
       if (formData.categoryId) {
-        const attributes = getCategoryAttributes(formData.categoryId);
+        // Prioritize database attributes if provided, fallback to constants
+        const attributes = dbAttributes || getCategoryAttributes(formData.categoryId);
         
         for (const attribute of attributes) {
-          if (attribute.required) {
-            const value = formData.categoryAttributes?.[attribute.id];
+          // Handle both database attributes (is_required, slug, label) and constant attributes (required, id, name)
+          const isRequired = 'is_required' in attribute ? attribute.is_required : (attribute as any).required;
+          const attrKey = 'slug' in attribute ? attribute.slug : (attribute as any).id;
+          const attrName = 'label' in attribute ? attribute.label : (attribute as any).name;
+          
+          if (isRequired) {
+            const value = formData.categoryAttributes?.[attrKey];
             if (!value || (Array.isArray(value) && value.length === 0) || (typeof value === 'string' && !value.trim())) {
-              errors[`attribute_${attribute.id}`] = `${attribute.name} is required`;
+              errors[`attribute_${attrKey}`] = `${attrName} is required`;
             }
           }
         }
@@ -136,13 +155,16 @@ export const validateListingStep = (step: number, formData: ListingFormData): Va
   };
 };
 
-export const validateCompleteForm = (formData: ListingFormData): ValidationResult => {
+export const validateCompleteForm = (
+  formData: ListingFormData,
+  dbAttributes?: DbCategoryAttribute[]
+): ValidationResult => {
   const allErrors: Record<string, string> = {};
   const allWarnings: Record<string, string> = {};
 
   // Validate all steps (now 3 steps: 0-2)
   for (let step = 0; step <= 2; step++) {
-    const stepValidation = validateListingStep(step, formData);
+    const stepValidation = validateListingStep(step, formData, dbAttributes);
     Object.assign(allErrors, stepValidation.errors);
     Object.assign(allWarnings, stepValidation.warnings);
   }
@@ -158,10 +180,15 @@ export const validateCompleteForm = (formData: ListingFormData): ValidationResul
 export const createDebouncedValidator = (delay: number = 300) => {
   let timeoutId: ReturnType<typeof setTimeout>;
   
-  return (step: number, formData: ListingFormData, callback: (result: ValidationResult) => void) => {
+  return (
+    step: number, 
+    formData: ListingFormData, 
+    callback: (result: ValidationResult) => void,
+    dbAttributes?: DbCategoryAttribute[]
+  ) => {
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => {
-      const result = validateListingStep(step, formData);
+      const result = validateListingStep(step, formData, dbAttributes);
       callback(result);
     }, delay);
   };

@@ -73,7 +73,7 @@ export function PrivacySettings({ onSettingsChange }: PrivacySettingsProps) {
       setLoading(true);
       
       const { data, error } = await supabase
-        .from('user_privacy_settings')
+        .from('user_settings')
         .select('*')
         .eq('user_id', user.id)
         .single();
@@ -117,12 +117,12 @@ export function PrivacySettings({ onSettingsChange }: PrivacySettingsProps) {
       const updatedSettings = { ...settings, ...newSettings };
       
       const { error } = await supabase
-        .from('user_privacy_settings')
+        .from('user_settings')
         .upsert({
           user_id: user.id,
           phone_visibility: updatedSettings.phoneVisibility,
           email_visibility: updatedSettings.emailVisibility,
-          online_status_visible: updatedSettings.onlineStatusVisible,
+          online_status_visibility: updatedSettings.onlineStatusVisible,
           last_seen_visible: updatedSettings.lastSeenVisible,
           profile_searchable: updatedSettings.profileSearchable,
           show_in_suggestions: updatedSettings.showInSuggestions,
@@ -135,6 +135,8 @@ export function PrivacySettings({ onSettingsChange }: PrivacySettingsProps) {
           login_notifications: updatedSettings.loginNotifications,
           suspicious_activity_alerts: updatedSettings.suspiciousActivityAlerts,
           updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id'
         });
 
       if (error) {

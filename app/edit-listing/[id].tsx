@@ -104,6 +104,7 @@ const CONDITIONS = [
 export default function EditListingScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
+  const { hasBusinessPlan } = useMonetizationStore();
   const { id: listingId } = useLocalSearchParams<{ id: string }>();
   
   // Form state
@@ -653,6 +654,10 @@ export default function EditListingScreen() {
           value={formData.images}
           onChange={handleImagesChange}
           disabled={loading}
+          title={hasBusinessPlan() ? "Upload Photos & Video *" : "Upload Photo(s) *"}
+          allowVideos={true}
+          maxVideoDuration={30}
+          isSellarPro={hasBusinessPlan()}
         />
         
         {loading && uploadProgress > 0 && (
@@ -691,7 +696,7 @@ export default function EditListingScreen() {
             marginTop: theme.spacing.sm,
           }}>
             <Text variant="bodySmall" style={{ color: theme.colors.warning, textAlign: 'center' }}>
-              📸 At least one photo is required
+              {hasBusinessPlan() ? "📸 At least one photo or video is required" : "📸 At least one photo is required"}
             </Text>
           </View>
         )}

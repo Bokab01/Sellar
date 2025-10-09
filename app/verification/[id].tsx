@@ -50,6 +50,23 @@ export default function VerificationRequestScreen() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Effect to find and set the request when requests array updates
+  useEffect(() => {
+    if (!id || loading === false && !request) return;
+    
+    const foundRequest = requests.find(r => r.id === id);
+    
+    if (foundRequest) {
+      setRequest(foundRequest);
+      setLoading(false);
+      setError(null);
+    } else if (requests.length > 0 && !foundRequest) {
+      // Only show error if we have requests but couldn't find this one
+      setError('Verification request not found');
+      setLoading(false);
+    }
+  }, [requests, id]);
+
   const fetchRequest = async () => {
     if (!id) return;
     
@@ -57,27 +74,11 @@ export default function VerificationRequestScreen() {
     setError(null);
     
     try {
-      // Find the request in the existing requests
-      const foundRequest = requests.find(r => r.id === id);
-      
-      if (foundRequest) {
-        setRequest(foundRequest);
-      } else {
-        // If not found in current requests, refetch and try again
-        await refetch();
-        const updatedRequests = await refetch();
-        const foundAfterRefetch = requests.find(r => r.id === id);
-        
-        if (foundAfterRefetch) {
-          setRequest(foundAfterRefetch);
-        } else {
-          throw new Error('Verification request not found');
-        }
-      }
+      // Refetch to get the latest data
+      await refetch();
     } catch (err) {
       console.error('Error fetching verification request:', err);
       setError(err instanceof Error ? err.message : 'Failed to load verification request');
-    } finally {
       setLoading(false);
     }
   };

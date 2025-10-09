@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, Component, ErrorInfo, ReactNode } from 'react';
-import { View, ScrollView, Alert, Pressable, BackHandler, Image, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, ScrollView, Alert, Pressable, BackHandler, Image, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Animated } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
@@ -130,6 +131,9 @@ function CreateListingScreen() {
   const [userListingsCount, setUserListingsCount] = useState(0);
   const [showPhotoTips, setShowPhotoTips] = useState(false);
   const [showListingTipsModal, setShowListingTipsModal] = useState(false);
+  const [showDraftModal, setShowDraftModal] = useState(false);
+  const [showExitModal, setShowExitModal] = useState(false);
+  const [draftData, setDraftData] = useState<ListingFormData | null>(null);
   
   // Feature selector state
   const [showFeatureSelector, setShowFeatureSelector] = useState(false);
@@ -138,6 +142,7 @@ function CreateListingScreen() {
   // Validation state
   const [validationResults, setValidationResults] = useState<Record<number, ValidationResult>>({});
   const [isValidating, setIsValidating] = useState(false);
+  const [categoryAttributes, setCategoryAttributes] = useState<any[]>([]); // Store DB attributes for validation
   
   // Performance optimization refs
   const isMountedRef = useRef(true); // Track if component is mounted
@@ -155,6 +160,10 @@ function CreateListingScreen() {
   const AUTOSAVE_KEY = useMemo(() => `listing_draft_${user?.id || 'anonymous'}`, [user?.id]);
   const [selectedCategory, setSelectedCategory] = useState<DbCategory | null>(null);
   
+  // Animation for autosave indicator
+  const autosaveOpacity = useRef(new Animated.Value(0)).current;
+  const fadeOutTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   // Autosave configuration
   const AUTOSAVE_DEBOUNCE_MS = 3000; // Wait 3 seconds after user stops typing
   const AUTOSAVE_THROTTLE_MS = 15000; // Minimum 15 seconds between database saves
@@ -169,8 +178,52 @@ function CreateListingScreen() {
         clearTimeout(autosaveTimeoutRef.current);
         autosaveTimeoutRef.current = null;
       }
+      // Clear fade out timeout on unmount
+      if (fadeOutTimeoutRef.current) {
+        clearTimeout(fadeOutTimeoutRef.current);
+        fadeOutTimeoutRef.current = null;
+      }
     };
   }, []);
+
+  // Handle autosave indicator animation - only show when saved
+  useEffect(() => {
+    try {
+      // Only show indicator when content is saved (not saving, not unsaved)
+      if (!isAutoSaving && !hasUnsavedChanges && (formData.title || formData.description || formData.images.length > 0)) {
+        // Clear any existing fade-out timeout
+        if (fadeOutTimeoutRef.current) {
+          clearTimeout(fadeOutTimeoutRef.current);
+          fadeOutTimeoutRef.current = null;
+        }
+        
+        // Fade in
+        Animated.timing(autosaveOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+        
+        // Show for 2 seconds then fade out
+        fadeOutTimeoutRef.current = setTimeout(() => {
+          try {
+            Animated.timing(autosaveOpacity, {
+              toValue: 0,
+              duration: 500,
+              useNativeDriver: true,
+            }).start();
+          } catch (animError) {
+            console.warn('Animation fade-out error:', animError);
+          }
+        }, 2000) as any;
+      } else {
+        // Hide immediately if saving or unsaved
+        autosaveOpacity.setValue(0);
+      }
+    } catch (error) {
+      console.warn('Autosave animation error:', error);
+    }
+  }, [isAutoSaving, hasUnsavedChanges, formData.title, formData.description, formData.images.length, autosaveOpacity]);
 
   // Feature selection handler
   const handleFeaturesSelected = useCallback((features: SelectedFeature[]) => {
@@ -183,21 +236,12 @@ function CreateListingScreen() {
     try {
       const savedDraft = await AsyncStorage.getItem(AUTOSAVE_KEY);
       if (savedDraft && !hasShownDraftAlert) {
-        const draftData = JSON.parse(savedDraft);
+        const parsedDraft = JSON.parse(savedDraft);
         // Only load if it's not empty and we haven't shown the alert yet
-        if (draftData.title || draftData.description || draftData.images?.length > 0) {
+        if (parsedDraft.title || parsedDraft.description || parsedDraft.images?.length > 0) {
           setHasShownDraftAlert(true);
-          Alert.alert(
-            'Draft Found',
-            'You have an unsaved draft. Would you like to continue where you left off?',
-            [
-              { text: 'Start Fresh', onPress: () => {
-                clearDraft();
-                setHasShownDraftAlert(false);
-              }, style: 'destructive' },
-              { text: 'Continue', onPress: () => setFormData(draftData) },
-            ]
-          );
+          setDraftData(parsedDraft);
+          setShowDraftModal(true);
         }
       }
       
@@ -421,27 +465,7 @@ function CreateListingScreen() {
         // Show alert if there's any content (saved or unsaved)
         const hasContent = formData.title?.trim() || formData.description?.trim() || formData.images.length > 0;
         if (hasContent) {
-          const message = hasUnsavedChanges 
-            ? 'You have unsaved changes. Would you like to save them as a draft before leaving?'
-            : 'Your draft has been saved. Would you like to keep it or discard it?';
-            
-          Alert.alert(
-            hasUnsavedChanges ? 'Unsaved Changes' : 'Draft Found',
-            message,
-            [
-              { text: 'Discard', onPress: () => { 
-                clearDraft(); 
-                router.back(); 
-              }, style: 'destructive' },
-              { text: hasUnsavedChanges ? 'Save Draft' : 'Keep Draft', onPress: () => { 
-                if (hasUnsavedChanges) {
-                  saveDraft(formData, true);
-                }
-                router.back(); 
-              }},
-              { text: 'Cancel', style: 'cancel' },
-            ]
-          );
+          setShowExitModal(true);
           return true;
         }
         // If no content, just navigate back
@@ -450,7 +474,7 @@ function CreateListingScreen() {
 
       const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () => subscription.remove();
-    }, [hasUnsavedChanges, formData, saveDraft, clearDraft])
+    }, [formData])
   );
 
   // Update form data with validation and autosave
@@ -484,14 +508,14 @@ function CreateListingScreen() {
           setValidationResults(prev => ({ ...prev, [currentStep]: result }));
           setIsValidating(false);
         });
-      });
+      }, categoryAttributes);
     });
-  }, [currentStep, saveDraft]);
+  }, [currentStep, saveDraft, categoryAttributes]);
 
   const validateStep = useCallback((step: number): boolean => {
-    const validation = validationResults[step] || validateListingStep(step, formData);
+    const validation = validationResults[step] || validateListingStep(step, formData, categoryAttributes);
     return validation.isValid;
-  }, [formData, validationResults]);
+  }, [formData, validationResults, categoryAttributes]);
 
   const canProceed = useMemo(() => validateStep(currentStep), [currentStep, validateStep]);
 
@@ -628,10 +652,10 @@ function CreateListingScreen() {
         }
       }
 
-      // Sanitize and optimize data
-      const sanitizedTitle = sanitizeInput(formData.title);
-      const sanitizedDescription = sanitizeInput(formData.description);
-      const seoTitle = generateSEOFriendlyTitle(sanitizedTitle, selectedCategory?.name || '');
+      // Sanitize and optimize data with safe guards
+      const sanitizedTitle = sanitizeInput(formData.title || '');
+      const sanitizedDescription = sanitizeInput(formData.description || '');
+      const seoTitle = generateSEOFriendlyTitle(sanitizedTitle, selectedCategory?.name || 'Uncategorized');
       const keywords = extractKeywords(sanitizedTitle, sanitizedDescription);
 
       // Create listing with optimized data including category attributes
@@ -642,15 +666,15 @@ function CreateListingScreen() {
         user_id: user!.id,
         title: sanitizedTitle,
         description: sanitizedDescription,
-        price: Number(formData.price),
+        price: Number(formData.price) || 0,
         currency: 'GHS',
         category_id: categoryUUID, // Use mapped category UUID
-        condition: formData.categoryAttributes.condition || 'good', // Get from attributes or default to 'good'
-        quantity: formData.quantity,
-        location: formData.location,
+        condition: 'good', // Will be set properly below after mapping
+        quantity: formData.quantity || 1,
+        location: formData.location || '',
         images: imageUrls,
-        accept_offers: formData.acceptOffers,
-        attributes: formData.categoryAttributes,
+        accept_offers: formData.acceptOffers ?? true,
+        attributes: formData.categoryAttributes || {},
         seo_title: seoTitle,
         keywords: keywords,
         status: 'active'
@@ -682,7 +706,9 @@ function CreateListingScreen() {
         'Acceptable': 'fair',
       };
       
-      const conditionValue = formData.categoryAttributes.condition as string || 'good';
+      // Handle condition safely (could be string or string[])
+      const conditionRaw = formData.categoryAttributes.condition;
+      const conditionValue = Array.isArray(conditionRaw) ? conditionRaw[0] : (conditionRaw as string) || 'good';
       listingData.condition = conditionMapping[conditionValue] || 'good';
 
 
@@ -1144,9 +1170,30 @@ function CreateListingScreen() {
 
 
 
-  const handleCategorySelect = useCallback((categoryId: string) => {
+  const handleCategorySelect = useCallback(async (categoryId: string) => {
+    if (!categoryId) {
+      console.warn('handleCategorySelect called with empty categoryId');
+      return;
+    }
+    
     // Clear category attributes when category changes
     updateFormData({ categoryId, categoryAttributes: {} });
+    
+    // Fetch category attributes from database for validation
+    try {
+      const { data, error } = await supabase
+        .rpc('get_category_attributes', { p_category_id: categoryId });
+      
+      if (!error && data) {
+        setCategoryAttributes(Array.isArray(data) ? data : []);
+      } else {
+        console.warn('No category attributes found or error:', error);
+        setCategoryAttributes([]);
+      }
+    } catch (error) {
+      console.error('Error fetching category attributes:', error);
+      setCategoryAttributes([]);
+    }
   }, [updateFormData]);
 
   const handleCategoryAttributeChange = useCallback((slug: string, value: any) => {
@@ -1222,7 +1269,7 @@ function CreateListingScreen() {
           value={formData.images}
           onChange={handleImagesChange}
           disabled={loading}
-          title="Upload Media"
+          title={hasBusinessPlan() ? "Upload Photos & Video *" : "Upload Photo(s) *"}
           allowVideos={true}
           maxVideoDuration={30}
           isSellarPro={hasBusinessPlan()}
@@ -1264,7 +1311,7 @@ function CreateListingScreen() {
             marginTop: theme.spacing.sm,
           }}>
             <Text variant="bodySmall" style={{ color: theme.colors.warning, textAlign: 'center' }}>
-              📸 At least one photo or video is required
+              {hasBusinessPlan() ? "📸 At least one photo or video is required" : "📸 At least one photo is required"}
             </Text>
           </View>
         )}
@@ -1278,7 +1325,7 @@ function CreateListingScreen() {
 
         <View style={{ gap: theme.spacing.md }}>
           <Input
-            label="Title"
+            label="Title *"
             placeholder="e.g. Samsung Galaxy Note 20"
             value={formData.title}
             onChangeText={handleTitleChange}
@@ -1288,7 +1335,7 @@ function CreateListingScreen() {
 
           <Input
             variant="multiline"
-            label="Describe your item"
+            label="Describe your item *"
             placeholder="Describe your item in detail..."
             value={formData.description}
             onChangeText={handleDescriptionChange}
@@ -1307,7 +1354,7 @@ function CreateListingScreen() {
       <View style={{ gap: theme.spacing.lg }}>
         <View>
           <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
-            Category
+            Category *
           </Text>
           <CategoryPicker
             value={formData.categoryId}
@@ -1338,12 +1385,13 @@ function CreateListingScreen() {
             categoryId={formData.categoryId}
             values={formData.categoryAttributes}
             onChange={handleCategoryAttributeChange}
+            errors={validationResults[1]?.errors || {}}
           />
         )}
 
         <View>
           <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
-            Location
+            Location *
           </Text>
           <LocationPicker
             value={formData.location}
@@ -1377,7 +1425,7 @@ function CreateListingScreen() {
 
           <View style={{ gap: theme.spacing.lg }}>
             <Input
-              label="Price (GH₵)"
+              label="Price (GH₵) *"
               placeholder="0.00"
               value={formData.price}
               onChangeText={handlePriceChange}
@@ -1439,13 +1487,29 @@ function CreateListingScreen() {
 
 
 
+  // Helper function to format condition for display
+  const formatCondition = (condition: string | string[]): string => {
+    const conditionValue = Array.isArray(condition) ? condition[0] : condition;
+    const conditionLabels: Record<string, string> = {
+      'new': 'New',
+      'brand_new': 'Brand New',
+      'like_new': 'Like New',
+      'good': 'Good',
+      'fair': 'Fair',
+      'poor': 'Poor',
+      'foreign_used': 'Foreign Used',
+      'locally_used': 'Locally Used',
+    };
+    return conditionLabels[conditionValue] || conditionValue.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
   const ReviewStep = useMemo(() => (
     <View style={{ gap: theme.spacing.lg }}>
 
       {/* Preview Header */}
       <View style={{ marginBottom: theme.spacing.md }}>
-        <Text variant="h3" style={{ marginBottom: theme.spacing.sm }}>
-          📋 Listing Preview
+        <Text variant="h4" style={{ marginBottom: theme.spacing.sm }}>
+          Preview your listing
         </Text>
         <Text variant="body" color="secondary">
           This is how your listing will appear to buyers
@@ -1527,7 +1591,7 @@ function CreateListingScreen() {
           </Text>
           {formData.categoryAttributes.condition && (
             <Text variant="caption" color="muted">
-              Condition: {formData.categoryAttributes.condition}
+              Condition: {formatCondition(formData.categoryAttributes.condition)}
             </Text>
           )}
           <Text variant="caption" color="muted">
@@ -1807,78 +1871,58 @@ function CreateListingScreen() {
         onBackPress={() => {
           const hasContent = formData.title?.trim() || formData.description?.trim() || formData.images.length > 0;
           if (hasContent) {
-            const message = hasUnsavedChanges 
-              ? 'You have unsaved changes. Would you like to save them as a draft before leaving?'
-              : 'You have a saved draft. Would you like to keep it or discard it?';
-              
-            Alert.alert(
-              hasUnsavedChanges ? 'Unsaved Changes' : 'Draft Found',
-              message,
-              [
-                { text: 'Discard', onPress: () => { clearDraft(); router.back(); }, style: 'destructive' },
-                { text: hasUnsavedChanges ? 'Save Draft' : 'Keep Draft', onPress: () => { 
-                  if (hasUnsavedChanges) {
-                    saveDraft(formData, true);
-                  }
-                  router.back(); 
-                }},
-                { text: 'Cancel', style: 'cancel' },
-              ]
-            );
+            setShowExitModal(true);
           } else {
             router.back();
           }
         }}
-        rightActions={
-          (isAutoSaving || hasUnsavedChanges || (formData.title || formData.description || formData.images.length > 0))
-          ? [
-              <View
-                key="autosave-status"
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingHorizontal: theme.spacing.sm,
-                  paddingVertical: theme.spacing.xs,
-                  borderRadius: theme.borderRadius.md,
-                  backgroundColor: isAutoSaving 
-                    ? theme.colors.primary + '10'
-                    : hasUnsavedChanges 
-                      ? theme.colors.warning + '10'
-                      : theme.colors.success + '10',
-                }}
-              >
-                {isAutoSaving ? (
-                  <>
-                    <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginRight: theme.spacing.xs }} />
-                    <Text variant="caption" style={{ color: theme.colors.primary, fontWeight: '600' }}>
-                      Saving...
-                    </Text>
-                  </>
-                ) : hasUnsavedChanges ? (
-                  <>
-                    <View style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: 3,
-                      backgroundColor: theme.colors.warning,
-                      marginRight: theme.spacing.xs,
-                    }} />
-                    <Text variant="caption" style={{ color: theme.colors.warning, fontWeight: '600' }}>
-                      Unsaved
-                    </Text>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle size={14} color={theme.colors.success} style={{ marginRight: theme.spacing.xs }} />
-                    <Text variant="caption" style={{ color: theme.colors.success, fontWeight: '600' }}>
-                      Saved
-                    </Text>
-                  </>
-                )}
-              </View>
-            ]
-          : []
-        }
+        rightActions={[
+          // Autosave Indicator - Only shows "Saved"
+          <Animated.View
+            key="autosave-indicator"
+            style={{
+              opacity: autosaveOpacity,
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: theme.spacing.sm,
+              paddingVertical: theme.spacing.xs,
+              borderRadius: theme.borderRadius.full,
+              backgroundColor: theme.colors.success,
+              marginRight: theme.spacing.sm,
+            }}
+          >
+            <CheckCircle size={12} color="#555" style={{ marginRight: theme.spacing.xs }} />
+            <Text variant="caption" style={{ color: '#555', fontWeight: '600', fontSize: 11 }}>
+              Saved
+            </Text>
+          </Animated.View>,
+          // Step Indicator
+          <View
+            key="step-indicator"
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: theme.spacing.xs,
+            }}
+          >
+            <View style={{
+              backgroundColor: theme.colors.primary + '15',
+              borderRadius: theme.borderRadius.full,
+              gap: theme.spacing.sm,
+              width: 32,
+              height: 32,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <Text variant="bodySmall" style={{ color: theme.colors.primary, fontWeight: '700' }}>
+                {currentStep + 1}
+              </Text>
+            </View>
+            <Text variant="bodySmall" style={{ color: theme.colors.text.secondary, fontWeight: '600' }}>
+              {STEPS[currentStep].title}
+            </Text>
+          </View>
+        ]}
       />
 
 
@@ -1887,23 +1931,6 @@ function CreateListingScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
       >
-        {/* Progress Indicator */}
-        <View style={{
-          paddingHorizontal: theme.spacing.lg,
-          backgroundColor: theme.colors.surface,
-          borderBottomWidth: 1,
-          borderBottomColor: theme.colors.border,
-        }}>
-          <StepIndicator
-            steps={STEPS.map((step, index) => ({
-              title: step.title,
-              completed: index < currentStep,
-              active: index === currentStep,
-            }))}
-            currentStep={currentStep}
-            showLabels={true}
-          />
-        </View>
 
 
 
@@ -1921,38 +1948,40 @@ function CreateListingScreen() {
         </ScrollView>
 
         {/* Navigation Buttons */}
-        <View style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          paddingHorizontal: theme.spacing.lg,
-          paddingVertical: theme.spacing.lg,
-          backgroundColor: theme.colors.surface,
-          borderTopWidth: 1,
-          borderTopColor: theme.colors.border,
-          gap: theme.spacing.md,
-        }}>
-          <Button
-            variant="secondary"
-            onPress={currentStep === 0 ? () => router.back() : previousStep}
-            disabled={loading}
-            icon={currentStep === 0 ? undefined : <ArrowLeft size={18} color={theme.colors.text.primary} />}
-            style={{ flex: 1 }}
-          >
-            {currentStep === 0 ? 'Cancel' : 'Previous'}
-          </Button>
+        <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.colors.surface }}>
+          <View style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingHorizontal: theme.spacing.md,
+            paddingVertical: theme.spacing.sm,
+            backgroundColor: theme.colors.surface,
+            borderTopWidth: 1,
+            borderTopColor: theme.colors.border,
+            gap: theme.spacing.md,
+          }}>
+            <Button
+              variant="outline"
+              onPress={currentStep === 0 ? () => router.back() : previousStep}
+              disabled={loading}
+              icon={currentStep === 0 ? undefined : <ArrowLeft size={18} color={theme.colors.text.primary} />}
+              style={{ flex: 1, borderColor: theme.colors.error}}
+            >
+              {currentStep === 0 ? 'Cancel' : 'Previous'}
+            </Button>
 
-          <Button
-            variant="primary"
-            onPress={currentStep === STEPS.length - 1 ? handleSubmit : nextStep}
-            disabled={!canProceed || loading}
-            loading={loading && currentStep === STEPS.length - 1}
-            icon={currentStep === STEPS.length - 1 ? undefined : <ArrowRight size={18} color={theme.colors.primaryForeground} />}
-            style={{ flex: 1 }}
-          >
-            {currentStep === STEPS.length - 1 ? 'Publish Listing' : 'Next'}
-          </Button>
-        </View>
+            <Button
+              variant="primary"
+              onPress={currentStep === STEPS.length - 1 ? handleSubmit : nextStep}
+              disabled={!canProceed || loading}
+              loading={loading && currentStep === STEPS.length - 1}
+              icon={currentStep === STEPS.length - 1 ? undefined : <ArrowRight size={18} color={theme.colors.primaryForeground} />}
+              style={{ flex: 1 }}
+            >
+              {currentStep === STEPS.length - 1 ? 'Publish Listing' : 'Next'}
+            </Button>
+          </View>
+        </SafeAreaView>
       </KeyboardAvoidingView>
 
       {/* Payment Modal */}
@@ -2584,6 +2613,109 @@ function CreateListingScreen() {
             </View>
           </View>
         </ScrollView>
+      </AppModal>
+
+      {/* Draft Found Modal */}
+      <AppModal
+        visible={showDraftModal}
+        onClose={() => {
+          setShowDraftModal(false);
+          setDraftData(null);
+          setHasShownDraftAlert(false);
+        }}
+        title="Draft Found"
+        size="sm"
+      >
+        <View style={{ padding: theme.spacing.lg }}>
+          <Text variant="body" color="secondary" style={{ marginBottom: theme.spacing.xl }}>
+            You have an unsaved draft. Would you like to continue where you left off?
+          </Text>
+          
+          <View style={{ gap: theme.spacing.md }}>
+            <Button
+              variant="primary"
+              onPress={() => {
+                if (draftData) {
+                  setFormData(draftData);
+                }
+                setShowDraftModal(false);
+                setDraftData(null);
+              }}
+            >
+              Continue Editing
+            </Button>
+            
+            <Button
+              variant="outline"
+              style={{
+                borderColor: theme.colors.primary,
+              }}
+              onPress={() => {
+                clearDraft();
+                setShowDraftModal(false);
+                setDraftData(null);
+                setHasShownDraftAlert(false);
+              }}
+            >
+              Start Fresh
+            </Button>
+          </View>
+        </View>
+      </AppModal>
+
+      {/* Exit Confirmation Modal */}
+      <AppModal
+        visible={showExitModal}
+        onClose={() => setShowExitModal(false)}
+        title={hasUnsavedChanges ? 'Unsaved Changes' : 'Draft Saved'}
+        size="sm"
+      >
+        <View style={{ padding: theme.spacing.lg }}>
+          <Text variant="body" color="secondary" style={{ marginBottom: theme.spacing.xl }}>
+            {hasUnsavedChanges 
+              ? 'You have unsaved changes. Would you like to save them as a draft before leaving?'
+              : 'Your draft has been saved. Would you like to keep it or discard it?'}
+          </Text>
+          
+          <View style={{ gap: theme.spacing.md }}>
+            <Button
+              variant="primary"
+              onPress={() => {
+                if (hasUnsavedChanges) {
+                  saveDraft(formData, true);
+                }
+                setShowExitModal(false);
+                router.back();
+              }}
+            >
+              {hasUnsavedChanges ? 'Save Draft' : 'Keep Draft'}
+            </Button>
+            
+            <Button
+              variant="outline"
+              style={{
+                borderColor: theme.colors.error,
+              }}
+              onPress={() => {
+                clearDraft();
+                setShowExitModal(false);
+                router.back();
+              }}
+            >
+              Discard
+            </Button>
+            
+            <Button
+                variant="outline"
+              style={{
+                borderColor: theme.colors.primary,
+              }}
+              onPress={() => setShowExitModal(false)}
+            >
+              Cancel
+            </Button>
+          </View>
+        </View>
       </AppModal>
 
     </SafeAreaWrapper>

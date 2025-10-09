@@ -6,6 +6,9 @@ import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
 import { MinimalPremiumProductCard } from '@/components/PremiumProductCard/MinimalPremiumProductCard';
 import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
+import { useFavoritesStore } from '@/store/useFavoritesStore';
+import { useMultipleListingStats } from '@/hooks/useListingStats';
+import { useAuthStore } from '@/store/useAuthStore';
 
 interface FeaturedListing {
   id: string;
@@ -42,9 +45,21 @@ export function FixedFeaturedListings({
   onViewAll,
 }: FixedFeaturedListingsProps) {
   const { theme } = useTheme();
+  const { user } = useAuthStore();
   const [listings, setListings] = useState<FeaturedListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // ✅ Get listing IDs for stats and favorites
+  const listingIds = React.useMemo(() => listings.map(l => l.id), [listings]);
+  const { viewCounts, refreshStats } = useMultipleListingStats({ listingIds });
+  const { 
+    favorites, 
+    listingFavoriteCounts, 
+    toggleFavorite: toggleGlobalFavorite,
+    incrementListingFavoriteCount,
+    decrementListingFavoriteCount
+  } = useFavoritesStore();
 
   // Helper function to get display name based on business settings
   const getDisplayName = (profile: any) => {
@@ -77,6 +92,8 @@ export function FixedFeaturedListings({
         setLoading(true);
         setError(null);
 
+        console.log('🔍 [FixedFeaturedListings] Starting fetch...');
+
         // Fetch featured listings - mix of business users and regular users with boosted listings
         const { data: businessUsers, error: businessError } = await supabase
           .from('user_subscriptions')
@@ -102,7 +119,13 @@ export function FixedFeaturedListings({
               business_name_priority
             )
           `)
-          .in('status', ['active', 'cancelled']);
+          .in('status', ['active', 'trialing', 'cancelled']); // ✅ FIX: Include 'trialing' for free trial users
+
+        console.log('🔍 [FixedFeaturedListings] Subscription query result:', {
+          error: businessError,
+          count: businessUsers?.length || 0,
+          users: businessUsers?.map(u => ({ id: u.user_id, status: u.status }))
+        });
 
         // Also fetch users who have business profiles but might not have active subscriptions
         let businessProfileUsers: any[] = [];
@@ -175,6 +198,22 @@ export function FixedFeaturedListings({
 
         const businessUserIds = allBusinessUsers.map(user => user.user_id);
 
+        console.log('📊 Featured Listings - Found business users:', {
+          subscriptionUsers: businessUsers?.length || 0,
+          profileBusinessUsers: businessProfileUsers?.length || 0,
+          totalBusinessUsers: allBusinessUsers.length,
+          businessUserIds: businessUserIds.length
+        });
+
+        // ✅ FIX: If no business users found, return empty array instead of running invalid query
+        if (businessUserIds.length === 0) {
+          console.log('⚠️ No business users found for featured listings');
+          if (isMounted) {
+            setListings([]);
+          }
+          return;
+        }
+
         // Fetch listings ONLY from Sellar Pro (business) users
         const { data: businessListings, error: businessListingsError } = await supabase
           .from('listings')
@@ -196,8 +235,17 @@ export function FixedFeaturedListings({
 
         if (businessListingsError) throw businessListingsError;
 
+        console.log('📊 Featured Listings - Query result:', {
+          listingsFound: businessListings?.length || 0,
+          listings: businessListings?.map(l => ({ id: l.id, title: l.title, user_id: l.user_id }))
+        });
+
         // Use only business listings - no regular users in "Featured Sellar Pro"
         const allListings = businessListings || [];
+
+        if (allListings.length === 0) {
+          console.log('⚠️ No listings found for business users');
+        }
 
         // Get unique user IDs for profile fetching
         const allUserIds = [...new Set(allListings.map(listing => listing.user_id))];
@@ -230,10 +278,43 @@ export function FixedFeaturedListings({
           }
         }
 
+        // ✅ FIX: Fetch profiles for any listings where we don't have profile data yet
+        const missingProfileUserIds = allListings
+          .filter(listing => !allBusinessUsers.find(user => user.user_id === listing.user_id))
+          .map(listing => listing.user_id);
+
+        let missingProfiles: any[] = [];
+        if (missingProfileUserIds.length > 0) {
+          console.log('🔍 Fetching missing profiles for:', missingProfileUserIds);
+          const { data: fetchedProfiles, error: missingProfilesError } = await supabase
+            .from('profiles')
+            .select(`
+              id,
+              first_name,
+              last_name,
+              full_name,
+              avatar_url,
+              rating,
+              is_business,
+              business_name,
+              display_business_name,
+              business_name_priority
+            `)
+            .in('id', missingProfileUserIds);
+
+          if (missingProfilesError) {
+            console.warn('Error fetching missing profiles:', missingProfilesError);
+          } else {
+            missingProfiles = fetchedProfiles || [];
+          }
+        }
+
         // Transform data - all users are Sellar Pro (business) users
         const transformedListings: FeaturedListing[] = allListings?.map(listing => {
           const businessUser = allBusinessUsers?.find(user => user.user_id === listing.user_id);
-          const sellerProfile = businessUser?.profiles || {
+          const missingProfile = missingProfiles.find(p => p.id === listing.user_id);
+          
+          const sellerProfile = businessUser?.profiles || missingProfile || {
             id: listing.user_id,
             first_name: 'Business',
             last_name: 'User',
@@ -271,11 +352,16 @@ export function FixedFeaturedListings({
           };
         }) || [];
 
+        console.log('✅ [FixedFeaturedListings] Final transformed listings:', {
+          count: transformedListings?.length || 0,
+          listings: transformedListings?.map(l => ({ id: l.id, seller: l.seller.name }))
+        });
+
         if (isMounted) {
           setListings(transformedListings);
         }
       } catch (err) {
-        console.error('Error fetching featured listings:', err);
+        console.error('❌ [FixedFeaturedListings] Error fetching featured listings:', err);
         if (isMounted) {
           setError('Failed to load featured listings');
         }
@@ -309,6 +395,44 @@ export function FixedFeaturedListings({
       router.push('/(tabs)/home/business-listings');
     }
   };
+
+  // ✅ Handle favorite toggle with database sync (matches home screen implementation)
+  const handleFavoriteToggle = React.useCallback((listingId: string, listingSellerId: string) => {
+    // Don't allow users to favorite their own listings
+    if (user?.id === listingSellerId) {
+      return;
+    }
+
+    import('@/lib/favoritesAndViews').then(({ toggleFavorite }) => {
+      const isFavorited = favorites[listingId] || false;
+      
+      // Optimistic update using global store (syncs across all instances)
+      toggleGlobalFavorite(listingId);
+      
+      // Update the listing's favorite count optimistically
+      if (isFavorited) {
+        decrementListingFavoriteCount(listingId);
+      } else {
+        incrementListingFavoriteCount(listingId);
+      }
+      
+      // Perform actual database toggle
+      toggleFavorite(listingId).then((result) => {
+        if (result.error) {
+          // Revert optimistic updates on error
+          toggleGlobalFavorite(listingId);
+          if (isFavorited) {
+            incrementListingFavoriteCount(listingId);
+          } else {
+            decrementListingFavoriteCount(listingId);
+          }
+        } else {
+          // Refresh stats after successful toggle
+          refreshStats();
+        }
+      });
+    });
+  }, [user, favorites, toggleGlobalFavorite, incrementListingFavoriteCount, decrementListingFavoriteCount, refreshStats]);
 
   if (loading) {
     return (
@@ -392,19 +516,31 @@ export function FixedFeaturedListings({
           paddingHorizontal: theme.spacing.sm,
           gap: theme.spacing.sm,
         }}>
-        {listings.map((listing) => (
-          <View key={listing.id} style={{ width: '48%' }}>
-            <MinimalPremiumProductCard
-              image={listing.images}
-              title={listing.title}
-              price={listing.price}
-              currency={listing.currency}
-              seller={listing.seller}
-              location={listing.location}
-              onPress={() => handleListingPress(listing.id)}
-            />
-          </View>
-        ))}
+        {listings.map((listing) => {
+          const isFavorited = favorites[listing.id] || false;
+          const favCount = listingFavoriteCounts[listing.id] ?? 0;
+          const views = viewCounts[listing.id] || 0;
+          const isOwnListing = user?.id === listing.seller.id;
+
+          return (
+            <View key={listing.id} style={{ width: '48%' }}>
+              <MinimalPremiumProductCard
+                listingId={listing.id}
+                image={listing.images}
+                title={listing.title}
+                price={listing.price}
+                currency={listing.currency}
+                seller={listing.seller}
+                location={listing.location}
+                viewCount={views}
+                favoritesCount={favCount}
+                isFavorited={isFavorited}
+                onFavoritePress={isOwnListing ? undefined : () => handleFavoriteToggle(listing.id, listing.seller.id)}
+                onPress={() => handleListingPress(listing.id)}
+              />
+            </View>
+          );
+        })}
         </View>
       );
     }
@@ -419,19 +555,31 @@ export function FixedFeaturedListings({
           gap: theme.spacing.sm - 5,
         }}
       >
-        {listings.map((listing) => (
-          <View key={listing.id} style={{ width: 190 }}>
-            <MinimalPremiumProductCard
-              image={listing.images}
-              title={listing.title}
-              price={listing.price}
-              currency={listing.currency}
-              seller={listing.seller}
-              location={listing.location}
-              onPress={() => handleListingPress(listing.id)}
-            />
-          </View>
-        ))}
+        {listings.map((listing) => {
+          const isFavorited = favorites[listing.id] || false;
+          const favCount = listingFavoriteCounts[listing.id] ?? 0;
+          const views = viewCounts[listing.id] || 0;
+          const isOwnListing = user?.id === listing.seller.id;
+
+          return (
+            <View key={listing.id} style={{ width: 190 }}>
+              <MinimalPremiumProductCard
+                listingId={listing.id}
+                image={listing.images}
+                title={listing.title}
+                price={listing.price}
+                currency={listing.currency}
+                seller={listing.seller}
+                location={listing.location}
+                viewCount={views}
+                favoritesCount={favCount}
+                isFavorited={isFavorited}
+                onFavoritePress={isOwnListing ? undefined : () => handleFavoriteToggle(listing.id, listing.seller.id)}
+                onPress={() => handleListingPress(listing.id)}
+              />
+            </View>
+          );
+        })}
       </ScrollView>
     );
   };

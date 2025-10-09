@@ -339,10 +339,22 @@ const RecommendationSection = memo(function RecommendationSection({
               return null;
             }
             
-            // Determine badge based on status
-            const badge = item.status === 'reserved' 
-              ? { text: 'Reserved', variant: 'warning' as const }
-              : undefined;
+            // ✅ Use pre-computed is_sellar_pro flag (optimal performance)
+            const isSellarPro = item.is_sellar_pro === true;
+            
+            // Determine badge based on status (Priority: Reserved > Urgent > Spotlight > Boosted > PRO)
+            let badge;
+            if (item.status === 'reserved') {
+              badge = { text: 'Reserved', variant: 'warning' as const };
+            } else if (item.urgent_until && new Date(item.urgent_until) > new Date()) {
+              badge = { text: 'Urgent Sale', variant: 'urgent' as const };
+            } else if (item.spotlight_until && new Date(item.spotlight_until) > new Date()) {
+              badge = { text: 'Spotlight', variant: 'spotlight' as const };
+            } else if (item.boost_until && new Date(item.boost_until) > new Date()) {
+              badge = { text: 'Boosted', variant: 'featured' as const };
+            } else if (isSellarPro) {
+              badge = { text: '⭐ PRO', variant: 'primary' as const };
+            }
             
             return (
               <View key={item.listing_id} style={{ position: 'relative' }}>
@@ -397,10 +409,22 @@ const RecommendationSection = memo(function RecommendationSection({
               return null;
             }
             
-            // Determine badge based on status
-            const badge = item.status === 'reserved' 
-              ? { text: 'Reserved', variant: 'warning' as const }
-              : undefined;
+            // ✅ Use pre-computed is_sellar_pro flag (optimal performance)
+            const isSellarPro = item.is_sellar_pro === true;
+            
+            // Determine badge based on status (Priority: Reserved > Urgent > Spotlight > Boosted > PRO)
+            let badge;
+            if (item.status === 'reserved') {
+              badge = { text: 'Reserved', variant: 'warning' as const };
+            } else if (item.urgent_until && new Date(item.urgent_until) > new Date()) {
+              badge = { text: 'Urgent Sale', variant: 'urgent' as const };
+            } else if (item.spotlight_until && new Date(item.spotlight_until) > new Date()) {
+              badge = { text: 'Spotlight', variant: 'spotlight' as const };
+            } else if (item.boost_until && new Date(item.boost_until) > new Date()) {
+              badge = { text: 'Boosted', variant: 'featured' as const };
+            } else if (isSellarPro) {
+              badge = { text: '⭐ PRO', variant: 'primary' as const };
+            }
             
             return (
               <View key={item.listing_id} style={{ width: 190 }}>

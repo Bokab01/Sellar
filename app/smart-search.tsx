@@ -232,16 +232,19 @@ export default function SmartSearchScreen() {
   const handleSuggestionPress = async (suggestion: SearchSuggestion) => {
     const query = suggestion.title.replace('Search for "', '').replace('"', '');
     
-    // Add to recent searches with AsyncStorage persistence
-    await addToRecentSearches(query);
-
-    // Record search history in recommendation system
-    await recordSearchHistory(query, {
-      suggestionType: suggestion.type,
-      suggestionId: suggestion.id
+    // Add to recent searches and record history in background (non-blocking)
+    // This prevents lag during navigation
+    Promise.all([
+      addToRecentSearches(query),
+      recordSearchHistory(query, {
+        suggestionType: suggestion.type,
+        suggestionId: suggestion.id
+      })
+    ]).catch(error => {
+      console.error('Failed to record search history:', error);
     });
 
-    // Navigate to search results with different parameters based on suggestion type
+    // Navigate to search results immediately (don't wait for history recording)
     if (suggestion.type === 'category') {
       // For category suggestions, pass the category ID and name (NO search query)
       const categoryId = suggestion.id.replace('category-', '');
@@ -340,10 +343,12 @@ export default function SmartSearchScreen() {
             placeholder="Search for anything..."
             onSearch={async (query, filters) => {
               if (query.trim()) {
-                // Record search history
-                await recordSearchHistory(query, filters);
+                // Record search history in background (non-blocking)
+                recordSearchHistory(query, filters).catch(error => {
+                  console.error('Failed to record search history:', error);
+                });
                 
-                // Navigate to search results
+                // Navigate to search results immediately
                 router.push({
                   pathname: '/search',
                   params: { q: query }

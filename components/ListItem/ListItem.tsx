@@ -95,17 +95,25 @@ export function ListItem({
             marginBottom: subtitle || description ? theme.spacing.xs : 0,
           }}
         >
-          <Text
-            variant="body"
-            numberOfLines={1}
-            style={{
-              flex: 1,
-              fontWeight: unreadCount ? '600' : '500',
-              marginRight: unreadCount ? theme.spacing.lg : theme.spacing.sm,
-            }}
-          >
-            {title}
-          </Text>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs, marginRight: unreadCount ? theme.spacing.lg : theme.spacing.sm }}>
+            <Text
+              variant="body"
+              numberOfLines={1}
+              style={{
+                fontWeight: unreadCount ? '600' : '500',
+              }}
+            >
+              {title}
+            </Text>
+            {/* ✅ PRO Badge inline with title */}
+            {badge && (
+              <Badge
+                text={badge.text}
+                variant={badge.variant}
+                size="xs"
+              />
+            )}
+          </View>
 
           {timestamp && (
             <Text
@@ -123,20 +131,10 @@ export function ListItem({
             variant="bodySmall"
             color="secondary"
             numberOfLines={1}
-            style={{ marginBottom: description || badge ? theme.spacing.xs : 0 }}
+            style={{ marginBottom: description ? theme.spacing.xs : 0 }}
           >
             {subtitle}
           </Text>
-        )}
-
-        {badge && (
-          <View style={{ marginTop: theme.spacing.xs, alignSelf: 'flex-start' }}>
-            <Badge
-              text={badge.text}
-              variant={badge.variant}
-              size="sm"
-            />
-          </View>
         )}
 
         {description && (

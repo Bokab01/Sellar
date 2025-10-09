@@ -235,18 +235,22 @@ export function usePushNotifications() {
    */
   const setupNotificationListeners = () => {
     try {
-      // Clean up existing listeners
+      // Clean up existing listeners to prevent duplicates
       if (notificationListener.current) {
+        console.log('Removing existing notification listener before setup');
         notificationListener.current.remove();
+        notificationListener.current = null;
       }
       if (responseListener.current) {
+        console.log('Removing existing response listener before setup');
         responseListener.current.remove();
+        responseListener.current = null;
       }
 
       // Handle notifications received while app is in foreground
       notificationListener.current = pushNotificationService.addNotificationReceivedListener(
         (notification) => {
-          console.log('Notification received in foreground:', notification);
+          console.log('🔔 Notification received in foreground:', notification.request.identifier);
           
           // Check quiet hours before showing in-app notification
           if (isInQuietHours()) {
@@ -262,7 +266,7 @@ export function usePushNotifications() {
       // Handle notification responses (user tapped notification)
       responseListener.current = pushNotificationService.addNotificationResponseReceivedListener(
         (response) => {
-          console.log('Notification response:', response);
+          console.log('👆 Notification response:', response.notification.request.identifier);
           try {
             handleNotificationResponse(response);
           } catch (error) {
@@ -270,6 +274,8 @@ export function usePushNotifications() {
           }
         }
       );
+
+      console.log('✅ Notification listeners setup completed');
     } catch (error) {
       console.error('Error setting up notification listeners:', error);
     }
@@ -280,13 +286,16 @@ export function usePushNotifications() {
    */
   const setupTokenRefreshListener = () => {
     try {
+      // Clean up existing listener to prevent duplicates
       if (tokenRefreshListener.current) {
+        console.log('Removing existing token refresh listener before setup');
         tokenRefreshListener.current.remove();
+        tokenRefreshListener.current = null;
       }
 
       // Listen for token refresh events
       tokenRefreshListener.current = Notifications.addPushTokenListener(async (tokenData) => {
-        console.log('Push token refreshed:', tokenData.data);
+        console.log('🔄 Push token refreshed:', tokenData.data);
         
         if (tokenData.data !== pushToken) {
           setPushToken(tokenData.data);
@@ -303,6 +312,8 @@ export function usePushNotifications() {
           }
         }
       });
+
+      console.log('✅ Token refresh listener setup completed');
     } catch (error) {
       console.error('Error setting up token refresh listener:', error);
     }
@@ -488,23 +499,36 @@ export function usePushNotifications() {
    * Update notification preferences
    */
   const updatePreferences = async (newPreferences: Partial<NotificationPreferences>) => {
-    if (!user) return;
+    if (!user) {
+      console.error('❌ Cannot update preferences: No user');
+      return false;
+    }
 
     try {
+      console.log('🔄 Updating notification preferences:', newPreferences);
+      
       const { data, error } = await dbHelpers.updateNotificationPreferences(
         user.id,
         newPreferences
       );
       
+      console.log('📦 RPC Response - Data:', data, 'Error:', error);
+      
       if (error) {
-        console.error('Failed to update notification preferences:', error);
+        console.error('❌ Failed to update notification preferences:', error);
         return false;
-      } else {
-        setPreferences(data);
-        return true;
       }
+      
+      if (!data) {
+        console.error('❌ No data returned from RPC');
+        return false;
+      }
+      
+      console.log('✅ Preferences updated successfully:', data);
+      setPreferences(data);
+      return true;
     } catch (err) {
-      console.error('Error updating notification preferences:', err);
+      console.error('❌ Error updating notification preferences:', err);
       return false;
     }
   };
@@ -548,11 +572,18 @@ export function usePushNotifications() {
 
   /**
    * Send a test notification
+   * Note: This respects the push_enabled preference
    */
   const sendTestNotification = async () => {
     if (!user) return;
 
     try {
+      // Check if push notifications are enabled
+      if (!preferences?.push_enabled) {
+        console.log('⚠️ Test notification blocked: Push notifications are disabled');
+        throw new Error('Push notifications are disabled. Please enable them to send a test notification.');
+      }
+
       await pushNotificationService.scheduleLocalNotification({
         type: 'test',
         title: 'Test Notification',
@@ -561,6 +592,7 @@ export function usePushNotifications() {
       });
     } catch (err) {
       console.error('Error sending test notification:', err);
+      throw err; // Re-throw so the UI can handle it
     }
   };
 
@@ -630,6 +662,39 @@ export function usePushNotifications() {
       console.error('Error during cleanup:', err);
     }
   };
+
+  /**
+   * Critical: Cleanup all listeners on unmount to prevent duplicate notifications
+   */
+  useEffect(() => {
+    return () => {
+      console.log('🧹 Cleaning up notification listeners on unmount');
+      
+      // Clear initialization timeout
+      if (initializationTimeoutRef.current) {
+        clearTimeout(initializationTimeoutRef.current);
+        initializationTimeoutRef.current = null;
+      }
+      
+      // Remove all listeners synchronously
+      if (notificationListener.current) {
+        notificationListener.current.remove();
+        notificationListener.current = null;
+      }
+      if (responseListener.current) {
+        responseListener.current.remove();
+        responseListener.current = null;
+      }
+      if (tokenRefreshListener.current) {
+        tokenRefreshListener.current.remove();
+        tokenRefreshListener.current = null;
+      }
+      if (appStateListener.current) {
+        appStateListener.current.remove();
+        appStateListener.current = null;
+      }
+    };
+  }, []); // Empty dependency array - runs only on mount/unmount
 
   return {
     // State

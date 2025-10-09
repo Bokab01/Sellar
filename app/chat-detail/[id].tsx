@@ -307,7 +307,24 @@ export default function ChatScreen() {
         const otherParticipant = conv.participant_1_profile?.id === user!.id 
           ? conv.participant_2_profile 
           : conv.participant_1_profile;
-        setOtherUser(otherParticipant);
+        
+        // ✅ Check if other user has active Sellar Pro subscription
+        if (otherParticipant?.id) {
+          const { data: subscription } = await supabase
+            .from('user_subscriptions')
+            .select('status, current_period_end, plan_id, subscription_plans(name)')
+            .eq('user_id', otherParticipant.id)
+            .in('status', ['active', 'trialing', 'cancelled'])
+            .single();
+
+          const isSellarPro = subscription && 
+            (subscription as any).subscription_plans?.name === 'Sellar Pro' &&
+            (subscription.current_period_end ? new Date(subscription.current_period_end) > new Date() : true);
+
+          setOtherUser({ ...otherParticipant, is_sellar_pro: isSellarPro });
+        } else {
+          setOtherUser(otherParticipant);
+        }
         
         // Check for existing transaction
         await checkExistingTransaction(conv.listing?.id);
@@ -959,7 +976,19 @@ export default function ChatScreen() {
   return (
     <SafeAreaWrapper style={{ flex: 1 }}>
       <AppHeader
-        title={otherUser ? getDisplayName(otherUser, false).displayName : 'Chat'}
+        title={
+          otherUser ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+              <Text variant="body" style={{ fontWeight: '600', fontSize: 16 }}>
+                {getDisplayName(otherUser, false).displayName}
+              </Text>
+              {/* ✅ PRO Badge after name */}
+              {otherUser.is_sellar_pro && (
+                <Badge text="⭐ PRO" variant="primary" size="xs" />
+              )}
+            </View>
+          ) : 'Chat'
+        }
         subtitle={otherUser ? lastSeenText : ''}
         showBackButton
         onBackPress={() => router.back()}

@@ -19,7 +19,7 @@ import {
   Chip,
 } from '@/components';
 import { useAppStore } from '@/store/useAppStore';
-import { SlidersHorizontal, ArrowUpDown, Check } from 'lucide-react-native';
+import { SlidersHorizontal, ArrowUpDown, Check, MapPin } from 'lucide-react-native';
 
 export default function SearchResultsScreen() {
   const { theme } = useTheme();
@@ -35,6 +35,7 @@ export default function SearchResultsScreen() {
     setFilters,
     selectedCategories,
     setSelectedCategories,
+    setSearchQuery: setGlobalSearchQuery,
   } = useAppStore();
 
   // Memoize useListings parameters to prevent unnecessary re-fetches
@@ -45,9 +46,10 @@ export default function SearchResultsScreen() {
     priceMin: filters.priceRange.min,
     priceMax: filters.priceRange.max,
     attributeFilters: filters.attributeFilters, // Use new dynamic attribute filters
+    sortBy: filters.sortBy || 'newest', // Add sorting
     // Add performance optimizations for "Other" category
     limit: categoryId === '00000000-0000-4000-8000-000000000000' ? 50 : undefined, // Limit results for "Other" category
-  }), [searchQuery, filters.categories, filters.location, filters.priceRange.min, filters.priceRange.max, filters.attributeFilters, categoryId]);
+  }), [searchQuery, filters.categories, filters.location, filters.priceRange.min, filters.priceRange.max, filters.attributeFilters, filters.sortBy, categoryId]);
 
   const { 
     listings: products, 
@@ -74,10 +76,10 @@ export default function SearchResultsScreen() {
     }, [filters, refresh])
   );
 
-  // Clear filters when leaving the search screen to prevent them from affecting home screen
+  // Clear filters and search query when leaving the search screen to prevent them from affecting home screen
   useEffect(() => {
     return () => {
-      // Cleanup: Reset filters when unmounting
+      // Cleanup: Reset filters and search query when unmounting
       setFilters({
         categories: [],
         priceRange: { min: undefined, max: undefined },
@@ -86,8 +88,9 @@ export default function SearchResultsScreen() {
         sortBy: 'newest',
         attributeFilters: {},
       });
+      setGlobalSearchQuery(''); // Clear search query from global store
     };
-  }, []);
+  }, [setFilters, setGlobalSearchQuery]);
 
   // Get listing IDs for stats
   const listingIds = products.map(product => product.id).filter(Boolean);
@@ -132,10 +135,25 @@ export default function SearchResultsScreen() {
 
   // Update search when query param changes
   useEffect(() => {
-    if (initialQuery) {
+    if (initialQuery && initialQuery !== searchQuery) {
       setSearchQuery(initialQuery);
+      // Sync to global store immediately when URL param changes
+      setGlobalSearchQuery(initialQuery);
     }
-  }, [initialQuery]);
+  }, [initialQuery, setGlobalSearchQuery]);
+
+  // Sync local search query to global store when user types (but not on initial mount)
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    // Skip on initial mount - the previous effect already handled initialQuery
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    // Only sync when user actively changes the search query
+    setGlobalSearchQuery(searchQuery);
+  }, [searchQuery, setGlobalSearchQuery]);
 
   // Transform database listings to component format - memoized for performance
   const transformedProducts = useMemo(() => {
@@ -143,16 +161,21 @@ export default function SearchResultsScreen() {
       // For "Other" category, we might not have joined profile data, so handle gracefully
       const seller = listing.profiles || null;
       
+      // ✅ Use pre-computed is_sellar_pro flag from database view (optimal performance)
+      const isSellarPro = listing.is_sellar_pro === true;
+      
       // Determine the highest priority badge (only show ONE badge per listing)
       let primaryBadge = null;
       
-      // Priority order: Urgent > Spotlight > Boosted > Business > Verified
+      // Priority order: Urgent > Spotlight > Boosted > PRO > Business > Verified
       if (listing.urgent_until && new Date(listing.urgent_until) > new Date()) {
         primaryBadge = { text: 'Urgent Sale', variant: 'urgent' as const };
       } else if (listing.spotlight_until && new Date(listing.spotlight_until) > new Date()) {
         primaryBadge = { text: 'Spotlight', variant: 'spotlight' as const };
       } else if (listing.boost_until && new Date(listing.boost_until) > new Date()) {
         primaryBadge = { text: 'Boosted', variant: 'featured' as const };
+      } else if (isSellarPro) {
+        primaryBadge = { text: '⭐ PRO', variant: 'primary' as const };
       } else if (seller?.account_type === 'business') {
         primaryBadge = { text: 'Business', variant: 'info' as const };
       } else if (seller?.verification_status === 'verified') {
@@ -181,9 +204,28 @@ export default function SearchResultsScreen() {
   }, [products]);
 
   const handleClearSearch = useCallback(() => {
+    // Clear local search query
     setSearchQuery('');
+    
+    // Clear all filters (not just categories)
+    setFilters({
+      categories: [],
+      priceRange: { min: undefined, max: undefined },
+      condition: [],
+      location: '',
+      sortBy: 'newest',
+      attributeFilters: {},
+    });
+    
+    // Clear selected categories
     setSelectedCategories([]);
-  }, [setSelectedCategories]);
+    
+    // Clear global search query
+    setGlobalSearchQuery('');
+    
+    // Stay on search results screen so user can search for something else
+    // (Don't navigate back)
+  }, [setSelectedCategories, setFilters, setGlobalSearchQuery]);
 
   // Memoize header title to prevent unnecessary re-renders
   const headerTitle = useMemo(() => {
@@ -219,7 +261,6 @@ export default function SearchResultsScreen() {
       <SearchBar
         value={searchQuery}
         onChangeText={setSearchQuery}
-        onFilter={handleFilterPress}
         onClear={searchQuery ? handleClearSearch : undefined}
         placeholder="Search for anything..."
       />
@@ -262,7 +303,7 @@ export default function SearchResultsScreen() {
 
         {/* Sort By Button */}
         <TouchableOpacity
-          onPress={handleFilterPress}
+          onPress={() => router.push('/filter-sort')}
           style={{
             flexDirection: 'row',
             alignItems: 'center',
@@ -275,8 +316,12 @@ export default function SearchResultsScreen() {
             gap: theme.spacing.xs,
           }}
         >
+          <ArrowUpDown 
+            size={16} 
+            color={filters.sortBy !== 'newest' ? theme.colors.primary : theme.colors.text.primary} 
+          />
           {filters.sortBy !== 'newest' && (
-            <Check size={16} color={theme.colors.primary} />
+            <Check size={14} color={theme.colors.primary} />
           )}
           <Text 
             variant="bodySmall" 
@@ -286,6 +331,77 @@ export default function SearchResultsScreen() {
             }}
           >
             Sort by
+          </Text>
+        </TouchableOpacity>
+
+        {/* Location Button */}
+        <TouchableOpacity
+          onPress={() => router.push('/filter-location')}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: theme.spacing.md,
+            paddingVertical: theme.spacing.sm,
+            borderRadius: theme.borderRadius.full,
+            borderWidth: 1,
+            borderColor: filters.location ? theme.colors.primary : theme.colors.border,
+            backgroundColor: filters.location ? theme.colors.primary + '10' : theme.colors.surface,
+            gap: theme.spacing.xs,
+          }}
+        >
+          <MapPin 
+            size={16} 
+            color={filters.location ? theme.colors.primary : theme.colors.text.primary} 
+          />
+          {filters.location && (
+            <Check size={14} color={theme.colors.primary} />
+          )}
+          <Text 
+            variant="bodySmall" 
+            style={{ 
+              fontWeight: '500',
+              color: filters.location ? theme.colors.primary : theme.colors.text.primary 
+            }}
+          >
+            Location
+          </Text>
+        </TouchableOpacity>
+
+        {/* Price Button */}
+        <TouchableOpacity
+          onPress={() => router.push('/filter-price')}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: theme.spacing.md,
+            paddingVertical: theme.spacing.sm,
+            borderRadius: theme.borderRadius.full,
+            borderWidth: 1,
+            borderColor: (filters.priceRange.min || filters.priceRange.max) ? theme.colors.primary : theme.colors.border,
+            backgroundColor: (filters.priceRange.min || filters.priceRange.max) ? theme.colors.primary + '10' : theme.colors.surface,
+            gap: theme.spacing.xs,
+          }}
+        >
+          <Text 
+            style={{ 
+              fontSize: 16,
+              fontWeight: '600',
+              color: (filters.priceRange.min || filters.priceRange.max) ? theme.colors.primary : theme.colors.text.primary 
+            }}
+          >
+            ₵
+          </Text>
+          {(filters.priceRange.min || filters.priceRange.max) && (
+            <Check size={14} color={theme.colors.primary} />
+          )}
+          <Text 
+            variant="bodySmall" 
+            style={{ 
+              fontWeight: '500',
+              color: (filters.priceRange.min || filters.priceRange.max) ? theme.colors.primary : theme.colors.text.primary 
+            }}
+          >
+            Price
           </Text>
         </TouchableOpacity>
 

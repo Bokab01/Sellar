@@ -57,7 +57,7 @@ const ListingItem = React.memo(({
   settings, 
   userListings, 
   toggleAutoRefreshForListing, 
-  updating, 
+  updatingListingId, 
   formatNextRefresh, 
   formatTimeRemaining 
 }: { 
@@ -67,7 +67,7 @@ const ListingItem = React.memo(({
   settings: AutoRefreshSettings;
   userListings: UserListing[];
   toggleAutoRefreshForListing: (id: string) => void;
-  updating: boolean;
+  updatingListingId: string | null;
   formatNextRefresh: (date: string) => string;
   formatTimeRemaining: (date: string) => string;
 }) => {
@@ -182,13 +182,13 @@ const ListingItem = React.memo(({
           style={{
             minWidth: 80,
           }}
-          disabled={updating}
+          disabled={updatingListingId === listing.id}
         >
           <Text variant="caption" style={{
             color: hasAutoRefresh ? theme.colors.primary : theme.colors.surface,
             fontWeight: '600',
           }}>
-            {hasAutoRefresh ? 'Disable' : 'Enable'}
+            {updatingListingId === listing.id ? '...' : (hasAutoRefresh ? 'Disable' : 'Enable')}
           </Text>
         </Button>
       </View>
@@ -213,6 +213,8 @@ export default function AutoBoostDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updating, setUpdating] = useState(false);
+  // ✅ FIX: Track which specific listing is being updated to prevent all buttons from flashing
+  const [updatingListingId, setUpdatingListingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMoreData, setHasMoreData] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -337,7 +339,8 @@ export default function AutoBoostDashboard() {
   const toggleAutoRefreshForListing = useCallback(async (listingId: string) => {
     if (!user) return;
     
-    setUpdating(true);
+    // ✅ FIX: Set updating state for specific listing only
+    setUpdatingListingId(listingId);
     try {
       const existingAutoRefresh = settings.activeListings.find(
         listing => listing.listingId === listingId && listing.hasAutoRefresh
@@ -402,7 +405,8 @@ export default function AutoBoostDashboard() {
       console.error('Error toggling auto-refresh:', error);
       Alert.alert('Error', 'Failed to update auto-refresh for this listing.');
     } finally {
-      setUpdating(false);
+      // ✅ FIX: Clear specific listing updating state
+      setUpdatingListingId(null);
     }
   }, [user, settings.activeListings]);
 
@@ -802,7 +806,7 @@ export default function AutoBoostDashboard() {
           settings={settings}
           userListings={userListings}
           toggleAutoRefreshForListing={toggleAutoRefreshForListing}
-          updating={updating}
+          updatingListingId={updatingListingId}
           formatNextRefresh={formatNextRefresh}
           formatTimeRemaining={formatTimeRemaining}
         />
@@ -810,7 +814,7 @@ export default function AutoBoostDashboard() {
     }
 
     return null;
-  }, [theme, getActiveListingsCount, getTotalListingsCount, settings, userListings, toggleAutoRefreshForListing, updating, formatNextRefresh, formatTimeRemaining]);
+  }, [theme, getActiveListingsCount, getTotalListingsCount, settings, userListings, toggleAutoRefreshForListing, updatingListingId, formatNextRefresh, formatTimeRemaining]);
 
   const flatListData = useMemo(() => {
     const data = [];

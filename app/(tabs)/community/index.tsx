@@ -221,6 +221,7 @@ export default function CommunityScreen() {
         isVerified: Boolean(post.profiles?.is_verified),
         location: post.profiles?.location || null,
         profile: post.profiles || null,
+        is_sellar_pro: Boolean(post.author_is_sellar_pro), // ✅ Sellar Pro status
       },
       timestamp: new Date(post.created_at || new Date()).toLocaleString(),
       content: post.content || '',

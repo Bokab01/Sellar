@@ -120,7 +120,7 @@ export const CategoryAttributesForm: React.FC<CategoryAttributesFormProps> = ({
           <View style={styles.fieldContainer}>
             <Text style={[styles.label, { color: theme.colors.text.primary }]}>
               {attribute.label}
-              {attribute.is_required && <Text style={styles.required}> *</Text>}
+              {attribute.is_required && <Text style={{ color: theme.colors.text.secondary }}> *</Text>}
             </Text>
             {attribute.help_text && (
               <Text style={[styles.helpText, { color: theme.colors.textSecondary }]}>
@@ -164,7 +164,7 @@ export const CategoryAttributesForm: React.FC<CategoryAttributesFormProps> = ({
           <View style={styles.fieldContainer}>
             <Text style={[styles.label, { color: theme.colors.text.primary }]}>
               {attribute.label}
-              {attribute.is_required && <Text style={styles.required}> *</Text>}
+              {attribute.is_required && <Text style={{ color: theme.colors.text.secondary }}> *</Text>}
             </Text>
             {attribute.help_text && (
               <Text style={[styles.helpText, { color: theme.colors.textSecondary }]}>
@@ -226,7 +226,7 @@ export const CategoryAttributesForm: React.FC<CategoryAttributesFormProps> = ({
                   onPress={() => onChange(attribute.slug, !value)}
                 >
                   {attribute.label}
-                  {attribute.is_required && <Text style={styles.required}> *</Text>}
+                  {attribute.is_required && <Text style={{ color: theme.colors.text.secondary }}> *</Text>}
                 </Text>
                 {attribute.help_text && (
                   <Text style={[styles.helpText, { color: theme.colors.textSecondary }]}>
@@ -248,7 +248,7 @@ export const CategoryAttributesForm: React.FC<CategoryAttributesFormProps> = ({
           <View style={styles.fieldContainer}>
             <Text style={[styles.label, { color: theme.colors.text.primary }]}>
               {attribute.label}
-              {attribute.is_required && <Text style={styles.required}> *</Text>}
+              {attribute.is_required && <Text style={{ color: theme.colors.text.secondary }}> *</Text>}
             </Text>
             {attribute.help_text && (
               <Text style={[styles.helpText, { color: theme.colors.textSecondary }]}>
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   required: {
-    color: '#EF4444',
+    // Asterisk color removed - will inherit from parent label color
   },
   helpText: {
     fontSize: 12,

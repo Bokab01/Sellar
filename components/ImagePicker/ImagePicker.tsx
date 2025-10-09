@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, TouchableOpacity, Image, Alert, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { Button } from '@/components/Button/Button';
@@ -9,7 +10,7 @@ import { useImageUpload } from '@/hooks/useImageUpload';
 import * as ImagePicker from 'expo-image-picker';
 import { VideoView, useVideoPlayer } from 'expo-video';
 
-import { Camera, Image as ImageIcon, X, Plus, Play } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, X, Plus, Play, Video } from 'lucide-react-native';
 
 export interface SelectedImage {
   uri: string;
@@ -227,7 +228,7 @@ export function CustomImagePicker({
     }
   };
 
-  const pickFromCamera = async () => {
+  const pickFromCamera = async (captureMode: 'photo' | 'video' = 'photo') => {
     setShowPicker(false);
     
     const hasPermission = await requestPermissions('camera');
@@ -240,11 +241,11 @@ export function CustomImagePicker({
 
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: allowVideos && isSellarPro ? ['images', 'videos'] : ['images'],
-        allowsEditing: !allowVideos, // Disable editing for videos
-        aspect: allowVideos ? undefined : undefined, // Allow flexible aspect ratio
-        videoMaxDuration: allowVideos ? maxVideoDuration : undefined,
-        videoQuality: allowVideos ? 0 : undefined, // 0 = low quality (compressed), 1 = high quality
+        mediaTypes: captureMode === 'video' ? ['videos'] : ['images'],
+        allowsEditing: captureMode === 'photo', // Only allow editing for photos
+        aspect: undefined, // Allow flexible aspect ratio
+        videoMaxDuration: captureMode === 'video' ? maxVideoDuration : undefined,
+        videoQuality: captureMode === 'video' ? 0 : undefined, // 0 = low quality (compressed), 1 = high quality
         quality: 0.8,
         exif: false, // Don't include EXIF data to reduce file size
       });
@@ -320,9 +321,12 @@ export function CustomImagePicker({
       return;
     }
 
+    // Check if a video already exists
+    const hasVideo = value.some(item => item.mediaType === 'video');
+
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: allowVideos && isSellarPro ? ['images', 'videos'] : ['images'],
+        mediaTypes: allowVideos && isSellarPro && !hasVideo ? ImagePicker.MediaTypeOptions.All : ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: true, // Always allow multiple selection
         selectionLimit: Math.max(1, limit - value.length), // Only allow selecting up to remaining slots
         quality: 0.8,
@@ -610,32 +614,69 @@ export function CustomImagePicker({
         size="sm"
         position="bottom"
       >
-        <View style={{ gap: theme.spacing.lg }}>
-          <Text variant="body" color="secondary" style={{ 
-            textAlign: 'center', 
-            lineHeight: 22,
-            marginBottom: theme.spacing.md,
-          }}>
-            {limit > 1 
-              ? `Choose how you'd like to add ${allowVideos ? 'photos or videos' : 'images'} (up to ${limit - value.length} more)`
-              : `Choose how you'd like to add ${allowVideos ? 'a photo or video' : 'an image'}`
-            }
-          </Text>
+        <SafeAreaView edges={['bottom']} style={{ paddingHorizontal: theme.spacing.lg }}>
+          <View style={{ gap: theme.spacing.lg }}>
+            <Text variant="body" color="secondary" style={{ 
+              textAlign: 'center', 
+              lineHeight: 22,
+              marginBottom: theme.spacing.md,
+            }}>
+              {limit > 1 
+                ? `Choose how you'd like to add ${allowVideos ? 'photos or a video' : 'images'} (up to ${limit - value.length} more)`
+                : `Choose how you'd like to add ${allowVideos ? 'a photo or video' : 'an image'}`
+              }
+            </Text>
 
-          <View style={{ gap: theme.spacing.md }}>
-            <Button
-              variant="primary"
-              icon={<Camera size={20} color={theme.colors.primaryForeground} />}
-              onPress={pickFromCamera}
-              fullWidth
-              size="lg"
-              style={{
-                paddingVertical: theme.spacing.lg,
-                ...theme.shadows.md,
-              }}
-            >
-              {allowVideos && isSellarPro ? 'Take Photo or Video' : 'Take Photo'}
-            </Button>
+            <View style={{ gap: theme.spacing.md }}>
+            {allowVideos && isSellarPro ? (
+              // Show separate buttons for Photo and Video for Sellar Pro users
+              <>
+                <Button
+                  variant="primary"
+                  icon={<Camera size={20} color={theme.colors.primaryForeground} />}
+                  onPress={() => pickFromCamera('photo')}
+                  fullWidth
+                  size="lg"
+                  style={{
+                    paddingVertical: theme.spacing.lg,
+                    
+                  }}
+                  disabled={value.length >= limit}
+                >
+                  Take Photo
+                </Button>
+
+                <Button
+                  variant="outline"
+                  icon={<Video size={20} color={theme.colors.primaryForeground} />}
+                  onPress={() => pickFromCamera('video')}
+                  fullWidth
+                  size="lg"
+                  style={{
+                    paddingVertical: theme.spacing.lg,
+                    borderColor: theme.colors.primary,
+                   
+                  }}
+                  disabled={value.length >= limit || value.some(item => item.mediaType === 'video')}
+                >
+                  {value.some(item => item.mediaType === 'video') ? 'Video Added (Max 1)' : 'Record Video'}
+                </Button>
+              </>
+            ) : (
+              // Show single button for free users
+              <Button
+                variant="primary"
+                icon={<Camera size={20} color={theme.colors.primaryForeground} />}
+                onPress={() => pickFromCamera('photo')}
+                fullWidth
+                size="lg"
+                style={{
+                  paddingVertical: theme.spacing.lg,
+                }}
+              >
+                Take Photo
+              </Button>
+            )}
 
             <Button
               variant="secondary"
@@ -645,36 +686,40 @@ export function CustomImagePicker({
               size="lg"
               style={{
                 paddingVertical: theme.spacing.lg,
-                ...theme.shadows.sm,
+                borderColor: theme.colors.primary,
+                borderWidth: 1,
               }}
             >
               {limit > 1 
-                ? (allowVideos && isSellarPro ? 'Choose Photos & Video' : 'Choose Photos')
+                ? (allowVideos && isSellarPro 
+                    ? (value.some(item => item.mediaType === 'video') ? 'Choose Photos' : 'Choose Photos & Video')
+                    : 'Choose Photos')
                 : 'Choose from Gallery'}
             </Button>
           </View>
 
-          {value.length > 0 && (
-            <View
-              style={{
-                backgroundColor: theme.colors.primary + '10',
-                borderColor: theme.colors.primary + '20',
-                borderWidth: 1,
-                padding: theme.spacing.md,
-                borderRadius: theme.borderRadius.md,
-                marginTop: theme.spacing.sm,
-              }}
-            >
-              <Text variant="bodySmall" style={{ 
-                textAlign: 'center',
-                color: theme.colors.primary,
-                fontWeight: '500',
-              }}>
-                {allowVideos ? '📸🎥' : '📸'} {limit - value.length} more {allowVideos ? 'item' : 'image'}{limit - value.length !== 1 ? 's' : ''} can be added
-              </Text>
-            </View>
-          )}
-        </View>
+            {value.length > 0 && (
+              <View
+                style={{
+                  backgroundColor: theme.colors.primary + '10',
+                  borderColor: theme.colors.primary + '20',
+                  borderWidth: 1,
+                  padding: theme.spacing.md,
+                  borderRadius: theme.borderRadius.md,
+                  marginTop: theme.spacing.sm,
+                }}
+              >
+                <Text variant="bodySmall" style={{ 
+                  textAlign: 'center',
+                  color: theme.colors.primary,
+                  fontWeight: '500',
+                }}>
+                  {allowVideos ? '📸🎥' : '📸'} {limit - value.length} more {allowVideos ? 'item' : 'image'}{limit - value.length !== 1 ? 's' : ''} can be added
+                </Text>
+              </View>
+            )}
+          </View>
+        </SafeAreaView>
       </AppModal>
 
       {/* Error Modal */}

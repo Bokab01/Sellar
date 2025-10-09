@@ -5,6 +5,8 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useListings } from '@/hooks/useListings';
 import { dbHelpers, supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
+import { useMultipleListingStats } from '@/hooks/useListingStats';
+import { useFavoritesStore } from '@/store/useFavoritesStore';
 import * as Haptics from 'expo-haptics';
 import {
   Text,
@@ -134,7 +136,30 @@ export default function MyListingsScreen() {
       let query = supabase
         .from('listings')
         .select(`
-          *,
+          id,
+          user_id,
+          title,
+          description,
+          price,
+          currency,
+          category_id,
+          condition,
+          quantity,
+          location,
+          images,
+          accept_offers,
+          status,
+          boost_until,
+          boost_score,
+          highlight_until,
+          urgent_until,
+          spotlight_until,
+          spotlight_category_id,
+          seo_title,
+          keywords,
+          attributes,
+          created_at,
+          updated_at,
           views_count,
           favorites_count,
           categories (
@@ -143,7 +168,7 @@ export default function MyListingsScreen() {
           )
         `)
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false});
 
       if (activeTab !== 'all') {
         query = query.eq('status', activeTab);
@@ -526,6 +551,18 @@ export default function MyListingsScreen() {
   );
   const canDelete = selectedListingsData.length > 0;
 
+  // ✅ Get real-time view and favorite counts for all listings
+  const listingIds = React.useMemo(() => 
+    filteredListings.map((listing: any) => listing.id), 
+    [filteredListings]
+  );
+  
+  const { viewCounts, refreshStats } = useMultipleListingStats({ 
+    listingIds 
+  });
+  
+  const { listingFavoriteCounts } = useFavoritesStore();
+
   const transformedListings = filteredListings.map((listing: any) => ({
     id: listing.id,
     image: listing.images || ['https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg'],
@@ -539,8 +576,9 @@ export default function MyListingsScreen() {
     badge: getStatusBadge(listing.status),
     location: listing.location,
     status: listing.status,
-    views: listing.views_count || 0,
-    favorites: listing.favorites_count || 0,
+    // ✅ Use real-time counts from hooks instead of stale DB columns
+    views: viewCounts[listing.id] || listing.views_count || 0,
+    favorites: listingFavoriteCounts[listing.id] ?? listing.favorites_count ?? 0,
   }));
 
   return (

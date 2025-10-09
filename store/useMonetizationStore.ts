@@ -60,6 +60,9 @@ interface MonetizationState extends CreditState, SubscriptionState {
   hasAutoBoost: () => boolean;
   hasBusinessPlan: () => boolean;
   getBusinessPlanCreditCost: () => number;
+  
+  // Store management
+  resetStore: () => void;
 }
 
 export const useMonetizationStore = create<MonetizationState>()(
@@ -818,6 +821,25 @@ export const useMonetizationStore = create<MonetizationState>()(
     const BUSINESS_PLAN_PRICE_GHS = 400;
     const CREDIT_RATE = 0.143;
     return Math.ceil(BUSINESS_PLAN_PRICE_GHS / CREDIT_RATE);
+  },
+
+  // ✅ FIX: Reset store to initial state (call on logout)
+  resetStore: () => {
+    set({
+      balance: 0,
+      lifetimeEarned: 0,
+      lifetimeSpent: 0,
+      transactions: [],
+      lastCreditsFetch: null,
+      currentPlan: null,
+      entitlements: {},
+      lastSubscriptionFetch: null,
+      isOnTrial: false,
+      trialEndsAt: null,
+      hasUsedTrial: false,
+      loading: false,
+      error: null,
+    });
   },
 }),
     {

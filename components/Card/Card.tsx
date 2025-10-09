@@ -36,7 +36,7 @@ interface ProductCardProps {
   };
   badge?: {
     text: string;
-    variant?: 'new' | 'sold' | 'featured' | 'discount' | 'info' | 'success' | 'neutral' | 'warning' | 'error' | 'urgent' | 'spotlight';
+    variant?: 'new' | 'sold' | 'featured' | 'discount' | 'info' | 'success' | 'neutral' | 'warning' | 'error' | 'urgent' | 'spotlight' | 'primary';
   };
   onPress?: () => void;
   onSellerPress?: () => void;

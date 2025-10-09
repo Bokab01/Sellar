@@ -41,7 +41,7 @@ interface CategoryAttribute {
 
 export default function FilterProductsScreen() {
   const { theme } = useTheme();
-  const { filters, setFilters } = useAppStore();
+  const { filters, setFilters, searchQuery } = useAppStore();
   
   const [localFilters, setLocalFilters] = useState<FilterOptions>(filters);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -64,6 +64,19 @@ export default function FilterProductsScreen() {
         .from('listings')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'active');
+
+      // ✅ Apply search query filter (if active)
+      if (searchQuery && searchQuery.trim()) {
+        // Split search terms and create OR conditions for each term
+        const searchTerms = searchQuery.trim().split(' ').filter((term: string) => term.trim());
+        if (searchTerms.length > 0) {
+          // Create OR conditions for each search term
+          const searchConditions = searchTerms.map((term: string) => 
+            `title.ilike.%${term}%,description.ilike.%${term}%`
+          ).join(',');
+          query = query.or(searchConditions);
+        }
+      }
 
       // Apply category filter
       if (filterOptions.categories && filterOptions.categories.length > 0) {
@@ -243,10 +256,11 @@ export default function FilterProductsScreen() {
     loadCategories();
   }, []);
 
-  // Fetch listing count whenever filters change
+  // Fetch listing count whenever filters or search query change
   useEffect(() => {
     fetchListingCount(localFilters);
   }, [
+    searchQuery, // ✅ Include search query to update count when filtering search results
     JSON.stringify(localFilters.categories),
     localFilters.priceRange.min,
     localFilters.priceRange.max,
@@ -504,6 +518,30 @@ export default function FilterProductsScreen() {
         contentContainerStyle={{ flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Active Search Context Banner */}
+        {searchQuery && searchQuery.trim() && (
+          <View style={{
+            backgroundColor: theme.colors.primary + '10',
+            borderLeftWidth: 4,
+            borderLeftColor: theme.colors.primary,
+            padding: theme.spacing.md,
+            marginHorizontal: theme.spacing.lg,
+            marginTop: theme.spacing.md,
+            marginBottom: theme.spacing.sm,
+            borderRadius: theme.borderRadius.md,
+          }}>
+            <Text variant="bodySmall" style={{ fontWeight: '600', color: theme.colors.primary, marginBottom: theme.spacing.xs }}>
+              Filtering search results for:
+            </Text>
+            <Text variant="body" style={{ fontWeight: '700', color: theme.colors.text.primary }}>
+              "{searchQuery}"
+            </Text>
+            <Text variant="caption" color="muted" style={{ marginTop: theme.spacing.xs }}>
+              Filters will refine these search results
+            </Text>
+          </View>
+        )}
+
         {/* Sort By */}
         {renderFilterRow('Sort by', getFilterValue('sortBy'), () => {
           // Navigate to sort options screen (to be implemented)

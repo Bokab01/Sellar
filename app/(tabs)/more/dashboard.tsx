@@ -60,6 +60,20 @@ export default function BusinessDashboardScreen() {
   
   const currentTier: 'free' | 'business' = isBusinessUser ? 'business' : 'free';
 
+  // ✅ FIX: Reset state when user changes or tier changes
+  useEffect(() => {
+    // Reset to default state when switching users or tiers
+    setActiveTab('overview');
+    setQuickStats({
+      profileViews: 0,
+      totalMessages: 0,
+      totalReviews: 0,
+      averageRating: 0,
+    });
+    setAnalyticsData(null);
+    setLoading(true);
+  }, [user?.id, currentTier]);
+
   // Available tabs for business users only
   const availableTabs = useMemo((): TabConfig[] => {
     if (currentTier !== 'business') {
@@ -90,10 +104,12 @@ export default function BusinessDashboardScreen() {
     ];
   }, [currentTier]);
 
-  // Load dashboard data - only once on mount
+  // Load dashboard data - reload when user or tier changes
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    if (user) {
+      loadDashboardData();
+    }
+  }, [user?.id, currentTier]);
 
   const loadDashboardData = async () => {
     try {

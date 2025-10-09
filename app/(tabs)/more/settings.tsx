@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, ScrollView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { dbHelpers, supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
 import {
@@ -165,6 +166,8 @@ export default function SettingsScreen() {
               onPress: () => {
                 setShowDeleteAccount(false);
                 setDeleteConfirmText('');
+                // ✅ FIX: Reset monetization store before signing out
+                useMonetizationStore.getState().resetStore();
                 // Sign out the user
                 signOut();
               }
@@ -222,7 +225,7 @@ export default function SettingsScreen() {
     icon, 
     isSelected 
   }: { 
-    mode: 'light' | 'dark' | 'system'; 
+    mode: 'light' | 'dark' | 'amoled' | 'system'; 
     title: string; 
     description: string;
     icon: React.ReactNode;
@@ -306,7 +309,7 @@ export default function SettingsScreen() {
       items: [
         {
           title: 'Theme',
-          subtitle: `Currently using ${themeMode === 'system' ? `System (${isDarkMode ? 'Dark' : 'Light'})` : (themeMode || 'Default')} theme`,
+          subtitle: `Currently using ${themeMode === 'system' ? `System (${isDarkMode ? 'Dark' : 'Light'})` : themeMode === 'amoled' ? 'AMOLED Dark' : (themeMode || 'Default')} theme`,
           icon: <Smartphone size={20} color={theme.colors.text.primary} />,
           rightIcon: (
             <View style={{ 
@@ -333,15 +336,23 @@ export default function SettingsScreen() {
               <ThemeOption
                 mode="dark"
                 title="Dark Theme"
-                description=""
+                description="Elevated cards on dark background"
                 icon={<Moon size={20} color={themeMode === 'dark' ? theme.colors.primary : theme.colors.text.primary} />}
                 isSelected={themeMode === 'dark'}
               />
               
               <ThemeOption
+                mode="amoled"
+                title="AMOLED Dark"
+                description="Pure black for OLED screens"
+                icon={<Moon size={20} color={themeMode === 'amoled' ? theme.colors.primary : theme.colors.text.primary} />}
+                isSelected={themeMode === 'amoled'}
+              />
+              
+              <ThemeOption
                 mode="system"
                 title="System Default"
-                description=""
+                description="Follow device settings"
                 icon={<Smartphone size={20} color={themeMode === 'system' ? theme.colors.primary : theme.colors.text.primary} />}
                 isSelected={themeMode === 'system'}
               />
@@ -354,22 +365,10 @@ export default function SettingsScreen() {
       title: 'Notifications',
       items: [
         {
-          title: 'Push Notifications',
-          subtitle: 'Receive notifications for messages, offers, and updates',
+          title: 'Notification Settings',
+          subtitle: 'Manage all notification preferences',
           icon: <Bell size={20} color={theme.colors.text.primary} />,
-          toggle: {
-            value: settings?.push_notifications ?? true,
-            onToggle: (value: boolean) => updateSetting('push_notifications', value),
-          },
-        },
-        {
-          title: 'Email Notifications',
-          subtitle: 'Receive important updates via email',
-          icon: <MessageCircle size={20} color={theme.colors.text.primary} />,
-          toggle: {
-            value: settings?.email_notifications ?? true,
-            onToggle: (value: boolean) => updateSetting('email_notifications', value),
-          },
+          onPress: () => router.push('/notification-settings'),
         },
       ],
     },
