@@ -134,6 +134,7 @@ function CreateListingScreen() {
   const [showDraftModal, setShowDraftModal] = useState(false);
   const [showExitModal, setShowExitModal] = useState(false);
   const [draftData, setDraftData] = useState<ListingFormData | null>(null);
+  const [showFeatureConfirmModal, setShowFeatureConfirmModal] = useState(false);
   
   // Feature selector state
   const [showFeatureSelector, setShowFeatureSelector] = useState(false);
@@ -536,6 +537,17 @@ function CreateListingScreen() {
   }, [currentStep, saveDraft]);
 
   const handleSubmit = async () => {
+    // If user has selected features, show confirmation modal
+    if (selectedFeatures.length > 0) {
+      setShowFeatureConfirmModal(true);
+      return;
+    }
+    
+    // No features selected, proceed directly
+    await proceedWithPublish();
+  };
+
+  const proceedWithPublish = async () => {
     // Check if payment is needed for additional listings
     const maxListings = getMaxListings();
     const needsCredits = !hasUnlimitedListings() && userListingsCount >= maxListings;
@@ -545,8 +557,50 @@ function CreateListingScreen() {
       return;
     }
 
-    // For free users (no payment), still wrap in try-catch for feature refunds
+    // For users who don't need to pay for the listing slot itself
+    // but may have selected features that need to be paid for
     try {
+      // Calculate feature credits
+      const featureCredits = selectedFeatures.reduce((sum, feature) => sum + (feature.credits || 0), 0);
+      
+      // If features were selected, deduct their credits first
+      if (featureCredits > 0) {
+        console.log(`💳 Deducting ${featureCredits} credits for features...`);
+        
+        // Check if user has enough credits
+        if (balance < featureCredits) {
+          Alert.alert(
+            'Insufficient Credits',
+            `You need ${featureCredits} credits for the selected features but only have ${balance}. Would you like to buy more credits?`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Buy Credits', onPress: () => {
+                try {
+                  router.push('/buy-credits');
+                } catch (error) {
+                  console.error('Navigation error:', error);
+                }
+              }},
+            ]
+          );
+          return;
+        }
+        
+        // Deduct credits for features
+        const result = await spendCredits(featureCredits, 'Listing features', {
+          referenceType: 'listing_creation',
+          features: selectedFeatures.map(f => ({ key: f.key, name: f.name, credits: f.credits })),
+        });
+        
+        if (!result.success) {
+          Alert.alert('Error', result.error || 'Failed to process feature payment');
+          return;
+        }
+        
+        console.log(`✅ Successfully deducted ${featureCredits} credits for features`);
+      }
+      
+      // Now create the listing
       await createListing();
     } catch (listingError) {
       console.log('🔄 Listing creation failed, checking for refunds...');
@@ -554,7 +608,7 @@ function CreateListingScreen() {
       
       // If features were selected, refund them
       if (selectedFeatures.length > 0) {
-        console.log('💰 Refunding features for free user...');
+        console.log('💰 Refunding features...');
         await refundAllCredits(0, 'listing_creation_failed', listingError);
       } else {
         console.log('ℹ️ No features to refund');
@@ -787,6 +841,8 @@ function CreateListingScreen() {
       }
 
       // Apply selected features to the newly created listing
+      // NOTE: Credits for features have already been deducted in handlePayForListing
+      // We just need to apply the features to the listing directly
       if (selectedFeatures.length > 0 && listing) {
         console.log(`Applying ${selectedFeatures.length} features to listing ${listing.id}`);
         
@@ -794,26 +850,74 @@ function CreateListingScreen() {
         
         try {
           for (const feature of selectedFeatures) {
-            const { data, error: featureError } = await supabase.rpc('purchase_feature', {
-              p_user_id: user!.id,
-              p_feature_key: feature.key,
-              p_credits: feature.credits,
-              p_metadata: { listing_id: listing.id },
-            });
+            try {
+              // Apply the feature directly to the listing by updating the appropriate timestamp column
+              // Credits have already been deducted, so we just need to set the expiry dates
+              const now = new Date();
+              let updateData: Record<string, any> = {};
+              
+              // Map feature keys to listing columns and durations
+              switch (feature.key) {
+                case 'pulse_boost_24h':
+                  updateData.boost_until = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+                  break;
+                case 'mega_pulse_7d':
+                  updateData.boost_until = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+                  break;
+                case 'category_spotlight_3d':
+                  updateData.spotlight_until = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString();
+                  break;
+                case 'listing_highlight':
+                  updateData.highlight_until = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+                  break;
+                case 'urgent_badge':
+                  updateData.urgent_until = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString();
+                  break;
+                case 'ad_refresh':
+                  // Ad refresh just updates the updated_at timestamp
+                  updateData.updated_at = now.toISOString();
+                  break;
+                default:
+                  console.warn(`Unknown feature key: ${feature.key}`);
+                  failedFeatures.push({ 
+                    feature, 
+                    error: 'Unknown feature type' 
+                  });
+                  continue;
+              }
+              
+              // Update the listing with the feature
+              const { error: updateError } = await supabase
+                .from('listings')
+                .update(updateData)
+                .eq('id', listing.id);
 
-            if (featureError) {
-              console.error(`Failed to apply feature ${feature.key}:`, featureError);
+              if (updateError) {
+                console.error(`Failed to apply feature ${feature.key}:`, updateError);
+                failedFeatures.push({ 
+                  feature, 
+                  error: updateError.message || 'Unknown error' 
+                });
+              } else {
+                console.log(`Successfully applied feature ${feature.key} to listing`);
+                
+                // Create feature purchase record for tracking
+                await supabase
+                  .from('feature_purchases')
+                  .insert({
+                    user_id: user!.id,
+                    listing_id: listing.id,
+                    feature_key: feature.key,
+                    credits_spent: feature.credits,
+                    status: 'active',
+                  });
+              }
+            } catch (featureError) {
+              console.error(`Exception applying feature ${feature.key}:`, featureError);
               failedFeatures.push({ 
                 feature, 
-                error: featureError.message || 'Unknown error' 
+                error: featureError instanceof Error ? featureError.message : 'Unknown error' 
               });
-            } else if (data?.success) {
-              console.log(`Successfully applied feature ${feature.key} to listing`);
-            } else {
-              // Feature purchase returned success: false
-              const errorMsg = data?.error || 'Feature purchase failed';
-              console.error(`Feature ${feature.key} purchase failed:`, errorMsg);
-              failedFeatures.push({ feature, error: errorMsg });
             }
           }
           
@@ -1002,10 +1106,15 @@ function CreateListingScreen() {
 
   const handlePayForListing = async () => {
     const requiredCredits = 10;
-    if (balance < requiredCredits) {
+    
+    // Calculate total credits needed (listing fee + selected features)
+    const featureCredits = selectedFeatures.reduce((sum, feature) => sum + (feature.credits || 0), 0);
+    const totalCreditsNeeded = requiredCredits + featureCredits;
+    
+    if (balance < totalCreditsNeeded) {
       Alert.alert(
         'Insufficient Credits',
-        `You need ${requiredCredits} credits but only have ${balance}. Would you like to buy more credits?`,
+        `You need ${totalCreditsNeeded} credits (${requiredCredits} for listing + ${featureCredits} for features) but only have ${balance}. Would you like to buy more credits?`,
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Buy Credits', onPress: () => {
@@ -1021,9 +1130,10 @@ function CreateListingScreen() {
     }
 
     try {
-      // First, deduct the credits
-      const result = await spendCredits(requiredCredits, 'Additional listing fee', {
+      // First, deduct ALL credits (listing fee + features)
+      const result = await spendCredits(totalCreditsNeeded, `Listing fee (${requiredCredits}) + Features (${featureCredits})`, {
         referenceType: 'listing_creation',
+        features: selectedFeatures.map(f => ({ key: f.key, name: f.name, credits: f.credits })),
       });
       
       if (result.success) {
@@ -1032,12 +1142,13 @@ function CreateListingScreen() {
         // Try to create the listing
         try {
           await createListing();
-          // Success! Credits were spent and listing was created
+          // Success! Credits were spent and listing was created with features applied
         } catch (listingError) {
-          // Listing creation failed - refund the credits
+          // Listing creation failed - refund ALL the credits
           console.log('🔄 Listing creation failed after payment, refunding credits...');
           console.log(`Listing fee: ${requiredCredits} credits`);
-          console.log(`Selected features: ${selectedFeatures.length}`);
+          console.log(`Feature credits: ${featureCredits} credits`);
+          console.log(`Total refunding: ${totalCreditsNeeded} credits`);
           
           await refundAllCredits(requiredCredits, 'listing_creation_failed', listingError);
           
@@ -1749,19 +1860,53 @@ function CreateListingScreen() {
 
           {selectedFeatures.length > 0 ? (
             <View>
-              <Text variant="body" style={{ marginBottom: theme.spacing.sm, color: theme.colors.success }}>
-                ✅ {selectedFeatures.length} feature{selectedFeatures.length > 1 ? 's' : ''} selected
-              </Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs, marginBottom: theme.spacing.md }}>
+              {/* Summary Header */}
+              <View style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                marginBottom: theme.spacing.md,
+              }}>
+                <Text variant="body" style={{ color: theme.colors.success, fontWeight: '600' }}>
+                  ✅ {selectedFeatures.length} Feature{selectedFeatures.length > 1 ? 's' : ''} Applied
+                </Text>
+                <Text variant="bodySmall" style={{ color: theme.colors.primary, fontWeight: '600' }}>
+                  {selectedFeatures.reduce((sum, f) => sum + f.credits, 0)} Credits
+                </Text>
+              </View>
+
+              {/* Feature Cards */}
+              <View style={{ gap: theme.spacing.sm, marginBottom: theme.spacing.md }}>
                 {selectedFeatures.map((feature) => (
-                  <Badge 
+                  <View
                     key={feature.key}
-                    text={`${feature.name} (${feature.credits} credits)`}
-                    variant="primary"
-                    size="sm"
-                  />
+                    style={{
+                      backgroundColor: theme.colors.primary + '10',
+                      borderRadius: theme.borderRadius.md,
+                      padding: theme.spacing.md,
+                      borderWidth: 1,
+                      borderColor: theme.colors.primary + '30',
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <View style={{ flex: 1 }}>
+                        <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
+                          {feature.name}
+                        </Text>
+                        <Text variant="caption" color="secondary" style={{ marginBottom: theme.spacing.xs }}>
+                          {feature.description}
+                        </Text>
+                        <View style={{ flexDirection: 'row', gap: theme.spacing.xs }}>
+                          <Badge text={feature.duration} variant="neutral" size="xs" />
+                          <Badge text={`${feature.credits} credits`} variant="primary" size="xs" />
+                        </View>
+                      </View>
+                    </View>
+                  </View>
                 ))}
               </View>
+
+              {/* Action Buttons */}
               <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
                 <Button
                   variant="secondary"
@@ -2711,6 +2856,96 @@ function CreateListingScreen() {
                 borderColor: theme.colors.primary,
               }}
               onPress={() => setShowExitModal(false)}
+            >
+              Cancel
+            </Button>
+          </View>
+        </View>
+      </AppModal>
+
+      {/* Feature Confirmation Modal */}
+      <AppModal
+        visible={showFeatureConfirmModal}
+        onClose={() => setShowFeatureConfirmModal(false)}
+        title="Confirm Features"
+        size="md"
+      >
+        <View style={{ padding: theme.spacing.lg }}>
+          <Text variant="body" color="secondary" style={{ marginBottom: theme.spacing.lg }}>
+            You're about to apply the following features to your listing:
+          </Text>
+          
+          {/* Feature List */}
+          <View style={{ 
+            backgroundColor: theme.colors.surface, 
+            borderRadius: theme.borderRadius.md, 
+            padding: theme.spacing.md,
+            marginBottom: theme.spacing.lg,
+            gap: theme.spacing.sm,
+          }}>
+            {selectedFeatures.map((feature, index) => (
+              <View
+                key={feature.key}
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingVertical: theme.spacing.sm,
+                  borderBottomWidth: index < selectedFeatures.length - 1 ? 1 : 0,
+                  borderBottomColor: theme.colors.border + '30',
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text variant="body" style={{ fontWeight: '600', marginBottom: 2 }}>
+                    {feature.name}
+                  </Text>
+                  <Text variant="caption" color="secondary">
+                    {feature.duration}
+                  </Text>
+                </View>
+                <Badge text={`${feature.credits} credits`} variant="primary" size="sm" />
+              </View>
+            ))}
+          </View>
+          
+          {/* Total Cost */}
+          <View style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingTop: theme.spacing.md,
+            borderTopWidth: 2,
+            borderTopColor: theme.colors.border,
+            marginBottom: theme.spacing.xl,
+          }}>
+            <Text variant="h4">Total Cost</Text>
+            <Text variant="h3" style={{ color: theme.colors.primary, fontWeight: '700' }}>
+              {selectedFeatures.reduce((sum, f) => sum + f.credits, 0)} Credits
+            </Text>
+          </View>
+          
+          <Text variant="caption" color="secondary" style={{ marginBottom: theme.spacing.xl, lineHeight: 18 }}>
+            💡 These features will be applied immediately after your listing is published. Credits will be deducted from your account.
+          </Text>
+          
+          {/* Action Buttons */}
+          <View style={{ gap: theme.spacing.md }}>
+            <Button
+              variant="primary"
+              onPress={() => {
+                setShowFeatureConfirmModal(false);
+                proceedWithPublish();
+              }}
+            >
+              Confirm & Publish
+            </Button>
+            
+            <Button
+              variant="outline"
+              style={{
+                borderColor: theme.colors.primary,
+              }}
+              onPress={() => setShowFeatureConfirmModal(false)}
             >
               Cancel
             </Button>

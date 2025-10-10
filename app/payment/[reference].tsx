@@ -68,10 +68,7 @@ export default function PaymentScreen() {
       setToastVariant('success');
       setShowToast(true);
 
-      // Navigate back after showing success - give user time to see the message
-      setTimeout(() => {
-        router.back();
-      }, 3500); // 3.5 seconds to see success screen
+      // Don't auto-navigate, let user click "Done" button
     } catch (error: any) {
       console.error('❌ Verification failed:', error);
       setPaymentStatus('failed');
@@ -182,7 +179,11 @@ export default function PaymentScreen() {
           
           <Button
             variant="primary"
-            onPress={() => router.back()}
+            onPress={() => {
+              // Navigate back to previous screen so credits are refreshed
+              // User can then see updated balance
+              router.back();
+            }}
             style={{ marginTop: theme.spacing.xl }}
           >
             Done

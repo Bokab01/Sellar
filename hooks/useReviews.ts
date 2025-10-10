@@ -63,6 +63,15 @@ export interface UpdateReviewData {
 }
 
 // Hook to fetch reviews for a user or listing
+// Cache reviews outside component to persist between mounts
+const reviewsCache = {
+  data: [] as Review[],
+  timestamp: 0,
+  key: null as string | null,
+};
+
+const REVIEWS_CACHE_DURATION = 30000; // 30 seconds
+
 export function useReviews(options: {
   userId?: string;
   listingId?: string;
@@ -70,18 +79,32 @@ export function useReviews(options: {
   limit?: number;
   offset?: number;
 } = {}) {
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { userId, listingId, reviewerId, limit = 20, offset = 0 } = options;
+  const { user } = useAuthStore();
+  
+  // Create cache key from options
+  const cacheKey = `${userId || ''}-${listingId || ''}-${reviewerId || ''}`;
+  
+  // Initialize with cached data if available and valid
+  const getCachedReviews = () => {
+    const now = Date.now();
+    const cacheValid = 
+      reviewsCache.key === cacheKey &&
+      reviewsCache.data.length > 0 &&
+      (now - reviewsCache.timestamp) < REVIEWS_CACHE_DURATION;
+    
+    return cacheValid ? reviewsCache.data : [];
+  };
+  
+  const [reviews, setReviews] = useState<Review[]>(getCachedReviews);
+  const [loading, setLoading] = useState(reviews.length === 0);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
-  const { user } = useAuthStore();
 
   // Cache data to prevent unnecessary refetches
-  const hasLoadedData = useRef(false);
-  const lastFetchTime = useRef(0);
+  const hasLoadedData = useRef(reviews.length > 0);
+  const lastFetchTime = useRef(reviews.length > 0 ? Date.now() : 0);
   const FETCH_COOLDOWN = 30000; // 30 seconds cooldown
-
-  const { userId, listingId, reviewerId, limit = 20, offset = 0 } = options;
 
   const fetchReviews = useCallback(async (reset = false, forceRefresh = false) => {
     // Smart caching - only fetch if needed
@@ -168,6 +191,12 @@ export function useReviews(options: {
 
       if (reset) {
         setReviews(reviewsWithVotes);
+        // Update cache
+        if (reviewsWithVotes.length > 0) {
+          reviewsCache.data = reviewsWithVotes;
+          reviewsCache.timestamp = now;
+          reviewsCache.key = cacheKey;
+        }
       } else {
         setReviews(prev => [...prev, ...reviewsWithVotes]);
       }

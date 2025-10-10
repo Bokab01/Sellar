@@ -89,21 +89,26 @@ export default function DashboardLayout() {
           component={DashboardOverviewScreen}
           options={{ title: 'Overview' }}
         />
-        <Tab.Screen 
-          name="auto-refresh" 
-          component={DashboardAutoRefreshScreen}
-          options={{ title: 'Auto-Refresh' }}
-        />
-        <Tab.Screen 
-          name="analytics" 
-          component={DashboardAnalyticsScreen}
-          options={{ title: 'Analytics' }}
-        />
-        <Tab.Screen 
-          name="support" 
-          component={DashboardSupportScreen}
-          options={{ title: 'Support' }}
-        />
+        {/* Only show these tabs for business users */}
+        {isBusinessUser && (
+          <>
+            <Tab.Screen 
+              name="auto-refresh" 
+              component={DashboardAutoRefreshScreen}
+              options={{ title: 'Auto-Refresh' }}
+            />
+            <Tab.Screen 
+              name="analytics" 
+              component={DashboardAnalyticsScreen}
+              options={{ title: 'Analytics' }}
+            />
+            <Tab.Screen 
+              name="support" 
+              component={DashboardSupportScreen}
+              options={{ title: 'Support' }}
+            />
+          </>
+        )}
       </Tab.Navigator>
     </SafeAreaWrapper>
   );

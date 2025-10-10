@@ -45,6 +45,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { BusinessProfileSetupModal } from '@/components/BusinessProfileSetupModal/BusinessProfileSetupModal';
 import { validateName, validateUsername, validatePhoneNumber } from '@/utils/validation';
 import { checkMultipleUniqueness } from '@/utils/uniquenessValidation';
+import { storageHelpers } from '@/lib/storage';
 import * as ImagePicker from 'expo-image-picker';
 import { Image as ImageIcon } from 'lucide-react-native';
 
@@ -1229,21 +1230,45 @@ export default function EditProfileScreen() {
                 variant="primary"
                 icon={<Camera size={20} color="#FFFFFF" />}
                 onPress={async () => {
-                  // Handle camera
-                  const { status } = await ImagePicker.requestCameraPermissionsAsync();
-                  if (status === 'granted') {
-                    const result = await ImagePicker.launchCameraAsync({
-                      mediaTypes: ['images'],
-                      allowsEditing: true,
-                      aspect: [1, 1],
-                      quality: 0.8,
-                    });
-                    
-                    if (!result.canceled && result.assets[0]) {
-                      setAvatar(result.assets[0].uri);
+                  try {
+                    // Handle camera
+                    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+                    if (status === 'granted') {
+                      const result = await ImagePicker.launchCameraAsync({
+                        mediaTypes: ['images'],
+                        allowsEditing: true,
+                        aspect: [1, 1],
+                        quality: 0.8,
+                      });
+                      
+                      if (!result.canceled && result.assets[0]) {
+                        const localUri = result.assets[0].uri;
+                        
+                        // Show loading state
+                        setShowAvatarPicker(false);
+                        setToastMessage('Uploading profile photo...');
+                        setToastVariant('success');
+                        setShowToast(true);
+                        
+                        // Upload to Supabase Storage
+                        const uploadResult = await storageHelpers.uploadProfileAvatar(localUri, user!.id);
+                        
+                        if (uploadResult && uploadResult.url) {
+                          setAvatar(uploadResult.url);
+                          setToastMessage('Profile photo uploaded successfully!');
+                          setShowToast(true);
+                        } else {
+                          throw new Error('Failed to upload image');
+                        }
+                      }
                     }
+                  } catch (error: any) {
+                    console.error('Error uploading profile photo:', error);
+                    setToastMessage(error.message || 'Failed to upload profile photo');
+                    setToastVariant('error');
+                    setShowToast(true);
+                    setShowAvatarPicker(false);
                   }
-                  setShowAvatarPicker(false);
                 }}
                 fullWidth
               >
@@ -1254,21 +1279,45 @@ export default function EditProfileScreen() {
                 variant="secondary"
                 icon={<ImageIcon size={20} color={theme.colors.primary} />}
                 onPress={async () => {
-                  // Handle gallery
-                  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                  if (status === 'granted') {
-                    const result = await ImagePicker.launchImageLibraryAsync({
-                      mediaTypes: ['images'],
-                      allowsEditing: true,
-                      aspect: [1, 1],
-                      quality: 0.8,
-                    });
-                    
-                    if (!result.canceled && result.assets[0]) {
-                      setAvatar(result.assets[0].uri);
+                  try {
+                    // Handle gallery
+                    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                    if (status === 'granted') {
+                      const result = await ImagePicker.launchImageLibraryAsync({
+                        mediaTypes: ['images'],
+                        allowsEditing: true,
+                        aspect: [1, 1],
+                        quality: 0.8,
+                      });
+                      
+                      if (!result.canceled && result.assets[0]) {
+                        const localUri = result.assets[0].uri;
+                        
+                        // Show loading state
+                        setShowAvatarPicker(false);
+                        setToastMessage('Uploading profile photo...');
+                        setToastVariant('success');
+                        setShowToast(true);
+                        
+                        // Upload to Supabase Storage
+                        const uploadResult = await storageHelpers.uploadProfileAvatar(localUri, user!.id);
+                        
+                        if (uploadResult && uploadResult.url) {
+                          setAvatar(uploadResult.url);
+                          setToastMessage('Profile photo uploaded successfully!');
+                          setShowToast(true);
+                        } else {
+                          throw new Error('Failed to upload image');
+                        }
+                      }
                     }
+                  } catch (error: any) {
+                    console.error('Error uploading profile photo:', error);
+                    setToastMessage(error.message || 'Failed to upload profile photo');
+                    setToastVariant('error');
+                    setShowToast(true);
+                    setShowAvatarPicker(false);
                   }
-                  setShowAvatarPicker(false);
                 }}
                 fullWidth
               >

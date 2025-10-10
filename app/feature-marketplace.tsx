@@ -23,7 +23,7 @@ import {
   Grid,
   FeatureActivationModal,
 } from '@/components';
-import { ShoppingCart, CheckCircle } from 'lucide-react-native';
+import { ShoppingCart, CheckCircle, Info } from 'lucide-react-native';
 
 // Combined Feature Modal Component
 function CombinedFeatureModal({
@@ -415,6 +415,8 @@ export default function FeatureMarketplaceScreen() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [infoFeature, setInfoFeature] = useState<any>(null);
 
   useEffect(() => {
     refreshCredits();
@@ -483,6 +485,17 @@ export default function FeatureMarketplaceScreen() {
 
   const handleListingSelection = (listingId: string) => {
     setSelectedListing(listingId);
+  };
+
+  const handleShowInfo = (featureKey: string, event: any) => {
+    // Stop event propagation to prevent card click
+    event?.stopPropagation?.();
+    
+    const feature = getFeatureByKey(featureKey);
+    if (feature) {
+      setInfoFeature({ key: featureKey, ...(feature as any) });
+      setShowInfoModal(true);
+    }
   };
 
   // Get all features directly from the catalog
@@ -628,47 +641,74 @@ export default function FeatureMarketplaceScreen() {
                 const hasAccess = hasFeatureAccess(featureKey);
 
                 return (
-                  <TouchableOpacity
+                  <View
                     key={featureKey}
-                    onPress={() => handleFeaturePurchase(featureKey)}
-                    disabled={!canAfford || hasAccess}
                     style={{
                       backgroundColor: theme.colors.surface,
                       borderRadius: theme.borderRadius.lg,
-                      padding: theme.spacing.lg,
                       borderWidth: 1,
                       borderColor: canAfford ? theme.colors.primary + '30' : theme.colors.border,
                       opacity: !canAfford || hasAccess ? 0.6 : 1,
                       ...theme.shadows.sm,
+                      position: 'relative',
                     }}
-                    activeOpacity={0.7}
                   >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.lg, marginBottom: theme.spacing.lg }}>
-                      <View
-                        style={{
-                          backgroundColor: theme.colors.primary + '15',
-                          borderRadius: theme.borderRadius.lg,
-                          width: 60,
-                          height: 60,
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <Text style={{ fontSize: 28 }}>{getFeatureIcon(featureKey)}</Text>
+                    {/* Info Icon - Top Right */}
+                    <TouchableOpacity
+                      onPress={(e) => handleShowInfo(featureKey, e)}
+                      style={{
+                        position: 'absolute',
+                        top: theme.spacing.md,
+                        right: theme.spacing.md,
+                        backgroundColor: theme.colors.primary + '15',
+                        borderRadius: theme.borderRadius.full,
+                        width: 32,
+                        height: 32,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        zIndex: 10,
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Info size={18} color={theme.colors.primary} />
+                    </TouchableOpacity>
+
+                    {/* Clickable Card Content */}
+                    <TouchableOpacity
+                      onPress={() => handleFeaturePurchase(featureKey)}
+                      disabled={!canAfford || hasAccess}
+                      style={{
+                        padding: theme.spacing.lg,
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.lg, marginBottom: theme.spacing.lg }}>
+                        <View
+                          style={{
+                            backgroundColor: theme.colors.primary + '15',
+                            borderRadius: theme.borderRadius.lg,
+                            width: 70,
+                            height: 70,
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <Text style={{ fontSize: 30, lineHeight: 36 }}>{getFeatureIcon(featureKey)}</Text>
+                        </View>
+                        
+                        <View style={{ flex: 1, paddingRight: theme.spacing.xl }}>
+                          <Text variant="h4" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
+                            {(feature as any).name}
+                          </Text>
+                          <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.sm }}>
+                            {(feature as any).description}
+                          </Text>
+                          <Text variant="caption" color="muted">
+                            Duration: {(feature as any).duration}
+                          </Text>
+                        </View>
                       </View>
-                      
-                      <View style={{ flex: 1 }}>
-                        <Text variant="h4" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
-                          {(feature as any).name}
-                        </Text>
-                        <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.sm }}>
-                          {(feature as any).description}
-                        </Text>
-                        <Text variant="caption" color="muted">
-                          Duration: {(feature as any).duration}
-                        </Text>
-                      </View>
-                    </View>
 
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
@@ -692,7 +732,8 @@ export default function FeatureMarketplaceScreen() {
                         </Text>
                       )}
                     </View>
-                  </TouchableOpacity>
+                    </TouchableOpacity>
+                  </View>
                 );
               })
             )}
@@ -815,6 +856,320 @@ export default function FeatureMarketplaceScreen() {
            }}
          />
        </AppModal>
+
+      {/* Enhanced Info Modal */}
+      <AppModal
+        visible={showInfoModal}
+        onClose={() => setShowInfoModal(false)}
+        title={infoFeature?.name || 'Feature Details'}
+        size="lg"
+        position="bottom"
+      >
+        <ScrollView style={{ maxHeight: 600 }} showsVerticalScrollIndicator={false}>
+          <View style={{ padding: theme.spacing.lg }}>
+            {infoFeature && (
+              <>
+                {/* Feature Icon & Price */}
+                <View style={{ alignItems: 'center', marginBottom: theme.spacing.xl }}>
+                  <View
+                    style={{
+                      backgroundColor: theme.colors.primary + '15',
+                      borderRadius: theme.borderRadius.lg,
+                      width: 90,
+                      height: 90,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      marginBottom: theme.spacing.md,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <Text style={{ fontSize: 38, lineHeight: 45 }}>{getFeatureIcon(infoFeature.key)}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: theme.spacing.sm, alignItems: 'center' }}>
+                    <Badge 
+                      text={`${getFeatureCost(infoFeature.key, hasBusinessPlan())} Credits`}
+                      variant="primary"
+                      size="md"
+                    />
+                    <Text variant="bodySmall" color="muted">
+                      ≈ GHS {calculateCreditValue(getFeatureCost(infoFeature.key, hasBusinessPlan())).toFixed(2)}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Compelling Headline */}
+                <View style={{
+                  backgroundColor: theme.colors.success + '10',
+                  borderRadius: theme.borderRadius.md,
+                  padding: theme.spacing.md,
+                  marginBottom: theme.spacing.xl,
+                  borderLeftWidth: 4,
+                  borderLeftColor: theme.colors.success,
+                }}>
+                  <Text variant="h4" style={{ color: theme.colors.success, marginBottom: theme.spacing.xs }}>
+                    {infoFeature.key === 'pulse_boost_24h' && '⚡ Get 2-3x More Views in 24 Hours!'}
+                    {infoFeature.key === 'mega_pulse_7d' && '🚀 Dominate Your Category for a Week!'}
+                    {infoFeature.key === 'category_spotlight_3d' && '🎯 Be Featured in Your Category!'}
+                    {infoFeature.key === 'ad_refresh' && '🔄 Move to Top Instantly!'}
+                    {infoFeature.key === 'listing_highlight' && '✨ Stand Out with Golden Border!'}
+                    {infoFeature.key === 'urgent_badge' && '🔥 Create Urgency, Sell Faster!'}
+                  </Text>
+                  <Text variant="bodySmall" color="secondary">
+                    {infoFeature.key === 'pulse_boost_24h' && 'Most sellers see 2-3x more views within the first 24 hours'}
+                    {infoFeature.key === 'mega_pulse_7d' && 'Stay at the top of search results for an entire week'}
+                    {infoFeature.key === 'category_spotlight_3d' && 'Your listing appears in the featured section of your category'}
+                    {infoFeature.key === 'ad_refresh' && 'Perfect for quick visibility boost when you need it most'}
+                    {infoFeature.key === 'listing_highlight' && 'Listings with highlights get 40% more engagement'}
+                    {infoFeature.key === 'urgent_badge' && 'Urgent badges increase response rates by 60%'}
+                  </Text>
+                </View>
+
+                {/* What You Get */}
+                <View style={{ marginBottom: theme.spacing.xl }}>
+                  <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+                    📦 What You Get:
+                  </Text>
+                  <View style={{
+                    backgroundColor: theme.colors.surface,
+                    borderRadius: theme.borderRadius.md,
+                    padding: theme.spacing.md,
+                    gap: theme.spacing.sm,
+                  }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text variant="bodySmall" color="secondary">Duration:</Text>
+                      <Text variant="bodySmall" style={{ fontWeight: '600' }}>{infoFeature.duration}</Text>
+                    </View>
+                    {infoFeature.key === 'pulse_boost_24h' && (
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Text variant="bodySmall" color="secondary">Visibility Boost:</Text>
+                        <Text variant="bodySmall" style={{ fontWeight: '600', color: theme.colors.success }}>2-3x Higher</Text>
+                      </View>
+                    )}
+                    {infoFeature.key === 'mega_pulse_7d' && (
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Text variant="bodySmall" color="secondary">Visibility Boost:</Text>
+                        <Text variant="bodySmall" style={{ fontWeight: '600', color: theme.colors.success }}>5x Higher</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                {/* Real Results - Coming Soon */}
+                {/* TODO: Integrate real seller testimonials and results
+                <View style={{ marginBottom: theme.spacing.xl }}>
+                  <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+                    📊 Real Results from Sellers:
+                  </Text>
+                  <View style={{ gap: theme.spacing.md }}>
+                    {infoFeature.key === 'pulse_boost_24h' && (
+                      <>
+                        <View style={{
+                          backgroundColor: theme.colors.background,
+                          borderRadius: theme.borderRadius.md,
+                          padding: theme.spacing.md,
+                          borderLeftWidth: 3,
+                          borderLeftColor: theme.colors.primary,
+                        }}>
+                          <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.xs, fontStyle: 'italic' }}>
+                            "Got 43 views in 24 hours vs my usual 12-15. Sold my laptop within 2 days!"
+                          </Text>
+                          <Text variant="caption" color="muted">- Kofi, Accra</Text>
+                        </View>
+                        <View style={{
+                          backgroundColor: theme.colors.background,
+                          borderRadius: theme.borderRadius.md,
+                          padding: theme.spacing.md,
+                          borderLeftWidth: 3,
+                          borderLeftColor: theme.colors.primary,
+                        }}>
+                          <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.xs, fontStyle: 'italic' }}>
+                            "Best investment! My phone listing got 8 inquiries in the first day."
+                          </Text>
+                          <Text variant="caption" color="muted">- Ama, Kumasi</Text>
+                        </View>
+                      </>
+                    )}
+                    {infoFeature.key === 'mega_pulse_7d' && (
+                      <>
+                        <View style={{
+                          backgroundColor: theme.colors.background,
+                          borderRadius: theme.borderRadius.md,
+                          padding: theme.spacing.md,
+                          borderLeftWidth: 3,
+                          borderLeftColor: theme.colors.primary,
+                        }}>
+                          <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.xs, fontStyle: 'italic' }}>
+                            "Stayed at the top for a full week. Got 120+ views and sold 3 items!"
+                          </Text>
+                          <Text variant="caption" color="muted">- Kwame, Tema</Text>
+                        </View>
+                        <View style={{
+                          backgroundColor: theme.colors.background,
+                          borderRadius: theme.borderRadius.md,
+                          padding: theme.spacing.md,
+                          borderLeftWidth: 3,
+                          borderLeftColor: theme.colors.primary,
+                        }}>
+                          <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.xs, fontStyle: 'italic' }}>
+                            "Worth every credit. My car listing was seen by hundreds of buyers."
+                          </Text>
+                          <Text variant="caption" color="muted">- Abena, Takoradi</Text>
+                        </View>
+                      </>
+                    )}
+                    {(infoFeature.key === 'category_spotlight_3d' || infoFeature.key === 'listing_highlight' || infoFeature.key === 'urgent_badge' || infoFeature.key === 'ad_refresh') && (
+                      <View style={{
+                        backgroundColor: theme.colors.background,
+                        borderRadius: theme.borderRadius.md,
+                        padding: theme.spacing.md,
+                        borderLeftWidth: 3,
+                        borderLeftColor: theme.colors.primary,
+                      }}>
+                        <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.xs, fontStyle: 'italic' }}>
+                          "My listing stood out from the crowd and I got serious buyers reaching out quickly!"
+                        </Text>
+                        <Text variant="caption" color="muted">- Sellar Community</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+                */}
+
+                {/* Key Benefits */}
+                {infoFeature.benefits && (
+                  <View style={{ marginBottom: theme.spacing.xl }}>
+                    <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+                      ✨ Key Benefits:
+                    </Text>
+                    <View style={{ gap: theme.spacing.sm }}>
+                      {infoFeature.benefits.map((benefit: string, index: number) => (
+                        <View
+                          key={index}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'flex-start',
+                            backgroundColor: theme.colors.success + '08',
+                            padding: theme.spacing.md,
+                            borderRadius: theme.borderRadius.md,
+                          }}
+                        >
+                          <Text style={{ color: theme.colors.success, marginRight: theme.spacing.sm, fontSize: 16 }}>✓</Text>
+                          <Text variant="bodySmall" style={{ flex: 1, lineHeight: 20 }}>
+                            {benefit}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* How It Works */}
+                <View style={{ marginBottom: theme.spacing.xl }}>
+                  <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+                    ⚙️ How It Works:
+                  </Text>
+                  <View style={{ gap: theme.spacing.md }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                      <View style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 14,
+                        backgroundColor: theme.colors.primary,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: theme.spacing.md,
+                      }}>
+                        <Text variant="caption" style={{ color: theme.colors.primaryForeground, fontWeight: '700' }}>1</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text variant="body" style={{ fontWeight: '600', marginBottom: 4 }}>Select Your Listing</Text>
+                        <Text variant="bodySmall" color="secondary">Choose which listing you want to boost</Text>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                      <View style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 14,
+                        backgroundColor: theme.colors.primary,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: theme.spacing.md,
+                      }}>
+                        <Text variant="caption" style={{ color: theme.colors.primaryForeground, fontWeight: '700' }}>2</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text variant="body" style={{ fontWeight: '600', marginBottom: 4 }}>Instant Activation</Text>
+                        <Text variant="bodySmall" color="secondary">Feature activates immediately after purchase</Text>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                      <View style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 14,
+                        backgroundColor: theme.colors.primary,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: theme.spacing.md,
+                      }}>
+                        <Text variant="caption" style={{ color: theme.colors.primaryForeground, fontWeight: '700' }}>3</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text variant="body" style={{ fontWeight: '600', marginBottom: 4 }}>Watch Results Roll In</Text>
+                        <Text variant="bodySmall" color="secondary">Track views and inquiries in real-time</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Value Proposition */}
+                <View style={{
+                  backgroundColor: theme.colors.warning + '15',
+                  borderRadius: theme.borderRadius.md,
+                  padding: theme.spacing.lg,
+                  marginBottom: theme.spacing.xl,
+                  borderWidth: 1,
+                  borderColor: theme.colors.warning + '30',
+                }}>
+                  <Text variant="h4" style={{ color: theme.colors.warning, marginBottom: theme.spacing.sm }}>
+                    💰 Why It's Worth It:
+                  </Text>
+                  <Text variant="body" color="secondary" style={{ lineHeight: 22 }}>
+                    {infoFeature.key === 'pulse_boost_24h' && 'Sell faster, get your money quicker! When your listing gets more views, you find buyers faster. The small credit cost pays for itself when you sell even just one day earlier.'}
+                    {infoFeature.key === 'mega_pulse_7d' && 'Stay at the top for a whole week! Your listing will be seen by more people every single day. Perfect for expensive items that take time to sell, like cars, phones, or furniture.'}
+                    {infoFeature.key === 'category_spotlight_3d' && 'Get featured in your category! When people browse your category, they see your listing first. More eyes on your listing means more buyers reaching out to you.'}
+                    {infoFeature.key === 'ad_refresh' && 'Your listing dropped down? Bring it back to the top instantly! No need to wait days for people to see your item again. Perfect for quick visibility.'}
+                    {infoFeature.key === 'listing_highlight' && 'Make your listing shine! The special golden border makes people notice your listing among hundreds of others. It catches attention and gets more clicks.'}
+                    {infoFeature.key === 'urgent_badge' && 'Make buyers act fast! The urgent badge tells buyers "don\'t wait, this might be gone soon!" People respond quicker when they think they might miss out.'}
+                  </Text>
+                </View>
+
+                {/* Action Buttons */}
+                <View style={{ gap: theme.spacing.md }}>
+                  <Button
+                    variant="primary"
+                    onPress={() => {
+                      setShowInfoModal(false);
+                      handleFeaturePurchase(infoFeature.key);
+                    }}
+                    fullWidth
+                  >
+                    Get {infoFeature.name} Now
+                  </Button>
+                  <Button
+                    variant="tertiary"
+                    onPress={() => setShowInfoModal(false)}
+                    fullWidth
+                  >
+                    Maybe Later
+                  </Button>
+                </View>
+              </>
+            )}
+          </View>
+        </ScrollView>
+      </AppModal>
 
       {/* Toast */}
       <Toast

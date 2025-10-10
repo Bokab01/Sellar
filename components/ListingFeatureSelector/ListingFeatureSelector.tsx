@@ -218,11 +218,44 @@ export function ListingFeatureSelector({
   }, [visible]);
 
   const handleFeatureToggle = (featureKey: string) => {
-    setSelectedFeatures(prev => 
-      prev.includes(featureKey)
-        ? prev.filter(key => key !== featureKey)
-        : [...prev, featureKey]
-    );
+    setSelectedFeatures(prev => {
+      // If already selected, remove it
+      if (prev.includes(featureKey)) {
+        return prev.filter(key => key !== featureKey);
+      }
+      
+      // Define conflicting feature groups
+      const boostFeatures = ['pulse_boost_24h', 'mega_pulse_7d'];
+      const highlightFeatures = ['listing_highlight'];
+      const urgentFeatures = ['urgent_badge'];
+      const spotlightFeatures = ['category_spotlight_3d'];
+      
+      // Check if the new feature conflicts with already selected features
+      let newSelection = [...prev];
+      
+      // If selecting a boost feature, remove other boost features
+      if (boostFeatures.includes(featureKey)) {
+        newSelection = newSelection.filter(key => !boostFeatures.includes(key));
+      }
+      
+      // If selecting highlight, remove other highlights
+      if (highlightFeatures.includes(featureKey)) {
+        newSelection = newSelection.filter(key => !highlightFeatures.includes(key));
+      }
+      
+      // If selecting urgent, remove other urgent badges
+      if (urgentFeatures.includes(featureKey)) {
+        newSelection = newSelection.filter(key => !urgentFeatures.includes(key));
+      }
+      
+      // If selecting spotlight, remove other spotlights
+      if (spotlightFeatures.includes(featureKey)) {
+        newSelection = newSelection.filter(key => !spotlightFeatures.includes(key));
+      }
+      
+      // Add the new feature
+      return [...newSelection, featureKey];
+    });
   };
 
   const getTotalCost = () => {

@@ -33,15 +33,25 @@ export function useNewUserDetection() {
       try {
         setState(prev => ({ ...prev, loading: true, error: null }));
 
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise<{ data: null, error: any }>((resolve) => {
+          setTimeout(() => {
+            console.warn('⚠️ User profile fetch timeout reached');
+            resolve({ data: null, error: { message: 'Profile fetch timeout' } });
+          }, 5000); // 5 second timeout
+        });
+        
+        const profilePromise = dbHelpers.getProfile(user.id);
+        
         // Get user profile to check creation date
-        const { data: profile, error } = await dbHelpers.getProfile(user.id);
+        const { data: profile, error } = await Promise.race([profilePromise, timeoutPromise]);
 
         if (error) {
           console.error('Error fetching user profile:', error);
           setState({
             isNewUser: false, // Default to existing user if we can't determine
             loading: false,
-            error: error.message,
+            error: error.message || 'Unknown error',
           });
           return;
         }

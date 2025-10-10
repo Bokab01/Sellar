@@ -112,13 +112,33 @@ export interface BusinessHours {
 }
 
 // Hook for managing user profile
+// Cache profile data outside component to persist between mounts
+const profileCache = {
+  data: null as UserProfile | null,
+  timestamp: 0,
+  userId: null as string | null,
+};
+
+const PROFILE_CACHE_DURATION = 30000; // 30 seconds
+
 export function useProfile(userId?: string) {
   const { user } = useAuth();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   const targetUserId = userId || user?.id;
+  
+  // Initialize with cached data if available and valid
+  const getCachedProfile = () => {
+    const now = Date.now();
+    const cacheValid = 
+      profileCache.userId === targetUserId &&
+      profileCache.data !== null &&
+      (now - profileCache.timestamp) < PROFILE_CACHE_DURATION;
+    
+    return cacheValid ? profileCache.data : null;
+  };
+  
+  const [profile, setProfile] = useState<UserProfile | null>(getCachedProfile);
+  const [loading, setLoading] = useState(profile === null && !!targetUserId);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchProfile = async () => {
     if (!targetUserId) return;
@@ -171,11 +191,19 @@ export function useProfile(userId?: string) {
           }
 
           setProfile(newProfile);
+          // Update cache
+          profileCache.data = newProfile;
+          profileCache.timestamp = Date.now();
+          profileCache.userId = targetUserId;
         } else {
           throw fetchError;
         }
       } else {
         setProfile(data);
+        // Update cache
+        profileCache.data = data;
+        profileCache.timestamp = Date.now();
+        profileCache.userId = targetUserId;
       }
     } catch (err) {
       console.error('Error fetching profile:', err);

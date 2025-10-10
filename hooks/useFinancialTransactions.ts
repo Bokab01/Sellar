@@ -69,6 +69,15 @@ export interface TransactionAnalytics {
   avg_amount: number;
 }
 
+// Cache transactions outside component to persist between mounts
+const transactionsCache = {
+  data: [] as FinancialTransaction[],
+  timestamp: 0,
+  userId: null as string | null,
+};
+
+const CACHE_DURATION = 30000; // 30 seconds
+
 // Main hook for fetching financial transactions
 export function useFinancialTransactions(options: {
   filters?: TransactionFilters;
@@ -76,8 +85,20 @@ export function useFinancialTransactions(options: {
   offset?: number;
 } = {}) {
   const { user } = useAuthStore();
-  const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  // Initialize with cached data if available and valid
+  const getCachedData = () => {
+    const now = Date.now();
+    const cacheValid = 
+      transactionsCache.userId === user?.id &&
+      transactionsCache.data.length > 0 &&
+      (now - transactionsCache.timestamp) < CACHE_DURATION;
+    
+    return cacheValid ? transactionsCache.data : [];
+  };
+  
+  const [transactions, setTransactions] = useState<FinancialTransaction[]>(getCachedData);
+  const [loading, setLoading] = useState(transactions.length === 0);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
 
@@ -132,8 +153,16 @@ export function useFinancialTransactions(options: {
         throw fetchError;
       }
 
-      setTransactions(data || []);
-      setHasMore((data || []).length === stableLimit);
+      const fetchedData = data || [];
+      setTransactions(fetchedData);
+      setHasMore(fetchedData.length === stableLimit);
+      
+      // Update cache
+      if (fetchedData.length > 0 && stableOffset === 0) {
+        transactionsCache.data = fetchedData;
+        transactionsCache.timestamp = Date.now();
+        transactionsCache.userId = stableUserId;
+      }
     } catch (err) {
       console.error('Error fetching transactions:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch transactions');

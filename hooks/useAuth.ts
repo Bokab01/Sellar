@@ -27,7 +27,18 @@ export function useAuth() {
     const initializeAuth = async () => {
       try {
         console.log('Initializing authentication...');
-        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise<{ data: { session: null }, error: any }>((resolve) => {
+          setTimeout(() => {
+            console.warn('⚠️ Auth initialization timeout reached');
+            resolve({ data: { session: null }, error: new Error('Auth initialization timeout') });
+          }, 5000); // 5 second timeout
+        });
+        
+        const authPromise = supabase.auth.getSession();
+        
+        const { data: { session }, error } = await Promise.race([authPromise, timeoutPromise]);
         
         if (error) {
           console.warn('Auth initialization error:', error.message);

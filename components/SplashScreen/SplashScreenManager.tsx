@@ -177,6 +177,18 @@ export function useSplashScreen() {
     setShowCustomSplash(false);
   }, []);
 
+  // Safety timeout: Force hide splash screen after 10 seconds to prevent stuck state
+  React.useEffect(() => {
+    const safetyTimeout = setTimeout(() => {
+      if (!isAppReady) {
+        console.warn('⚠️ Splash screen safety timeout reached. Forcing app ready state.');
+        setIsAppReady(true);
+      }
+    }, 10000); // 10 second timeout
+
+    return () => clearTimeout(safetyTimeout);
+  }, [isAppReady]);
+
   return {
     isAppReady,
     showCustomSplash,

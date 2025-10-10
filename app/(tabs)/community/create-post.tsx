@@ -81,7 +81,8 @@ export default function CreatePostScreen() {
         content.trim(),
         imageUrls,
         selectedListing?.id, // Attach selected listing
-        postType // Pass the selected post type
+        postType, // Pass the selected post type
+        location // Pass the location
       );
 
       if (error) {

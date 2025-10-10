@@ -12,6 +12,7 @@ import {
   Button,
 } from '@/components';
 import { TransactionCard } from '@/components/TransactionCard/TransactionCard';
+import { TransactionDetailsModal } from '@/components/TransactionDetailsModal/TransactionDetailsModal';
 import { 
   useFinancialTransactions, 
   useTransactionSummary,
@@ -34,6 +35,8 @@ import {
 export default function TransactionsScreen() {
   const { theme } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   const { transactions, loading, error, refresh } = useFinancialTransactions();
   const { summary, loading: summaryLoading } = useTransactionSummary();
@@ -50,9 +53,14 @@ export default function TransactionsScreen() {
   }, [refresh]);
 
   const handleTransactionPress = useCallback((transaction: Transaction) => {
-    // For now, just show an alert with transaction details
-    // TODO: Implement transaction details modal or screen
-    console.log('Transaction pressed:', transaction.id);
+    setSelectedTransaction(transaction);
+    setShowDetailsModal(true);
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    setShowDetailsModal(false);
+    // Delay clearing transaction to allow modal animation to complete
+    setTimeout(() => setSelectedTransaction(null), 300);
   }, []);
 
 
@@ -338,6 +346,13 @@ export default function TransactionsScreen() {
           )}
         </Container>
       </ScrollView>
+
+      {/* Transaction Details Modal */}
+      <TransactionDetailsModal
+        visible={showDetailsModal}
+        transaction={selectedTransaction}
+        onClose={handleCloseModal}
+      />
     </SafeAreaWrapper>
   );
 }

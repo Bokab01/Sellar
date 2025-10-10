@@ -59,6 +59,8 @@ export function useCommunityPosts(options: {
       
       setError(null);
 
+      console.log('📊 Fetching posts with options:', options);
+
       // Set a timeout for the fetch operation
       const fetchPromise = dbHelpers.getPosts({
         ...options,
@@ -82,6 +84,7 @@ export function useCommunityPosts(options: {
       if (fetchError) {
         setError(fetchError.message);
       } else {
+        console.log(`✅ Fetched ${data?.length || 0} posts with filters`);
         setPosts(data || []);
         hasInitialDataRef.current = true;
       }
@@ -125,7 +128,7 @@ export function useCommunityPosts(options: {
     // Reset the initial data flag when options change
     hasInitialDataRef.current = false;
     fetchPosts();
-  }, [options.following, options.userId, options.postType, options.location]);
+  }, [fetchPosts]);
 
   // Listen for profile refresh events to update posts with new profile data
   useEffect(() => {
@@ -146,7 +149,7 @@ export function useCommunityPosts(options: {
     };
   }, []);
 
-  const createPost = async (content: string, images: string[] = [], listingId?: string, type?: string) => {
+  const createPost = async (content: string, images: string[] = [], listingId?: string, type?: string, location?: string) => {
     if (!user) return { error: 'Not authenticated' };
 
     try {
@@ -198,6 +201,7 @@ export function useCommunityPosts(options: {
         content,
         images,
         listing_id: listingId,
+        location: location || null,
         type: type || 'general', // Default to 'general' if no type provided
         status: moderationResult.requiresManualReview ? 'hidden' : 'active', // Hide if requires review
       };
