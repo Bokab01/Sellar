@@ -634,6 +634,7 @@ export default function HomeScreen() {
         zIndex: 12,
         transform: [{ translateY: floatingSearchTranslateY }],
         opacity: floatingSearchOpacity,
+        paddingVertical:theme.spacing.sm,
       }}>
         <EnhancedSearchHeader
           searchQuery={searchQuery}
@@ -641,6 +642,7 @@ export default function HomeScreen() {
           onFilterPress={() => router.push('/filter-products')}
           onAvatarPress={() => router.push('/(tabs)/more')}
           placeholder= 'Search here...'
+          
         />
       </Animated.View>
 

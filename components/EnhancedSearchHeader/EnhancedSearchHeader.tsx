@@ -45,7 +45,7 @@ export function EnhancedSearchHeader({
         borderWidth: 1,
         borderColor: theme.colors.border,
         paddingHorizontal: theme.spacing.sm,
-        paddingVertical: theme.spacing.sm - 1,
+        paddingVertical: theme.spacing.sm + 2,
         marginHorizontal: theme.spacing.sm, // Minimal margins for true floating effect
         ...theme.shadows.sm, // Add shadow for floating effect
       }}
@@ -108,7 +108,7 @@ export function EnhancedSearchHeader({
             onPress={() => router.push('/notifications')}
             activeOpacity={0.7}
           >
-            <Bell size={18} color={theme.colors.text.primary} />
+            <Bell size={20} color={theme.colors.text.primary} />
             {unreadCount > 0 && (
               <View
                 style={{
@@ -159,7 +159,7 @@ export function EnhancedSearchHeader({
             onPress={() => router.push('/favorites')}
             activeOpacity={0.7}
           >
-            <Heart size={18} color={theme.colors.text.primary} />
+            <Heart size={20} color={theme.colors.text.primary} />
             {favoritesCount > 0 && (
               <View
                 style={{
@@ -208,7 +208,7 @@ export function EnhancedSearchHeader({
             onPress={onFilterPress}
             activeOpacity={0.7}
           >
-            <ListFilterPlus size={18} color={theme.colors.text.primary} />
+            <ListFilterPlus size={20} color={theme.colors.text.primary} />
           </TouchableOpacity>
         </View>
     </View>

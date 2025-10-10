@@ -6,7 +6,6 @@ import { Dimensions, Platform, View } from 'react-native';
 
 // Import the screen components explicitly
 import MoreScreen from './index';
-import BusinessDashboardScreen from './dashboard';
 import WalletScreen from './wallet';
 import SettingsScreen from './settings';
 import { SafeAreaWrapper } from '@/components';
@@ -64,11 +63,6 @@ export default function MoreLayout() {
             name="Profile" 
             component={MoreScreen}
             options={{ title: 'Profile' }}
-          />
-          <Tab.Screen 
-            name="Dashboard" 
-            component={BusinessDashboardScreen}
-            options={{ title: 'Dashboard' }}
           />
           <Tab.Screen 
             name="Wallet" 

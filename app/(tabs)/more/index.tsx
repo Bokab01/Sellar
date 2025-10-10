@@ -244,20 +244,13 @@ export default function MoreScreen() {
           icon: <Award size={20} color={theme.colors.warning} />,
           onPress: () => router.push('/my-rewards'),
         },
-       /*  {
-          title: 'Business Plans',
-          subtitle: currentPlan ? `${currentPlan.subscription_plans?.name} Plan` : 'Unlock business features',
-          icon: <Building size={20} color={theme.colors.primary} />,
-          badge: currentPlan ? { text: 'Active', variant: 'success' as const } : undefined,
-          onPress: () => router.push('/subscription-plans'),
-        },
         {
-          title: 'Dashboard',
-          subtitle: hasBusinessPlan() ? 'Business analytics and management' : 'Unlock with business plan',
+          title: hasBusinessPlan() ? 'Sellar Pro Dashboard' : 'Dashboard',
+          subtitle: hasBusinessPlan() ? 'Detailed analytics and insights' : 'View your performance metrics',
           icon: <BarChart3 size={20} color={theme.colors.primary} />,
-          badge: hasBusinessPlan() ? { text: 'Business', variant: 'success' as const } : undefined,
-          onPress: () => router.push('/(tabs)/more/dashboard'),
-        }, */
+          badge: hasBusinessPlan() ? { text: 'Pro', variant: 'success' as const } : undefined,
+          onPress: () => router.push('/dashboard'),
+        },
         {
           title: 'Boost Listings',
           subtitle: 'Boost your listings and unlock tools',
