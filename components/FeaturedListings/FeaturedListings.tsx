@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, ScrollView, TouchableOpacity } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
-import { PremiumProductCard } from '@/components/PremiumProductCard/PremiumProductCard';
+import { ProductCard } from '@/components/Card/Card';
 import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
 import { EmptyState } from '@/components/EmptyState/EmptyState';
 import { BusinessBadge } from '@/components/BusinessBadge/BusinessBadge';
@@ -269,8 +269,10 @@ export function FeaturedListings({
           paddingHorizontal: theme.spacing.lg,
         }}>
           {listings.map((listing) => (
-            <PremiumProductCard
+            <ProductCard
               key={listing.id}
+              variant="compact"
+              shadowSize="sm"
               image={listing.images}
               title={listing.title}
               price={listing.price}
@@ -278,9 +280,6 @@ export function FeaturedListings({
               seller={listing.seller}
               location={listing.location}
               layout="grid"
-              isBoosted={listing.isBoosted}
-              isSponsored={listing.isSponsored}
-              isPriority={listing.isPriority}
               viewCount={listing.viewCount}
               onPress={() => handleListingPress(listing.id)}
               onSellerPress={() => handleSellerPress(listing.seller.id)}
@@ -302,7 +301,10 @@ export function FeaturedListings({
       >
         {listings.map((listing) => (
           <View key={listing.id} style={{ width: 280 }}>
-            <PremiumProductCard
+            <ProductCard
+              variant="compact"
+              width={280}
+              shadowSize="sm"
               image={listing.images}
               title={listing.title}
               price={listing.price}
@@ -311,9 +313,6 @@ export function FeaturedListings({
               location={listing.location}
               layout="default"
               fullWidth
-              isBoosted={listing.isBoosted}
-              isSponsored={listing.isSponsored}
-              isPriority={listing.isPriority}
               viewCount={listing.viewCount}
               onPress={() => handleListingPress(listing.id)}
               onSellerPress={() => handleSellerPress(listing.seller.id)}

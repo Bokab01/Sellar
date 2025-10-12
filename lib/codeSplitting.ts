@@ -21,9 +21,9 @@ export const CodeSplitting = {
   SimpleFeaturedListings: lazy(() => import('@/components/FeaturedListings/SimpleFeaturedListings').then(module => ({ default: module.SimpleFeaturedListings }))),
   FixedFeaturedListings: lazy(() => import('@/components/FeaturedListings/FixedFeaturedListings').then(module => ({ default: module.FixedFeaturedListings }))),
 
-  // Premium Components
-  PremiumProductCard: lazy(() => import('@/components/PremiumProductCard/PremiumProductCard').then(module => ({ default: module.PremiumProductCard }))),
-  MinimalPremiumProductCard: lazy(() => import('@/components/PremiumProductCard/MinimalPremiumProductCard').then(module => ({ default: module.MinimalPremiumProductCard }))),
+  // Premium Components - Now using unified ProductCard
+  // PremiumProductCard: lazy(() => import('@/components/PremiumProductCard/PremiumProductCard').then(module => ({ default: module.PremiumProductCard }))),
+  // MinimalPremiumProductCard: lazy(() => import('@/components/PremiumProductCard/MinimalPremiumProductCard').then(module => ({ default: module.MinimalPremiumProductCard }))),
 
   // Community Features
   PostCard: lazy(() => import('@/components/PostCard/PostCard').then(module => ({ default: module.PostCard }))),

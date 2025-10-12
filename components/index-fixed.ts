@@ -11,7 +11,8 @@ export { MultiStepForm, useMultiStepForm } from './MultiStepForm/MultiStepForm';
 
 // Marketplace Components
 export { ProductCard } from './Card/Card';
-export { PremiumProductCard } from './PremiumProductCard/PremiumProductCard';
+// Legacy component removed - Now using unified ProductCard with variant prop
+// export { PremiumProductCard } from './PremiumProductCard/PremiumProductCard';
 export { Badge } from './Badge/Badge';
 export { BusinessBadge, BusinessBadges } from './BusinessBadge/BusinessBadge';
 export { UserBadgeSystem, CompactUserBadges, FullUserBadges, DarkThemeUserBadges } from './UserBadgeSystem';

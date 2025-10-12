@@ -679,36 +679,36 @@ export default function FeatureMarketplaceScreen() {
                       disabled={!canAfford || hasAccess}
                       style={{
                         padding: theme.spacing.lg,
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.lg, marginBottom: theme.spacing.lg }}>
-                        <View
-                          style={{
-                            backgroundColor: theme.colors.primary + '15',
-                            borderRadius: theme.borderRadius.lg,
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.lg, marginBottom: theme.spacing.lg }}>
+                      <View
+                        style={{
+                          backgroundColor: theme.colors.primary + '15',
+                          borderRadius: theme.borderRadius.lg,
                             width: 70,
                             height: 70,
-                            justifyContent: 'center',
-                            alignItems: 'center',
+                          justifyContent: 'center',
+                          alignItems: 'center',
                             overflow: 'hidden',
-                          }}
-                        >
+                        }}
+                      >
                           <Text style={{ fontSize: 30, lineHeight: 36 }}>{getFeatureIcon(featureKey)}</Text>
-                        </View>
-                        
-                        <View style={{ flex: 1, paddingRight: theme.spacing.xl }}>
-                          <Text variant="h4" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
-                            {(feature as any).name}
-                          </Text>
-                          <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.sm }}>
-                            {(feature as any).description}
-                          </Text>
-                          <Text variant="caption" color="muted">
-                            Duration: {(feature as any).duration}
-                          </Text>
-                        </View>
                       </View>
+                      
+                        <View style={{ flex: 1, paddingRight: theme.spacing.xl }}>
+                        <Text variant="h4" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
+                          {(feature as any).name}
+                        </Text>
+                        <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.sm }}>
+                          {(feature as any).description}
+                        </Text>
+                        <Text variant="caption" color="muted">
+                          Duration: {(feature as any).duration}
+                        </Text>
+                      </View>
+                    </View>
 
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
@@ -732,7 +732,7 @@ export default function FeatureMarketplaceScreen() {
                         </Text>
                       )}
                     </View>
-                    </TouchableOpacity>
+                  </TouchableOpacity>
                   </View>
                 );
               })

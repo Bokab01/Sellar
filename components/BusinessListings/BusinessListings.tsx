@@ -2,7 +2,7 @@ import React, { memo, useCallback, useMemo } from 'react';
 import { View, ScrollView, TouchableOpacity, FlatList } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
-import { MinimalPremiumProductCard } from '@/components/PremiumProductCard/MinimalPremiumProductCard';
+import { ProductCard } from '@/components/Card/Card';
 import { router } from 'expo-router';
 
 interface BusinessListing {
@@ -68,8 +68,12 @@ const BusinessListings = memo(function BusinessListings({
 
   // Memoize the render item function to prevent re-renders
   const renderListing = useCallback(({ item: listing }: { item: BusinessListing }) => (
-    <View style={{ width: 190 }}>
-      <MinimalPremiumProductCard
+    <View style={{ width: 190, marginBottom: theme.spacing.md }}>
+      <ProductCard
+        variant="compact"
+        width={190}
+        shadowSize="sm"
+        layout="grid"
         image={listing.images}
         title={listing.title}
         price={listing.price}
@@ -83,7 +87,7 @@ const BusinessListings = memo(function BusinessListings({
         listingId={listing.id}
       />
     </View>
-  ), [handleListingPress, favorites, currentUserId, onFavoritePress]);
+  ), [handleListingPress, favorites, currentUserId, onFavoritePress, theme.spacing.md]);
 
   return (
     <View style={{ marginBottom: theme.spacing.lg }}>

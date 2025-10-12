@@ -3,7 +3,7 @@ import { View, ScrollView, TouchableOpacity } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
-import { MinimalPremiumProductCard } from '@/components/PremiumProductCard/MinimalPremiumProductCard';
+import { ProductCard } from '@/components/Card/Card';
 import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
@@ -523,8 +523,11 @@ export function FixedFeaturedListings({
           const isOwnListing = user?.id === listing.seller.id;
 
           return (
-            <View key={listing.id} style={{ width: '48%' }}>
-              <MinimalPremiumProductCard
+            <View key={listing.id} style={{ width: '48%', marginBottom: theme.spacing.md }}>
+              <ProductCard
+                variant="compact"
+                shadowSize="sm"
+                layout="grid"
                 listingId={listing.id}
                 image={listing.images}
                 title={listing.title}
@@ -537,6 +540,7 @@ export function FixedFeaturedListings({
                 isFavorited={isFavorited}
                 onFavoritePress={isOwnListing ? undefined : () => handleFavoriteToggle(listing.id, listing.seller.id)}
                 onPress={() => handleListingPress(listing.id)}
+                borderColor={theme.colors.primary}
               />
             </View>
           );
@@ -562,8 +566,12 @@ export function FixedFeaturedListings({
           const isOwnListing = user?.id === listing.seller.id;
 
           return (
-            <View key={listing.id} style={{ width: 190 }}>
-              <MinimalPremiumProductCard
+            <View key={listing.id} style={{ width: 190, marginBottom: theme.spacing.md }}>
+              <ProductCard
+                variant="compact"
+                width={190}
+                shadowSize="sm"
+                layout="grid"
                 listingId={listing.id}
                 image={listing.images}
                 title={listing.title}
@@ -576,6 +584,7 @@ export function FixedFeaturedListings({
                 isFavorited={isFavorited}
                 onFavoritePress={isOwnListing ? undefined : () => handleFavoriteToggle(listing.id, listing.seller.id)}
                 onPress={() => handleListingPress(listing.id)}
+                borderColor={theme.colors.primary}
               />
             </View>
           );

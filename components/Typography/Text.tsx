@@ -2,7 +2,7 @@ import React from 'react';
 import { Text as RNText, TextProps as RNTextProps, TextStyle } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 
-type TextVariant = 'h1' | 'h2' | 'h3' | 'h4' | 'body' | 'bodySmall' | 'caption' | 'button';
+type TextVariant = 'h1' | 'h2' | 'h3' | 'h4' | 'body' | 'bodySmall' | 'caption' | 'location' | 'button';
 type TextColor = 'primary' | 'secondary' | 'muted' | 'inverse' | 'error' | 'success' | 'warning';
 type TextWeight = 'normal' | 'medium' | 'semibold' | 'bold';
 

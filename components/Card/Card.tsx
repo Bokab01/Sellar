@@ -11,7 +11,7 @@ import { ListingImage } from '@/components/OptimizedImage/OptimizedImage';
 import { useMemoryManager } from '@/utils/memoryManager';
 import { ImageViewer } from '@/components/ImageViewer/ImageViewer';
 import { useImageViewer } from '@/hooks/useImageViewer';
-import { Heart, Eye, MoreVertical, Play } from 'lucide-react-native';
+import { Heart, Eye, MoreVertical, Play, Edit, Trash2, EyeOff, MapPin } from 'lucide-react-native';
 import { ReportButton } from '@/components/ReportButton/ReportButton';
 
 // Helper function to detect if URL is a video
@@ -36,7 +36,7 @@ interface ProductCardProps {
   };
   badge?: {
     text: string;
-    variant?: 'new' | 'sold' | 'featured' | 'discount' | 'info' | 'success' | 'neutral' | 'warning' | 'error' | 'urgent' | 'spotlight' | 'primary';
+    variant?: 'new' | 'sold' | 'featured' | 'discount' | 'info' | 'success' | 'neutral' | 'warning' | 'error' | 'urgent' | 'spotlight' | 'primary' | 'secondary';
   };
   onPress?: () => void;
   onSellerPress?: () => void;
@@ -45,6 +45,7 @@ interface ProductCardProps {
   location?: string;
   layout?: 'default' | 'grid' | 'list';
   fullWidth?: boolean; // New prop for full-width mode
+  shadowSize?: 'sm' | 'md' | 'lg'; // New prop to control shadow size
   enableImageViewer?: boolean; // New prop to enable/disable ImageViewer
   // New props for favorites and views
   listingId?: string;
@@ -58,6 +59,19 @@ interface ProductCardProps {
   // Report props
   showReportButton?: boolean;
   currentUserId?: string;
+  // Unified card variants
+  variant?: 'default' | 'compact' | 'list'; // NEW: Control card style (default, compact for featured, list for horizontal)
+  width?: number; // NEW: Fixed width for compact variant
+  // My Listings props
+  status?: string; // NEW: For listing status (active, draft, sold, hidden)
+  onEdit?: () => void; // NEW: Edit action
+  onDelete?: () => void; // NEW: Delete action
+  onToggleVisibility?: () => void; // NEW: Show/Hide toggle
+  badges?: Array<{ // NEW: Multiple badges support
+    text: string;
+    variant: 'new' | 'sold' | 'featured' | 'discount' | 'info' | 'success' | 'neutral' | 'warning' | 'error' | 'urgent' | 'spotlight' | 'primary' | 'secondary';
+  }>;
+  borderColor?: string; // NEW: Custom border color
 }
 
 const ProductCard = memo<ProductCardProps>(function ProductCard({
@@ -75,6 +89,7 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
   location,
   layout = 'default',
   fullWidth = false,
+  shadowSize,
   enableImageViewer = true,
   // New props for favorites and views
   listingId,
@@ -88,6 +103,16 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
   // Report props
   showReportButton = false,
   currentUserId,
+  // Unified card variants
+  variant = 'default',
+  width,
+  // My Listings props
+  status,
+  onEdit,
+  onDelete,
+  onToggleVisibility,
+  badges = [],
+  borderColor,
 }) {
   const { theme } = useTheme();
   const { shouldLoadHeavyComponent } = useMemoryManager();
@@ -140,6 +165,232 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
     }
   };
 
+  // Calculate dimensions based on variant
+  const cardWidth = variant === 'compact' && width ? width : '100%';
+  const cardHeight = variant === 'compact' ? 280 : (isGridLayout ? totalCardHeight : undefined);
+  const compactImageHeight = variant === 'compact' ? 182 : imageHeight;
+
+  // LIST VARIANT RENDERING (Horizontal layout)
+  if (variant === 'list') {
+    return (
+      <>
+        <TouchableOpacity
+          onPress={onPress}
+          style={{
+            flexDirection: 'row',
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.borderRadius.lg,
+            ...(shadowSize ? theme.shadows[shadowSize] : theme.shadows.sm),
+            overflow: 'hidden',
+            marginBottom: theme.spacing.sm,
+            padding: theme.spacing.sm,
+          }}
+          activeOpacity={0.95}
+        >
+          {/* Image - Left Side */}
+          <View style={{ position: 'relative', width: 100, height: 100, borderRadius: theme.borderRadius.md, overflow: 'hidden' }}>
+            <Image
+              source={imageSource}
+              style={{
+                width: '100%',
+                height: '100%',
+                backgroundColor: theme.colors.surfaceVariant,
+              }}
+              resizeMode="cover"
+            />
+          </View>
+
+          {/* Content - Middle */}
+          <View style={{ flex: 1, marginLeft: theme.spacing.md, justifyContent: 'flex-start' }}>
+            {/* Title */}
+            <Text 
+              variant="body" 
+              numberOfLines={2}
+              style={{ 
+                fontWeight: '600',
+                marginBottom: 2,
+              }}
+            >
+              {title}
+            </Text>
+
+            {/* Price */}
+            <PriceDisplay 
+              amount={price}
+              currency={currency}
+              size="sm"
+              style={{ marginBottom: 2 }}
+            />
+
+            {/* Location */}
+            {location && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4, gap: 4 }}>
+                <MapPin size={10} color={theme.colors.text.muted} />
+                <Text 
+                  variant="location"
+                  color="muted"
+                  numberOfLines={1}
+                >
+                  {location}
+                </Text>
+              </View>
+            )}
+
+            {/* Feature Badges */}
+            {badges.length > 0 && (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs }}>
+                {badges.slice(0, 2).map((badgeItem, index) => (
+                  <Badge
+                    key={index}
+                    variant={badgeItem.variant}
+                    text={badgeItem.text}
+                    size="xs"
+                  />
+                ))}
+              </View>
+            )}
+          </View>
+
+          {/* Right Side Container - Action Buttons OR Stats Icons */}
+          <View style={{ flexDirection: 'column', justifyContent: 'space-between', marginLeft: theme.spacing.sm, minHeight: 100 }}>
+            {(onEdit || onDelete || onToggleVisibility) ? (
+              // Action Buttons (for My Listings)
+              <View style={{ flexDirection: 'column', gap: theme.spacing.xs, justifyContent: 'center' }}>
+                {onEdit && (
+                  <TouchableOpacity
+                    onPress={onEdit}
+                    style={{
+                      backgroundColor: theme.colors.primary,
+                      borderRadius: theme.borderRadius.md,
+                      width: 30,
+                      height: 30,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 1,
+                      borderColor: theme.colors.border,
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Edit size={14} color={theme.colors.primaryForeground} />
+                  </TouchableOpacity>
+                )}
+
+                {onToggleVisibility && (
+                  <TouchableOpacity
+                    onPress={onToggleVisibility}
+                    style={{
+                      backgroundColor: status === 'hidden' ? theme.colors.success : theme.colors.warning,
+                      borderRadius: theme.borderRadius.md,
+                      width: 30,
+                      height: 30,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 1,
+                      borderColor: theme.colors.border,
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    {status === 'hidden' ? (
+                      <Eye size={14} color={theme.colors.primaryForeground} />
+                    ) : (
+                      <EyeOff size={14} color={theme.colors.primaryForeground} />
+                    )}
+                  </TouchableOpacity>
+                )}
+
+                {onDelete && (
+                  <TouchableOpacity
+                    onPress={onDelete}
+                    style={{
+                      backgroundColor: theme.colors.error,
+                      borderRadius: theme.borderRadius.md,
+                      width: 30,
+                      height: 30,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 1,
+                      borderColor: theme.colors.border,
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Trash2 size={14} color={theme.colors.primaryForeground} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : (
+              // Stats Icons (for Search Results) - Vertical with space between
+              <>
+                {/* Heart/Favorite - Top */}
+                {onFavoritePress && (
+                  <View style={{ alignSelf: 'flex-start' }}>
+                    <TouchableOpacity
+                      onPress={onFavoritePress}
+                      style={{
+                        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                        borderRadius: 16,
+                        width: 26,
+                        height: 26,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Heart 
+                        size={14}
+                        color={isFavorited ? '#ff4757' : '#ffffff'} 
+                        fill={isFavorited ? '#ff4757' : 'transparent'}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* View Count - Bottom */}
+                {viewCount > 0 && (
+                  <View style={{ alignSelf: 'flex-start' }}>
+                    <TouchableOpacity
+                      onPress={onViewPress}
+                      style={{
+                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                        borderRadius: 8,
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 2,
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Eye size={10} color="#ffffff" />
+                      <Text 
+                        variant="caption" 
+                        style={{ 
+                          color: '#ffffff',
+                          fontSize: 9,
+                          fontWeight: '600'
+                        }}
+                      >
+                        {viewCount}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </>
+            )}
+          </View>
+        </TouchableOpacity>
+
+        {/* ImageViewer */}
+        <ImageViewer
+          visible={imageViewerVisible}
+          images={images}
+          initialIndex={imageViewerIndex}
+          onClose={closeImageViewer}
+        />
+      </>
+    );
+  }
+
+  // DEFAULT & COMPACT VARIANT RENDERING (Vertical layout)
   return (
     <>
       <TouchableOpacity
@@ -148,10 +399,16 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
         style={{
           backgroundColor: theme.colors.surface,
           borderRadius: fullWidth ? theme.borderRadius.sm : theme.borderRadius.lg,
-          ...(fullWidth ? theme.shadows.sm : theme.shadows.md),
+          ...(shadowSize ? theme.shadows[shadowSize] : (fullWidth ? theme.shadows.sm : theme.shadows.md)),
           overflow: 'hidden',
           marginBottom: isGridLayout ? 0 : theme.spacing.md,
-          height: isGridLayout ? totalCardHeight : undefined,
+          height: cardHeight,
+          width: cardWidth,
+          // Add custom border if provided
+          ...(borderColor && {
+            borderWidth: 1.5,
+            borderColor: borderColor,
+          }),
           // Add highlight border if highlighted
           ...(isHighlighted && {
             borderWidth: 3,
@@ -160,7 +417,7 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
             shadowOffset: { width: 0, height: 0 },
             shadowOpacity: 0.3,
             shadowRadius: 8,
-            elevation: 8,
+            elevation: 4,
           }),
         }}
         activeOpacity={0.95}
@@ -172,7 +429,7 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
             path={imagePath}
             style={{
               width: '100%',
-              height: imageHeight,
+              height: variant === 'compact' ? compactImageHeight : imageHeight,
             }}
             containerStyle={{
               backgroundColor: theme.colors.surfaceVariant,
@@ -187,7 +444,7 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
             source={imageSource}
             style={{
               width: '100%',
-              height: imageHeight,
+              height: variant === 'compact' ? compactImageHeight : imageHeight,
               backgroundColor: theme.colors.surfaceVariant,
             }}
             resizeMode="cover"
@@ -335,7 +592,7 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
               gap: isGridLayout ? 2 : 4,
             }}
           >
-            <Heart size={isGridLayout ? 10 : 12} color="#ff4757" />
+            <Text style={{ fontSize: isGridLayout ? 10 : 12, color: '#ff4757' }}>♡</Text>
             <Text 
               variant="caption" 
               style={{ 
@@ -380,17 +637,16 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
         </View>
 
         {location && (
-          <Text 
-            variant={isGridLayout ? "caption" : "bodySmall"}
-            color="muted"
-            numberOfLines={1}
-            style={{ 
-              marginBottom: isGridLayout ? theme.spacing.xs : theme.spacing.md,
-              fontSize: isGridLayout ? 10 : undefined,
-            }}
-          >
-             {location}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md, gap: 4 }}>
+            <MapPin size={10} color={theme.colors.text.muted} />
+            <Text 
+              variant="location"
+              color="muted"
+              numberOfLines={1}
+            >
+              {location}
+            </Text>
+          </View>
         )}
 
         {/* Seller Info - Simplified for grid layout */}

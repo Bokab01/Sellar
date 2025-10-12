@@ -204,17 +204,47 @@ async function processSuccessfulPayment(supabase: any, paymentData: any) {
       }
     }
 
-    // Create notification
+    // Create notification with purchase-specific details
+    let notificationData: any = {
+      user_id: transaction.user_id,
+      type: 'payment_success',
+      data: {
+        reference: paymentData.reference,
+        amount: amount,
+      },
+    };
+
+    // Customize notification based on purchase type
+    if (transaction.purchase_type === 'credit_package') {
+      // For credit purchases, get package details from credit_purchases table
+      const { data: purchase } = await supabase
+        .from('credit_purchases')
+        .select('credits, amount_ghs')
+        .eq('id', transaction.purchase_id)
+        .single();
+      
+      const credits = purchase?.credits || 0;
+      
+      if (credits > 0) {
+        notificationData.title = 'Payment Successful! 🎉';
+        notificationData.body = `${credits} credits have been added to your account! Thank you for using Sellar!`;
+        notificationData.data.credits = credits;
+      } else {
+        // Fallback if purchase not found
+        notificationData.title = 'Payment Successful! 🎉';
+        notificationData.body = `Your credits have been added to your account! Thank you for using Sellar!`;
+      }
+    } else if (transaction.purchase_type === 'subscription') {
+      notificationData.title = 'Payment Successful! 🎉';
+      notificationData.body = `Your subscription has been activated successfully! Thank you for using Sellar!`;
+    } else {
+      notificationData.title = 'Payment Successful';
+      notificationData.body = `Your payment of GHS ${amount} has been processed successfully. Thank you for using Sellar!`;
+    }
+
     await supabase
       .from('notifications')
-      .insert({
-        user_id: transaction.user_id,
-        title: 'Payment Successful',
-        message: `Your payment of GHS ${amount} has been processed successfully.`,
-        notification_type: 'payment_received',
-        related_id: transaction.id,
-        related_type: 'transaction',
-      });
+      .insert(notificationData);
 
   } catch (error) {
     console.error('Failed to process successful payment:', error);

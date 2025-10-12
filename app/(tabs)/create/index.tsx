@@ -537,41 +537,52 @@ function CreateListingScreen() {
   }, [currentStep, saveDraft]);
 
   const handleSubmit = async () => {
-    // If user has selected features, show confirmation modal
+    // Check if payment is needed for additional listings first
+    const maxListings = getMaxListings();
+    const needsCredits = !hasUnlimitedListings() && userListingsCount >= maxListings;
+    
+    // If needs credits AND has features, show combined confirmation
+    if (needsCredits && selectedFeatures.length > 0) {
+      setShowFeatureConfirmModal(true);
+      return;
+    }
+    
+    // If only needs credits (no features), show payment modal
+    if (needsCredits) {
+      setShowPaymentModal(true);
+      return;
+    }
+    
+    // If only has features (no credits needed), show feature confirmation
     if (selectedFeatures.length > 0) {
       setShowFeatureConfirmModal(true);
       return;
     }
     
-    // No features selected, proceed directly
+    // No features and no credits needed, proceed directly
     await proceedWithPublish();
   };
 
   const proceedWithPublish = async () => {
-    // Check if payment is needed for additional listings
-    const maxListings = getMaxListings();
-    const needsCredits = !hasUnlimitedListings() && userListingsCount >= maxListings;
-    
-    if (needsCredits) {
-      setShowPaymentModal(true);
-      return;
-    }
-
-    // For users who don't need to pay for the listing slot itself
-    // but may have selected features that need to be paid for
+    // Process credits (listing fee + features) and create listing
+    // Note: Payment modal check is now handled in handleSubmit to avoid double confirmation
     try {
-      // Calculate feature credits
+      // Calculate total credits needed
+      const maxListings = getMaxListings();
+      const needsListingFee = !hasUnlimitedListings() && userListingsCount >= maxListings;
+      const listingFee = needsListingFee ? 5 : 0;
       const featureCredits = selectedFeatures.reduce((sum, feature) => sum + (feature.credits || 0), 0);
+      const totalCredits = listingFee + featureCredits;
       
-      // If features were selected, deduct their credits first
-      if (featureCredits > 0) {
-        console.log(`💳 Deducting ${featureCredits} credits for features...`);
+      // If any credits are needed, deduct them
+      if (totalCredits > 0) {
+        console.log(`💳 Deducting ${totalCredits} credits (${listingFee} listing fee + ${featureCredits} features)...`);
         
         // Check if user has enough credits
-        if (balance < featureCredits) {
+        if (balance < totalCredits) {
           Alert.alert(
             'Insufficient Credits',
-            `You need ${featureCredits} credits for the selected features but only have ${balance}. Would you like to buy more credits?`,
+            `You need ${totalCredits} credits (${listingFee} for listing + ${featureCredits} for features) but only have ${balance}. Would you like to buy more credits?`,
             [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Buy Credits', onPress: () => {
@@ -586,18 +597,39 @@ function CreateListingScreen() {
           return;
         }
         
-        // Deduct credits for features
-        const result = await spendCredits(featureCredits, 'Listing features', {
-          referenceType: 'listing_creation',
-          features: selectedFeatures.map(f => ({ key: f.key, name: f.name, credits: f.credits })),
-        });
-        
-        if (!result.success) {
-          Alert.alert('Error', result.error || 'Failed to process feature payment');
-          return;
+        // Deduct credits for listing fee if needed
+        if (listingFee > 0) {
+          const listingFeeResult = await spendCredits(listingFee, 'Additional listing slot', {
+            referenceType: 'listing_creation',
+          });
+          
+          if (!listingFeeResult.success) {
+            Alert.alert('Error', listingFeeResult.error || 'Failed to process listing fee payment');
+            return;
+          }
+          
+          console.log(`✅ Successfully deducted ${listingFee} credits for additional listing slot`);
         }
         
-        console.log(`✅ Successfully deducted ${featureCredits} credits for features`);
+        // Deduct credits for features if any were selected
+        if (featureCredits > 0) {
+          const featureResult = await spendCredits(featureCredits, 'Listing features', {
+            referenceType: 'listing_creation',
+            features: selectedFeatures.map(f => ({ key: f.key, name: f.name, credits: f.credits })),
+          });
+          
+          if (!featureResult.success) {
+            // Refund listing fee if feature payment fails
+            if (listingFee > 0) {
+              console.log('💰 Refunding listing fee due to feature payment failure...');
+              // TODO: Implement refund logic
+            }
+            Alert.alert('Error', featureResult.error || 'Failed to process feature payment');
+            return;
+          }
+          
+          console.log(`✅ Successfully deducted ${featureCredits} credits for features`);
+        }
       }
       
       // Now create the listing
@@ -2867,15 +2899,29 @@ function CreateListingScreen() {
       <AppModal
         visible={showFeatureConfirmModal}
         onClose={() => setShowFeatureConfirmModal(false)}
-        title="Confirm Features"
-        size="md"
+        title="Confirm Features & Payment"
+        size="lg"
       >
-        <View style={{ padding: theme.spacing.lg }}>
+        <ScrollView 
+          style={{ maxHeight: '80%' }}
+          showsVerticalScrollIndicator={true}
+          contentContainerStyle={{ padding: theme.spacing.lg }}
+        >
           <Text variant="body" color="secondary" style={{ marginBottom: theme.spacing.lg }}>
-            You're about to apply the following features to your listing:
+            {(() => {
+              const maxListings = getMaxListings();
+              const needsCredits = !hasUnlimitedListings() && userListingsCount >= maxListings;
+              
+              if (needsCredits && selectedFeatures.length > 0) {
+                return "You've reached your listing limit and are applying features. Here's the breakdown:";
+              } else if (selectedFeatures.length > 0) {
+                return "You're about to apply the following features to your listing:";
+              }
+              return "";
+            })()}
           </Text>
           
-          {/* Feature List */}
+          {/* Cost Breakdown */}
           <View style={{ 
             backgroundColor: theme.colors.surface, 
             borderRadius: theme.borderRadius.md, 
@@ -2883,6 +2929,39 @@ function CreateListingScreen() {
             marginBottom: theme.spacing.lg,
             gap: theme.spacing.sm,
           }}>
+            {/* Additional Listing Fee (if needed) */}
+            {(() => {
+              const maxListings = getMaxListings();
+              const needsCredits = !hasUnlimitedListings() && userListingsCount >= maxListings;
+              
+              if (needsCredits) {
+                return (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      paddingVertical: theme.spacing.sm,
+                      borderBottomWidth: selectedFeatures.length > 0 ? 1 : 0,
+                      borderBottomColor: theme.colors.border + '30',
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text variant="body" style={{ fontWeight: '600', marginBottom: 2 }}>
+                        Additional Listing Fee
+                      </Text>
+                      <Text variant="caption" color="secondary">
+                        You've reached your {maxListings} listing limit
+                      </Text>
+                    </View>
+                    <Badge text="5 credits" variant="warning" size="sm" />
+                  </View>
+                );
+              }
+              return null;
+            })()}
+            
+            {/* Feature List */}
             {selectedFeatures.map((feature, index) => (
               <View
                 key={feature.key}
@@ -2920,12 +2999,26 @@ function CreateListingScreen() {
           }}>
             <Text variant="h4">Total Cost</Text>
             <Text variant="h3" style={{ color: theme.colors.primary, fontWeight: '700' }}>
-              {selectedFeatures.reduce((sum, f) => sum + f.credits, 0)} Credits
+              {(() => {
+                const maxListings = getMaxListings();
+                const needsCredits = !hasUnlimitedListings() && userListingsCount >= maxListings;
+                const featureCredits = selectedFeatures.reduce((sum, f) => sum + f.credits, 0);
+                const listingFee = needsCredits ? 5 : 0;
+                return featureCredits + listingFee;
+              })()} Credits
             </Text>
           </View>
           
           <Text variant="caption" color="secondary" style={{ marginBottom: theme.spacing.xl, lineHeight: 18 }}>
-            💡 These features will be applied immediately after your listing is published. Credits will be deducted from your account.
+            💡 {(() => {
+              const maxListings = getMaxListings();
+              const needsCredits = !hasUnlimitedListings() && userListingsCount >= maxListings;
+              
+              if (needsCredits) {
+                return "Credits will be deducted for both the additional listing slot and selected features after publishing.";
+              }
+              return "These features will be applied immediately after your listing is published. Credits will be deducted from your account.";
+            })()}
           </Text>
           
           {/* Action Buttons */}
@@ -2950,7 +3043,7 @@ function CreateListingScreen() {
               Cancel
             </Button>
           </View>
-        </View>
+        </ScrollView>
       </AppModal>
 
     </SafeAreaWrapper>

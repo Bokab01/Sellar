@@ -45,6 +45,12 @@ const baseTypography = {
     fontFamily: getFontFamily('body', 'medium'),
     letterSpacing: 0.5,
   },
+  location: {
+    fontSize: 10,
+    lineHeight: 14,
+    fontFamily: getFontFamily('body', 'regular'),
+    letterSpacing: 0,
+  },
   button: {
     fontSize: 14,
     lineHeight: 20,

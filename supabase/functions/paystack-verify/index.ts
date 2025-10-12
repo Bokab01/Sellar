@@ -423,21 +423,8 @@ async function processPayment(supabase: any, transaction: any, paystackData: any
 
       console.log(`Credit purchase completed: ${pkg.credits} credits added`);
 
-      // Create notification for user
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: transaction.user_id,
-          type: 'payment_success',
-          title: 'Payment Successful! 🎉',
-          body: `${pkg.credits} credits have been added to your account!`,
-          data: {
-            reference: transaction.reference,
-            amount: transaction.amount,
-            credits: pkg.credits,
-            package_name: pkg.name,
-          },
-        });
+      // NOTE: Notification is created by the webhook handler (paystack-webhook)
+      // to avoid duplicate notifications. Do not create notification here.
 
     } else if (transaction.purchase_type === 'subscription') {
       // Activate subscription

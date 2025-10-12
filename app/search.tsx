@@ -7,6 +7,7 @@ import { useListings } from '@/hooks/useListings';
 import { useMultipleListingStats } from '@/hooks/useListingStats';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { getDisplayName } from '@/hooks/useDisplayName';
+import * as Haptics from 'expo-haptics';
 import {
   Text,
   SafeAreaWrapper,
@@ -17,9 +18,12 @@ import {
   LoadingSkeleton,
   SearchBar,
   Chip,
+  Button,
 } from '@/components';
 import { useAppStore } from '@/store/useAppStore';
-import { SlidersHorizontal, ArrowUpDown, Check, MapPin } from 'lucide-react-native';
+import { SlidersHorizontal, ArrowUpDown, Check, MapPin, LayoutGrid, List, ArrowLeft } from 'lucide-react-native';
+
+type ViewMode = 'grid' | 'list';
 
 export default function SearchResultsScreen() {
   const { theme } = useTheme();
@@ -30,6 +34,7 @@ export default function SearchResultsScreen() {
     categoryName?: string; 
   }>();
   const [searchQuery, setSearchQuery] = useState(initialQuery || '');
+  const [viewMode, setViewMode] = useState<ViewMode>('list'); // ✅ Default to list view
   const { 
     filters,
     setFilters,
@@ -180,27 +185,27 @@ export default function SearchResultsScreen() {
         primaryBadge = { text: 'Business', variant: 'info' as const };
       } else if (seller?.verification_status === 'verified') {
         primaryBadge = { text: 'Verified', variant: 'success' as const };
-      }
+    }
 
-      return {
-        id: listing.id,
-        image: listing.images || ['https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg'],
-        title: listing.title,
-        price: listing.price,
-        seller: {
-          id: seller?.id || listing.user_id,
+    return {
+      id: listing.id,
+      image: listing.images || ['https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg'],
+      title: listing.title,
+      price: listing.price,
+      seller: {
+        id: seller?.id || listing.user_id,
           name: seller ? getDisplayName(seller, false).displayName : 'Anonymous User',
-          avatar: seller?.avatar_url || null,
-          rating: seller?.rating || 0,
-          badges: seller?.account_type === 'business' ? ['business'] : [],
-        },
+        avatar: seller?.avatar_url || null,
+        rating: seller?.rating || 0,
+        badges: seller?.account_type === 'business' ? ['business'] : [],
+      },
         badge: primaryBadge || undefined, // Convert null to undefined
-        location: listing.location,
-        views: listing.views_count || 0,
-        favorites: listing.favorites_count || 0,
-        isBoosted: listing.boost_until && new Date(listing.boost_until) > new Date(),
-      };
-    });
+      location: listing.location,
+      views: listing.views_count || 0,
+      favorites: listing.favorites_count || 0,
+      isBoosted: listing.boost_until && new Date(listing.boost_until) > new Date(),
+    };
+  });
   }, [products]);
 
   const handleClearSearch = useCallback(() => {
@@ -251,58 +256,169 @@ export default function SearchResultsScreen() {
 
   return (
     <SafeAreaWrapper>
-      <AppHeader
-        title={headerTitle}
-        showBackButton
-        onBackPress={handleBackPress}
-      />
+      {/* Header with Search Bar */}
+      <View
+        style={{
+          backgroundColor: theme.colors.surface,
+          paddingHorizontal: theme.spacing.md,
+          paddingVertical: theme.spacing.sm,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: theme.spacing.sm,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.colors.border,
+        }}
+      >
+        {/* Back Button */}
+        <TouchableOpacity
+          onPress={handleBackPress}
+          style={{
+            padding: theme.spacing.sm,
+            marginLeft: -theme.spacing.sm,
+          }}
+          activeOpacity={0.7}
+        >
+          <ArrowLeft size={24} color={theme.colors.text.primary} />
+        </TouchableOpacity>
 
-      {/* Search Bar */}
+        {/* Search Bar - Compact */}
+        <View style={{ flex: 1 }}>
       <SearchBar
         value={searchQuery}
         onChangeText={setSearchQuery}
         onClear={searchQuery ? handleClearSearch : undefined}
         placeholder="Search for anything..."
-      />
+            showFilter={false}
+            style={{
+              paddingVertical: 0, // Remove built-in vertical padding to match smart search
+              paddingHorizontal: 0,
+            }}
+          />
+        </View>
 
-      {/* Filter Pills */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingHorizontal: theme.spacing.lg,
-          paddingVertical: theme.spacing.sm,
-          gap: theme.spacing.sm,
-        }}
-        style={{
-          borderBottomWidth: 1,
-          borderBottomColor: theme.colors.border,
-          maxHeight: 65,
-        }}
-      >
-        {/* Filter Button */}
-        <TouchableOpacity
-          onPress={handleFilterPress}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: theme.spacing.md,
-            paddingVertical: theme.spacing.sm,
-            borderRadius: theme.borderRadius.full,
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-            backgroundColor: theme.colors.surface,
-            gap: theme.spacing.xs,
+        {/* View Toggle Button */}
+        <Button
+          variant="icon"
+          icon={viewMode === 'grid' ? 
+            <List size={20} color={theme.colors.text.primary} /> : 
+            <LayoutGrid size={20} color={theme.colors.text.primary} />
+          }
+          onPress={() => {
+            setViewMode(viewMode === 'grid' ? 'list' : 'grid');
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           }}
-        >
-          <SlidersHorizontal size={16} color={theme.colors.text.primary} />
-          <Text variant="bodySmall" style={{ fontWeight: '500' }}>
-            Filter
-          </Text>
-        </TouchableOpacity>
+        />
+      </View>
 
-        {/* Sort By Button */}
-        <TouchableOpacity
+      {/* Results Area */}
+        {error ? (
+        <View style={{ flex: 1, paddingHorizontal: theme.spacing.lg }}>
+            <EmptyState
+              title="Unable to load results"
+              description="Please check your internet connection and try again."
+              action={{
+                text: 'Retry',
+                onPress: refresh,
+              }}
+            />
+          </View>
+        ) : loading ? (
+        <ScrollView contentContainerStyle={{ paddingBottom: theme.spacing.lg }}>
+          {viewMode === 'grid' ? (
+          <View style={{ paddingHorizontal: theme.spacing.lg }}>
+            <Grid columns={2}>
+                {Array.from({ length: isOtherCategory ? 8 : 6 }).map((_, index) => (
+                <LoadingSkeleton
+                  key={index}
+                  width="100%"
+                  height={280}
+                  borderRadius={theme.borderRadius.lg}
+                />
+              ))}
+            </Grid>
+          </View>
+          ) : (
+            <View style={{ paddingHorizontal: theme.spacing.sm, paddingTop: theme.spacing.sm }}>
+              {Array.from({ length: isOtherCategory ? 8 : 6 }).map((_, index) => (
+                <LoadingSkeleton
+                  key={index}
+                  width="100%"
+                  height={100}
+                  borderRadius={theme.borderRadius.lg}
+                  style={{ marginBottom: theme.spacing.sm }}
+                />
+              ))}
+            </View>
+          )}
+        </ScrollView>
+        ) : transformedProducts.length === 0 ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: theme.spacing.lg }}>
+            <EmptyState
+              title="No results found"
+              description={searchQuery 
+                ? `No listings match "${searchQuery}". Try different keywords or adjust your filters.`
+                : "Start typing to search for products, categories, or anything you need."
+              }
+              action={{
+                text: searchQuery ? 'Clear Search' : 'Browse All',
+                onPress: searchQuery 
+                  ? handleClearSearch
+                  : () => router.push('/(tabs)/home'),
+              }}
+            />
+          </View>
+        ) : (
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingBottom: theme.spacing.xl,
+            }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={refresh}
+                tintColor={theme.colors.primary}
+                colors={[theme.colors.primary]}
+              />
+            }
+          // Performance optimizations for ScrollView
+          removeClippedSubviews={true}
+          scrollEventThrottle={16}
+          decelerationRate="fast"
+        >
+          {/* Filter Pills - Inside ScrollView */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingHorizontal: theme.spacing.lg,
+              paddingVertical: theme.spacing.sm,
+              gap: theme.spacing.sm,
+            }}
+          >
+            {/* Filter Button */}
+            <TouchableOpacity
+              onPress={handleFilterPress}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: theme.spacing.md,
+                paddingVertical: theme.spacing.sm,
+                borderRadius: theme.borderRadius.full,
+                borderWidth: 1,
+                borderColor: theme.colors.primary,
+                backgroundColor: theme.colors.surface,
+                gap: theme.spacing.xs,
+              }}
+            >
+              <SlidersHorizontal size={16} color={theme.colors.text.primary} />
+              <Text variant="bodySmall" style={{ fontWeight: '500' }}>
+                Filter
+              </Text>
+            </TouchableOpacity>
+
+            {/* Sort By Button */}
+            <TouchableOpacity
           onPress={() => router.push('/filter-sort')}
           style={{
             flexDirection: 'row',
@@ -456,84 +572,23 @@ export default function SearchResultsScreen() {
       </ScrollView>
 
       {/* Results Count */}
-      {!loading && (
-        <View style={{ 
-          paddingHorizontal: theme.spacing.lg,
-          paddingVertical: theme.spacing.md,
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
-          <Text variant="body" style={{ fontWeight: '600' }}>
-            {transformedProducts.length >= 500 ? '500+' : transformedProducts.length} {transformedProducts.length === 1 ? 'result' : 'results'}
-          </Text>
-          <Text variant="bodySmall" color="muted">
-            Search results
-          </Text>
-        </View>
-      )}
+      <View style={{ 
+        paddingHorizontal: theme.spacing.lg,
+        paddingVertical: theme.spacing.md,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+      }}>
+        <Text variant="body" style={{ fontWeight: '600' }}>
+          {transformedProducts.length >= 500 ? '500+' : transformedProducts.length} {transformedProducts.length === 1 ? 'result' : 'results'}
+        </Text>
+        <Text variant="bodySmall" color="muted">
+          Search results
+        </Text>
+      </View>
 
-      {/* Results */}
-      <View style={{ flex: 1 }}>
-        {error ? (
-          <View style={{ paddingHorizontal: theme.spacing.lg }}>
-            <EmptyState
-              title="Unable to load results"
-              description="Please check your internet connection and try again."
-              action={{
-                text: 'Retry',
-                onPress: refresh,
-              }}
-            />
-          </View>
-        ) : loading ? (
-          <View style={{ paddingHorizontal: theme.spacing.lg }}>
-            <Grid columns={2}>
-              {Array.from({ length: isOtherCategory ? 8 : 6 }).map((_, index) => (
-                <LoadingSkeleton
-                  key={index}
-                  width="100%"
-                  height={280}
-                  borderRadius={theme.borderRadius.lg}
-                />
-              ))}
-            </Grid>
-          </View>
-        ) : transformedProducts.length === 0 ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: theme.spacing.lg }}>
-            <EmptyState
-              title="No results found"
-              description={searchQuery 
-                ? `No listings match "${searchQuery}". Try different keywords or adjust your filters.`
-                : "Start typing to search for products, categories, or anything you need."
-              }
-              action={{
-                text: searchQuery ? 'Clear Search' : 'Browse All',
-                onPress: searchQuery 
-                  ? handleClearSearch
-                  : () => router.push('/(tabs)/home'),
-              }}
-            />
-          </View>
-        ) : (
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{
-              paddingBottom: theme.spacing.xl,
-            }}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={refresh}
-                tintColor={theme.colors.primary}
-                colors={[theme.colors.primary]}
-              />
-            }
-            // Performance optimizations for ScrollView
-            removeClippedSubviews={true}
-            scrollEventThrottle={16}
-            decelerationRate="fast"
-          >
+      {/* Results Grid/List */}
+      {viewMode === 'grid' ? (
             <Grid columns={2} spacing={4}>
               {transformedProducts.map((product) => (
                 <ProductCard
@@ -546,20 +601,58 @@ export default function SearchResultsScreen() {
                   location={product.location}
                   layout="grid"
                   fullWidth={true}
-                  listingId={product.id}
-                  isFavorited={hookFavorites[product.id] || false}
-                  viewCount={viewCounts[product.id] || 0}
-                  favoritesCount={product.favorites || 0}
+              listingId={product.id}
+              isFavorited={hookFavorites[product.id] || false}
+              viewCount={viewCounts[product.id] || 0}
+              favoritesCount={product.favorites || 0}
                   onPress={() => router.push(`/(tabs)/home/${product.id}`)}
-                  onFavoritePress={user?.id !== product.seller.id ? () => handleFavoritePress(product.id) : undefined}
-                  onViewPress={() => handleViewPress(product.id)}
-                  currentUserId={user?.id || ""}
+              onFavoritePress={user?.id !== product.seller.id ? () => handleFavoritePress(product.id) : undefined}
+              onViewPress={() => handleViewPress(product.id)}
+              currentUserId={user?.id || ""}
                 />
               ))}
             </Grid>
+      ) : (
+        <View style={{ paddingHorizontal: theme.spacing.sm }}>
+          {transformedProducts.map((product) => {
+            // ✅ Prepare badges for ListingListCard
+            const listBadges: Array<{ text: string; variant: 'primary' | 'success' | 'warning' | 'error' | 'info' | 'neutral' | 'secondary' }> = [];
+            
+            if (product.badge?.text && product.badge?.variant) {
+              listBadges.push({ 
+                text: String(product.badge.text), 
+                variant: String(product.badge.variant) as any
+              });
+            }
+
+            return (
+              <ProductCard
+                key={product.id}
+                variant="list"
+                shadowSize="sm"
+                listingId={String(product.id)}
+                image={Array.isArray(product.image) ? product.image[0] : String(product.image)}
+                title={String(product.title)}
+                price={product.price}
+                currency="GHS"
+                seller={product.seller}
+                status="active"
+                location={product.location}
+                viewCount={viewCounts[product.id] || 0}
+                favoritesCount={product.favorites || 0}
+                isFavorited={hookFavorites[product.id] || false}
+                badge={listBadges[0]}
+                badges={listBadges}
+                onPress={() => router.push(`/(tabs)/home/${product.id}`)}
+                onFavoritePress={user?.id !== product.seller.id ? () => handleFavoritePress(product.id) : undefined}
+                onViewPress={() => handleViewPress(product.id)}
+              />
+            );
+          })}
+        </View>
+      )}
           </ScrollView>
         )}
-      </View>
 
     </SafeAreaWrapper>
   );

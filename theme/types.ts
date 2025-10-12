@@ -159,6 +159,12 @@ export interface Typography {
     fontFamily: string;
     letterSpacing: number;
   };
+  location: {
+    fontSize: number;
+    lineHeight: number;
+    fontFamily: string;
+    letterSpacing: number;
+  };
   button: {
     fontSize: number;
     lineHeight: number;

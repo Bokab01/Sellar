@@ -357,7 +357,7 @@ const RecommendationSection = memo(function RecommendationSection({
             }
             
             return (
-              <View key={item.listing_id} style={{ position: 'relative' }}>
+              <View key={item.listing_id} style={{ position: 'relative', marginBottom: theme.spacing.sm }}>
                 <ProductCard
                   image={Array.isArray(item.images) ? item.images[0] : (item.images || '')}
                   title={item.title || 'Untitled'}
@@ -372,7 +372,8 @@ const RecommendationSection = memo(function RecommendationSection({
                   badge={badge}
                   location={item.location || 'Unknown'}
                   layout="grid"
-                  fullWidth={true}
+                  fullWidth={false}
+                  shadowSize="sm"
                   listingId={item.listing_id}
                   isFavorited={favorites[item.listing_id] || false}
                   viewCount={viewCounts[item.listing_id] || 0}
@@ -427,7 +428,7 @@ const RecommendationSection = memo(function RecommendationSection({
             }
             
             return (
-              <View key={item.listing_id} style={{ width: 190 }}>
+              <View key={item.listing_id} style={{ width: 190, marginBottom: theme.spacing.sm }}>
                 <ProductCard
                   image={Array.isArray(item.images) ? item.images[0] : (item.images || '')}
                   title={item.title || 'Untitled'}
@@ -442,6 +443,7 @@ const RecommendationSection = memo(function RecommendationSection({
                   badge={badge}
                   location={item.location || 'Unknown'}
                   layout="grid"
+                  shadowSize="sm"
                   listingId={item.listing_id}
                   isFavorited={favorites[item.listing_id] || false}
                   viewCount={viewCounts[item.listing_id] || 0}

@@ -165,6 +165,14 @@ export default function ReportScreen() {
         throw new Error('User not authenticated');
       }
 
+      console.log('Submitting report with params:', {
+        p_reporter_id: user.id,
+        p_target_type: targetType,
+        p_target_id: targetId,
+        p_category: selectedCategory,
+        p_reason: reason.trim(),
+      });
+
       const { data, error } = await supabase.rpc('submit_report', {
         p_reporter_id: user.id,
         p_target_type: targetType,
@@ -175,16 +183,23 @@ export default function ReportScreen() {
         p_evidence_urls: JSON.stringify([])
       });
 
+      console.log('Report submission response:', { data, error });
+
       if (error) throw error;
 
       if (data && data.length > 0 && data[0].success) {
         setStep('success');
       } else {
-        throw new Error(data?.[0]?.error || 'Failed to submit report');
+        const errorMessage = data?.[0]?.error || 'Failed to submit report';
+        console.error('Report submission failed:', errorMessage);
+        throw new Error(errorMessage);
       }
     } catch (error) {
       console.error('Report submission error:', error);
-      Alert.alert('Error', 'Failed to submit report. Please try again.');
+      Alert.alert(
+        'Error', 
+        error instanceof Error ? error.message : 'Failed to submit report. Please try again.'
+      );
     } finally {
       setLoading(false);
     }
