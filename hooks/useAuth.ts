@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, dbHelpers } from '@/lib/supabase';
 import { handleAuthError, analyzeAuthError } from '@/utils/authErrorHandler';
+import { AUTH_TIMEOUTS } from '@/constants/auth';
 
 export function useAuth() {
   const { 
@@ -20,25 +21,55 @@ export function useAuth() {
     setLoading
   } = useAuthStore();
 
-
+  // Add refs to prevent race conditions
+  const hasInitializedRef = useRef(false);
+  const isInitializingRef = useRef(false);
 
   useEffect(() => {
     // Get initial session with enhanced error handling
     const initializeAuth = async () => {
+      // Prevent double initialization
+      if (isInitializingRef.current) {
+        console.log('Auth initialization already in progress, skipping...');
+        return;
+      }
+      
+      isInitializingRef.current = true;
+      
       try {
         console.log('Initializing authentication...');
         
-        // Add timeout to prevent hanging
-        const timeoutPromise = new Promise<{ data: { session: null }, error: any }>((resolve) => {
-          setTimeout(() => {
-            console.warn('⚠️ Auth initialization timeout reached');
-            resolve({ data: { session: null }, error: new Error('Auth initialization timeout') });
-          }, 5000); // 5 second timeout
-        });
+        // Try to get session with retries for app restarts
+        let session = null;
+        let error = null;
+        let attempts = 0;
+        const maxAttempts = AUTH_TIMEOUTS.SESSION_FETCH_RETRIES;
         
-        const authPromise = supabase.auth.getSession();
-        
-        const { data: { session }, error } = await Promise.race([authPromise, timeoutPromise]);
+        while (attempts < maxAttempts && !session && !error) {
+          attempts++;
+          console.log(`Auth initialization attempt ${attempts}/${maxAttempts}`);
+          
+          // Add timeout to prevent hanging
+          const timeoutPromise = new Promise<{ data: { session: null }, error: any }>((resolve) => {
+            setTimeout(() => {
+              console.warn(`⚠️ Auth initialization timeout reached (attempt ${attempts})`);
+              resolve({ data: { session: null }, error: new Error('Auth initialization timeout') });
+            }, AUTH_TIMEOUTS.SESSION_FETCH);
+          });
+          
+          const authPromise = supabase.auth.getSession();
+          
+          const result = await Promise.race([authPromise, timeoutPromise]);
+          session = result.data.session;
+          error = result.error;
+          
+          // If we got a timeout on first attempt, try again with shorter delay
+          if (error && error.message.includes('timeout') && attempts < maxAttempts) {
+            console.log('Retrying auth initialization after short delay...');
+            await new Promise(resolve => setTimeout(resolve, 500));
+            error = null; // Clear error to try again
+          }
+        }
         
         if (error) {
           console.warn('Auth initialization error:', error.message);
@@ -103,6 +134,10 @@ export function useAuth() {
         setUser(session?.user ?? null);
         setLoading(false);
         
+        // Mark as initialized
+        hasInitializedRef.current = true;
+        console.log('✅ Auth initialization completed successfully');
+        
       } catch (error: any) {
         console.error('Unexpected error during auth initialization:', error);
         
@@ -120,6 +155,11 @@ export function useAuth() {
         setSession(null);
         setUser(null);
         setLoading(false);
+        
+        // Mark as initialized even on error
+        hasInitializedRef.current = true;
+      } finally {
+        isInitializingRef.current = false;
       }
     };
 
@@ -129,6 +169,13 @@ export function useAuth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state change:', event, session ? 'session exists' : 'no session');
+        
+        // Skip INITIAL_SESSION if we haven't finished initializing
+        // This prevents race condition between initializeAuth and listener
+        if (event === 'INITIAL_SESSION' && !hasInitializedRef.current) {
+          console.log('⏭️ Skipping INITIAL_SESSION - still initializing');
+          return;
+        }
         
         // Handle specific auth events
         if (event === 'TOKEN_REFRESHED') {

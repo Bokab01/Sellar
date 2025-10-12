@@ -12,6 +12,7 @@ import { Search, Clock, TrendingUp, X, ArrowUpRight } from 'lucide-react-native'
 import { router } from 'expo-router';
 import { useRecommendations } from '@/hooks/useRecommendations';
 import { EnhancedSearchBar } from '@/components/Search/EnhancedSearchBar';
+import { useAppStore } from '@/store/useAppStore';
 
 interface SearchSuggestion {
   id: string;
@@ -28,6 +29,7 @@ const MAX_RECENT_SEARCHES = 10;
 export default function SmartSearchScreen() {
   const { theme } = useTheme();
   const { recordSearchHistory } = useRecommendations();
+  const { setSearchQuery: setGlobalSearchQuery } = useAppStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
@@ -248,6 +250,8 @@ export default function SmartSearchScreen() {
     if (suggestion.type === 'category') {
       // For category suggestions, pass the category ID and name (NO search query)
       const categoryId = suggestion.id.replace('category-', '');
+      // Don't set global search query for category-only searches
+      setGlobalSearchQuery('');
       router.push({
         pathname: '/search',
         params: { 
@@ -256,6 +260,9 @@ export default function SmartSearchScreen() {
         }
       });
     } else {
+      // ✅ FIX: Update global search query so filters can detect it
+      setGlobalSearchQuery(query.trim());
+      
       // For other suggestions, use regular text search
       router.push({
         pathname: '/search',
@@ -343,6 +350,9 @@ export default function SmartSearchScreen() {
             placeholder="Search for anything..."
             onSearch={async (query, filters) => {
               if (query.trim()) {
+                // ✅ FIX: Update global search query so filters can detect it
+                setGlobalSearchQuery(query.trim());
+                
                 // Record search history in background (non-blocking)
                 recordSearchHistory(query, filters).catch(error => {
                   console.error('Failed to record search history:', error);
@@ -365,76 +375,79 @@ export default function SmartSearchScreen() {
           />
         </View>
 
-        {/* Suggestions List */}
-        <View style={{ flex: 1 }}>
-          {loading && searchQuery ? (
-            <View style={{ 
-              padding: theme.spacing.xl,
-              alignItems: 'center',
-            }}>
-              <ActivityIndicator size="small" color={theme.colors.primary} />
-              <Text variant="body" color="muted" style={{ marginTop: theme.spacing.md }}>
-                Searching...
-              </Text>
-            </View>
-          ) : (
-            <>
-              {/* Header */}
-              {suggestions.length > 0 && (
-                <View style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
+        {/* Suggestions List - Fixed container overflow */}
+        {loading && searchQuery ? (
+          <View style={{ 
+            padding: theme.spacing.xl,
+            alignItems: 'center',
+          }}>
+            <ActivityIndicator size="small" color={theme.colors.primary} />
+            <Text variant="body" color="muted" style={{ marginTop: theme.spacing.md }}>
+              Searching...
+            </Text>
+          </View>
+        ) : (
+          <View style={{ flex: 1, overflow: 'hidden' }}>
+            {/* Header */}
+            {suggestions.length > 0 && (
+              <View style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingHorizontal: theme.spacing.lg,
+                paddingVertical: theme.spacing.md,
+                backgroundColor: theme.colors.surface,
+                borderBottomWidth: 1,
+                borderBottomColor: theme.colors.border,
+              }}>
+                <Text variant="bodySmall" color="muted">
+                  {searchQuery ? 'Suggestions' : 
+                   (suggestions.some(s => s.type === 'category') ? 'Recent & Trending' : 'Recent Searches')}
+                </Text>
+                {!searchQuery && recentSearches.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onPress={handleClearRecent}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </View>
+            )}
+
+            {/* Suggestions - Properly constrained */}
+            <FlatList
+              data={suggestions}
+              renderItem={renderSuggestion}
+              keyExtractor={(item) => item.id}
+              showsVerticalScrollIndicator={true}
+              contentContainerStyle={{ 
+                flexGrow: 1,
+                paddingBottom: theme.spacing.xl,
+              }}
+              ListEmptyComponent={() => (
+                <View style={{ 
+                  padding: theme.spacing.xl,
                   alignItems: 'center',
-                  paddingHorizontal: theme.spacing.lg,
-                  paddingVertical: theme.spacing.md,
-                  backgroundColor: theme.colors.surface,
+                  justifyContent: 'center',
+                  minHeight: 300,
                 }}>
-                  <Text variant="bodySmall" color="muted">
-                    {searchQuery ? 'Suggestions' : 
-                     (suggestions.some(s => s.type === 'category') ? 'Recent & Trending' : 'Recent Searches')}
+                  <Search size={48} color={theme.colors.text.secondary} />
+                  <Text variant="h4" style={{ marginTop: theme.spacing.lg, marginBottom: theme.spacing.md }}>
+                    {searchQuery ? 'No suggestions found' : 'Start typing to search'}
                   </Text>
-                  {!searchQuery && recentSearches.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onPress={handleClearRecent}
-                    >
-                      Clear
-                    </Button>
-                  )}
+                  <Text variant="body" color="muted" style={{ textAlign: 'center' }}>
+                    {searchQuery 
+                      ? 'Try different keywords or check your spelling'
+                      : 'Search for products, categories, or anything you need'
+                    }
+                  </Text>
                 </View>
               )}
-
-              {/* Suggestions */}
-              <FlatList
-                data={suggestions}
-                renderItem={renderSuggestion}
-                keyExtractor={(item) => item.id}
-                showsVerticalScrollIndicator={false}
-                style={{ flex: 1 }}
-                ListEmptyComponent={() => (
-                  <View style={{ 
-                    padding: theme.spacing.xl,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flex: 1,
-                  }}>
-                    <Search size={48} color={theme.colors.text.secondary} />
-                    <Text variant="h4" style={{ marginTop: theme.spacing.lg, marginBottom: theme.spacing.md }}>
-                      {searchQuery ? 'No suggestions found' : 'Start typing to search'}
-                    </Text>
-                    <Text variant="body" color="muted" style={{ textAlign: 'center' }}>
-                      {searchQuery 
-                        ? 'Try different keywords or check your spelling'
-                        : 'Search for products, categories, or anything you need'
-                      }
-                    </Text>
-                  </View>
-                )}
-              />
-            </>
-          )}
-        </View>
+            />
+          </View>
+        )}
       </View>
     </SafeAreaWrapper>
   );

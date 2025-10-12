@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/useAuthStore';
 import { analyzeAuthError } from './authErrorHandler';
+import { clearAllAuthData } from './authCleanup';
 
 /**
  * Handles refresh token errors and implements automatic recovery
@@ -53,13 +54,8 @@ export class RefreshTokenHandler {
    */
   private static async clearCorruptedSession(): Promise<void> {
     try {
-      // Sign out locally to clear session
-      await supabase.auth.signOut({ scope: 'local' });
-      
-      // Clear any stored auth data
-      const { clearStoredAuthData } = await import('./authErrorHandler');
-      await clearStoredAuthData();
-      
+      // Use unified cleanup function
+      await clearAllAuthData();
     } catch (error) {
       console.error('Error clearing corrupted session:', error);
       throw error;

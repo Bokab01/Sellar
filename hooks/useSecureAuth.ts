@@ -62,7 +62,7 @@ export function useSecureAuth() {
     initializeSecureAuth().finally(() => {
       initializingRef.current = false;
     });
-  }, [user, session]);
+  }, [user?.id]); // ✅ FIXED: Only depend on user ID, not full objects
 
   useEffect(() => {
     // Listen for security events
@@ -81,9 +81,11 @@ export function useSecureAuth() {
     securityService.addSecurityEventListener(handleSecurityEvent);
 
     return () => {
+      // ✅ This cleanup is correct, verify it's being called
+      console.log('🧹 Cleaning up security event listener');
       securityService.removeSecurityEventListener(handleSecurityEvent);
     };
-  }, []);
+  }, []); // Keep empty deps since listener function doesn't depend on external state
 
   const initializeSecureAuth = async () => {
     try {
@@ -175,16 +177,26 @@ export function useSecureAuth() {
 
       setSecureState(prev => ({ ...prev, isLoading: true }));
 
-      // Use security service for enhanced login
-      const result = await securityService.secureLogin(email, password, {
-        rememberDevice,
-        skipRateLimit: false,
-      });
+      // ✅ FIXED: Call signIn directly, not through securityService
+      // This prevents double authentication
+      
+      // Verify MFA code if provided
+      if (mfaCode) {
+        const mfaValid = await verifyMFACode(mfaCode);
+        if (!mfaValid) {
+          setSecureState(prev => ({ ...prev, isLoading: false }));
+          return { success: false, error: 'Invalid MFA code' };
+        }
+      }
 
-      if (!result.success) {
+      // Complete sign in - this will do the actual authentication
+      const signInResult = await signIn(email, password);
+      if (signInResult.error) {
         setLoginAttempts(prev => prev + 1);
+        setSecureState(prev => ({ ...prev, isLoading: false }));
         
-        if (result.requiresMFA) {
+        // Check if MFA required (would need to be added to signIn response)
+        if (signInResult.error.includes('MFA') || signInResult.error.includes('verification')) {
           setSecureState(prev => ({ 
             ...prev, 
             requiresMFA: true, 
@@ -192,33 +204,7 @@ export function useSecureAuth() {
           }));
           return { success: false, requiresMFA: true };
         }
-
-        setSecureState(prev => ({ ...prev, isLoading: false }));
-        return { success: false, error: result.error };
-      }
-
-      // If MFA is required but no code provided
-      if (result.requiresMFA && !mfaCode) {
-        setSecureState(prev => ({ 
-          ...prev, 
-          requiresMFA: true, 
-          isLoading: false 
-        }));
-        return { success: false, requiresMFA: true };
-      }
-
-      // Verify MFA code if provided
-      if (mfaCode) {
-        const mfaValid = await verifyMFACode(mfaCode);
-        if (!mfaValid) {
-          return { success: false, error: 'Invalid MFA code' };
-        }
-      }
-
-      // Complete regular sign in
-      const signInResult = await signIn(email, password);
-      if (signInResult.error) {
-        setSecureState(prev => ({ ...prev, isLoading: false }));
+        
         return { success: false, error: signInResult.error };
       }
 

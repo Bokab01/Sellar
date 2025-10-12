@@ -72,6 +72,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
       }
 
+      // ✅ CRITICAL FIX: Explicitly update auth state after successful login
+      // This ensures the UI updates immediately, even if auth listener is delayed
+      if (data.session && data.user) {
+        console.log('✅ Sign in successful, updating auth state immediately');
+        set({ 
+          session: data.session, 
+          user: data.user, 
+          loading: false 
+        });
+      }
+
       return {};
     } catch (error) {
       const errorInfo = analyzeAuthError(error);

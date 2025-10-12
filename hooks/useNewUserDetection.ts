@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { dbHelpers } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
+import { AUTH_TIMEOUTS } from '@/constants/auth';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 
@@ -38,7 +39,7 @@ export function useNewUserDetection() {
           setTimeout(() => {
             console.warn('⚠️ User profile fetch timeout reached');
             resolve({ data: null, error: { message: 'Profile fetch timeout' } });
-          }, 5000); // 5 second timeout
+          }, AUTH_TIMEOUTS.PROFILE_FETCH);
         });
         
         const profilePromise = dbHelpers.getProfile(user.id);

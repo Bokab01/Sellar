@@ -12,6 +12,7 @@ import { useMultipleListingStats } from '@/hooks/useListingStats';
 import { fetchMainCategories } from '@/utils/categoryUtils';
 import { useAppResume } from '@/hooks/useAppResume';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
+import { useNewUserDetection } from '@/hooks/useNewUserDetection';
 // Temporarily disabled performance hooks to debug infinite re-render
 // import { useOfflineListings, useOfflineSync } from '@/hooks/useOfflineSync';
 // import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
@@ -73,6 +74,17 @@ export default function HomeScreen() {
   const { trackInteraction } = useRecommendations();
   const { preloadComponents, trackComponentLoad } = usePerformanceOptimization();
   const { contentBottomPadding } = useBottomTabBarSpacing();
+  
+  // ✅ NEW: Check if user should see welcome screen (moved from index.tsx)
+  const { isNewUser, loading: newUserLoading } = useNewUserDetection();
+
+  // Check if user should see welcome screen after mounting
+  useEffect(() => {
+    if (!newUserLoading && isNewUser === true) {
+      console.log('🎉 New user detected, navigating to welcome screen');
+      router.replace('/(auth)/welcome');
+    }
+  }, [isNewUser, newUserLoading]);
   const { 
     currentLocation, 
     setCurrentLocation,

@@ -5,6 +5,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { generateDeviceFingerprint, generateSecureToken, RateLimiter } from '../utils/security';
+import { clearAllAuthData } from '@/utils/authCleanup';
 
 export interface SecurityEvent {
   id: string;
@@ -299,25 +300,32 @@ class SecurityService {
         metadata
       };
 
-      // Store in database - temporarily disabled due to RLS policy issues
-      console.log('Security event logging skipped due to RLS policy issues:', { userId, eventType });
-      return;
-      
-      const { error } = await supabase
-        .from('security_events')
-        .insert({
-          user_id: userId,
-          event_type: eventType,
-          device_fingerprint: this.deviceFingerprint!,
-          metadata,
-          created_at: new Date().toISOString()
-        });
+      // ✅ FIXED: Re-enabled security event logging with proper RLS policies
+      try {
+        const { error } = await supabase
+          .from('security_events')
+          .insert({
+            user_id: userId,
+            event_type: eventType,
+            device_fingerprint: this.deviceFingerprint!,
+            metadata,
+            created_at: new Date().toISOString()
+          });
 
-      if (error) {
-        console.error('Error logging security event:', error);
+        if (error) {
+          console.error('❌ Error logging security event to database:', error);
+          // Fallback: Log to console for debugging
+          console.log('📝 Security Event (DB failed):', { userId, eventType, metadata });
+        } else {
+          console.log('✅ Security event logged successfully:', eventType);
+        }
+      } catch (dbError) {
+        console.error('❌ Exception logging security event:', dbError);
+        // Fallback: Still log to console
+        console.log('📝 Security Event (Exception):', { userId, eventType, metadata });
       }
 
-      // Notify listeners
+      // Notify listeners (always do this, even if DB fails)
       this.securityEventListeners.forEach(listener => {
         listener({ ...event, id: generateSecureToken(16) });
       });
@@ -381,14 +389,12 @@ class SecurityService {
    */
   async invalidateSession(sessionId?: string): Promise<void> {
     try {
-      const targetSessionId = sessionId || await AsyncStorage.getItem('current_session_id');
-      
-      if (targetSessionId) {
-        await AsyncStorage.removeItem(`session_${targetSessionId}`);
-        
-        if (!sessionId) { // Only remove current session if not specified
-          await AsyncStorage.removeItem('current_session_id');
-        }
+      if (sessionId) {
+        // If specific session ID provided, only remove that session
+        await AsyncStorage.removeItem(`session_${sessionId}`);
+      } else {
+        // If no session ID, do full cleanup using unified function
+        await clearAllAuthData();
       }
     } catch (error) {
       console.error('Error invalidating session:', error);

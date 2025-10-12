@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
+import { clearAllAuthData } from './authCleanup';
 
 export interface AuthErrorInfo {
   type: 'refresh_token' | 'network' | 'session' | 'unknown';
@@ -92,11 +93,8 @@ export async function handleAuthError(error: any): Promise<{
     if (errorInfo.shouldSignOut) {
       console.log('Clearing invalid session...');
       
-      // Clear Supabase session
-      await supabase.auth.signOut({ scope: 'local' });
-      
-      // Clear any additional stored auth data
-      await clearStoredAuthData();
+      // Use unified cleanup function
+      await clearAllAuthData();
       
       return {
         handled: true,
@@ -132,26 +130,10 @@ export async function handleAuthError(error: any): Promise<{
 
 /**
  * Clears all stored authentication-related data
+ * @deprecated Use clearAllAuthData from authCleanup instead
  */
 export async function clearStoredAuthData(): Promise<void> {
-  try {
-    // Clear security service sessions
-    const keys = await AsyncStorage.getAllKeys();
-    const sessionKeys = keys.filter(key => 
-      key.startsWith('session_') || 
-      key === 'current_session_id' ||
-      key.startsWith('device_') ||
-      key.includes('auth_')
-    );
-    
-    if (sessionKeys.length > 0) {
-      await AsyncStorage.multiRemove(sessionKeys);
-      console.log(`Cleared ${sessionKeys.length} auth-related storage items`);
-    }
-    
-  } catch (error) {
-    console.warn('Error clearing stored auth data:', error);
-  }
+  await clearAllAuthData();
 }
 
 /**
@@ -174,9 +156,8 @@ export async function recoverFromCorruptedSession(): Promise<{
       if (errorInfo.shouldSignOut) {
         console.log('Corrupted session detected, clearing silently...');
         
-        // Clear session silently
-        await supabase.auth.signOut({ scope: 'local' });
-        await clearStoredAuthData();
+        // Clear session silently using unified cleanup
+        await clearAllAuthData();
         
         return {
           recovered: true,
@@ -200,10 +181,9 @@ export async function recoverFromCorruptedSession(): Promise<{
   } catch (error: any) {
     console.error('Session recovery failed:', error);
     
-    // Force clean state on recovery failure
+    // Force clean state on recovery failure using unified cleanup
     try {
-      await supabase.auth.signOut({ scope: 'local' });
-      await clearStoredAuthData();
+      await clearAllAuthData();
     } catch (cleanupError) {
       console.error('Failed to cleanup after recovery failure:', cleanupError);
     }
