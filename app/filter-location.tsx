@@ -2,11 +2,29 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { View, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
-import { Text, SafeAreaWrapper, AppHeader, Button } from '@/components';
+import { Text, SafeAreaWrapper, AppHeader, Button, LoadingSkeleton } from '@/components';
 import { useAppStore } from '@/store/useAppStore';
 import { supabase } from '@/lib/supabase';
 import { Check, MapPin, ChevronDown, ChevronRight } from 'lucide-react-native';
-import { GHANA_REGIONS, MAJOR_CITIES } from '@/constants/ghana';
+
+// Types for database locations
+interface Region {
+  id: string;
+  name: string;
+  display_order: number;
+}
+
+interface City {
+  id: string;
+  name: string;
+  region_id: string;
+  display_order: number;
+}
+
+interface LocationData {
+  regions: Region[];
+  cities: City[];
+}
 
 export default function FilterLocationScreen() {
   const { theme } = useTheme();
@@ -15,6 +33,8 @@ export default function FilterLocationScreen() {
   const [listingCount, setListingCount] = useState<number | null>(null);
   const [loadingCount, setLoadingCount] = useState(false);
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
+  const [locationData, setLocationData] = useState<LocationData>({ regions: [], cities: [] });
+  const [loadingLocations, setLoadingLocations] = useState(true);
 
   // Fetch listing count based on search query and current filters
   const fetchListingCount = async (location: string) => {
@@ -117,6 +137,45 @@ export default function FilterLocationScreen() {
     }
   };
 
+  // Fetch regions and cities from database
+  const fetchLocations = async () => {
+    try {
+      setLoadingLocations(true);
+      
+      // Fetch regions
+      const { data: regionsData, error: regionsError } = await supabase
+        .from('regions')
+        .select('id, name, display_order')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (regionsError) throw regionsError;
+
+      // Fetch cities
+      const { data: citiesData, error: citiesError } = await supabase
+        .from('cities')
+        .select('id, name, region_id, display_order')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (citiesError) throw citiesError;
+
+      setLocationData({
+        regions: regionsData || [],
+        cities: citiesData || [],
+      });
+    } catch (error: any) {
+      console.error('Error fetching locations:', error);
+    } finally {
+      setLoadingLocations(false);
+    }
+  };
+
+  // Fetch locations on mount
+  useEffect(() => {
+    fetchLocations();
+  }, []);
+
   // Fetch count when location selection changes
   useEffect(() => {
     fetchListingCount(selectedLocation);
@@ -202,41 +261,55 @@ export default function FilterLocationScreen() {
           )}
         </TouchableOpacity>
 
-        {/* Collapsible Regions */}
-        {GHANA_REGIONS.map((region) => {
-          const isExpanded = expandedRegions.has(region);
-          const cities = MAJOR_CITIES[region] || [];
-          const allRegionValue = `All ${region}`;
-          
-          return (
-            <View key={region} style={{ borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
-              {/* Region Header (Collapsible) */}
-              <TouchableOpacity
-                onPress={() => toggleRegion(region)}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingVertical: theme.spacing.md,
-                  paddingHorizontal: theme.spacing.lg,
-                  backgroundColor: theme.colors.background,
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-                  {isExpanded ? (
-                    <ChevronDown size={20} color={theme.colors.text.secondary} />
-                  ) : (
-                    <ChevronRight size={20} color={theme.colors.text.secondary} />
-                  )}
-                  <Text variant="body" style={{ fontWeight: '600', color: theme.colors.text.primary }}>
-                    {region}
-                  </Text>
-                </View>
-                <Text variant="caption" color="muted">
-                  ({cities.length + 1})
-                </Text>
-              </TouchableOpacity>
+        {/* Loading State */}
+        {loadingLocations ? (
+          <View style={{ padding: theme.spacing.lg, gap: theme.spacing.md }}>
+            {Array.from({ length: 8 }).map((_, index) => (
+              <LoadingSkeleton
+                key={index}
+                width="100%"
+                height={50}
+                borderRadius={theme.borderRadius.md}
+              />
+            ))}
+          </View>
+        ) : (
+          <>
+            {/* Collapsible Regions */}
+            {locationData.regions.map((region) => {
+              const isExpanded = expandedRegions.has(region.name);
+              const cities = locationData.cities.filter(c => c.region_id === region.id);
+              const allRegionValue = `All ${region.name}`;
+              
+              return (
+                <View key={region.id} style={{ borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
+                  {/* Region Header (Collapsible) */}
+                  <TouchableOpacity
+                    onPress={() => toggleRegion(region.name)}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingVertical: theme.spacing.md,
+                      paddingHorizontal: theme.spacing.lg,
+                      backgroundColor: theme.colors.background,
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+                      {isExpanded ? (
+                        <ChevronDown size={20} color={theme.colors.text.secondary} />
+                      ) : (
+                        <ChevronRight size={20} color={theme.colors.text.secondary} />
+                      )}
+                      <Text variant="body" style={{ fontWeight: '600', color: theme.colors.text.primary }}>
+                        {region.name}
+                      </Text>
+                    </View>
+                    <Text variant="caption" color="muted">
+                      ({cities.length + 1})
+                    </Text>
+                  </TouchableOpacity>
 
               {/* Region Cities (Expanded) */}
               {isExpanded && (
@@ -264,7 +337,7 @@ export default function FilterLocationScreen() {
                         color: selectedLocation === allRegionValue ? theme.colors.primary : theme.colors.text.primary
                       }}
                     >
-                      All {region}
+                      All {region.name}
                     </Text>
                     {selectedLocation === allRegionValue && (
                       <Check size={20} color={theme.colors.primary} />
@@ -273,10 +346,10 @@ export default function FilterLocationScreen() {
 
                   {/* Individual Cities */}
                   {cities.map((city, index) => {
-                    const cityValue = `${city}, ${region}`;
+                    const cityValue = `${city.name}, ${region.name}`;
                     return (
                       <TouchableOpacity
-                        key={cityValue}
+                        key={city.id}
                         onPress={() => handleSelect(cityValue)}
                         style={{
                           flexDirection: 'row',
@@ -298,7 +371,7 @@ export default function FilterLocationScreen() {
                             color: selectedLocation === cityValue ? theme.colors.primary : theme.colors.text.primary
                           }}
                         >
-                          {city}
+                          {city.name}
                         </Text>
                         {selectedLocation === cityValue && (
                           <Check size={20} color={theme.colors.primary} />
@@ -311,6 +384,8 @@ export default function FilterLocationScreen() {
             </View>
           );
         })}
+          </>
+        )}
       </ScrollView>
 
       {/* Show Results Button */}

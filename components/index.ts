@@ -29,6 +29,12 @@ export { Stepper } from './Stepper/Stepper';
 // Moderation Components
 export { ModerationErrorModal } from './ModerationErrorModal/ModerationErrorModal';
 
+// Announcement Components
+export { AnnouncementBanner } from './AnnouncementBanner/AnnouncementBanner';
+
+// Official Content Components
+export { OfficialBadge } from './OfficialBadge/OfficialBadge';
+
 // Reputation System Components
 export { ReputationDisplay } from './ReputationDisplay/ReputationDisplay';
 

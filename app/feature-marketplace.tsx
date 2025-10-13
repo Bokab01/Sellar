@@ -4,8 +4,8 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useListings } from '@/hooks/useListings';
-import { FEATURE_CATALOG, getFeatureByKey, getFeatureCost, calculateCreditValue } from '@/constants/monetization';
 import { router } from 'expo-router';
+import { supabase } from '@/lib/supabase';
 import {
   Text,
   SafeAreaWrapper,
@@ -24,6 +24,21 @@ import {
   FeatureActivationModal,
 } from '@/components';
 import { ShoppingCart, CheckCircle, Info } from 'lucide-react-native';
+
+// Feature type from database
+interface ListingFeature {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  credits: number;
+  duration_hours: number | null;
+  icon_emoji: string | null;
+  display_order: number;
+  category: string;
+  pro_benefit: string | null;
+  is_active: boolean;
+}
 
 // Combined Feature Modal Component
 function CombinedFeatureModal({
@@ -51,7 +66,7 @@ function CombinedFeatureModal({
 
   const requiresListing = ['pulse_boost_24h', 'mega_pulse_7d', 'category_spotlight_3d', 'ad_refresh', 'listing_highlight', 'urgent_badge'].includes(feature.key);
   const isBusinessUser = hasBusinessPlan();
-  const featureCost = getFeatureCost(feature.key, isBusinessUser);
+  const featureCost = isBusinessUser ? 0 : (feature.credits || 0);
   const canAfford = balance >= featureCost;
   
   // Check if selected listing has active boosts
@@ -408,48 +423,75 @@ export default function FeatureMarketplaceScreen() {
   
   const { listings: userListings, loading: listingsLoading, refresh: refreshListings } = useListings({ userId: user?.id });
   
-  // Removed selectedCategory state - no longer using tabs
+  // Feature states
+  const [features, setFeatures] = useState<ListingFeature[]>([]);
+  const [loadingFeatures, setLoadingFeatures] = useState(true);
+  
+  // Modal states
   const [showFeatureModal, setShowFeatureModal] = useState(false);
-  const [selectedFeature, setSelectedFeature] = useState<any>(null);
+  const [selectedFeature, setSelectedFeature] = useState<ListingFeature | null>(null);
   const [selectedListing, setSelectedListing] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
   const [showInfoModal, setShowInfoModal] = useState(false);
-  const [infoFeature, setInfoFeature] = useState<any>(null);
+  const [infoFeature, setInfoFeature] = useState<ListingFeature | null>(null);
+
+  // Fetch features from database
+  const fetchFeatures = async () => {
+    try {
+      setLoadingFeatures(true);
+      const { data, error } = await supabase
+        .from('listing_features')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+
+      setFeatures(data || []);
+    } catch (error: any) {
+      console.error('Error fetching listing features:', error);
+      setToastMessage('Failed to load features. Please try again.');
+      setToastVariant('error');
+      setShowToast(true);
+    } finally {
+      setLoadingFeatures(false);
+    }
+  };
 
   useEffect(() => {
     refreshCredits();
+    fetchFeatures();
   }, []);
 
 
   // Removed getCategoryIcon function - no longer using categories
 
-  const getFeatureIcon = (featureKey: string) => {
-    // Use the icon from the feature definition, or fallback to key-based logic
-    const feature = getFeatureByKey(featureKey);
-    if (feature && 'icon' in feature) {
-      return feature.icon;
+  const getFeatureIcon = (feature: ListingFeature) => {
+    // Use the icon from database, or fallback to key-based logic
+    if (feature.icon_emoji) {
+      return feature.icon_emoji;
     }
     
     // Fallback logic for any missing icons
-    if (featureKey.includes('boost')) return '⚡';
-    if (featureKey.includes('spotlight')) return '🎯';
-    if (featureKey.includes('refresh')) return '🔄';
-    if (featureKey.includes('highlight')) return '✨';
-    if (featureKey.includes('urgent')) return '🔥';
+    if (feature.key.includes('boost')) return '⚡';
+    if (feature.key.includes('spotlight')) return '🎯';
+    if (feature.key.includes('refresh')) return '🔄';
+    if (feature.key.includes('highlight')) return '✨';
+    if (feature.key.includes('urgent')) return '🔥';
     return '✨';
   };
 
   const handleFeaturePurchase = (featureKey: string) => {
-    const feature = getFeatureByKey(featureKey);
+    const feature = features.find(f => f.key === featureKey);
     
     if (!feature) {
       Alert.alert('Error', `Feature "${featureKey}" not found. Please try again.`);
       return;
     }
 
-    setSelectedFeature({ key: featureKey, ...(feature as any) });
+    setSelectedFeature(feature);
     
     // For listing-specific features, check if user has listings
     if (['pulse_boost_24h', 'mega_pulse_7d', 'category_spotlight_3d', 'ad_refresh', 'listing_highlight', 'urgent_badge'].includes(featureKey)) {
@@ -491,15 +533,12 @@ export default function FeatureMarketplaceScreen() {
     // Stop event propagation to prevent card click
     event?.stopPropagation?.();
     
-    const feature = getFeatureByKey(featureKey);
+    const feature = features.find(f => f.key === featureKey);
     if (feature) {
-      setInfoFeature({ key: featureKey, ...(feature as any) });
+      setInfoFeature(feature);
       setShowInfoModal(true);
     }
   };
-
-  // Get all features directly from the catalog
-  const allFeatures = Object.keys(FEATURE_CATALOG);
 
   // Show features immediately, don't wait for credits to load
 
@@ -629,20 +668,27 @@ export default function FeatureMarketplaceScreen() {
                   text="Included in Pro" variant="success" style={{ paddingHorizontal: theme.spacing.sm, paddingVertical: theme.spacing.xs, marginLeft: theme.spacing.sm }} />
                 </View>
               </View>
+            ) : loadingFeatures ? (
+              // Loading state
+              Array.from({ length: 4 }).map((_, index) => (
+                <LoadingSkeleton
+                  key={index}
+                  width="100%"
+                  height={180}
+                  borderRadius={theme.borderRadius.lg}
+                />
+              ))
             ) : (
-              // Regular users see boost features
-              allFeatures.map((featureKey) => {
-                const feature = getFeatureByKey(featureKey);
-                if (!feature) return null;
-
+              // Regular users see boost features from database
+              features.map((feature) => {
                 const isBusinessUser = hasBusinessPlan();
-                const featureCost = getFeatureCost(featureKey, isBusinessUser);
+                const featureCost = isBusinessUser ? 0 : feature.credits;
                 const canAfford = balance >= featureCost;
-                const hasAccess = hasFeatureAccess(featureKey);
+                const hasAccess = hasFeatureAccess(feature.key);
 
                 return (
                   <View
-                    key={featureKey}
+                    key={feature.key}
                     style={{
                       backgroundColor: theme.colors.surface,
                       borderRadius: theme.borderRadius.lg,
@@ -655,7 +701,7 @@ export default function FeatureMarketplaceScreen() {
                   >
                     {/* Info Icon - Top Right */}
                     <TouchableOpacity
-                      onPress={(e) => handleShowInfo(featureKey, e)}
+                      onPress={(e) => handleShowInfo(feature.key, e)}
                       style={{
                         position: 'absolute',
                         top: theme.spacing.md,
@@ -675,7 +721,7 @@ export default function FeatureMarketplaceScreen() {
 
                     {/* Clickable Card Content */}
                     <TouchableOpacity
-                      onPress={() => handleFeaturePurchase(featureKey)}
+                      onPress={() => handleFeaturePurchase(feature.key)}
                       disabled={!canAfford || hasAccess}
                       style={{
                         padding: theme.spacing.lg,
@@ -694,18 +740,18 @@ export default function FeatureMarketplaceScreen() {
                             overflow: 'hidden',
                         }}
                       >
-                          <Text style={{ fontSize: 30, lineHeight: 36 }}>{getFeatureIcon(featureKey)}</Text>
+                          <Text style={{ fontSize: 30, lineHeight: 36 }}>{getFeatureIcon(feature)}</Text>
                       </View>
                       
                         <View style={{ flex: 1, paddingRight: theme.spacing.xl }}>
                         <Text variant="h4" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
-                          {(feature as any).name}
+                          {feature.name}
                         </Text>
                         <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.sm }}>
-                          {(feature as any).description}
+                          {feature.description}
                         </Text>
                         <Text variant="caption" color="muted">
-                          Duration: {(feature as any).duration}
+                          Duration: {feature.duration_hours ? `${feature.duration_hours} hours` : 'Instant'}
                         </Text>
                       </View>
                     </View>
@@ -718,7 +764,7 @@ export default function FeatureMarketplaceScreen() {
                         />
                         
                         <Text variant="caption" color="muted">
-                          ≈ GHS {calculateCreditValue(featureCost).toFixed(2)}
+                          ≈ GHS {(featureCost * 0.167).toFixed(2)}
                         </Text>
                       </View>
 
@@ -830,7 +876,7 @@ export default function FeatureMarketplaceScreen() {
 
              try {
                const isBusinessUser = hasBusinessPlan();
-               const featureCost = getFeatureCost(selectedFeature.key, isBusinessUser);
+               const featureCost = isBusinessUser ? 0 : (selectedFeature.credits || 0);
                const result = await purchaseFeature(selectedFeature.key, featureCost, { listing_id: selectedListing });
                
                if (result.success) {
@@ -883,16 +929,16 @@ export default function FeatureMarketplaceScreen() {
                       overflow: 'hidden',
                     }}
                   >
-                    <Text style={{ fontSize: 38, lineHeight: 45 }}>{getFeatureIcon(infoFeature.key)}</Text>
+                    <Text style={{ fontSize: 38, lineHeight: 45 }}>{getFeatureIcon(infoFeature)}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', gap: theme.spacing.sm, alignItems: 'center' }}>
                     <Badge 
-                      text={`${getFeatureCost(infoFeature.key, hasBusinessPlan())} Credits`}
+                      text={`${hasBusinessPlan() ? 0 : infoFeature.credits} Credits`}
                       variant="primary"
                       size="md"
                     />
                     <Text variant="bodySmall" color="muted">
-                      ≈ GHS {calculateCreditValue(getFeatureCost(infoFeature.key, hasBusinessPlan())).toFixed(2)}
+                      ≈ GHS {((hasBusinessPlan() ? 0 : infoFeature.credits) * 0.167).toFixed(2)}
                     </Text>
                   </View>
                 </View>
@@ -937,7 +983,9 @@ export default function FeatureMarketplaceScreen() {
                   }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                       <Text variant="bodySmall" color="secondary">Duration:</Text>
-                      <Text variant="bodySmall" style={{ fontWeight: '600' }}>{infoFeature.duration}</Text>
+                      <Text variant="bodySmall" style={{ fontWeight: '600' }}>
+                        {infoFeature.duration_hours ? `${infoFeature.duration_hours} hours` : 'Instant'}
+                      </Text>
                     </View>
                     {infoFeature.key === 'pulse_boost_24h' && (
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -1035,8 +1083,8 @@ export default function FeatureMarketplaceScreen() {
                 </View>
                 */}
 
-                {/* Key Benefits */}
-                {infoFeature.benefits && (
+                {/* Key Benefits - TODO: Add benefits field to database */}
+                {/* {infoFeature.benefits && (
                   <View style={{ marginBottom: theme.spacing.xl }}>
                     <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
                       ✨ Key Benefits:
@@ -1061,7 +1109,7 @@ export default function FeatureMarketplaceScreen() {
                       ))}
                     </View>
                   </View>
-                )}
+                )} */}
 
                 {/* How It Works */}
                 <View style={{ marginBottom: theme.spacing.xl }}>

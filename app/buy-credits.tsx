@@ -3,7 +3,6 @@ import { View, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
-import { CREDIT_PACKAGES } from '@/constants/monetization';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import {
@@ -21,38 +20,78 @@ import {
 } from '@/components';
 import { Zap, Star, Crown, Building, CreditCard, Smartphone } from 'lucide-react-native';
 
+// Credit package type from database
+interface CreditPackage {
+  id: string;
+  name: string;
+  credits: number;
+  price_ghs: number;
+  description: string | null;
+  popular: boolean;
+  display_order: number;
+  icon_key: string | null;
+  is_active: boolean;
+}
+
 export default function BuyCreditsScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
   const { 
     balance, 
-    loading, 
+    loading: balanceLoading, 
     refreshCredits, 
     purchaseCredits 
   } = useMonetizationStore();
   
+  const [packages, setPackages] = useState<CreditPackage[]>([]);
+  const [loadingPackages, setLoadingPackages] = useState(true);
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
   const [purchasing, setPurchasing] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVariant, setToastVariant] = useState<'success' | 'error'>('success');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [pendingPackage, setPendingPackage] = useState<typeof CREDIT_PACKAGES[number] | null>(null);
+  const [pendingPackage, setPendingPackage] = useState<CreditPackage | null>(null);
 
+
+  // Fetch credit packages from database
+  const fetchPackages = async () => {
+    try {
+      setLoadingPackages(true);
+      const { data, error } = await supabase
+        .from('credit_packages')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+
+      setPackages(data || []);
+    } catch (error: any) {
+      console.error('Error fetching credit packages:', error);
+      setToastMessage('Failed to load credit packages. Please try again.');
+      setToastVariant('error');
+      setShowToast(true);
+    } finally {
+      setLoadingPackages(false);
+    }
+  };
 
   useEffect(() => {
     refreshCredits();
+    fetchPackages();
   }, []);
 
-  // Refresh credits when returning to this screen (after payment)
+  // Refresh credits and packages when returning to this screen (after payment)
   useFocusEffect(
     useCallback(() => {
       refreshCredits();
+      fetchPackages();
     }, [])
   );
 
-  const getPackageIcon = (packageId: string) => {
-    switch (packageId) {
+  const getPackageIcon = (iconKey: string | null) => {
+    switch (iconKey?.toLowerCase()) {
       case 'starter': return <Zap size={32} color={theme.colors.primary} />;
       case 'seller': return <Star size={32} color={theme.colors.warning} />;
       case 'plus': return <Crown size={32} color={theme.colors.primary} />;
@@ -63,7 +102,7 @@ export default function BuyCreditsScreen() {
 
   const handlePurchase = async (packageId: string) => {
     // Find the selected package
-    const selectedPkg = CREDIT_PACKAGES.find(pkg => pkg.id === packageId);
+    const selectedPkg = packages.find(pkg => pkg.id === packageId);
     if (!selectedPkg) {
       setToastMessage('Package not found');
       setToastVariant('error');
@@ -87,9 +126,9 @@ export default function BuyCreditsScreen() {
       // Initialize payment with Paystack
       const reference = `sellar_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
       
-      const { data, error } = await supabase.functions.invoke('paystack-initialize', {
+      const response = await supabase.functions.invoke('paystack-initialize', {
         body: {
-          amount: pendingPackage.priceGHS * 100, // Convert to pesewas
+          amount: Math.round(pendingPackage.price_ghs * 100), // Convert to pesewas and ensure integer
           email: user?.email || 'user@example.com',
           reference,
           purpose: 'credit_purchase',
@@ -102,10 +141,50 @@ export default function BuyCreditsScreen() {
         },
       });
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      console.log('✅ Payment initialized:', data);
+      // Handle HTTP errors (400, 500, etc.) - these contain our custom error responses
+      if (response.error && response.response) {
+        // Extract error body from the response
+        let errorData = null;
+        
+        try {
+          const responseText = await response.response.text();
+          errorData = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('Failed to parse error response:', parseError);
+        }
+        
+        // Handle price mismatch specifically
+        if (errorData?.error === 'Price mismatch' && errorData?.new_price) {
+          setToastMessage(`Price updated! Package now costs GHS ${errorData.new_price}. Refreshing...`);
+          setToastVariant('warning');
+          setShowToast(true);
+          
+          // Refresh packages to get latest prices
+          await fetchPackages();
+          setPurchasing(false);
+          setSelectedPackage(null);
+          setPendingPackage(null);
+          return;
+        }
+        
+        // Handle other errors
+        if (errorData?.details) {
+          throw new Error(errorData.details);
+        }
+        
+        if (errorData?.error) {
+          throw new Error(errorData.error);
+        }
+        
+        throw response.error;
+      }
+      
+      const data = response.data;
+      
+      if (data?.error) {
+        console.error('Payment initialization error:', data);
+        throw new Error(data.details || data.error);
+      }
 
       if (!data?.authorization_url) {
         throw new Error('Payment URL not received from Paystack');
@@ -116,7 +195,7 @@ export default function BuyCreditsScreen() {
         pathname: `/payment/${reference}`,
         params: {
           paymentUrl: data.authorization_url,
-          amount: pendingPackage.priceGHS.toString(),
+          amount: pendingPackage.price_ghs.toString(),
           purpose: 'credit_purchase',
           purpose_id: pendingPackage.id,
           credits: pendingPackage.credits.toString(),
@@ -136,7 +215,7 @@ export default function BuyCreditsScreen() {
   };
 
 
-  if (loading) {
+  if (loadingPackages || balanceLoading) {
     return (
       <SafeAreaWrapper>
         <AppHeader
@@ -245,115 +324,118 @@ export default function BuyCreditsScreen() {
             </Text>
 
             <View style={{ gap: theme.spacing.lg }}>
-              {CREDIT_PACKAGES.map((package_) => (
-                <TouchableOpacity
-                  key={package_.id}
-                  onPress={() => handlePurchase(package_.id)}
-                  disabled={purchasing}
-                  style={{
-                    backgroundColor: theme.colors.surface,
-                    borderRadius: theme.borderRadius.lg,
-                    padding: theme.spacing.xl,
-                    borderWidth: 2,
-                    borderColor: package_.popular ? theme.colors.primary : theme.colors.border,
-                    position: 'relative',
-                    opacity: purchasing && selectedPackage !== package_.id ? 0.5 : 1,
-                    ...theme.shadows.md,
-                  }}
-                  activeOpacity={0.95}
-                >
-                  {/* Popular Badge */}
-                  {package_.popular && (
-                    <View
-                      style={{
-                        position: 'absolute',
-                        top: -12,
-                        alignSelf: 'center',
-                        backgroundColor: theme.colors.primary,
-                        borderRadius: theme.borderRadius.full,
-                        paddingHorizontal: theme.spacing.lg,
-                        paddingVertical: theme.spacing.sm,
-                      }}
-                    >
-                      <Text
-                        variant="caption"
+              {packages.map((package_) => {
+                const pricePerCredit = package_.price_ghs / package_.credits;
+                return (
+                  <TouchableOpacity
+                    key={package_.id}
+                    onPress={() => handlePurchase(package_.id)}
+                    disabled={purchasing}
+                    style={{
+                      backgroundColor: theme.colors.surface,
+                      borderRadius: theme.borderRadius.lg,
+                      padding: theme.spacing.xl,
+                      borderWidth: 2,
+                      borderColor: package_.popular ? theme.colors.primary : theme.colors.border,
+                      position: 'relative',
+                      opacity: purchasing && selectedPackage !== package_.id ? 0.5 : 1,
+                      ...theme.shadows.md,
+                    }}
+                    activeOpacity={0.95}
+                  >
+                    {/* Popular Badge */}
+                    {package_.popular && (
+                      <View
                         style={{
-                          color: theme.colors.primaryForeground,
-                          fontWeight: '600',
-                          textTransform: 'uppercase',
+                          position: 'absolute',
+                          top: -12,
+                          alignSelf: 'center',
+                          backgroundColor: theme.colors.primary,
+                          borderRadius: theme.borderRadius.full,
+                          paddingHorizontal: theme.spacing.lg,
+                          paddingVertical: theme.spacing.sm,
                         }}
                       >
-                        Most Popular
-                      </Text>
-                    </View>
-                  )}
+                        <Text
+                          variant="caption"
+                          style={{
+                            color: theme.colors.primaryForeground,
+                            fontWeight: '600',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          Most Popular
+                        </Text>
+                      </View>
+                    )}
 
-                  {/* Loading Indicator */}
-                  {purchasing && selectedPackage === package_.id && (
-                    <View style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
-                      <LinearProgress progress={0.7} color={theme.colors.primary} />
-                    </View>
-                  )}
+                    {/* Loading Indicator */}
+                    {purchasing && selectedPackage === package_.id && (
+                      <View style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
+                        <LinearProgress progress={0.7} color={theme.colors.primary} />
+                      </View>
+                    )}
 
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.lg }}>
-                    {getPackageIcon(package_.id)}
-                    <View style={{ marginLeft: theme.spacing.lg, flex: 1 }}>
-                      <Text variant="h3" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
-                        {package_.name}
-                      </Text>
-                      <Text variant="bodySmall" color="secondary">
-                        {package_.description}
-                      </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.lg }}>
+                      {getPackageIcon(package_.icon_key)}
+                      <View style={{ marginLeft: theme.spacing.lg, flex: 1 }}>
+                        <Text variant="h3" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
+                          {package_.name}
+                        </Text>
+                        <Text variant="bodySmall" color="secondary">
+                          {package_.description}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
 
-                  <View style={{ marginBottom: theme.spacing.lg }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing.sm, marginBottom: theme.spacing.sm }}>
-                      <Text variant="h2" style={{ fontWeight: '700' }}>
-                        {(package_.credits || 0).toLocaleString()}
-                      </Text>
-                      <Text variant="body" color="secondary">
-                        credits
+                    <View style={{ marginBottom: theme.spacing.lg }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing.sm, marginBottom: theme.spacing.sm }}>
+                        <Text variant="h2" style={{ fontWeight: '700' }}>
+                          {(package_.credits || 0).toLocaleString()}
+                        </Text>
+                        <Text variant="body" color="secondary">
+                          credits
+                        </Text>
+                      </View>
+                      
+                      <PriceDisplay
+                        amount={package_.price_ghs}
+                        size="lg"
+                        style={{ marginBottom: theme.spacing.sm }}
+                      />
+                      
+                      <Text variant="caption" color="muted">
+                        GHS {pricePerCredit.toFixed(3)} per credit
                       </Text>
                     </View>
-                    
-                    <PriceDisplay
-                      amount={package_.priceGHS}
+
+                    {/* Value Proposition */}
+                    <View
+                      style={{
+                        backgroundColor: theme.colors.surfaceVariant,
+                        borderRadius: theme.borderRadius.md,
+                        padding: theme.spacing.md,
+                        marginBottom: theme.spacing.lg,
+                      }}
+                    >
+                      <Text variant="bodySmall" style={{ textAlign: 'center' }}>
+                        💡 Enough for {Math.floor(package_.credits / 15)} Pulse Boosts or {Math.floor(package_.credits / 5)} Ad Refreshes
+                      </Text>
+                    </View>
+
+                    <Button
+                      variant="primary"
+                      onPress={() => handlePurchase(package_.id)}
+                      loading={purchasing && selectedPackage === package_.id}
+                      disabled={purchasing}
+                      fullWidth
                       size="lg"
-                      style={{ marginBottom: theme.spacing.sm }}
-                    />
-                    
-                    <Text variant="caption" color="muted">
-                      GHS {package_.pricePerCredit.toFixed(3)} per credit
-                    </Text>
-                  </View>
-
-                  {/* Value Proposition */}
-                  <View
-                    style={{
-                      backgroundColor: theme.colors.surfaceVariant,
-                      borderRadius: theme.borderRadius.md,
-                      padding: theme.spacing.md,
-                      marginBottom: theme.spacing.lg,
-                    }}
-                  >
-                    <Text variant="bodySmall" style={{ textAlign: 'center' }}>
-                      💡 Enough for {Math.floor(package_.credits / 15)} Pulse Boosts or {Math.floor(package_.credits / 5)} Ad Refreshes
-                    </Text>
-                  </View>
-
-                  <Button
-                    variant="primary"
-                    onPress={() => handlePurchase(package_.id)}
-                    loading={purchasing && selectedPackage === package_.id}
-                    disabled={purchasing}
-                    fullWidth
-                    size="lg"
-                  >
-                    {purchasing && selectedPackage === package_.id ? 'Processing...' : `Buy for GHS ${package_.priceGHS}`}
-                  </Button>
-                </TouchableOpacity>
-              ))}
+                    >
+                      {purchasing && selectedPackage === package_.id ? 'Processing...' : `Buy for GHS ${package_.price_ghs.toFixed(2)}`}
+                    </Button>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
 
@@ -537,7 +619,7 @@ export default function BuyCreditsScreen() {
                 {pendingPackage.credits.toLocaleString()} Credits
               </Text>
               <Text variant="h4" style={{ textAlign: 'center' }}>
-                GHS {pendingPackage.priceGHS.toFixed(2)}
+                GHS {pendingPackage.price_ghs.toFixed(2)}
               </Text>
             </View>
             

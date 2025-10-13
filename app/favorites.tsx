@@ -18,7 +18,7 @@ import {
   Button,
   Badge,
 } from '@/components';
-import { Heart, Trash2, ShoppingBag } from 'lucide-react-native';
+import { Heart, Trash2, ShoppingBag, LayoutGrid, List, Clock } from 'lucide-react-native';
 
 export default function FavoritesScreen() {
   const { theme } = useTheme();
@@ -30,6 +30,7 @@ export default function FavoritesScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   useEffect(() => {
     if (user) {
@@ -220,9 +221,24 @@ export default function FavoritesScreen() {
         showBackButton
         onBackPress={() => router.back()}
         rightActions={favorites.length > 0 ? [
-          <Text key="favorites-count" variant="caption" color="muted">
+          <Text key="favorites-count" variant="caption" color="muted" style={{ marginRight: theme.spacing.sm }}>
             {favorites.length} saved
           </Text>,
+          <TouchableOpacity
+            key="view-toggle"
+            onPress={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+            style={{
+              padding: theme.spacing.xs,
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.borderRadius.sm,
+            }}
+          >
+            {viewMode === 'grid' ? (
+              <List size={20} color={theme.colors.text.primary} />
+            ) : (
+              <LayoutGrid size={20} color={theme.colors.text.primary} />
+            )}
+          </TouchableOpacity>,
         ] : []}
       />
 
@@ -231,6 +247,8 @@ export default function FavoritesScreen() {
           <ScrollView
             contentContainerStyle={{
               paddingBottom: theme.spacing.xl,
+              paddingTop: theme.spacing.sm,
+              paddingHorizontal: viewMode === 'list' ? theme.spacing.lg : 0,
             }}
             refreshControl={
               <RefreshControl
@@ -240,85 +258,172 @@ export default function FavoritesScreen() {
               />
             }
           >
-            <Grid columns={2} spacing={4}>
-              {transformedProducts.map((product) => (
-                <View key={product.id} style={{ position: 'relative' }}>
-                  <ProductCard
-                    image={product.image}
-                    title={product.title}
-                    price={product.price}
-                    seller={product.seller}
-                    badge={product.badge}
-                    location={product.location}
-                    layout="grid"
-                    fullWidth={true}
-                    onPress={() => router.push(`/(tabs)/home/${product.id}`)}
-                  />
+            {viewMode === 'grid' ? (
+              <Grid columns={2} spacing={4}>
+                {transformedProducts.map((product) => (
+                  <View key={product.id}>
+                    <View style={{ position: 'relative' }}>
+                      <ProductCard
+                        image={product.image}
+                        title={product.title}
+                        price={product.price}
+                        seller={product.seller}
+                        badge={product.badge}
+                        location={product.location}
+                        layout="grid"
+                        fullWidth={false}
+                        shadowSize="sm"
+                        isFavorited={true}
+                        onFavoritePress={() => handleToggleFavorite(product.favoriteId, product.title)}
+                        onPress={() => router.push(`/(tabs)/home/${product.id}`)}
+                      />
 
-                  {/* Heart/Favorite Icon */}
-                  <TouchableOpacity
-                    onPress={() => handleToggleFavorite(product.favoriteId, product.title)}
-                    style={{
-                      position: 'absolute',
-                      top: theme.spacing.xs,
-                      right: theme.spacing.xs,
-                      backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                      borderRadius: 16,
-                      padding: 6,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      zIndex: 1,
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Heart 
-                      size={14}
-                      color="#ff4757" 
-                      fill="#ff4757"
-                    />
-                  </TouchableOpacity>
+                      {/* Status Indicator */}
+                      {product.status !== 'active' && (
+                        <View
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: 'rgba(0,0,0,0.7)',
+                            borderRadius: theme.borderRadius.lg,
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            zIndex: 2,
+                          }}
+                        >
+                          <Badge
+                            text={product.status === 'sold' ? 'SOLD' : 'UNAVAILABLE'}
+                            variant="error"
+                          />
+                        </View>
+                      )}
+                    </View>
 
-                  {/* Saved Date */}
-                  <View
-                    style={{
-                      position: 'absolute',
-                      bottom: theme.spacing.sm,
-                      left: theme.spacing.sm,
-                      backgroundColor: theme.colors.surface + 'E6',
-                      borderRadius: theme.borderRadius.sm,
-                      paddingHorizontal: theme.spacing.sm,
-                      paddingVertical: theme.spacing.xs,
-                    }}
-                  >
-                    <Text variant="caption" style={{ fontWeight: '500' }}>
-                      Saved {product.savedAt}
-                    </Text>
-                  </View>
-
-                  {/* Status Indicator */}
-                  {product.status !== 'active' && (
+                    {/* Saved Date - Below card */}
                     <View
                       style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: 'rgba(0,0,0,0.7)',
-                        borderRadius: theme.borderRadius.lg,
-                        justifyContent: 'center',
+                        flexDirection: 'row',
                         alignItems: 'center',
+                        paddingHorizontal: theme.spacing.sm,
+                        paddingVertical: theme.spacing.xs,
+                        marginTop: theme.spacing.xs,
+                        backgroundColor: theme.colors.primary + '10',
+                        borderRadius: theme.borderRadius.sm,
+                        gap: theme.spacing.xs,
                       }}
                     >
-                      <Badge
-                        text={product.status === 'sold' ? 'SOLD' : 'UNAVAILABLE'}
-                        variant="error"
-                      />
+                      <Clock size={10} color={theme.colors.primary} />
+                      <Text 
+                        variant="caption" 
+                        style={{ 
+                          color: theme.colors.primary,
+                          fontWeight: '600',
+                          fontSize: 10,
+                        }}
+                      >
+                        Saved {product.savedAt}
+                      </Text>
                     </View>
-                  )}
-                </View>
-              ))}
-            </Grid>
+                  </View>
+                ))}
+              </Grid>
+            ) : (
+              <View style={{ gap: theme.spacing.sm }}>
+                {transformedProducts.map((product) => (
+                  <View key={product.id} style={{ marginBottom: theme.spacing.sm }}>
+                    <View style={{ position: 'relative' }}>
+                      <ProductCard
+                        variant="list"
+                        image={product.image}
+                        title={product.title}
+                        price={product.price}
+                        seller={product.seller}
+                        badge={product.badge}
+                        location={product.location}
+                        shadowSize="sm"
+                        isFavorited={true}
+                        onFavoritePress={() => handleToggleFavorite(product.favoriteId, product.title)}
+                        onPress={() => router.push(`/(tabs)/home/${product.id}`)}
+                      />
+
+                      {/* Status Indicator */}
+                      {product.status !== 'active' && (
+                        <View
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: 'rgba(0,0,0,0.7)',
+                            borderRadius: theme.borderRadius.lg,
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            zIndex: 2,
+                          }}
+                        >
+                          <Badge
+                            text={product.status === 'sold' ? 'SOLD' : 'UNAVAILABLE'}
+                            variant="error"
+                          />
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Saved Date - Below list card with pro styling */}
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingHorizontal: theme.spacing.md,
+                        paddingVertical: theme.spacing.sm,
+                        marginTop: theme.spacing.xs,
+                        backgroundColor: theme.colors.primary + '10',
+                        borderRadius: theme.borderRadius.sm,
+                        borderLeftWidth: 2,
+                        borderLeftColor: theme.colors.primary,
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+                        <Clock size={12} color={theme.colors.primary} />
+                        <Text 
+                          variant="caption" 
+                          style={{ 
+                            color: theme.colors.primary,
+                            fontWeight: '600',
+                          }}
+                        >
+                          Saved {product.savedAt}
+                        </Text>
+                      </View>
+                      <View
+                        style={{
+                          backgroundColor: theme.colors.primary + '20',
+                          paddingHorizontal: theme.spacing.sm,
+                          paddingVertical: 2,
+                          borderRadius: theme.borderRadius.xs,
+                        }}
+                      >
+                      {/*   <Text
+                          variant="caption"
+                          style={{
+                            color: theme.colors.primary,
+                            fontWeight: '700',
+                            fontSize: 9,
+                          }}
+                        >
+                          FAVORITE
+                        </Text> */}
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
           </ScrollView>
         ) : (
           <EmptyState

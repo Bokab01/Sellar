@@ -351,11 +351,11 @@ export function TransactionDetailsModal({
               )}
 
               {/* Payment Amount */}
-              {transaction.metadata.payment_amount && (
+              {(transaction.metadata.payment_amount || transaction.metadata.amount_paid) && (
                 <InfoRow
                   icon={<CreditCard size={18} color={theme.colors.primary} />}
-                  label="Payment Amount"
-                  value={`GHS ${transaction.metadata.payment_amount}`}
+                  label="Amount Paid"
+                  value={`GHS ${(transaction.metadata.payment_amount || transaction.metadata.amount_paid).toFixed(2)}`}
                 />
               )}
 

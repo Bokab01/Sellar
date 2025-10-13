@@ -30,6 +30,48 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Validate amount against database for credit packages
+    if (purpose === 'credit_purchase') {
+      const { data: pkg, error: pkgError } = await supabase
+        .from('credit_packages')
+        .select('id, name, price_ghs, credits, is_active')
+        .eq('id', purpose_id)
+        .single();
+
+      if (pkgError || !pkg) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Invalid package', 
+            details: 'The selected package is no longer available' 
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!pkg.is_active) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Package inactive', 
+            details: 'The selected package is no longer available' 
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const expectedAmount = Math.round(pkg.price_ghs * 100); // Convert to pesewas and ensure integer
+      if (amount !== expectedAmount) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Price mismatch', 
+            details: `Package price has changed. Expected GHS ${pkg.price_ghs}, but received GHS ${(amount / 100).toFixed(2)}. Please refresh and try again.`,
+            new_price: pkg.price_ghs,
+            new_credits: pkg.credits,
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // Get Paystack secret key from environment
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
     if (!paystackSecretKey) {

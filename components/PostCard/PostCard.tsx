@@ -16,6 +16,8 @@ import { useImageViewer } from '@/hooks/useImageViewer';
 import { PostImage, ThumbnailImage } from '@/components/ResponsiveImage/ResponsiveImage';
 import { PostInlineMenu } from '@/components/PostInlineMenu/PostInlineMenu';
 import { useFollowFeedback } from '@/hooks/useFollowFeedback';
+import { OfficialBadge } from '@/components/OfficialBadge/OfficialBadge';
+import { isOfficialSellarContent, getOfficialDisplayName } from '@/lib/officialContent';
 import { 
   Heart, 
   MessageCircle, 
@@ -117,6 +119,11 @@ export function PostCard({
   }, [post.isLiked, post.likes_count, post.comments_count]);
 
   const isOwnPost = user?.id === post.author.id;
+  const isOfficial = isOfficialSellarContent(post.author.id);
+  
+  // Get display name and avatar
+  const displayName = isOfficial ? getOfficialDisplayName() : post.author.name;
+  const avatarSource = isOfficial ? require('../../assets/icon/icon-light.png') : post.author.avatar;
 
 
   // Initialize ImageViewer for post images
@@ -360,13 +367,13 @@ export function PostCard({
         >
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', flex: 1 }}>
             <TouchableOpacity
-              onPress={() => !isOwnPost && router.push(`/profile/${post.author.id}` as any)}
-              activeOpacity={isOwnPost ? 1 : 0.7}
-              disabled={isOwnPost}
+              onPress={() => !isOwnPost && !isOfficial && router.push(`/profile/${post.author.id}` as any)}
+              activeOpacity={isOwnPost || isOfficial ? 1 : 0.7}
+              disabled={isOwnPost || isOfficial}
             >
               <Avatar
-                source={post.author.avatar}
-                name={post.author.name}
+                source={avatarSource}
+                name={displayName}
                 size="md"
                 style={{ marginRight: theme.spacing.sm }}
               />
@@ -374,20 +381,32 @@ export function PostCard({
             
             <View style={{ flex: 1 }}>
               <TouchableOpacity
-                onPress={() => !isOwnPost && router.push(`/profile/${post.author.id}` as any)}
-                activeOpacity={isOwnPost ? 1 : 0.7}
-                disabled={isOwnPost}
+                onPress={() => !isOwnPost && !isOfficial && router.push(`/profile/${post.author.id}` as any)}
+                activeOpacity={isOwnPost || isOfficial ? 1 : 0.7}
+                disabled={isOwnPost || isOfficial}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs, flexWrap: 'wrap' }}>
-                  <UserDisplayName
-                    profile={post.author.profile}
-                    variant="full"
-                    showBadge={true}
-                    textVariant="body"
-                    style={{ fontWeight: '600' }}
-                  />
-                  {/* ✅ PRO Badge after name */}
-                  {post.author.is_sellar_pro && (
+                  {isOfficial ? (
+                    <Text variant="body" style={{ fontWeight: '600' }}>
+                      {displayName}
+                    </Text>
+                  ) : (
+                    <UserDisplayName
+                      profile={post.author.profile}
+                      variant="full"
+                      showBadge={true}
+                      textVariant="body"
+                      style={{ fontWeight: '600' }}
+                    />
+                  )}
+                  
+                  {/* ✅ Official Badge */}
+                  {isOfficial && (
+                    <OfficialBadge variant="compact" size="sm" />
+                  )}
+                  
+                  {/* ✅ PRO Badge after name (only for non-official users) */}
+                  {!isOfficial && post.author.is_sellar_pro && (
                     <Badge text="⭐ PRO" variant="primary" size="xs" />
                   )}
                 </View>

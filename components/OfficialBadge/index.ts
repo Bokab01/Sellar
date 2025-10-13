@@ -1,0 +1,2 @@
+export { OfficialBadge } from './OfficialBadge';
+

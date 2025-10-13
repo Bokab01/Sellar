@@ -3,8 +3,8 @@ import { View, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
-import { BUSINESS_PLANS } from '@/constants/monetization';
 import { router } from 'expo-router';
+import { supabase } from '@/lib/supabase';
 import {
   Text,
   SafeAreaWrapper,
@@ -23,6 +23,24 @@ import {
 } from '@/components';
 import type { PaymentRequest } from '@/components';
 import { Building, Star, Crown, Check, Zap, ChartBar as BarChart, Headphones, Award } from 'lucide-react-native';
+
+// Subscription plan type from database
+interface SubscriptionPlan {
+  id: string;
+  name: string;
+  description: string | null;
+  price_ghs: number;
+  billing_cycle: string;
+  features: any;
+  popular: boolean;
+  display_order: number;
+  icon_key: string | null;
+  trial_days: number;
+  max_listings: number | null;
+  highlights: string[];
+  badge_text: string | null;
+  is_active: boolean;
+}
 
 export default function SubscriptionPlansScreen() {
   const { theme } = useTheme();
@@ -48,6 +66,8 @@ export default function SubscriptionPlansScreen() {
     cancelTrial,
   } = useMonetizationStore();
   
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [subscribing, setSubscribing] = useState(false);
   const [showToast, setShowToast] = useState(false);
@@ -58,10 +78,34 @@ export default function SubscriptionPlansScreen() {
   const [isEligibleForTrial, setIsEligibleForTrial] = useState(false);
   const [showTrialConfirmModal, setShowTrialConfirmModal] = useState(false);
 
+  // Fetch subscription plans from database
+  const fetchPlans = async () => {
+    try {
+      setLoadingPlans(true);
+      const { data, error } = await supabase
+        .from('subscription_plans')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+
+      setPlans(data || []);
+    } catch (error: any) {
+      console.error('Error fetching subscription plans:', error);
+      setToastMessage('Failed to load subscription plans. Please try again.');
+      setToastVariant('error');
+      setShowToast(true);
+    } finally {
+      setLoadingPlans(false);
+    }
+  };
+
   useEffect(() => {
     refreshSubscription();
     refreshCredits();
     checkTrialEligibility().then(setIsEligibleForTrial);
+    fetchPlans();
   }, []);
 
   const getPlanIcon = (planId: string) => {
@@ -75,14 +119,14 @@ export default function SubscriptionPlansScreen() {
 
     try {
       // Find the selected plan
-      const selectedPlan = BUSINESS_PLANS.find(plan => plan.id === planId);
+      const selectedPlan = plans.find(plan => plan.id === planId);
       if (!selectedPlan) {
         throw new Error('Plan not found');
       }
 
       // Create payment request for subscription
       const request: PaymentRequest = {
-        amount: selectedPlan.priceMonthly, // Use monthly price
+        amount: selectedPlan.price_ghs, // Use plan price
         email: user?.email || 'user@example.com',
         purpose: 'subscription',
         purpose_id: planId,
@@ -249,7 +293,7 @@ export default function SubscriptionPlansScreen() {
       if (result.success && result.paymentUrl) {
         // Open payment URL
         const request: PaymentRequest = {
-          amount: BUSINESS_PLANS[0].priceMonthly,
+          amount: plans[0]?.price_ghs || 400,
           email: user?.email || 'user@example.com',
           purpose: 'subscription' as const,
           purpose_id: currentPlan?.id || '',
@@ -378,7 +422,18 @@ export default function SubscriptionPlansScreen() {
 
           {/* Plans */}
           <View style={{ gap: theme.spacing.xl }}>
-            {BUSINESS_PLANS.map((plan) => (
+            {loadingPlans ? (
+              // Loading skeletons
+              Array.from({ length: 1 }).map((_, index) => (
+                <LoadingSkeleton
+                  key={index}
+                  width="100%"
+                  height={600}
+                  borderRadius={theme.borderRadius.lg}
+                />
+              ))
+            ) : (
+              plans.map((plan) => (
               <View
                 key={plan.id}
                 style={{
@@ -462,7 +517,7 @@ export default function SubscriptionPlansScreen() {
                     </Text>
                     
                     <PriceDisplay
-                      amount={plan.priceGHS}
+                      amount={plan.price_ghs}
                       size="xl"
                       style={{ marginBottom: theme.spacing.sm }}
                     />
@@ -479,7 +534,7 @@ export default function SubscriptionPlansScreen() {
                     </Text>
                     
                     <View style={{ gap: theme.spacing.md }}>
-                      {plan.highlights.map((highlight, index) => (
+                      {(plan.highlights || []).map((highlight, index) => (
                         <View key={index} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.md }}>
                           <Check size={16} color={theme.colors.success} style={{ marginTop: 2 }} />
                           <Text variant="body" style={{ flex: 1, lineHeight: 22 }}>
@@ -490,19 +545,18 @@ export default function SubscriptionPlansScreen() {
                     </View>
                   </View>
 
-                  {/* Badges */}
-                  <View style={{ flexDirection: 'row', gap: theme.spacing.sm, marginBottom: theme.spacing.xl, flexWrap: 'wrap' }}>
-                    {plan.badges.map((badge) => (
+                  {/* Badge */}
+                  {plan.badge_text && (
+                    <View style={{ flexDirection: 'row', gap: theme.spacing.sm, marginBottom: theme.spacing.xl, flexWrap: 'wrap' }}>
                       <BusinessBadge
-                        key={badge}
-                        type={badge as 'business' | 'priority_seller' | 'premium' | 'verified' | 'boosted'}
+                        type="business"
                         size="small"
                         variant="compact"
                         showIcon={true}
                         showText={true}
                       />
-                    ))}
-                  </View>
+                    </View>
+                  )}
 
                   {/* Action Buttons */}
                   <View style={{ gap: theme.spacing.md }}>
@@ -545,7 +599,7 @@ export default function SubscriptionPlansScreen() {
                           ? 'Upgrade to Paid Subscription'
                           : subscribing && selectedPlan === plan.id 
                           ? 'Processing...' 
-                          : `Subscribe for GHS ${plan.priceGHS}/month`
+                          : `Subscribe for GHS ${plan.price_ghs}/month`
                         }
                       </Button>
                     )}
@@ -595,7 +649,8 @@ export default function SubscriptionPlansScreen() {
                   </View>
                 </View>
               </View>
-            ))}
+            ))
+            )}
           </View>
 
           {/* FAQ */}

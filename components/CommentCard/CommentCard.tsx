@@ -7,6 +7,8 @@ import { Text } from '@/components/Typography/Text';
 import { Avatar } from '@/components/Avatar/Avatar';
 import { Button } from '@/components/Button/Button';
 import { Heart, Reply, MoreHorizontal, Flag, Trash2, Edit3, ChevronDown, ChevronRight } from 'lucide-react-native';
+import { OfficialBadge } from '@/components/OfficialBadge/OfficialBadge';
+import { isOfficialSellarContent, getOfficialDisplayName } from '@/lib/officialContent';
 
 interface CommentCardProps {
   comment: {
@@ -51,8 +53,13 @@ export function CommentCard({
   const canReply = depth === 0; // Only allow replies to top-level comments (depth 0)
   const isOwnComment = user?.id === comment.author.id;
   const hasReplies = comment.replies && comment.replies.length > 0;
+  const isOfficial = isOfficialSellarContent(comment.author.id);
 
   const leftMargin = depth * theme.spacing.lg; // Reduced from xl to lg
+  
+  // Get display name and avatar for official content
+  const displayName = isOfficial ? getOfficialDisplayName() : comment.author.name;
+  const avatarSource = isOfficial ? require('../../assets/icon/icon-light.png') : comment.author.avatar;
 
   const handleReport = () => {
     Alert.alert(
@@ -121,25 +128,34 @@ export function CommentCard({
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
             <TouchableOpacity
-              onPress={() => router.push(`/profile/${comment.author.id}`)}
-              activeOpacity={0.7}
+              onPress={() => !isOfficial && router.push(`/profile/${comment.author.id}`)}
+              activeOpacity={isOfficial ? 1 : 0.7}
+              disabled={isOfficial}
             >
               <Avatar
-                source={comment.author.avatar}
-                name={comment.author.name}
+                source={avatarSource}
+                name={displayName}
                 size="xs"
                 style={{ marginRight: theme.spacing.xs }} // Reduced from sm to xs
               />
             </TouchableOpacity>
             
             <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs, flexWrap: 'wrap' }}>
                 <Text variant="bodySmall" style={{ fontWeight: '600' }}>
-                  {comment.author.name}
+                  {displayName}
                 </Text>
-                {comment.author.isVerified && (
+                
+                {/* ✅ Official Badge */}
+                {isOfficial && (
+                  <OfficialBadge variant="compact" size="sm" />
+                )}
+                
+                {/* ✅ Verified Badge (only for non-official users) */}
+                {!isOfficial && comment.author.isVerified && (
                   <Text style={{ color: theme.colors.primary }}>✓</Text>
                 )}
+                
                 <Text variant="bodySmall" style={{ color: theme.colors.text.muted }}>
                   • {comment.timestamp}
                 </Text>

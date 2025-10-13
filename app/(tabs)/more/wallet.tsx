@@ -4,7 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
-import { CREDIT_PACKAGES, BUSINESS_PLANS } from '@/constants/monetization';
+import { BUSINESS_PLANS } from '@/constants/monetization';
 import { dbHelpers, supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
 import {
@@ -37,6 +37,16 @@ import {
   DollarSign
 } from 'lucide-react-native';
 
+// Credit package type from database
+interface CreditPackage {
+  id: string;
+  name: string;
+  credits: number;
+  price_ghs: number;
+  description: string | null;
+  popular: boolean;
+}
+
 export default function WalletScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
@@ -45,7 +55,7 @@ export default function WalletScreen() {
   const creditLoading = useMonetizationStore(state => state.loading);
   const refreshCredits = useMonetizationStore(state => state.refreshCredits);
 
-  
+  const [packages, setPackages] = useState<CreditPackage[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,6 +76,23 @@ export default function WalletScreen() {
   const handleFeatureMarketplace = useCallback(() => {
     router.push('/feature-marketplace');
   }, []);
+
+  // Fetch credit packages from database
+  const fetchPackages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('credit_packages')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+        .limit(2); // Only fetch top 2 for preview
+
+      if (error) throw error;
+      setPackages(data || []);
+    } catch (error: any) {
+      console.error('Error fetching credit packages:', error);
+    }
+  };
 
   // Memoize styles to prevent re-renders
   const styles = useMemo(() => ({
@@ -114,6 +141,7 @@ export default function WalletScreen() {
   useEffect(() => {
     if (user) {
       fetchWalletData();
+      fetchPackages();
     }
   }, [user]);
 
@@ -250,7 +278,7 @@ export default function WalletScreen() {
             </Text>
             
             <View style={styles.gapMd}>
-              {CREDIT_PACKAGES.slice(0, 2).map((package_) => (
+              {packages.map((package_) => (
                 <TouchableOpacity
                   key={package_.id}
                   onPress={handleTopUp}
@@ -282,13 +310,13 @@ export default function WalletScreen() {
                     </View>
                     <View style={styles.alignEnd}>
                       <PriceDisplay 
-                        amount={package_.priceGHS} 
+                        amount={package_.price_ghs} 
                         currency="GHS" 
                         size="lg"
                         style={{ marginBottom: theme.spacing.xs }}
                       />
                       <Text variant="caption" color="muted">
-                        GHS {package_.pricePerCredit.toFixed(3)}/credit
+                        GHS {(package_.price_ghs / package_.credits).toFixed(3)}/credit
                       </Text>
                     </View>
                   </View>

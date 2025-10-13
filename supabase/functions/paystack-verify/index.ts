@@ -62,8 +62,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log('Verifying payment:', reference);
-
     // SECURITY: Check for suspicious activity (rate limiting)
     const { data: suspiciousCheck } = await supabase.rpc(
       'check_suspicious_payment_activity',
@@ -143,8 +141,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log('Paystack verification response:', paystackData.data.status);
-
     // SECURITY: Track verification attempt
     await supabase.rpc('increment_verification_attempts', { p_reference: reference });
 
@@ -177,11 +173,9 @@ Deno.serve(async (req: Request) => {
 
     // If payment is successful and not yet processed by webhook, process it now
     if (paystackStatus === 'success' && !transaction.webhook_processed) {
-      console.log('Processing payment manually (webhook not received yet)');
-      
       // SECURITY: Validate payment amount before processing
       try {
-        await validatePaymentAmount(transaction, paystackData.data);
+        await validatePaymentAmount(transaction, paystackData.data, supabase);
         await processPayment(supabase, transaction, paystackData.data);
       } catch (validationError: any) {
         console.error('❌ Payment validation failed:', validationError.message);
@@ -243,26 +237,24 @@ Deno.serve(async (req: Request) => {
 });
 
 // Helper function to validate payment amount against package
-async function validatePaymentAmount(transaction: any, paystackData: any) {
-  console.log('🔒 Validating payment amount...');
-  
+async function validatePaymentAmount(transaction: any, paystackData: any, supabase: any) {
   // Only validate for credit packages
   if (transaction.purchase_type === 'credit_package') {
     const packageId = transaction.purchase_id;
     
-    // Define package prices in pesewas (MUST match CREDIT_PACKAGES)
-    const packagePrices: Record<string, number> = {
-      'starter': 15 * 100,  // GHS 15 = 1500 pesewas
-      'seller': 25 * 100,   // GHS 25 = 2500 pesewas
-      'plus': 50 * 100,     // GHS 50 = 5000 pesewas
-      'max': 100 * 100,     // GHS 100 = 10000 pesewas
-    };
+    // Fetch package from database
+    const { data: pkg, error: pkgError } = await supabase
+      .from('credit_packages')
+      .select('id, name, price_ghs, credits')
+      .eq('id', packageId)
+      .eq('is_active', true)
+      .single();
     
-    const expectedAmount = packagePrices[packageId];
-    
-    if (!expectedAmount) {
+    if (pkgError || !pkg) {
       throw new Error(`Unknown package ID: ${packageId}`);
     }
+    
+    const expectedAmount = Math.round(pkg.price_ghs * 100); // Convert to pesewas and ensure integer
     
     // Verify actual payment amount matches expected amount
     const actualAmount = paystackData.amount; // Already in pesewas
@@ -272,6 +264,7 @@ async function validatePaymentAmount(transaction: any, paystackData: any) {
         expected: expectedAmount,
         actual: actualAmount,
         packageId,
+        packageName: pkg.name,
         difference: actualAmount - expectedAmount,
       });
       
@@ -280,12 +273,6 @@ async function validatePaymentAmount(transaction: any, paystackData: any) {
         `This transaction has been flagged for review.`
       );
     }
-    
-    console.log('✅ Payment amount validated:', {
-      packageId,
-      amount: actualAmount / 100,
-      status: 'VALID',
-    });
   }
   
   // For subscriptions, validate against stored amount
@@ -304,25 +291,19 @@ async function validatePaymentAmount(transaction: any, paystackData: any) {
 // Helper function to process successful payment
 async function processPayment(supabase: any, transaction: any, paystackData: any) {
   try {
-    console.log('Processing payment for:', transaction.purchase_type);
-
     // Process based on purchase type
     if (transaction.purchase_type === 'credit_package') {
-      // Get the package details from purchase_id (package ID like 'starter', 'seller')
+      // Get the package details from database
       const packageId = transaction.purchase_id;
       
-      // Define credit packages (MUST match CREDIT_PACKAGES in constants/monetization.ts)
-      const packages: Record<string, { credits: number; name: string }> = {
-        'starter': { credits: 50, name: 'Starter' },
-        'seller': { credits: 120, name: 'Seller' },
-        'plus': { credits: 300, name: 'Plus' },
-        'max': { credits: 700, name: 'Max' },
-      };
-
-      const pkg = packages[packageId];
+      const { data: pkg, error: pkgError } = await supabase
+        .from('credit_packages')
+        .select('id, name, credits, price_ghs')
+        .eq('id', packageId)
+        .eq('is_active', true)
+        .single();
       
-      if (!pkg) {
-        console.error('Unknown package ID:', packageId);
+      if (pkgError || !pkg) {
         throw new Error('Unknown package');
       }
 
@@ -410,18 +391,26 @@ async function processPayment(supabase: any, transaction: any, paystackData: any
 
       if (txError) {
         console.error('Failed to record transaction:', txError);
-        console.error('Transaction data:', {
-          user_id: transaction.user_id,
-          amount: pkg.credits,
-          balance_before: currentBalance,
-          balance_after: newBalance,
-        });
         // Don't throw - credits were already added
-      } else {
-        console.log('✅ Transaction logged successfully in credit_transactions');
       }
 
-      console.log(`Credit purchase completed: ${pkg.credits} credits added`);
+      // Create credit purchase record
+      const { error: purchaseError } = await supabase
+        .from('credit_purchases')
+        .insert({
+          user_id: transaction.user_id,
+          package_id: packageId,
+          credits: pkg.credits,
+          amount_ghs: pkg.price_ghs,
+          payment_method: 'paystack',
+          payment_reference: transaction.reference,
+          status: 'completed',
+        });
+
+      if (purchaseError) {
+        console.error('Failed to record credit purchase:', purchaseError);
+        // Don't throw - credits were already added
+      }
 
       // NOTE: Notification is created by the webhook handler (paystack-webhook)
       // to avoid duplicate notifications. Do not create notification here.
@@ -441,8 +430,6 @@ async function processPayment(supabase: any, transaction: any, paystackData: any
         console.error('Failed to activate subscription:', subError);
         throw subError;
       }
-
-      console.log('Subscription activated successfully');
 
       // Create notification for user
       await supabase
