@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, ScrollView, TouchableOpacity, RefreshControl, Animated } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { View, ScrollView, TouchableOpacity, RefreshControl, Animated, FlatList } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useNotificationStore } from '@/store/useNotificationStore';
@@ -20,7 +20,7 @@ import {
   LoadingSkeleton,
   Toast,
 } from '@/components';
-import { Bell, MessageCircle, DollarSign, Heart, MessageSquare, UserPlus2, Star, Package, CircleAlert as AlertCircle, CircleCheck as CheckCircle2, Trash2, ChevronRight, CheckSquare, Square, MailOpen, Mail } from 'lucide-react-native';
+import { Bell, MessageCircle, DollarSign, Heart, MessageSquare, UserPlus2, Star, Package, CircleAlert as AlertCircle, CircleCheck as CheckCircle2, Trash2, ChevronRight, CheckSquare, Square, MailOpen, Mail, BadgeCent } from 'lucide-react-native';
 
 export default function NotificationsScreen() {
   const { theme } = useTheme();
@@ -97,7 +97,34 @@ export default function NotificationsScreen() {
 
   const [deleteAlertVisible, setDeleteAlertVisible] = useState(false);
   const [notificationToDelete, setNotificationToDelete] = useState<string | null>(null);
+
+
+  // ✅ Optimized keyExtractor
+  const keyExtractor = useCallback((item: any) => item.id, []);
+
+  // ✅ List header component with unread count
+  const ListHeader = useCallback(() => (
+    <>
+      {/* Unread Count Header */}
+      {unreadCount > 0 && (
+        <View
+          style={{
+            backgroundColor: theme.colors.primary + '10',
+            borderBottomWidth: 1,
+            borderBottomColor: theme.colors.primary + '20',
+            paddingHorizontal: theme.spacing.lg,
+            paddingVertical: theme.spacing.md,
+          }}
+        >
+          <Text variant="bodySmall" style={{ color: theme.colors.primary, textAlign: 'center' }}>
+            📬 {unreadCount} unread notification{unreadCount > 1 ? 's' : ''}
+          </Text>
+        </View>
+      )}
+    </>
+  ), [unreadCount, theme]);
   const [bulkDeleteAlertVisible, setBulkDeleteAlertVisible] = useState(false);
+
 
   const handleDeleteNotification = async (notificationId: string) => {
     setNotificationToDelete(notificationId);
@@ -137,20 +164,6 @@ export default function NotificationsScreen() {
     }
   };
 
-  const handleNotificationPress = async (notification: any) => {
-    // Mark as read
-    if (!notification.is_read) {
-      await markAsRead(notification.id);
-    }
-
-    // Navigate to notification detail screen
-    router.push({
-      pathname: '/notification-detail',
-      params: {
-        notification: JSON.stringify(notification),
-      },
-    });
-  };
 
   // Bulk operation functions
   const toggleSelectionMode = () => {
@@ -192,6 +205,180 @@ export default function NotificationsScreen() {
   const clearSelection = () => {
     setSelectedNotifications(new Set());
   };
+
+  const handleNotificationPress = async (notification: any) => {
+    // Mark as read if not already read
+    if (!notification.is_read) {
+      await markAsRead(notification.id);
+    }
+
+    // Navigate based on notification type
+    const data = notification.data || {};
+    
+          if (data.conversation_id) {
+      router.push(`/chat-detail/${data.conversation_id}`);
+          } else if (data.listing_id) {
+      router.push(`/(tabs)/home/${data.listing_id}`);
+    } else if (data.post_id) {
+      router.push(`/(tabs)/community`);
+          } else if (data.user_id) {
+            router.push(`/profile/${data.user_id}`);
+    }
+  };
+
+  // ✅ Memoized notification render function
+  const renderNotification = useCallback(({ item: notification, index }: { item: any; index: number }) => {
+    const data = notification.data || {};
+    const hasActionableContent = data.conversation_id || data.listing_id || data.post_id || data.user_id;
+    
+    return (
+      <View
+        style={{
+          borderBottomWidth: index < notifications.length - 1 ? 1 : 0,
+          borderBottomColor: theme.colors.border,
+          backgroundColor: notification.is_read 
+            ? 'transparent' 
+            : theme.colors.primary + '10',
+          // Add visual cue for unread notifications
+          borderLeftWidth: 4,
+          borderLeftColor: notification.is_read 
+            ? 'transparent'
+            : theme.colors.primary,
+        }}
+      >
+        <TouchableOpacity
+          onPress={() => isSelectionMode ? toggleNotificationSelection(notification.id) : handleNotificationPress(notification)}
+          onLongPress={() => {
+            if (!isSelectionMode) {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              setIsSelectionMode(true);
+              toggleNotificationSelection(notification.id);
+            }
+          }}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingVertical: theme.spacing.md,
+            paddingHorizontal: theme.spacing.md,
+          }}
+          activeOpacity={0.7}
+        >
+          {/* Selection Checkbox or Left Icon */}
+          <View style={{ marginRight: theme.spacing.md }}>
+            {isSelectionMode ? (
+              <TouchableOpacity
+                onPress={() => toggleNotificationSelection(notification.id)}
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: theme.borderRadius.sm,
+                  borderWidth: 2,
+                  borderColor: selectedNotifications.has(notification.id) 
+                    ? theme.colors.primary 
+                    : theme.colors.border,
+                  backgroundColor: selectedNotifications.has(notification.id) 
+                    ? theme.colors.primary 
+                    : 'transparent',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                {selectedNotifications.has(notification.id) && (
+                  <CheckSquare size={14} color={theme.colors.primaryForeground} />
+                )}
+              </TouchableOpacity>
+            ) : (
+              <View
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: theme.borderRadius.full,
+                  backgroundColor: notification.is_read 
+                    ? theme.colors.text.muted 
+                    : theme.colors.primary,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                {notification.type === 'message' && <MessageCircle size={12} color="white" />}
+                {notification.type === 'offer' && <DollarSign size={12} color="white" />}
+                {notification.type === 'like' && <Heart size={12} color="white" />}
+                {notification.type === 'comment' && <MessageSquare size={12} color="white" />}
+                {notification.type === 'follow' && <UserPlus2 size={12} color="white" />}
+                {notification.type === 'review' && <Star size={12} color="white" />}
+                {notification.type === 'listing' && <Package size={12} color="white" />}
+                {notification.type === 'payment' && <DollarSign size={12} color="white" />}
+                {notification.type === 'feature' && <BadgeCent size={12} color="white" />}
+                {notification.type === 'system' && <AlertCircle size={12} color="white" />}
+              </View>
+            )}
+          </View>
+
+          {/* Notification Content */}
+          <View style={{ flex: 1 }}>
+            <Text 
+              variant="body" 
+              style={{ 
+                fontWeight: notification.is_read ? '400' : '600',
+                color: notification.is_read ? theme.colors.text.primary : theme.colors.text.primary,
+                marginBottom: theme.spacing.xs,
+              }}
+            >
+              {notification.title}
+            </Text>
+            <Text 
+              variant="bodySmall" 
+              color="muted"
+              style={{ marginBottom: theme.spacing.xs }}
+            >
+              {notification.body}
+            </Text>
+            <Text 
+              variant="caption" 
+              color="muted"
+            >
+              {formatNotificationTimestamp(notification.created_at)}
+            </Text>
+          </View>
+
+          {/* Unread Indicator */}
+          {!notification.is_read && (
+            <View
+              style={{
+                width: 8,
+                position: 'absolute',
+                left: theme.spacing['2xl'],
+                top: theme.spacing.xl - 4,
+                height: 8,
+                borderRadius: theme.borderRadius.full,
+                backgroundColor: theme.colors.primary,
+              }}
+            />
+          )}
+
+          {/* Action Button */}
+          
+          {/* Delete Button - Always visible */}
+          <TouchableOpacity
+            onPress={() => {
+              setNotificationToDelete(notification.id);
+              setDeleteAlertVisible(true);
+            }}
+            style={{
+              marginLeft: theme.spacing.sm,
+              padding: theme.spacing.sm,
+              borderRadius: theme.borderRadius.sm,
+              backgroundColor: theme.colors.error + '10',
+            }}
+            activeOpacity={0.7}
+          >
+            <Trash2 size={16} color={theme.colors.error} />
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </View>
+    );
+  }, [notifications.length, isSelectionMode, selectedNotifications, theme, toggleNotificationSelection, handleNotificationPress]);
+
 
   const handleBulkMarkAsRead = async () => {
     if (selectedNotifications.size === 0) return;
@@ -490,10 +677,14 @@ export default function NotificationsScreen() {
         </Animated.View>
       )}
 
+
       <View style={{ flex: 1 }}>
         {notifications.length > 0 ? (
-          <ScrollView
-            contentContainerStyle={{ paddingBottom: theme.spacing.xl}}
+          <FlatList
+            data={notifications}
+            renderItem={renderNotification}
+            keyExtractor={keyExtractor}
+            ListHeaderComponent={ListHeader}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -502,196 +693,28 @@ export default function NotificationsScreen() {
                 colors={[theme.colors.primary]}
               />
             }
-          >
-            {/* Unread Count Header */}
-            {unreadCount > 0 && (
-              <View
-                style={{
-                  backgroundColor: theme.colors.primary + '10',
-                  borderBottomWidth: 1,
-                  borderBottomColor: theme.colors.primary + '20',
-                  paddingHorizontal: theme.spacing.lg,
-                  paddingVertical: theme.spacing.md,
-                }}
-              >
-                <Text variant="bodySmall" style={{ color: theme.colors.primary, textAlign: 'center' }}>
-                  📬 {unreadCount} unread notification{unreadCount > 1 ? 's' : ''}
-                </Text>
-              </View>
-            )}
-
-            {/* Notifications List */}
-            <View
+            // ✅ Performance optimizations
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={10}
+            windowSize={5}
+            initialNumToRender={10}
+            updateCellsBatchingPeriod={50}
+            contentContainerStyle={{
+              paddingBottom: theme.spacing.xl,
+            }}
+            showsVerticalScrollIndicator={false}
               style={{
                 backgroundColor: theme.colors.surface,
-                marginHorizontal: theme.spacing.sm,
-                marginTop: theme.spacing.md,
+              marginHorizontal: theme.spacing.sm,
+              marginTop: theme.spacing.md,
                 borderRadius: theme.borderRadius.lg,
                 overflow: 'hidden',
                 borderWidth: 1,
                 borderColor: theme.colors.border,
                 ...theme.shadows.sm,
               }}
-            >
-              {notifications.map((notification, index) => {
-                const data = notification.data || {};
-                const hasActionableContent = data.conversation_id || data.listing_id || data.post_id || data.user_id;
-                
-                return (
-                  <View
-                    key={notification.id}
-                    style={{
-                      borderBottomWidth: index < notifications.length - 1 ? 1 : 0,
-                      borderBottomColor: theme.colors.border,
-                      backgroundColor: notification.is_read 
-                        ? 'transparent' 
-                        : theme.colors.primary + '10',
-                      // Add visual cue for unread notifications
-                      borderLeftWidth: 4,
-                      borderLeftColor: notification.is_read 
-                        ? 'transparent'
-                        : theme.colors.primary,
-                    }}
-                  >
-                    <TouchableOpacity
-                      onPress={() => isSelectionMode ? toggleNotificationSelection(notification.id) : handleNotificationPress(notification)}
-                      onLongPress={() => {
-                        if (!isSelectionMode) {
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                          setIsSelectionMode(true);
-                          toggleNotificationSelection(notification.id);
-                        }
-                      }}
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        paddingVertical: theme.spacing.md,
-                        paddingHorizontal: theme.spacing.md,
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      {/* Selection Checkbox or Left Icon */}
-                      <View style={{ marginRight: theme.spacing.md }}>
-                        {isSelectionMode ? (
-                          <TouchableOpacity
-                            onPress={() => toggleNotificationSelection(notification.id)}
-                            style={{
-                              width: 24,
-                              height: 24,
-                              borderRadius: 4,
-                              borderWidth: 2,
-                              borderColor: selectedNotifications.has(notification.id) ? theme.colors.primary : theme.colors.border,
-                              backgroundColor: selectedNotifications.has(notification.id) ? theme.colors.primary : 'transparent',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                            activeOpacity={0.7}
-                          >
-                            {selectedNotifications.has(notification.id) && (
-                              <CheckSquare size={16} color="white" />
-                            )}
-                          </TouchableOpacity>
-                        ) : (
-                          getNotificationIcon(notification.type)
-                        )}
-                      </View>
+          />
 
-                      {/* Content */}
-                      <View style={{ flex: 1 }}>
-                        {/* Title with unread indicator */}
-                        <View style={{ 
-                          flexDirection: 'row', 
-                          alignItems: 'center', 
-                          marginBottom: theme.spacing.xs,
-                        }}>
-                          {/* Unread Indicator Dot */}
-                          {!notification.is_read && (
-                            <View
-                              style={{
-                                width: 8,
-                                height: 8,
-                                borderRadius: 4,
-                                backgroundColor: theme.colors.primary,
-                                marginRight: theme.spacing.xs,
-                              }}
-                            />
-                          )}
-                          <Text
-                            variant="body"
-                            numberOfLines={1}
-                            style={{
-                              flex: 1,
-                              fontWeight: notification.is_read ? '500' : '700',
-                              color: notification.is_read 
-                                ? theme.colors.text.primary 
-                                : theme.colors.text.primary,
-                            }}
-                          >
-                            {notification.title}
-                          </Text>
-                        </View>
-
-                        {/* Body */}
-                        <Text
-                          variant="bodySmall"
-                          numberOfLines={2}
-                          style={{ 
-                            lineHeight: 18,
-                            color: notification.is_read 
-                              ? theme.colors.text.muted 
-                              : theme.colors.text.secondary,
-                            marginBottom: theme.spacing.xs,
-                          }}
-                        >
-                          {notification.body}
-                        </Text>
-
-                        {/* Timestamp */}
-                        <Text
-                          variant="caption"
-                          color="muted"
-                          style={{ fontSize: 10 }}
-                        >
-                          {formatNotificationTimestamp(notification.created_at)}
-                        </Text>
-                      </View>
-
-                      {/* Right Side */}
-                      {!isSelectionMode && (
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: theme.spacing.sm,
-                          }}
-                        >
-                          {hasActionableContent && (
-                            <ChevronRight
-                              size={16}
-                              color={theme.colors.text.muted}
-                            />
-                          )}
-                          
-                          {/* Delete Button */}
-                          <TouchableOpacity
-                            onPress={() => handleDeleteNotification(notification.id)}
-                            style={{
-                              padding: theme.spacing.sm,
-                              borderRadius: theme.borderRadius.sm,
-                              backgroundColor: theme.colors.error + '10',
-                            }}
-                            activeOpacity={0.7}
-                          >
-                            <Trash2 size={16} color={theme.colors.error} />
-                          </TouchableOpacity>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                );
-              })}
-            </View>
-          </ScrollView>
         ) : (
           <EmptyState
             icon={<Bell size={64} color={theme.colors.text.muted} />}

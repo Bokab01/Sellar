@@ -198,6 +198,54 @@ export default function TransactionsScreen() {
     );
   }, [theme, handleTransactionPress]);
 
+  // ✅ Memoized transaction render function for FlatList
+  const renderTransaction = useCallback(({ item: transaction }: { item: Transaction }) => (
+    <TransactionCard
+      transaction={transaction}
+      onPress={handleTransactionPress}
+      showDate={true}
+    />
+  ), [handleTransactionPress]);
+
+  // ✅ Optimized keyExtractor
+  const keyExtractor = useCallback((item: Transaction) => item.id, []);
+
+  // ✅ List header component with summary
+  const ListHeader = useCallback(() => (
+    <>
+      {/* Summary Card */}
+      {renderSummaryCard()}
+
+      {/* Error State */}
+      {error && (
+        <View style={{
+          backgroundColor: theme.colors.error + '10',
+          borderRadius: theme.borderRadius.lg,
+          padding: theme.spacing.lg,
+          marginBottom: theme.spacing.lg,
+        }}>
+          <Text variant="body" style={{ color: theme.colors.error, textAlign: 'center' }}>
+            {error}
+          </Text>
+        </View>
+      )}
+
+      {/* Results Count */}
+      {transactions.length > 0 && (
+        <Text 
+          variant="bodySmall" 
+          color="secondary" 
+          style={{ 
+            marginBottom: theme.spacing.lg,
+            paddingHorizontal: theme.spacing.sm,
+          }}
+        >
+          {transactions.length} transaction{transactions.length !== 1 ? 's' : ''} found
+        </Text>
+      )}
+    </>
+  ), [renderSummaryCard, error, theme, transactions.length]);
+
   if (loading && transactions.length === 0) {
     return (
       <SafeAreaWrapper>
@@ -285,8 +333,21 @@ export default function TransactionsScreen() {
         onBackPress={() => router.back()}
       />
 
-      <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
+      <FlatList
+        data={transactions}
+        renderItem={renderTransaction}
+        keyExtractor={keyExtractor}
+        ListHeaderComponent={ListHeader}
+        ListEmptyComponent={
+          <EmptyState
+            title="No Transactions Found"
+            description="You haven't made any transactions yet. Start by purchasing credits or making your first listing."
+            action={{
+              text: "Buy Credits",
+              onPress: () => router.push('/buy-credits')
+            }}
+          />
+        }
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -295,57 +356,18 @@ export default function TransactionsScreen() {
             tintColor={theme.colors.primary}
           />
         }
-      >
-        <Container>
-          {/* Summary Card */}
-          {renderSummaryCard()}
-
-          {/* Error State */}
-          {error && (
-            <View style={{
-              backgroundColor: theme.colors.error + '10',
-              borderRadius: theme.borderRadius.lg,
-              padding: theme.spacing.lg,
-              marginBottom: theme.spacing.lg,
-            }}>
-              <Text variant="body" style={{ color: theme.colors.error, textAlign: 'center' }}>
-                {error}
-              </Text>
-            </View>
-          )}
-
-          {/* Transactions List */}
-          {transactions.length === 0 ? (
-            <EmptyState
-              title="No Transactions Found"
-              description="You haven't made any transactions yet. Start by purchasing credits or making your first listing."
-              action={{
-                text: "Buy Credits",
-                onPress: () => router.push('/buy-credits')
-              }}
-            />
-          ) : (
-            <View style={{ marginBottom: theme.spacing.xl }}>
-              {/* Results Count */}
-              <Text 
-                variant="bodySmall" 
-                color="secondary" 
-                style={{ 
-                  marginBottom: theme.spacing.lg,
-                  paddingHorizontal: theme.spacing.sm,
-                }}
-              >
-                {transactions.length} transaction{transactions.length !== 1 ? 's' : ''} found
-              </Text>
-
-              {/* Grouped Transactions */}
-              {Object.entries(groupedTransactions).map((item) => 
-                renderTransactionGroup({ item })
-              )}
-            </View>
-          )}
-        </Container>
-      </ScrollView>
+        // ✅ Performance optimizations
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        initialNumToRender={10}
+        updateCellsBatchingPeriod={50}
+        contentContainerStyle={{
+          paddingBottom: theme.spacing.xl,
+        }}
+        showsVerticalScrollIndicator={false}
+        style={{ flex: 1 }}
+      />
 
       {/* Transaction Details Modal */}
       <TransactionDetailsModal

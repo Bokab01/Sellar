@@ -352,7 +352,7 @@ export default function CommunityScreen() {
   return (
     <SafeAreaWrapper>
       <AppHeader
-        title="Sellar Community"
+        title="Sellar Connect"
         leftAction={
           <SidebarToggle
             isOpen={sidebarVisible}
@@ -377,7 +377,7 @@ export default function CommunityScreen() {
               <PostCardSkeleton key={index} showImage={index % 2 === 0} />
             )}
             contentContainerStyle={{
-              padding: theme.spacing.lg,
+              padding: theme.spacing.sm,
             }}
             // ✅ Performance optimizations for skeleton loading
             removeClippedSubviews={true}

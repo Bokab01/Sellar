@@ -231,7 +231,7 @@ export default function WalletScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
           <ScrollView 
-            contentContainerStyle={{ padding: theme.spacing.lg }}
+            contentContainerStyle={{ padding: theme.spacing.sm }}
             style={{ backgroundColor: theme.colors.background }}
           >
             <LoadingSkeleton width="100%" height={150} borderRadius={theme.borderRadius.lg} style={styles.loadingMain} />

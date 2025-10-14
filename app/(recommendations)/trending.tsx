@@ -10,7 +10,7 @@ import { Text } from '@/components/Typography/Text';
 import { SafeAreaWrapper } from '@/components/Layout';
 import { AppHeader } from '@/components/AppHeader/AppHeader';
 import { EmptyState } from '@/components/EmptyState/EmptyState';
-import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
+import { LoadingSkeleton, HomeScreenSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
 import { TrendingUp } from 'lucide-react-native';
 import { router } from 'expo-router';
 
@@ -246,11 +246,7 @@ export default function TrendingScreen() {
     return (
       <SafeAreaWrapper>
         <AppHeader title="Trending Near You" showBackButton />
-        <View style={{ padding: theme.spacing.lg }}>
-          <LoadingSkeleton width="100%" height={200} style={{ marginBottom: theme.spacing.lg }} />
-          <LoadingSkeleton width="100%" height={200} style={{ marginBottom: theme.spacing.lg }} />
-          <LoadingSkeleton width="100%" height={200} />
-        </View>
+        <HomeScreenSkeleton loadingText="Finding trending items near you..." />
       </SafeAreaWrapper>
     );
   }

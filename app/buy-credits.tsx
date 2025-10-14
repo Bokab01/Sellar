@@ -240,7 +240,7 @@ export default function BuyCreditsScreen() {
             </TouchableOpacity>
           ]}
         />
-        <ScrollView contentContainerStyle={{ padding: theme.spacing.lg }}>
+        <ScrollView contentContainerStyle={{ padding: theme.spacing.sm }}>
           <LoadingSkeleton width="100%" height={120} borderRadius={theme.borderRadius.lg} style={{ marginBottom: theme.spacing.xl }} />
           {Array.from({ length: 4 }).map((_, index) => (
             <LoadingSkeleton key={index} width="100%" height={200} borderRadius={theme.borderRadius.lg} style={{ marginBottom: theme.spacing.lg }} />

@@ -334,7 +334,7 @@ export default function SubscriptionPlansScreen() {
           showBackButton
           onBackPress={() => router.back()}
         />
-        <ScrollView contentContainerStyle={{ padding: theme.spacing.lg }}>
+        <ScrollView contentContainerStyle={{ padding: theme.spacing.sm }}>
           {Array.from({ length: 3 }).map((_, index) => (
             <LoadingSkeleton key={index} width="100%" height={300} borderRadius={theme.borderRadius.lg} style={{ marginBottom: theme.spacing.lg }} />
           ))}

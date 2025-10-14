@@ -17,6 +17,7 @@ import {
   EmptyState,
   ErrorState,
   ChatListSkeleton,
+  HomeScreenSkeleton,
   Button,
   Badge,
 } from '@/components';
@@ -654,18 +655,7 @@ export default function InboxScreen() {
 
         {/* Conversations List */}
         {loading ? (
-          <FlatList
-            data={Array.from({ length: 5 })}
-            keyExtractor={(_, index) => `skeleton-${index}`}
-            renderItem={({ index }) => <ChatListSkeleton key={index} />}
-            style={{ flex: 1 }}
-            // ✅ Performance optimizations for skeleton loading
-            removeClippedSubviews={true}
-            maxToRenderPerBatch={5}
-            windowSize={3}
-            initialNumToRender={5}
-            showsVerticalScrollIndicator={false}
-          />
+          <HomeScreenSkeleton loadingText="Loading your conversations..." />
         ) : error ? (
           <ErrorState
             message={error}

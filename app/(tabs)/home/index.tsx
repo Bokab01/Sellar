@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, lazy, Suspense, useCallback } from 'react';
-import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl, Alert, Animated, Pressable, FlatList } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl, Animated, Pressable, FlatList } from 'react-native';
 
 // Create animated FlatList for scroll animations
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList<any>);
@@ -56,7 +56,6 @@ import {
   Briefcase, 
   MoveHorizontal as MoreHorizontal, 
   MapPin, 
-  ChevronDown,
   Zap,
   Grid3X3,
   Search,
@@ -643,59 +642,86 @@ export default function HomeScreen() {
   // ✅ Create a completely stable header using useMemo
   const ListHeader = useMemo(() => (
     <View>
-      {/* Location Picker Trigger */}
-      <TouchableOpacity
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          marginTop: theme.spacing.md,
-          marginLeft: theme.spacing.lg,
-        }}
-        activeOpacity={0.7}
-        onPress={() => {
-          Alert.alert('Coming Soon', 'Location picker will be available soon');
-        }}
-      >
-        <MapPin size={14} color={theme.colors.text.secondary} />
-        <Text
-          variant="caption"
-          style={{
-            color: theme.colors.text.secondary,
-            marginLeft: theme.spacing.xs,
-            fontWeight: '500',
-          }}
-        >
-          {currentLocation}
-        </Text>
-        <ChevronDown size={12} color={theme.colors.text.secondary} style={{ marginLeft: theme.spacing.xs }} />
-      </TouchableOpacity>
+               {/* Professional Location Display */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginTop: theme.spacing.md,
+                  marginLeft: theme.spacing.lg,
+                  marginRight: theme.spacing.lg,
+                  paddingVertical: theme.spacing.sm,
+                  paddingHorizontal: theme.spacing.md,
+                  backgroundColor: theme.colors.surface,
+                  borderRadius: theme.borderRadius.lg,
+                  borderWidth: 1,
+                  borderColor: theme.colors.border,
+                  ...theme.shadows.sm,
+                }}
+              >
+                <View
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    backgroundColor: theme.colors.primary + '15',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: theme.spacing.sm,
+                  }}
+                >
+                  <MapPin size={16} color={theme.colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+            
+                  <Text
+                    variant="button"
+                    style={{
+                      color: theme.colors.text.primary,
+                      fontWeight: '600',
+                      marginTop: 2,
+                    }}
+                  >
+                    {currentLocation}
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: theme.colors.success,
+                    marginLeft: theme.spacing.sm,
+                  }}
+                />
+              </View>
 
-      {/* Enhanced Categories with Icons and Scroll Indicator */}
-      <View style={{ paddingVertical: theme.spacing.md, position: 'relative' }}>
-        {/* Professional Scroll Indicator - Top Right */}
-        {categoryContentWidth > categoryScrollViewWidth && (
+              {/* Enhanced Categories with Icons and Scroll Indicator */}
+              <View style={{ paddingVertical: theme.spacing.md, position: 'relative' }}>
+                {/* Professional Scroll Indicator - Top Right */}
+                {categoryContentWidth > categoryScrollViewWidth && (
           <Animated.View
-            style={{
-              position: 'absolute',
-              top: theme.spacing.sm,
-              right: theme.spacing.lg,
+                    style={{
+                      position: 'absolute',
+                      top: theme.spacing.sm,
+                      right: theme.spacing.lg,
               width: screenWidth / 5,
               height: 4,
-              backgroundColor: theme.colors.border,
-              borderRadius: 1.5,
-              overflow: 'hidden',
-              zIndex: 10,
+                      backgroundColor: theme.colors.border,
+                      borderRadius: 1.5,
+                      overflow: 'hidden',
+                      zIndex: 10,
               opacity: scrollIndicatorOpacity,
-            }}
-          >
+                    }}
+                  >
             <Animated.View
-              style={{
-                height: '100%',
-                backgroundColor: theme.colors.primary,
-                borderRadius: 1.5,
-                width: `${Math.min(100, (categoryScrollViewWidth / categoryContentWidth) * 100)}%`,
-                transform: [
-                  {
+                      style={{
+                        height: '100%',
+                        backgroundColor: theme.colors.primary,
+                        borderRadius: 1.5,
+                        width: `${Math.min(100, (categoryScrollViewWidth / categoryContentWidth) * 100)}%`,
+                        transform: [
+                          {
                     translateX: categoryScrollX.interpolate({
                       inputRange: [0, Math.max(1, categoryContentWidth - categoryScrollViewWidth)],
                       outputRange: [
@@ -704,17 +730,17 @@ export default function HomeScreen() {
                       ],
                       extrapolate: 'clamp',
                     }),
-                  },
-                ],
-              }}
-            />
+                          },
+                        ],
+                      }}
+                    />
           </Animated.View>
-        )}
-        
-        <ScrollView
-          ref={categoryScrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
+                )}
+                
+                <ScrollView
+                  ref={categoryScrollRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
           decelerationRate="fast"
           scrollEventThrottle={16}
           onScroll={Animated.event(
@@ -734,9 +760,9 @@ export default function HomeScreen() {
                 useNativeDriver: true,
               }),
             ]).start();
-          }}
-          onContentSizeChange={(width) => {
-            setCategoryContentWidth(width);
+                  }}
+                  onContentSizeChange={(width) => {
+                    setCategoryContentWidth(width);
             if (width > categoryScrollViewWidth) {
               Animated.spring(scrollIndicatorOpacity, {
                 toValue: 1,
@@ -745,66 +771,66 @@ export default function HomeScreen() {
                 friction: 8,
               }).start();
             }
-          }}
-          onLayout={(event) => {
-            setCategoryScrollViewWidth(event.nativeEvent.layout.width);
-          }}
-          contentContainerStyle={{
+                  }}
+                  onLayout={(event) => {
+                    setCategoryScrollViewWidth(event.nativeEvent.layout.width);
+                  }}
+                  contentContainerStyle={{
             paddingHorizontal: theme.spacing.md,
             marginVertical: theme.spacing.sm,
-            gap: theme.spacing.sm,
-            alignItems: 'center',
+                    gap: theme.spacing.sm,
+                    alignItems: 'center',
             paddingTop: theme.spacing.md,
-          }}
-        >
-          {categories.map((category) => {
+                  }}
+                >
+                  {categories.map((category) => {
             const isSelected = filters.categories?.includes(category.label);
             
-            return (
+                    return (
               <Pressable
-                key={category.id}
-                onPress={() => handleCategoryToggle(category.id)}
+                        key={category.id}
+                        onPress={() => handleCategoryToggle(category.id)}
                 style={({ pressed }) => ({
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingHorizontal: theme.spacing.lg,
-                  paddingVertical: theme.spacing.md,
-                  borderRadius: theme.borderRadius.full,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingHorizontal: theme.spacing.lg,
+                          paddingVertical: theme.spacing.md,
+                          borderRadius: theme.borderRadius.full,
                   backgroundColor: isSelected ? theme.colors.primary : theme.colors.surface,
-                  borderWidth: 1,
+                          borderWidth: 1,
                   borderColor: isSelected ? theme.colors.primary : theme.colors.border,
-                  gap: theme.spacing.sm,
-                  minHeight: 48,
+                          gap: theme.spacing.sm,
+                          minHeight: 48,
                   shadowColor: theme.colors.text.primary,
-                  shadowOffset: { width: 0, height: 2 },
+                          shadowOffset: { width: 0, height: 2 },
                   shadowOpacity: isSelected ? 0.2 : 0.1,
                   shadowRadius: pressed ? 8 : 4,
                   elevation: pressed ? 4 : 2,
                   transform: [{ scale: pressed ? 0.98 : 1 }],
                 })}
               >
-                <View style={{ 
-                  width: 24, 
-                  height: 24, 
-                  justifyContent: 'center', 
-                  alignItems: 'center' 
-                }}>
-                  {React.cloneElement(category.icon as React.ReactElement, {
-                    size: 20,
+                        <View style={{ 
+                          width: 24, 
+                          height: 24, 
+                          justifyContent: 'center', 
+                          alignItems: 'center' 
+                        }}>
+                          {React.cloneElement(category.icon as React.ReactElement, {
+                            size: 20,
                     color: isSelected ? theme.colors.primaryForeground : theme.colors.primary,
-                  } as any)}
-                </View>
-                
-                <Text
-                  variant="body"
-                  style={{
+                          } as any)}
+                        </View>
+                        
+                        <Text
+                          variant="body"
+                          style={{
                     color: isSelected ? theme.colors.primaryForeground : theme.colors.text.primary,
                     fontWeight: '700',
                     fontSize: 13,
-                  }}
-                >
-                  {category.label}
-                </Text>
+                          }}
+                        >
+                          {category.label}
+                        </Text>
               </Pressable>
             );
           })}
@@ -839,7 +865,7 @@ export default function HomeScreen() {
       {/* All Listings Section - Dynamic Title */}
       <View style={{ 
         flexDirection: 'row', 
-        alignItems: 'center', 
+                            alignItems: 'center',
         justifyContent: 'space-between',
         marginBottom: theme.spacing.lg,
         paddingHorizontal: theme.spacing.lg
@@ -878,7 +904,7 @@ export default function HomeScreen() {
                 sortBy: 'newest',
               });
             }}
-            style={{
+                            style={{
               paddingHorizontal: theme.spacing.md,
               paddingVertical: theme.spacing.sm,
               borderRadius: theme.borderRadius.md,
@@ -889,10 +915,10 @@ export default function HomeScreen() {
           >
             <Text variant="bodySmall" style={{ color: theme.colors.primary, fontWeight: '600' }}>
               Clear
-            </Text>
-          </TouchableOpacity>
+                          </Text>
+                      </TouchableOpacity>
         )}
-      </View>
+              </View>
     </View>
   ), [
     // Only re-create when these specific values change
@@ -904,6 +930,7 @@ export default function HomeScreen() {
     filters.priceRange.max,
     transformedProducts.length,
     user?.id,
+    theme, // ✅ Add theme dependency for proper theme switching
   ]);
 
   return (
@@ -948,7 +975,7 @@ export default function HomeScreen() {
               />
             </View>
           ) : loading ? (
-            <HomeScreenSkeleton />
+            <HomeScreenSkeleton loadingText="Loading your marketplace..." />
           ) : transformedProducts.length === 0 ? (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: theme.spacing.lg }}>
               <EmptyState
@@ -961,7 +988,7 @@ export default function HomeScreen() {
                   text: searchQuery || filters.categories?.length > 0 || filters.location || filters.condition?.length > 0 ? 'Clear Filters' : 'Create Listing',
                   onPress: searchQuery || filters.categories?.length > 0 || filters.location || filters.condition?.length > 0
                     ? () => {
-                        setSearchQuery('');
+                  setSearchQuery('');
                         setFilters({
                           categories: [],
                           priceRange: { min: undefined, max: undefined },
@@ -989,26 +1016,26 @@ export default function HomeScreen() {
               keyExtractor={(item) => item.id}
               renderItem={({ item: product }) => (
                 <View style={{ flex: 0.5, padding: 2 }}>
-                  <ProductCard
-                    image={product.image}
-                    title={product.title}
-                    price={product.price}
+                    <ProductCard
+                      image={product.image}
+                      title={product.title}
+                      price={product.price}
                     previousPrice={product.previous_price}
                     priceChangedAt={product.price_changed_at}
-                    seller={product.seller}
-                    badge={product.badge}
-                    location={product.location}
-                    layout="grid"
-                    fullWidth={true}
+                      seller={product.seller}
+                      badge={product.badge}
+                      location={product.location}
+                      layout="grid"
+                      fullWidth={true}
                     borderRadius={theme.borderRadius.sm}
-                    listingId={product.id}
-                    isFavorited={favorites[product.id] || false}
-                    viewCount={viewCounts[product.id] || 0}
+                      listingId={product.id}
+                      isFavorited={favorites[product.id] || false}
+                      viewCount={viewCounts[product.id] || 0}
                     favoritesCount={listingFavoriteCounts[product.id] ?? product.favorites ?? 0}
                     isHighlighted={product.isHighlighted}
                     onPress={() => handleListingPress(product.id)}
-                    onFavoritePress={user?.id !== product.seller.id ? () => {
-                      import('@/lib/favoritesAndViews').then(({ toggleFavorite }) => {
+                      onFavoritePress={user?.id !== product.seller.id ? () => {
+                        import('@/lib/favoritesAndViews').then(({ toggleFavorite }) => {
                         const isFavorited = favorites[product.id] || false;
                         toggleGlobalFavorite(product.id);
                         if (isFavorited) {
@@ -1016,7 +1043,7 @@ export default function HomeScreen() {
                         } else {
                           incrementListingFavoriteCount(product.id);
                         }
-                        toggleFavorite(product.id).then((result) => {
+                          toggleFavorite(product.id).then((result) => {
                           if (result.error) {
                             toggleGlobalFavorite(product.id);
                             if (isFavorited) {
@@ -1026,10 +1053,10 @@ export default function HomeScreen() {
                             }
                           } else {
                             refreshStats();
-                          }
+                            }
+                          });
                         });
-                      });
-                    } : undefined}
+                      } : undefined}
                     onViewPress={() => router.push(`/(tabs)/home/${product.id}`)}
                   />
                 </View>

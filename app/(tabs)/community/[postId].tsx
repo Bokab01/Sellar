@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, RefreshControl, Platform, TouchableOpacity, Keyboard, TouchableWithoutFeedback, Animated } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { View, RefreshControl, Platform, TouchableOpacity, Keyboard, TouchableWithoutFeedback, Animated, FlatList } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -603,6 +603,21 @@ export default function PostDetailScreen() {
     setReplyingTo(null); // Clear any reply state
   };
 
+  // ✅ Memoized comment render function for FlatList
+  const renderComment = useCallback(({ item: comment }: { item: any }) => (
+    <CommentCard
+      comment={comment}
+      onLike={() => handleLikeComment(comment.id)}
+      onReply={(commentId, authorName) => handleReplyToComment(commentId, authorName)}
+      onReport={() => handleReportComment(comment.id)}
+      onDelete={handleDeleteComment}
+      onEdit={handleEditComment}
+    />
+  ), [handleLikeComment, handleReplyToComment, handleReportComment, handleDeleteComment, handleEditComment]);
+
+  // ✅ Optimized keyExtractor
+  const keyExtractor = useCallback((item: any) => item.id, []);
+
   // Fetch post and comments when component mounts or postId changes
   useEffect(() => {
     if (postId) {
@@ -802,21 +817,25 @@ export default function PostDetailScreen() {
               Comments ({totalCommentsCount})
             </Text>
 
-            {/* Comments List */}
+            {/* Comments List - Optimized with FlatList */}
             {transformedComments.length > 0 ? (
-              <View style={{ gap: theme.spacing.sm, marginBottom: theme.spacing.lg }}> {/* Reduced gap and margin */}
-                {transformedComments.map((comment) => (
-                  <CommentCard
-                    key={comment.id}
-                    comment={comment}
-                    onLike={() => handleLikeComment(comment.id)}
-                    onReply={(commentId, authorName) => handleReplyToComment(commentId, authorName)}
-                    onReport={() => handleReportComment(comment.id)}
-                    onDelete={handleDeleteComment}
-                    onEdit={handleEditComment}
-                  />
-                ))}
-              </View>
+              <FlatList
+                data={transformedComments}
+                renderItem={renderComment}
+                keyExtractor={keyExtractor}
+                // ✅ Performance optimizations
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                initialNumToRender={10}
+                updateCellsBatchingPeriod={50}
+                contentContainerStyle={{
+                  gap: theme.spacing.sm,
+                  marginBottom: theme.spacing.lg,
+                }}
+                showsVerticalScrollIndicator={false}
+                scrollEnabled={false} // Disable scrolling since we're inside KeyboardAwareScrollView
+              />
             ) : (
               <EmptyState
                 icon={<MessageCircle size={48} color={theme.colors.text.muted} />}

@@ -167,7 +167,11 @@ export function ProductCardSkeleton() {
 }
 
 // Home screen specific skeleton that matches the current UI
-export function HomeScreenSkeleton() {
+interface HomeScreenSkeletonProps {
+  loadingText?: string;
+}
+
+export function HomeScreenSkeleton({ loadingText = "Loading your marketplace..." }: HomeScreenSkeletonProps) {
   const { theme } = useTheme();
   const colorScheme = useColorScheme();
   const animatedValue = useRef(new Animated.Value(0)).current;
@@ -247,7 +251,7 @@ export function HomeScreenSkeleton() {
           color: theme.colors.text.secondary,
           opacity,
         }}>
-          Loading your marketplace...
+          {loadingText}
         </Animated.Text>
       </Animated.View>
     </View>

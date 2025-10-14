@@ -750,7 +750,7 @@ export default function SearchResultsScreen() {
         windowSize={5}
         initialNumToRender={viewMode === 'grid' ? 5 : 10}
         updateCellsBatchingPeriod={50}
-        contentContainerStyle={{
+            contentContainerStyle={{
           paddingBottom: theme.spacing.lg,
         }}
         showsVerticalScrollIndicator={false}

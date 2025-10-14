@@ -236,26 +236,24 @@ export default function FavoritesScreen() {
             </View>
           )}
 
-          {/* Saved Date Indicator */}
+          {/* Saved Date - Below card */}
           <View
             style={{
-              position: 'absolute',
-              bottom: theme.spacing.sm,
-              left: theme.spacing.sm,
-              backgroundColor: theme.colors.primary,
-              borderRadius: theme.borderRadius.full,
-              paddingHorizontal: theme.spacing.sm,
-              paddingVertical: theme.spacing.xs,
               flexDirection: 'row',
               alignItems: 'center',
+              paddingHorizontal: theme.spacing.sm,
+              paddingVertical: theme.spacing.xs,
+              marginTop: theme.spacing.xs,
+              backgroundColor: theme.colors.primary + '10',
+              borderRadius: theme.borderRadius.sm,
               gap: theme.spacing.xs,
             }}
           >
-            <Clock size={10} color={theme.colors.primaryForeground} />
+            <Clock size={10} color={theme.colors.primary} />
             <Text 
               variant="caption" 
               style={{ 
-                color: theme.colors.primaryForeground,
+                color: theme.colors.primary,
                 fontWeight: '600',
                 fontSize: 10,
               }}
@@ -307,26 +305,24 @@ export default function FavoritesScreen() {
               </View>
             )}
 
-            {/* Saved Date Indicator */}
+            {/* Saved Date - Below card */}
             <View
               style={{
-                position: 'absolute',
-                bottom: theme.spacing.sm,
-                left: theme.spacing.sm,
-                backgroundColor: theme.colors.primary,
-                borderRadius: theme.borderRadius.full,
-                paddingHorizontal: theme.spacing.sm,
-                paddingVertical: theme.spacing.xs,
                 flexDirection: 'row',
                 alignItems: 'center',
+                paddingHorizontal: theme.spacing.sm,
+                paddingVertical: theme.spacing.xs,
+                marginTop: theme.spacing.xs,
+                backgroundColor: theme.colors.primary + '10',
+                borderRadius: theme.borderRadius.sm,
                 gap: theme.spacing.xs,
               }}
             >
-              <Clock size={10} color={theme.colors.primaryForeground} />
+              <Clock size={10} color={theme.colors.primary} />
               <Text 
                 variant="caption" 
                 style={{ 
-                  color: theme.colors.primaryForeground,
+                  color: theme.colors.primary,
                   fontWeight: '600',
                   fontSize: 10,
                 }}
@@ -381,32 +377,42 @@ export default function FavoritesScreen() {
           </View>
         )}
 
-        {/* Saved Date Indicator */}
+        {/* Saved Date - Below list card with pro styling */}
         <View
           style={{
-            position: 'absolute',
-            bottom: theme.spacing.sm,
-            left: theme.spacing.sm,
-            backgroundColor: theme.colors.primary,
-            borderRadius: theme.borderRadius.full,
-            paddingHorizontal: theme.spacing.sm,
-            paddingVertical: theme.spacing.xs,
             flexDirection: 'row',
             alignItems: 'center',
-            gap: theme.spacing.xs,
+            justifyContent: 'space-between',
+            paddingHorizontal: theme.spacing.md,
+            paddingVertical: theme.spacing.sm,
+            marginTop: theme.spacing.xs,
+            backgroundColor: theme.colors.primary + '10',
+            borderRadius: theme.borderRadius.sm,
+            borderLeftWidth: 2,
+            borderLeftColor: theme.colors.primary,
           }}
         >
-          <Clock size={10} color={theme.colors.primaryForeground} />
-          <Text 
-            variant="caption" 
-            style={{ 
-              color: theme.colors.primaryForeground,
-              fontWeight: '600',
-              fontSize: 10,
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+            <Clock size={12} color={theme.colors.primary} />
+            <Text 
+              variant="caption" 
+              style={{ 
+                color: theme.colors.primary,
+                fontWeight: '600',
+              }}
+            >
+              Saved {product.savedAt}
+            </Text>
+          </View>
+          <View
+            style={{
+              backgroundColor: theme.colors.primary + '20',
+              paddingHorizontal: theme.spacing.sm,
+              paddingVertical: 2,
+              borderRadius: theme.borderRadius.xs,
             }}
           >
-            Saved {product.savedAt}
-          </Text>
+          </View>
         </View>
       </View>
     </View>
@@ -485,12 +491,10 @@ export default function FavoritesScreen() {
 
       <View style={{ flex: 1 }}>
         {transformedProducts.length > 0 ? (
-          <ScrollView
-            contentContainerStyle={{
-              paddingBottom: theme.spacing.xl,
-              paddingTop: theme.spacing.sm,
-              paddingHorizontal: viewMode === 'list' ? theme.spacing.lg : 0,
-            }}
+          <FlatList
+            data={viewMode === 'grid' ? (gridData as any) : (transformedProducts as any)}
+            renderItem={viewMode === 'grid' ? (renderGridRow as any) : (renderListItem as any)}
+            keyExtractor={(item: any, index: number) => viewMode === 'grid' ? `row-${index}` : keyExtractor(item)}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -498,178 +502,18 @@ export default function FavoritesScreen() {
                 tintColor={theme.colors.primary}
               />
             }
-          >
-            {viewMode === 'grid' ? (
-              <Grid columns={2} spacing={4}>
-                {transformedProducts.map((product) => (
-                  <View key={product.id}>
-                    <View style={{ position: 'relative' }}>
-                      <ProductCard
-                        image={product.image}
-                        title={product.title}
-                        price={product.price}
-                        previousPrice={product.previous_price}
-                        priceChangedAt={product.price_changed_at}
-                        seller={product.seller}
-                        badge={product.badge}
-                        location={product.location}
-                        layout="grid"
-                        fullWidth={false}
-                        shadowSize="sm"
-                        isFavorited={true}
-                        onFavoritePress={() => handleToggleFavorite(product.favoriteId, product.title)}
-                        onPress={() => router.push(`/(tabs)/home/${product.id}`)}
-                      />
-
-                      {/* Status Indicator */}
-                      {product.status !== 'active' && (
-                        <View
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            borderRadius: theme.borderRadius.lg,
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            zIndex: 2,
-                          }}
-                        >
-                          <Badge
-                            text={product.status === 'sold' ? 'SOLD' : 'UNAVAILABLE'}
-                            variant="error"
-                          />
-                        </View>
-                      )}
-                    </View>
-
-                    {/* Saved Date - Below card */}
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        paddingHorizontal: theme.spacing.sm,
-                        paddingVertical: theme.spacing.xs,
-                        marginTop: theme.spacing.xs,
-                        backgroundColor: theme.colors.primary + '10',
-                        borderRadius: theme.borderRadius.sm,
-                        gap: theme.spacing.xs,
-                      }}
-                    >
-                      <Clock size={10} color={theme.colors.primary} />
-                      <Text 
-                        variant="caption" 
-                        style={{ 
-                          color: theme.colors.primary,
-                          fontWeight: '600',
-                          fontSize: 10,
-                        }}
-                      >
-                        Saved {product.savedAt}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
-              </Grid>
-            ) : (
-              <View style={{ gap: theme.spacing.sm }}>
-                {transformedProducts.map((product) => (
-                  <View key={product.id} style={{ marginBottom: theme.spacing.sm }}>
-                    <View style={{ position: 'relative' }}>
-                      <ProductCard
-                        variant="list"
-                        image={product.image}
-                        title={product.title}
-                        price={product.price}
-                        previousPrice={product.previous_price}
-                        priceChangedAt={product.price_changed_at}
-                        seller={product.seller}
-                        badge={product.badge}
-                        location={product.location}
-                        shadowSize="sm"
-                        isFavorited={true}
-                        onFavoritePress={() => handleToggleFavorite(product.favoriteId, product.title)}
-                        onPress={() => router.push(`/(tabs)/home/${product.id}`)}
-                      />
-
-                      {/* Status Indicator */}
-                      {product.status !== 'active' && (
-                        <View
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            borderRadius: theme.borderRadius.lg,
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            zIndex: 2,
-                          }}
-                        >
-                          <Badge
-                            text={product.status === 'sold' ? 'SOLD' : 'UNAVAILABLE'}
-                            variant="error"
-                          />
-                        </View>
-                      )}
-                    </View>
-
-                    {/* Saved Date - Below list card with pro styling */}
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        paddingHorizontal: theme.spacing.md,
-                        paddingVertical: theme.spacing.sm,
-                        marginTop: theme.spacing.xs,
-                        backgroundColor: theme.colors.primary + '10',
-                        borderRadius: theme.borderRadius.sm,
-                        borderLeftWidth: 2,
-                        borderLeftColor: theme.colors.primary,
-                      }}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
-                        <Clock size={12} color={theme.colors.primary} />
-                        <Text 
-                          variant="caption" 
-                          style={{ 
-                            color: theme.colors.primary,
-                            fontWeight: '600',
-                          }}
-                        >
-                          Saved {product.savedAt}
-                        </Text>
-                      </View>
-                      <View
-                        style={{
-                          backgroundColor: theme.colors.primary + '20',
-                          paddingHorizontal: theme.spacing.sm,
-                          paddingVertical: 2,
-                          borderRadius: theme.borderRadius.xs,
-                        }}
-                      >
-                      {/*   <Text
-                          variant="caption"
-                          style={{
-                            color: theme.colors.primary,
-                            fontWeight: '700',
-                            fontSize: 9,
-                          }}
-                        >
-                          FAVORITE
-                        </Text> */}
-                      </View>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-          </ScrollView>
+            // ✅ Performance optimizations
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={viewMode === 'grid' ? 5 : 10}
+            windowSize={5}
+            initialNumToRender={viewMode === 'grid' ? 5 : 10}
+            updateCellsBatchingPeriod={50}
+            contentContainerStyle={{
+              paddingBottom: theme.spacing.xl,
+              paddingTop: theme.spacing.sm,
+            }}
+            showsVerticalScrollIndicator={false}
+          />
         ) : (
           <EmptyState
             icon={<Heart size={64} color={theme.colors.text.muted} />}

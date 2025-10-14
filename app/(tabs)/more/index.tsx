@@ -321,7 +321,7 @@ export default function MoreScreen() {
           <ScrollView 
             contentContainerStyle={{ 
               paddingTop: theme.spacing.md,
-              padding: theme.spacing.lg,
+              padding: theme.spacing.sm,
               flexGrow: 1 
             }}
             style={{ backgroundColor: theme.colors.background }}

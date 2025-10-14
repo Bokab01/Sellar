@@ -205,7 +205,7 @@ export default function SettingsScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
           <ScrollView 
-            contentContainerStyle={{ padding: theme.spacing.lg }}
+            contentContainerStyle={{ padding: theme.spacing.sm }}
             style={{ backgroundColor: theme.colors.background }}
           >
             {Array.from({ length: 6 }).map((_, index) => (
