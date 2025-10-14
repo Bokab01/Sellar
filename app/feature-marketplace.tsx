@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -169,7 +170,7 @@ function CombinedFeatureModal({
   }
 
   return (
-    <View style={{ height: 500, width: '100%' }}>
+    <View style={{ height: 500, width: '100%', padding: theme.spacing.md }}>
       {/* Compact Feature Details Header */}
       <View style={{ 
         paddingBottom: theme.spacing.md,
@@ -382,29 +383,31 @@ function CombinedFeatureModal({
       )}
 
       {/* Action Buttons */}
-      <View style={{ 
-        paddingTop: theme.spacing.lg,
-        borderTopWidth: 1,
-        borderTopColor: theme.colors.border,
-        gap: theme.spacing.md,
-      }}>
-        <Button
-          onPress={onActivate}
-          disabled={!canActivate}
-          style={{ 
-            opacity: canActivate ? 1 : 0.5,
-          }}
-        >
-          {!canAfford ? `Need ${featureCost - balance} more credits` : 
-           requiresListing && !selectedListing ? 'Select a listing first' :
-           hasActiveBoost ? 'Listing already has an active boost' :
-           `Activate for ${featureCost} credits`}
-        </Button>
-        
-        <Button variant="tertiary" onPress={onCancel}>
-          Cancel
-        </Button>
-      </View>
+      <SafeAreaView edges={['bottom']} style={{ marginTop: 'auto' }}>
+        <View style={{ 
+          paddingTop: theme.spacing.lg,
+          borderTopWidth: 1,
+          borderTopColor: theme.colors.border,
+          gap: theme.spacing.md,
+        }}>
+          <Button
+            onPress={onActivate}
+            disabled={!canActivate}
+            style={{ 
+              opacity: canActivate ? 1 : 0.5,
+            }}
+          >
+            {!canAfford ? `Need ${featureCost - balance} more credits` : 
+             requiresListing && !selectedListing ? 'Select a listing first' :
+             hasActiveBoost ? 'Listing already has an active boost' :
+             `Activate for ${featureCost} credits`}
+          </Button>
+          
+          <Button variant="tertiary" onPress={onCancel}>
+            Cancel
+          </Button>
+        </View>
+      </SafeAreaView>
     </View>
   );
 }
@@ -615,10 +618,10 @@ export default function FeatureMarketplaceScreen() {
             {hasBusinessPlan() ? (
               // Sellar Pro users see auto-refresh status instead of boost features
               <View
-                style={{
-                  backgroundColor: theme.colors.surface,
-                  borderRadius: theme.borderRadius.lg,
-                  padding: theme.spacing.lg,
+                    style={{
+                      backgroundColor: theme.colors.surface,
+                      borderRadius: theme.borderRadius.lg,
+                      padding: theme.spacing.lg,
                   borderWidth: 1,
                   borderColor: theme.colors.success + '30',
                   ...theme.shadows.sm,

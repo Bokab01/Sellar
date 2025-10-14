@@ -75,7 +75,13 @@ A reusable badge component for marking official content:
 ```tsx
 const isOfficial = isOfficialSellarContent(post.author.id);
 const displayName = isOfficial ? getOfficialDisplayName() : post.author.name;
-const avatarSource = isOfficial ? require('../../assets/icon/icon-light.png') : post.author.avatar;
+
+// Get theme-aware official icon
+const officialIcon = isDarkMode
+  ? require('../../assets/icon/icon-dark.png')
+  : require('../../assets/icon/icon-light.png');
+
+const avatarSource = isOfficial ? officialIcon : post.author.avatar;
 
 {isOfficial && <OfficialBadge variant="compact" size="sm" />}
 ```
@@ -94,12 +100,25 @@ const avatarSource = isOfficial ? require('../../assets/icon/icon-light.png') : 
 ```tsx
 const isOfficial = isOfficialSellarContent(comment.author.id);
 const displayName = isOfficial ? getOfficialDisplayName() : comment.author.name;
-const avatarSource = isOfficial ? require('../../assets/icon/icon-light.png') : comment.author.avatar;
+
+// Get theme-aware official icon
+const officialIcon = isDarkMode
+  ? require('../../assets/icon/icon-dark.png')
+  : require('../../assets/icon/icon-light.png');
+
+const avatarSource = isOfficial ? officialIcon : comment.author.avatar;
 
 {isOfficial && <OfficialBadge variant="compact" size="sm" />}
 ```
 
 ## 🎨 Visual Design
+
+### Theme Support
+The official branding is **fully theme-aware**:
+- **Light Mode**: Uses `icon-light.png` (dark icon on light background)
+- **Dark Mode**: Uses `icon-dark.png` (light icon on dark background)
+- **AMOLED Mode**: Uses `icon-dark.png` (light icon on pure black)
+- **Automatic Switching**: Icon changes instantly when user switches themes
 
 ### Official Badge Styling
 - **Background**: Primary color with transparency (`primary + '15'`)
@@ -109,8 +128,10 @@ const avatarSource = isOfficial ? require('../../assets/icon/icon-light.png') : 
 
 ### Avatar Display
 - Official posts use the **Sellar app icon** as the avatar
+- Avatar is **theme-aware** (switches between light and dark icon)
 - Avatar is **non-clickable** for official content
 - Maintains same size as regular user avatars for consistency
+- Uses explicit dimensions (48x48 for posts, 24x24 for comments)
 
 ### Name Display
 - **Font Weight**: 600 (semi-bold)
@@ -241,9 +262,10 @@ Potential improvements:
 - Ensure OfficialBadge is imported correctly
 
 ### Avatar not displaying
-- Check if `require('../../assets/icon/icon-light.png')` path is correct
-- Verify the icon-light.png file exists in assets/icon/ folder
-- Try using a different image format if needed
+- Check if `require('../../assets/icon/icon-light.png')` and `icon-dark.png` paths are correct
+- Verify both icon files exist in `assets/icon/` folder
+- Ensure theme.mode is accessible and correct
+- Check if the Image component is properly rendering with explicit dimensions
 
 ### Profile navigation still works
 - Ensure `disabled={isOfficial}` prop is set

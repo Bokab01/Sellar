@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { View, ScrollView, Alert, Pressable, BackHandler, Image } from 'react-native';
+import { View, ScrollView, Alert, Pressable, BackHandler, Image, Animated, KeyboardAvoidingView, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
@@ -882,8 +883,8 @@ export default function EditListingScreen() {
 
       {/* Preview Header */}
       <View style={{ marginBottom: theme.spacing.md }}>
-        <Text variant="h3" style={{ marginBottom: theme.spacing.sm }}>
-          📋 Listing Preview
+        <Text variant="h4" style={{ marginBottom: theme.spacing.sm }}>
+          Listing Preview
         </Text>
         <Text variant="body" color="secondary">
           This is how your updated listing will appear to buyers
@@ -963,11 +964,6 @@ export default function EditListingScreen() {
           <Text variant="caption" color="muted">
             Category: {selectedCategory?.name}
           </Text>
-          {formData.categoryAttributes.condition && (
-            <Text variant="caption" color="muted">
-              Condition: {formData.categoryAttributes.condition}
-            </Text>
-          )}
           <Text variant="caption" color="muted">
             Quantity: {formData.quantity}
           </Text>
@@ -989,6 +985,23 @@ export default function EditListingScreen() {
                 };
                 
                 const formatSingleValue = (val: string): string => {
+                  // Special handling for condition values
+                  const conditionLabels: Record<string, string> = {
+                    'new': 'New',
+                    'brand_new': 'Brand New',
+                    'like_new': 'Like New',
+                    'good': 'Good',
+                    'fair': 'Fair',
+                    'poor': 'Poor',
+                    'foreign_used': 'Foreign Used',
+                    'locally_used': 'Locally Used',
+                  };
+                  
+                  // Check if it's a known condition value
+                  if (conditionLabels[val]) {
+                    return conditionLabels[val];
+                  }
+                  
                   // Common words that should remain lowercase (except at the beginning)
                   const lowercaseWords = new Set([
                     'and', 'or', 'of', 'the', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'from',
@@ -1084,118 +1097,106 @@ export default function EditListingScreen() {
           }
         }}
         rightActions={[
+          // Autosave indicator
           isAutoSaving && (
-            <View key="autosave" style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
-              <Text variant="caption" style={{ color: theme.colors.text.secondary }}>
+            <View key="autosave" style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: theme.spacing.sm,
+              paddingVertical: theme.spacing.xs,
+              borderRadius: theme.borderRadius.full,
+              backgroundColor: theme.colors.success,
+              marginRight: theme.spacing.sm,
+            }}>
+              <CheckCircle size={12} color="#555" style={{ marginRight: theme.spacing.xs }} />
+              <Text variant="caption" style={{ color: '#555', fontWeight: '600', fontSize: 11 }}>
                 Saving...
               </Text>
             </View>
           ),
+          // Step Indicator
+          <View
+            key="step-indicator"
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: theme.spacing.xs,
+            }}
+          >
+            <View style={{
+              backgroundColor: theme.colors.primary + '15',
+              borderRadius: theme.borderRadius.full,
+              width: 32,
+              height: 32,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <Text variant="bodySmall" style={{ color: theme.colors.primary, fontWeight: '700' }}>
+                {currentStep + 1}
+              </Text>
+            </View>
+            <Text variant="bodySmall" style={{ color: theme.colors.text.secondary, fontWeight: '600' }}>
+              {STEPS[currentStep].title}
+            </Text>
+          </View>
         ].filter(Boolean)}
       />
 
-      <View style={{ flex: 1 }}>
-        {/* Step Indicator */}
-        <View style={{
-          backgroundColor: theme.colors.surface,
-          borderBottomWidth: 1,
-          borderBottomColor: theme.colors.border,
-          paddingVertical: theme.spacing.md,
-        }}>
-          <StepIndicator
-            steps={STEPS.map((step, index) => ({
-              ...step,
-              completed: index < currentStep || (index === currentStep && currentValidation?.isValid),
-              active: index === currentStep,
-            }))}
-            currentStep={currentStep}
-          />
-        </View>
-
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+      >
         {/* Step Content */}
-        <ScrollView
+        <ScrollView 
           style={{ flex: 1 }}
-          contentContainerStyle={{
-            padding: theme.spacing.lg,
-            paddingBottom: theme.spacing.xl * 2,
-          }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: theme.spacing.xl }}
+          showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
-          <View style={{ marginBottom: theme.spacing.xl }}>
-            <Text variant="h3" style={{ marginBottom: theme.spacing.sm }}>
-              {currentStepData.title}
-            </Text>
-            <Text variant="body" color="secondary">
-              {currentStepData.description}
-            </Text>
+          <View style={{ flex: 1, paddingHorizontal: theme.spacing.sm, paddingVertical: theme.spacing.sm }}>
+            {steps[currentStep]}
           </View>
 
-          {steps[currentStep]}
-
-          {/* Validation Errors */}
-          {currentValidation && !currentValidation.isValid && (
-            <View style={{
-              marginTop: theme.spacing.lg,
-              padding: theme.spacing.md,
-              backgroundColor: theme.colors.error + '10',
-              borderRadius: theme.borderRadius.md,
-              borderLeftWidth: 4,
-              borderLeftColor: theme.colors.error,
-            }}>
-              {Array.isArray(currentValidation.errors) ? currentValidation.errors.map((error, index) => (
-                <Text key={index} variant="bodySmall" style={{ color: theme.colors.error }}>
-                  • {error}
-                </Text>
-              )) : null}
-            </View>
-          )}
         </ScrollView>
 
-        {/* Navigation */}
-        <View style={{
-          backgroundColor: theme.colors.surface,
-          borderTopWidth: 1,
-          borderTopColor: theme.colors.border,
-          padding: theme.spacing.lg,
-          flexDirection: 'row',
-          justifyContent: currentStep === 0 ? 'flex-end' : 'space-between',
-          gap: theme.spacing.md,
-        }}>
-          {currentStep > 0 && (
+        {/* Navigation Buttons */}
+        <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.colors.surface }}>
+          <View style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingHorizontal: theme.spacing.md,
+            paddingVertical: theme.spacing.sm,
+            backgroundColor: theme.colors.surface,
+            borderTopWidth: 1,
+            borderTopColor: theme.colors.border,
+            gap: theme.spacing.md,
+          }}>
             <Button
-              variant="secondary"
-              onPress={previousStep}
-              leftIcon={<ArrowLeft size={16} />}
+              variant="outline"
+              onPress={currentStep === 0 ? () => router.back() : previousStep}
+              disabled={loading}
+              icon={currentStep === 0 ? undefined : <ArrowLeft size={18} color={theme.colors.text.primary} />}
+              style={{ flex: 1, borderColor: theme.colors.error }}
+            >
+              {currentStep === 0 ? 'Cancel' : 'Previous'}
+            </Button>
+
+            <Button
+              variant="primary"
+              onPress={currentStep === STEPS.length - 1 ? handleSubmit : nextStep}
+              disabled={loading || isValidating}
+              loading={loading && currentStep === STEPS.length - 1}
+              icon={currentStep === STEPS.length - 1 ? <Save size={18} color={theme.colors.primaryForeground} /> : <ArrowRight size={18} color={theme.colors.primaryForeground} />}
               style={{ flex: 1 }}
             >
-              Previous
+              {currentStep === STEPS.length - 1 ? 'Update Listing' : (isValidating ? 'Validating...' : 'Next')}
             </Button>
-          )}
-          
-          {currentStep < STEPS.length - 1 ? (
-            <Button
-              variant="primary"
-              onPress={nextStep}
-              disabled={loading || isValidating}
-              icon={<ArrowRight size={16} />}
-              style={{ flex: currentStep > 0 ? 1 : undefined }}
-            >
-              {isValidating ? 'Validating...' : 'Next'}
-            </Button>
-          ) : (
-            <Button
-              variant="primary"
-              onPress={handleSubmit}
-              disabled={loading || isValidating}
-              loading={loading}
-              icon={<Save size={16} />}
-              style={{ flex: currentStep > 0 ? 1 : undefined }}
-            >
-              Update Listing
-            </Button>
-          )}
-        </View>
-      </View>
+          </View>
+        </SafeAreaView>
+      </KeyboardAvoidingView>
 
       {/* Success Modal */}
       <AppModal

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, TouchableOpacity, TextInput } from 'react-native';
+import { View, TouchableOpacity, TextInput, Animated } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { Button } from '@/components/Button/Button';
 import { usePresence } from '@/hooks/usePresence';
 import { Send, Paperclip, Camera, Mic, Image as ImageIcon } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 
 interface MessageInputProps {
   value: string;
@@ -38,8 +39,22 @@ export function MessageInput({
   const [isFocused, setIsFocused] = useState(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textInputRef = useRef<TextInput>(null);
+  
+  // Animation values
+  const sendButtonScale = useRef(new Animated.Value(0)).current;
+  const focusedScale = useRef(new Animated.Value(1)).current;
 
   const canSend = value.trim().length > 0 && !disabled;
+  
+  // Animate send button appearance
+  useEffect(() => {
+    Animated.spring(sendButtonScale, {
+      toValue: canSend ? 1 : 0,
+      friction: 6,
+      tension: 40,
+      useNativeDriver: true,
+    }).start();
+  }, [canSend]);
 
   // Handle typing indicators
   const handleTextChange = (text: string) => {
@@ -218,25 +233,33 @@ export function MessageInput({
           />
         </View>
 
-        {/* Send/Voice Button */}
+        {/* Send/Voice Button with Animation */}
         {canSend ? (
-          <Button
-            variant="primary"
-            icon={<Send size={20} color={theme.colors.primaryForeground} />}
-            onPress={handleSend}
-            disabled={disabled}
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: theme.borderRadius.full,
-            }}
-          />
+          <Animated.View style={{ transform: [{ scale: sendButtonScale }], opacity: sendButtonScale }}>
+            <Button
+              variant="primary"
+              icon={<Send size={20} color={theme.colors.primaryForeground} />}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                handleSend();
+              }}
+              disabled={disabled}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: theme.borderRadius.full,
+              }}
+            />
+          </Animated.View>
         ) : (
           onVoice && (
             <Button
               variant="icon"
               icon={<Mic size={20} color={theme.colors.text.muted} />}
-              onPress={onVoice}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                onVoice();
+              }}
               disabled={disabled}
               style={{
                 width: 44,

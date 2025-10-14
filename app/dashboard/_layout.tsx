@@ -45,16 +45,14 @@ export default function DashboardLayout() {
       height: 3,
     },
     tabBarLabelStyle: {
-      fontSize: Platform.OS === 'android' ? 13 : 12,
+      fontSize: 13,
       fontWeight: '700' as const,
       textTransform: 'capitalize' as const,
-      marginHorizontal: -2,
-    },
-    tabBarItemStyle: {
-      paddingHorizontal: theme.spacing.sm,
+      padding: theme.spacing.xs,
     },
     tabBarPressColor: theme.colors.primary + '20',
-    tabBarScrollEnabled: false,
+    tabBarScrollEnabled: true,
+    tabBarBounces: false,
     // CRITICAL: Add background color to prevent white flash
     sceneContainerStyle: {
       backgroundColor: theme.colors.background,

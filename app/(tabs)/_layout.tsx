@@ -1,12 +1,13 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import { router, Tabs } from 'expo-router';
-import { View, Text, Image, Platform, useColorScheme } from 'react-native';
+import { View, Text, Image, Platform, useColorScheme, Animated, Pressable } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { MessageCircle, Plus, Users, EllipsisVertical, House, BadgePlus, CirclePlus } from 'lucide-react-native';
 import { useChatStore } from '@/store/useChatStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomTabBarSpacing } from '@/hooks/useBottomTabBarSpacing';
 import { usePathname } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 
 export default function TabLayout() {
   const { theme, isDarkMode } = useTheme();
@@ -55,9 +56,29 @@ export default function TabLayout() {
       marginTop: 4,
       letterSpacing: 0.5,
     },
+    tabBarItemStyle: {
+      paddingVertical: 4,
+    },
     // Optimize animations
     animationEnabled: true,
     animationTypeForReplace: 'push',
+    // Add press effect
+    tabBarButton: (props: any) => (
+      <Pressable
+        {...props}
+        onPress={(e) => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          props.onPress?.(e);
+        }}
+        style={({ pressed }) => [
+          props.style,
+          {
+            opacity: pressed ? 0.7 : 1,
+            transform: [{ scale: pressed ? 0.95 : 1 }],
+          },
+        ]}
+      />
+    ),
   }), [theme, tabBarHeight, tabBarBottomPadding, contentBottomPadding, isPostDetailScreen]);
 
   return (
@@ -127,7 +148,7 @@ export default function TabLayout() {
           tabBarStyle: {
             display: 'none',
           },
-          tabBarIcon: ({ size, color }) => {
+          tabBarIcon: ({ size, color, focused }) => {
             // Use isDarkMode to determine which icon to show
             const createIcon = isDarkMode 
               ? require('@/assets/icon/icon-dark.png')
@@ -144,6 +165,7 @@ export default function TabLayout() {
                   alignItems: 'center',
                   marginBottom: 20,
                   ...theme.shadows.lg,
+                  transform: [{ scale: focused ? 1.1 : 1 }],
                 }}
               >
                 <Image source={createIcon} style={{ width: 60, height: 60 }} />
@@ -151,6 +173,11 @@ export default function TabLayout() {
             );
           },
           tabBarLabel: 'Sell',
+        }}
+        listeners={{
+          tabPress: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          },
         }}
       />
 

@@ -6,7 +6,6 @@ import { useTheme } from '@/theme/ThemeProvider';
 interface DynamicThemeColors {
   primary: string;
   secondary: string;
-  accent: string;
   success: string;
   error: string;
   warning: string;
@@ -31,7 +30,6 @@ export function useDynamicTheme() {
     try {
       const primaryColor = getSetting<string>('primary_color', theme.colors.primary);
       const secondaryColor = getSetting<string>('secondary_color', theme.colors.secondary);
-      const accentColor = getSetting<string>('accent_color', theme.colors.accent);
       const successColor = getSetting<string>('success_color', theme.colors.success);
       const errorColor = getSetting<string>('error_color', theme.colors.error);
       const warningColor = getSetting<string>('warning_color', theme.colors.warning);
@@ -41,7 +39,6 @@ export function useDynamicTheme() {
       const colors: DynamicThemeColors = {
         primary: hexRegex.test(primaryColor) ? primaryColor : theme.colors.primary,
         secondary: hexRegex.test(secondaryColor) ? secondaryColor : theme.colors.secondary,
-        accent: hexRegex.test(accentColor) ? accentColor : theme.colors.accent,
         success: hexRegex.test(successColor) ? successColor : theme.colors.success,
         error: hexRegex.test(errorColor) ? errorColor : theme.colors.error,
         warning: hexRegex.test(warningColor) ? warningColor : theme.colors.warning,
@@ -66,7 +63,6 @@ export function useDynamicTheme() {
         ...theme.colors,
         primary: dynamicColors.primary,
         secondary: dynamicColors.secondary,
-        accent: dynamicColors.accent,
         success: dynamicColors.success,
         error: dynamicColors.error,
         warning: dynamicColors.warning,
@@ -115,12 +111,21 @@ export function useDynamicColor(colorKey: keyof DynamicThemeColors): string {
   const { theme } = useTheme();
   const { getSetting, loading } = useAppSettings('theme');
 
-  if (loading) return theme.colors[colorKey];
+  // Map of color keys to theme colors
+  const colorMap: Record<keyof DynamicThemeColors, string> = {
+    primary: theme.colors.primary,
+    secondary: theme.colors.secondary,
+    success: theme.colors.success,
+    error: theme.colors.error,
+    warning: theme.colors.warning,
+  };
+
+  if (loading) return colorMap[colorKey];
 
   const settingKey = `${colorKey}_color`;
   const customColor = getSetting<string>(settingKey, '');
   const hexRegex = /^#[0-9A-F]{6}$/i;
 
-  return hexRegex.test(customColor) ? customColor : theme.colors[colorKey];
+  return hexRegex.test(customColor) ? customColor : colorMap[colorKey];
 }
 

@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { View, ScrollView, TouchableOpacity, RefreshControl, Pressable, Alert, Animated } from 'react-native';
+import React, { useState, useRef, useMemo, useCallback } from 'react';
+import { View, ScrollView, TouchableOpacity, RefreshControl, Pressable, Alert, Animated, FlatList } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useCommunityPosts } from '@/hooks/useCommunity';
@@ -201,55 +201,152 @@ export default function CommunityScreen() {
   };
 
   // Transform database posts to component format with enhanced features
-  const transformedPosts = posts.map((post: any) => {
-    // Safety check for post data
-    if (!post || typeof post !== 'object') {
-      console.warn('Invalid post data:', post);
-      return null;
-    }
+  const transformedPosts = useMemo(() => {
+    return posts.map((post: any) => {
+      // Safety check for post data
+      if (!post || typeof post !== 'object') {
+        console.warn('Invalid post data:', post);
+        return null;
+      }
 
-    const transformedPost = {
-      id: post.id || 'unknown',
-      type: post.type || (post.listings ? 'listing' : 'general'),
-      user_id: post.user_id, // Preserve the original user_id for ownership checks
-      author: {
-        id: post.profiles?.id || 'unknown',
-        name: getDisplayName(post.profiles, false).displayName,
-        avatar: post.profiles?.avatar_url || null,
-        rating: Number(post.profiles?.rating) || 0,
-        reviewCount: Number(post.profiles?.rating_count || post.profiles?.total_reviews) || 0,
-        isVerified: Boolean(post.profiles?.is_verified),
-        location: post.profiles?.location || null,
-        profile: post.profiles || null,
-        is_sellar_pro: Boolean(post.author_is_sellar_pro), // ✅ Sellar Pro status
-      },
-      timestamp: new Date(post.created_at || new Date()).toLocaleString(),
-      content: post.content || '',
-      images: Array.isArray(post.images) ? post.images : [],
-      likes_count: Number(post.likes_count) || 0,
-      comments_count: Number(post.comments_count) || 0,
-      shares_count: Number(post.shares_count) || 0,
-      isLiked: false,
-      location: post.location || null,
-      listing: post.listings ? {
-        id: post.listings.id || 'unknown',
-        title: post.listings.title || 'Untitled',
-        price: Number(post.listings.price) || 0,
-        image: post.listings.images?.[0] || null,
-      } : undefined,
-    };
+      const transformedPost = {
+        id: post.id || 'unknown',
+        type: post.type || (post.listings ? 'listing' : 'general'),
+        user_id: post.user_id, // Preserve the original user_id for ownership checks
+        author: {
+          id: post.profiles?.id || 'unknown',
+          name: getDisplayName(post.profiles, false).displayName,
+          avatar: post.profiles?.avatar_url || null,
+          rating: Number(post.profiles?.rating) || 0,
+          reviewCount: Number(post.profiles?.rating_count || post.profiles?.total_reviews) || 0,
+          isVerified: Boolean(post.profiles?.is_verified),
+          location: post.profiles?.location || null,
+          profile: post.profiles || null,
+          is_sellar_pro: Boolean(post.author_is_sellar_pro), // ✅ Sellar Pro status
+        },
+        timestamp: new Date(post.created_at || new Date()).toLocaleString(),
+        content: post.content || '',
+        images: Array.isArray(post.images) ? post.images : [],
+        likes_count: Number(post.likes_count) || 0,
+        comments_count: Number(post.comments_count) || 0,
+        shares_count: Number(post.shares_count) || 0,
+        isLiked: false,
+        location: post.location || null,
+        listing: post.listings ? {
+          id: post.listings.id || 'unknown',
+          title: post.listings.title || 'Untitled',
+          price: Number(post.listings.price) || 0,
+          image: post.listings.images?.[0] || null,
+        } : undefined,
+      };
 
-    // Debug log for posts with invalid IDs
-    if (!post.id || post.id === 'unknown') {
-      console.warn('Post with invalid ID detected:', { 
-        originalId: post.id, 
-        transformedId: transformedPost.id,
-        postData: post 
-      });
-    }
+      // Debug log for posts with invalid IDs
+      if (!post.id || post.id === 'unknown') {
+        console.warn('Post with invalid ID detected:', { 
+          originalId: post.id, 
+          transformedId: transformedPost.id,
+          postData: post 
+        });
+      }
 
-    return transformedPost;
-  }).filter(Boolean); // Remove any null entries
+      return transformedPost;
+    }).filter(Boolean); // Remove any null entries
+  }, [posts]);
+
+  // Memoized PostCard component to prevent unnecessary re-renders
+  const MemoizedPostCard = useCallback(({ post }: { post: any }) => {
+    if (!post) return null;
+    
+    return (
+      <PostCard 
+        key={post.id} 
+        post={post}
+        isFollowing={isFollowing(post.author.id)}
+        onLike={() => {
+          console.log('Liked post:', post.id);
+          // TODO: Implement like functionality
+        }}
+        onComment={() => router.push(`/(tabs)/community/${post.id}`)}
+        onShare={() => {
+          console.log('Shared post:', post.id);
+          // TODO: Implement share functionality
+        }}
+        onEdit={() => handleEditPost(post.id)}
+        onDelete={() => handleDeletePost(post.id)}
+        onFollow={() => handleFollow(post.author.id)}
+        onUnfollow={() => handleUnfollow(post.author.id)}
+        onReport={() => {
+          console.log('Reported post:', post.id);
+          // TODO: Implement report functionality
+        }}
+      />
+    );
+  }, [isFollowing, handleEditPost, handleDeletePost, handleFollow, handleUnfollow]);
+
+  // Memoized Create Post Prompt
+  const CreatePostPrompt = useMemo(() => (
+    <TouchableOpacity
+      onPress={() => router.push('/(tabs)/community/create-post')}
+      style={{
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.borderRadius.lg,
+        padding: theme.spacing.lg,
+        marginBottom: theme.spacing.lg,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        ...theme.shadows.sm,
+      }}
+      activeOpacity={0.7}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+        <Avatar 
+          source={profile?.avatar_url || user?.user_metadata?.avatar_url}
+          name={profile?.full_name || `${user?.user_metadata?.first_name || 'User'} ${user?.user_metadata?.last_name || ''}`}
+          size="sm" 
+        />
+        <Text variant="body" color="muted" style={{ flex: 1 }}>
+          What&apos;s on your mind?
+        </Text>
+        <View
+          style={{
+            backgroundColor: theme.colors.primary,
+            borderRadius: theme.borderRadius.full,
+            paddingHorizontal: theme.spacing.md,
+            paddingVertical: theme.spacing.sm,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: theme.spacing.xs,
+          }}
+        >
+          <Plus size={16} color={theme.colors.primaryForeground} />
+          <Text
+            variant="bodySmall"
+            style={{
+              color: theme.colors.primaryForeground,
+              fontWeight: '600',
+            }}
+          >
+            Post
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  ), [theme, profile, user]);
+
+  // Memoized ListHeader for FlatList
+  const ListHeader = useMemo(() => (
+    <View>
+      {CreatePostPrompt}
+    </View>
+  ), [CreatePostPrompt]);
+
+  // Optimized renderItem for FlatList
+  const renderPost = useCallback(({ item: post }: { item: any }) => (
+    <MemoizedPostCard post={post} />
+  ), [MemoizedPostCard]);
+
+  // Optimized keyExtractor
+  const keyExtractor = useCallback((item: any) => item.id, []);
 
 
   return (
@@ -273,23 +370,33 @@ export default function CommunityScreen() {
         />
 
         {loading ? (
-          <ScrollView
+          <FlatList
+            data={Array.from({ length: 3 })}
+            keyExtractor={(_, index) => `skeleton-${index}`}
+            renderItem={({ index }) => (
+              <PostCardSkeleton key={index} showImage={index % 2 === 0} />
+            )}
             contentContainerStyle={{
               padding: theme.spacing.lg,
             }}
-          >
-            {Array.from({ length: 3 }).map((_, index) => (
-              <PostCardSkeleton key={index} showImage={index % 2 === 0} />
-            ))}
-          </ScrollView>
+            // ✅ Performance optimizations for skeleton loading
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={3}
+            windowSize={2}
+            initialNumToRender={3}
+          />
         ) : error ? (
           <ErrorState
             message={error}
             onRetry={refresh}
           />
         ) : transformedPosts.length > 0 ? (
-          <ScrollView
-            ref={scrollViewRef}
+          <FlatList
+            ref={scrollViewRef as any}
+            data={transformedPosts}
+            keyExtractor={keyExtractor}
+            renderItem={renderPost}
+            ListHeaderComponent={ListHeader}
             contentContainerStyle={{
               padding: theme.spacing.sm,
               paddingBottom: contentBottomPadding,
@@ -308,84 +415,14 @@ export default function CommunityScreen() {
                 colors={[theme.colors.primary]}
               />
             }
-          >
-            {/* Create Post Prompt */}
-            <TouchableOpacity
-              onPress={() => router.push('/(tabs)/community/create-post')}
-              style={{
-                backgroundColor: theme.colors.surface,
-                borderRadius: theme.borderRadius.lg,
-                padding: theme.spacing.lg,
-                marginBottom: theme.spacing.lg,
-                borderWidth: 1,
-                borderColor: theme.colors.border,
-                ...theme.shadows.sm,
-              }}
-              activeOpacity={0.7}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
-                <Avatar 
-                  source={profile?.avatar_url || user?.user_metadata?.avatar_url}
-                  name={profile?.full_name || `${user?.user_metadata?.first_name || 'User'} ${user?.user_metadata?.last_name || ''}`}
-                  size="sm" 
-                />
-                <Text variant="body" color="muted" style={{ flex: 1 }}>
-                  What&apos;s on your mind?
-                </Text>
-                <View
-                  style={{
-                    backgroundColor: theme.colors.primary,
-                    borderRadius: theme.borderRadius.full,
-                    paddingHorizontal: theme.spacing.md,
-                    paddingVertical: theme.spacing.sm,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: theme.spacing.xs,
-                  }}
-                >
-                  <Plus size={16} color={theme.colors.primaryForeground} />
-                  <Text
-                    variant="bodySmall"
-                    style={{
-                      color: theme.colors.primaryForeground,
-                      fontWeight: '600',
-                    }}
-                  >
-                    Post
-                  </Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            {/* Posts Feed */}
-            {transformedPosts.map((post) => {
-              if (!post) return null;
-              return (
-                <PostCard 
-                  key={post.id} 
-                  post={post}
-                  isFollowing={isFollowing(post.author.id)}
-                  onLike={() => {
-                    console.log('Liked post:', post.id);
-                    // TODO: Implement like functionality
-                  }}
-                  onComment={() => router.push(`/(tabs)/community/${post.id}`)}
-                  onShare={() => {
-                    console.log('Shared post:', post.id);
-                    // TODO: Implement share functionality
-                  }}
-                  onEdit={() => handleEditPost(post.id)}
-                  onDelete={() => handleDeletePost(post.id)}
-                  onFollow={() => handleFollow(post.author.id)}
-                  onUnfollow={() => handleUnfollow(post.author.id)}
-                  onReport={() => {
-                    console.log('Reported post:', post.id);
-                    // TODO: Implement report functionality
-                  }}
-                />
-              );
-            })}
-          </ScrollView>
+            // ✅ Performance optimizations for smooth scrolling
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={10}
+            windowSize={5}
+            initialNumToRender={10}
+            updateCellsBatchingPeriod={50}
+            decelerationRate="fast"
+          />
         ) : (
           <EmptyState
             icon={<Users size={64} color={theme.colors.text.muted} />}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, TouchableOpacity, Alert } from 'react-native';
+import { View, TouchableOpacity, Alert, Image } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { router } from 'expo-router';
@@ -45,7 +45,7 @@ export function CommentCard({
   maxDepth = 3,
   style,
 }: CommentCardProps) {
-  const { theme } = useTheme();
+  const { theme, isDarkMode } = useTheme();
   const { user } = useAuthStore();
   const [isRepliesCollapsed, setIsRepliesCollapsed] = useState(false);
 
@@ -59,7 +59,13 @@ export function CommentCard({
   
   // Get display name and avatar for official content
   const displayName = isOfficial ? getOfficialDisplayName() : comment.author.name;
-  const avatarSource = isOfficial ? require('../../assets/icon/icon-light.png') : comment.author.avatar;
+  
+  // Get theme-aware official icon
+  const officialIcon = isDarkMode
+    ? require('../../assets/icon/icon-dark.png')
+    : require('../../assets/icon/icon-light.png');
+  
+  const avatarSource = isOfficial ? officialIcon : comment.author.avatar;
 
   const handleReport = () => {
     Alert.alert(
@@ -132,12 +138,33 @@ export function CommentCard({
               activeOpacity={isOfficial ? 1 : 0.7}
               disabled={isOfficial}
             >
-              <Avatar
-                source={avatarSource}
-                name={displayName}
-                size="xs"
-                style={{ marginRight: theme.spacing.xs }} // Reduced from sm to xs
-              />
+              {isOfficial ? (
+                <View
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 12,
+                    backgroundColor: theme.colors.surface,
+                    marginRight: theme.spacing.xs,
+                    overflow: 'hidden',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Image
+                    source={officialIcon}
+                    style={{ width: 24, height: 24 }}
+                    resizeMode="cover"
+                  />
+                </View>
+              ) : (
+                <Avatar
+                  source={avatarSource}
+                  name={displayName}
+                  size="xs"
+                  style={{ marginRight: theme.spacing.xs }} // Reduced from sm to xs
+                />
+              )}
             </TouchableOpacity>
             
             <View style={{ flex: 1 }}>

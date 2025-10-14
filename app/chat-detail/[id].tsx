@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Platform, Alert, TouchableOpacity, Linking, Image, Keyboard, TouchableWithoutFeedback, Animated, ScrollView } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { View, Platform, Alert, TouchableOpacity, Linking, Image, Keyboard, TouchableWithoutFeedback, Animated, ScrollView, FlatList } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -77,6 +77,7 @@ export default function ChatScreen() {
   const [showModerationModal, setShowModerationModal] = useState(false);
   
   const scrollViewRef = useRef<KeyboardAwareScrollView>(null);
+  const flatListRef = useRef<FlatList>(null);
   const inputContainerTranslateY = useRef(new Animated.Value(0)).current;
 
   // Get conversation details
@@ -85,6 +86,37 @@ export default function ChatScreen() {
   const [typing, setTyping] = useState(false);
   const [existingTransaction, setExistingTransaction] = useState<any>(null);
   const [conversationDeleted, setConversationDeleted] = useState(false);
+
+  // Transform messages for FlatList with date separators
+  const transformedMessages = useMemo(() => {
+    if (!messages || messages.length === 0) return [];
+    
+    const items: any[] = [];
+    
+    messages.forEach((message: any, index: number) => {
+      const messageDate = new Date(message.created_at);
+      const showDateSeparator = index === 0 || 
+        (index > 0 && isDifferentDay(message.created_at, messages[index - 1].created_at));
+      
+      // Add date separator if needed
+      if (showDateSeparator) {
+        items.push({
+          id: `date-${message.id}`,
+          type: 'date-separator',
+          date: messageDate,
+        });
+      }
+      
+      // Add the message
+      items.push({
+        id: message.id,
+        type: 'message',
+        data: message,
+      });
+    });
+    
+    return items;
+  }, [messages]);
 
   useEffect(() => {
     if (conversationId && !conversationDeleted) {
@@ -856,6 +888,201 @@ export default function ChatScreen() {
     setShowToast(true);
   };
 
+  // Memoized message renderer
+  const renderMessage = useCallback(({ item }: { item: any }) => {
+    if (item.type === 'date-separator') {
+      return (
+        <DateSeparator
+          key={item.id}
+          date={item.date}
+        />
+      );
+    }
+    
+    const message = item.data;
+    const isOwn = message.sender_id === user?.id;
+    const messageDate = new Date(message.created_at);
+    const timestamp = formatChatTimestamp(messageDate);
+    
+    const safeMessageContent = String(message.content || '');
+
+    if (message.message_type === 'offer') {
+      const offer = message.offers?.[0];
+      
+      if (!offer && message.offers && message.offers.length === 0) {
+        return (
+          <ChatBubble
+            key={message.id}
+            message={safeMessageContent}
+            isOwn={isOwn}
+            timestamp={timestamp}
+            type={message.message_type}
+            status={message.status}
+            senderName={!isOwn ? getDisplayName(message.sender, false).displayName : undefined}
+          />
+        );
+      }
+      
+      if (offer) {
+        const isUserBuyer = offer.buyer_id === user?.id;
+        const buyerProfile = offer.buyer || message.sender;
+        
+        return (
+          <View key={message.id} style={{ paddingHorizontal: theme.spacing.lg }}>
+            <OfferCard
+              offer={{
+                id: offer.id,
+                amount: offer.amount,
+                currency: offer.currency,
+                originalPrice: conversation?.listing?.price,
+                status: offer.status,
+                timestamp,
+                expiresAt: offer.expires_at,
+                buyer: {
+                  name: getDisplayName(buyerProfile, false).displayName || 
+                        buyerProfile?.full_name || 
+                        (buyerProfile?.first_name && buyerProfile?.last_name 
+                          ? `${buyerProfile.first_name} ${buyerProfile.last_name}` 
+                          : null) || 
+                        'Unknown User',
+                  avatar: buyerProfile?.avatar_url,
+                  rating: buyerProfile?.rating,
+                },
+                message: offer.message ? String(offer.message) : undefined,
+                isOwn: isUserBuyer,
+              }}
+              onAccept={() => handleOfferAction(offer.id, 'accept')}
+              onReject={() => handleOfferAction(offer.id, 'reject')}
+              onCounter={() => {
+                setCounteringOfferId(offer.id);
+                setShowCounterModal(true);
+                setOfferAmount('');
+                setOfferMessage('');
+              }}
+              onMessage={() => {}}
+              showActions={offer.status === 'pending'}
+            />
+          </View>
+        );
+      }
+    }
+
+    if (message.message_type === 'callback_request') {
+      return (
+        <CallbackMessage
+          key={message.id}
+          message={message}
+          isOwn={isOwn}
+          senderName={!isOwn ? getDisplayName(message.sender, false).displayName : undefined}
+          senderPhone={message.sender?.phone}
+          timestamp={timestamp}
+        />
+      );
+    }
+
+    if (message.message_type === 'system') {
+      return (
+        <View key={message.id} style={{ alignItems: 'center', marginVertical: theme.spacing.md }}>
+          <View
+            style={{
+              backgroundColor: theme.colors.surfaceVariant,
+              paddingHorizontal: theme.spacing.lg,
+              paddingVertical: theme.spacing.sm,
+              borderRadius: theme.borderRadius.full,
+              maxWidth: '80%',
+            }}
+          >
+            <Text
+              variant="caption"
+              style={{
+                color: theme.colors.text.secondary,
+                textAlign: 'center',
+                fontWeight: '500',
+              }}
+            >
+              {safeMessageContent}
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    let messageStatus = message.status || 'sent';
+    
+    if (isOwn) {
+      if (message.read_at) {
+        messageStatus = 'read';
+      } else if (message.delivered_at) {
+        messageStatus = 'delivered';
+      } else {
+        messageStatus = 'sent';
+      }
+    }
+
+    return (
+      <ChatBubble
+        key={message.id}
+        message={safeMessageContent}
+        isOwn={isOwn}
+        timestamp={timestamp}
+        type={message.message_type}
+        status={messageStatus}
+        senderName={!isOwn ? getDisplayName(message.sender || otherUser, false).displayName : undefined}
+        images={message.message_type === 'image' && message.images ? 
+          (() => {
+            try {
+              return typeof message.images === 'string' ? JSON.parse(message.images) : message.images;
+            } catch (e) {
+              console.warn('Failed to parse message images:', e);
+              return undefined;
+            }
+          })()
+          : undefined}
+      />
+    );
+  }, [user, conversation, otherUser, theme, handleOfferAction, setCounteringOfferId, setShowCounterModal, setOfferAmount, setOfferMessage]);
+
+  const keyExtractor = useCallback((item: any) => item.id, []);
+
+  const ListFooter = useMemo(() => (
+    <View>
+      {conversation?.listing && otherUser && (
+        <View style={{
+          paddingHorizontal: theme.spacing.lg,
+          paddingTop: theme.spacing.xl,
+          paddingBottom: theme.spacing.md,
+          alignItems: 'center',
+        }}>
+          <TransactionCompletionButton
+            conversationId={conversationId!}
+            otherUser={otherUser}
+            listing={conversation.listing}
+            existingTransaction={existingTransaction}
+            onTransactionCreated={handleTransactionCreated}
+            onTransactionUpdated={handleTransactionUpdated}
+          />
+        </View>
+      )}
+      {typing && (
+        <View style={{ paddingHorizontal: theme.spacing.lg, marginTop: theme.spacing.md }}>
+          <View
+            style={{
+              backgroundColor: theme.colors.surfaceVariant,
+              borderRadius: theme.borderRadius.lg,
+              padding: theme.spacing.md,
+              alignSelf: 'flex-start',
+              maxWidth: '80%',
+            }}
+          >
+            <Text variant="bodySmall" color="muted" style={{ fontStyle: 'italic' }}>
+              {otherUser?.first_name ? `${otherUser.first_name} is typing...` : 'User is typing...'}
+            </Text>
+          </View>
+        </View>
+      )}
+    </View>
+  ), [conversation, otherUser, conversationId, existingTransaction, handleTransactionCreated, handleTransactionUpdated, typing, theme]);
+
   // Show loading state if conversation was deleted
   if (conversationDeleted) {
     return (
@@ -1211,240 +1438,19 @@ export default function ChatScreen() {
           }}
         >
           {messages.length === 0 ? (
-            <EmptyState
-              title="Start the conversation"
-              description={conversation?.listing?.title 
-                ? `Send a message about "${conversation.listing.title}"`
-                : "Send a message to begin chatting"
-              }
-            />
-          ) : (
-            messages.map((message: any, index: number) => {
-              const isOwn = message.sender_id === user?.id;
-              const messageDate = new Date(message.created_at);
-              const timestamp = formatChatTimestamp(messageDate);
-              
-              // Check if we need a date separator
-              const showDateSeparator = index === 0 || 
-                (index > 0 && isDifferentDay(message.created_at, messages[index - 1].created_at));
-              
-              const elements = [];
-              
-              // Add date separator if needed
-              if (showDateSeparator) {
-                elements.push(
-                  <DateSeparator
-                    key={`date-${message.id}`}
-                    date={messageDate}
-                  />
-                );
-              }
-              
-              // Ensure message content is safe
-              const safeMessageContent = String(message.content || '');
-
-              if (message.message_type === 'offer') {
-                const offer = message.offers?.[0];
-                console.log('🎯 Offer data:', { offer, messageId: message.id, messageType: message.message_type, offersArray: message.offers });
-                
-                // If offer is undefined, try to fetch it manually
-                if (!offer && message.offers && message.offers.length === 0) {
-                  console.log('🎯 No offer found for message, this might be an old offer message without proper offer data');
-                  // For now, render as a regular message if no offer data is available
-                  elements.push(
-                    <ChatBubble
-                      key={message.id}
-                      message={safeMessageContent}
-                      isOwn={isOwn}
-                      timestamp={timestamp}
-                      type={message.message_type}
-                      status={message.status}
-                      senderName={!isOwn ? getDisplayName(message.sender, false).displayName : undefined}
-                    />
-                  );
-                  return elements;
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+              <EmptyState
+                title="Start the conversation"
+                description={conversation?.listing?.title 
+                  ? `Send a message about "${conversation.listing.title}"`
+                  : "Send a message to begin chatting"
                 }
-                
-                if (offer) {
-                  // Determine if this is the current user's offer (they are the buyer)
-                  const isUserBuyer = offer.buyer_id === user?.id;
-                  
-                  // Get buyer info from the offer.buyer profile
-                  const buyerProfile = offer.buyer || message.sender;
-                  
-                  elements.push(
-                    <View key={message.id} style={{ paddingHorizontal: theme.spacing.lg }}>
-                      <OfferCard
-                        offer={{
-                          id: offer.id,
-                          amount: offer.amount,
-                          currency: offer.currency,
-                          originalPrice: conversation?.listing?.price,
-                          status: offer.status,
-                          timestamp,
-                          expiresAt: offer.expires_at,
-                          buyer: {
-                            name: getDisplayName(buyerProfile, false).displayName || 
-                                  buyerProfile?.full_name || 
-                                  (buyerProfile?.first_name && buyerProfile?.last_name 
-                                    ? `${buyerProfile.first_name} ${buyerProfile.last_name}` 
-                                    : null) || 
-                                  'Unknown User',
-                            avatar: buyerProfile?.avatar_url,
-                            rating: buyerProfile?.rating,
-                          },
-                          message: offer.message ? String(offer.message) : undefined,
-                          isOwn: isUserBuyer,
-                        }}
-                        onAccept={() => {
-                          console.log('🎯 Accept button clicked for offer:', { 
-                            offerId: offer.id, 
-                            offerType: typeof offer.id,
-                            fullOffer: offer 
-                          });
-                          handleOfferAction(offer.id, 'accept');
-                        }}
-                        onReject={() => {
-                          console.log('🎯 Reject button clicked for offer:', { 
-                            offerId: offer.id, 
-                            offerType: typeof offer.id,
-                            fullOffer: offer 
-                          });
-                          handleOfferAction(offer.id, 'reject');
-                        }}
-                        onCounter={() => {
-                          setCounteringOfferId(offer.id);
-                          setShowCounterModal(true);
-                          setOfferAmount('');
-                          setOfferMessage('');
-                        }}
-                        onMessage={() => {}}
-                        showActions={offer.status === 'pending'}
-                      />
-                    </View>
-                  );
-                  return elements;
-                }
-              }
-
-              // Callback request message
-              if (message.message_type === 'callback_request') {
-                elements.push(
-                  <CallbackMessage
-                    key={message.id}
-                    message={message}
-                    isOwn={isOwn}
-                    senderName={!isOwn ? getDisplayName(message.sender, false).displayName : undefined}
-                    senderPhone={message.sender?.phone}
-                    timestamp={timestamp}
-                  />
-                );
-                return elements;
-              }
-
-              if (message.message_type === 'system') {
-                elements.push(
-                  <View key={message.id} style={{ alignItems: 'center', marginVertical: theme.spacing.md }}>
-                    <View
-                      style={{
-                        backgroundColor: theme.colors.surfaceVariant,
-                        paddingHorizontal: theme.spacing.lg,
-                        paddingVertical: theme.spacing.sm,
-                        borderRadius: theme.borderRadius.full,
-                        maxWidth: '80%',
-                      }}
-                    >
-                      <Text
-                        variant="caption"
-                        style={{
-                          color: theme.colors.text.secondary,
-                          textAlign: 'center',
-                          fontWeight: '500',
-                        }}
-                      >
-                        {safeMessageContent}
-                      </Text>
-                    </View>
-                  </View>
-                );
-                return elements;
-              }
-
-              // Determine message status for read receipts
-              let messageStatus = message.status || 'sent';
-              
-              // If it's our own message, check if the other user has read it
-              if (isOwn) {
-                if (message.read_at) {
-                  messageStatus = 'read';
-                } else if (message.delivered_at) {
-                  messageStatus = 'delivered';
-                } else {
-                  messageStatus = 'sent';
-                }
-              }
-
-              elements.push(
-                <ChatBubble
-                  key={message.id}
-                  message={safeMessageContent}
-                  isOwn={isOwn}
-                  timestamp={timestamp}
-                  type={message.message_type}
-                  status={messageStatus}
-                  senderName={!isOwn ? getDisplayName(message.sender || otherUser, false).displayName : undefined}
-                  images={message.message_type === 'image' && message.images ? 
-                    (() => {
-                      try {
-                        return typeof message.images === 'string' ? JSON.parse(message.images) : message.images;
-                      } catch (e) {
-                        console.warn('Failed to parse message images:', e);
-                        return undefined;
-                      }
-                    })()
-                    : undefined}
-                />
-              );
-              
-              return elements;
-            })
-          )}
-
-          {/* Transaction Button - Inline in chat */}
-          {conversation?.listing && otherUser && (
-            <View style={{
-              paddingHorizontal: theme.spacing.lg,
-              paddingTop: theme.spacing.xl,
-              paddingBottom: theme.spacing.md,
-              alignItems: 'center',
-            }}>
-              <TransactionCompletionButton
-                conversationId={conversationId!}
-                otherUser={otherUser}
-                listing={conversation.listing}
-                existingTransaction={existingTransaction}
-                onTransactionCreated={handleTransactionCreated}
-                onTransactionUpdated={handleTransactionUpdated}
               />
             </View>
-          )}
-
-          {/* Typing Indicator */}
-          {typing && (
-            <View style={{ paddingHorizontal: theme.spacing.lg, marginTop: theme.spacing.md }}>
-              <View
-                style={{
-                  backgroundColor: theme.colors.surfaceVariant,
-                  borderRadius: theme.borderRadius.lg,
-                  padding: theme.spacing.md,
-                  alignSelf: 'flex-start',
-                  maxWidth: '80%',
-                }}
-              >
-                <Text variant="bodySmall" color="muted" style={{ fontStyle: 'italic' }}>
-                  {otherUser?.first_name ? `${otherUser.first_name} is typing...` : 'User is typing...'}
-                </Text>
-              </View>
+          ) : (
+            <View>
+              {transformedMessages.map((item) => renderMessage({ item }))}
+              {ListFooter}
             </View>
           )}
         </KeyboardAwareScrollView>

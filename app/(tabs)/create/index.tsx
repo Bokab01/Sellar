@@ -52,33 +52,11 @@ import { router } from 'expo-router';
 import { findCategoryById as findCategoryByIdUtil, DbCategory } from '@/utils/categoryUtils';
 import { networkUtils } from '@/utils/networkUtils';
 import { reputationService } from '@/lib/reputationService';
-
-
-
-interface ListingFormData {
-  // Images (Step 1)
-  images: SelectedImage[];
-  
-  // Basic Info (Step 2)
-  title: string;
-  description: string;
-  
-  // Category & Details (Step 2)
-  categoryId: string;
-  categoryAttributes: Record<string, string | string[]>;
-  price: string;
-  quantity: number;
-  acceptOffers: boolean;
-  location: string;
-}
-
-interface SelectedFeature {
-  key: string;
-  name: string;
-  credits: number;
-  duration: string;
-  description: string;
-}
+import { useListingForm, type ListingFormData, type SelectedFeature } from '@/hooks/useListingForm';
+import { useListingAutosave } from '@/hooks/useListingAutosave';
+import { useListingDraft } from '@/hooks/useListingDraft';
+import { useListingValidation } from '@/hooks/useListingValidation';
+import { useListingSubmission } from '@/hooks/useListingSubmission';
 
 const STEPS = [
   {
@@ -109,140 +87,108 @@ function CreateListingScreen() {
   const { user } = useAuthStore();
   const { balance, getMaxListings, spendCredits, hasUnlimitedListings, refreshCredits, hasBusinessPlan } = useMonetizationStore();
   
-  // Form state
-  const [currentStep, setCurrentStep] = useState(0);
-  const [formData, setFormData] = useState<ListingFormData>({
-    images: [],
-    title: '',
-    description: '',
-    categoryId: '',
-    categoryAttributes: {},
-    price: '',
-    quantity: 1,
-    acceptOffers: true,
-    location: '',
-  });
+  // ✅ REFACTORED: Form state using useListingForm hook
+  const {
+    formData,
+    currentStep,
+    selectedFeatures,
+    updateMultipleFields,
+    resetForm,
+    loadFormData,
+    nextStep,
+    previousStep,
+    setCurrentStep,
+    setSelectedFeatures,
+  } = useListingForm();
+  
+  // ✅ REFACTORED: Autosave logic using useListingAutosave hook
+  const {
+    isSaved,
+    autosaveOpacity,
+    saveDraft: saveDraftToStorage,
+    clearDraft: clearDraftFromStorage,
+    loadDraft: loadDraftFromStorage,
+  } = useListingAutosave(formData, currentStep, user?.id);
+  
+  // ✅ REFACTORED: Draft modal management using useListingDraft hook
+  const {
+    showDraftModal,
+    showExitModal,
+    draftData,
+    handleDraftFound,
+    handleLoadDraft,
+    handleStartFresh,
+    handleExitConfirm,
+    handleExitCancel,
+    showExitConfirmation,
+    setShowDraftModal,
+    setShowExitModal,
+  } = useListingDraft();
+  
+  // Category attributes state (needed for validation)
+  const [categoryAttributes, setCategoryAttributes] = useState<any[]>([]);
+  
+  // ✅ REFACTORED: Validation logic using useListingValidation hook
+  const {
+    validationResults,
+    isValidating,
+    validateCurrentStep,
+    isStepValid: isStepValidFromHook,
+    getCurrentStepErrors,
+  } = useListingValidation(formData, currentStep, categoryAttributes);
+  
+  // ✅ REFACTORED: Submission logic using useListingSubmission hook
+  const {
+    loading,
+    uploadProgress,
+    submitListing,
+  } = useListingSubmission();
   
   // UI state
-  const [loading, setLoading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [userListingsCount, setUserListingsCount] = useState(0);
   const [showPhotoTips, setShowPhotoTips] = useState(false);
   const [showListingTipsModal, setShowListingTipsModal] = useState(false);
-  const [showDraftModal, setShowDraftModal] = useState(false);
-  const [showExitModal, setShowExitModal] = useState(false);
-  const [draftData, setDraftData] = useState<ListingFormData | null>(null);
   const [showFeatureConfirmModal, setShowFeatureConfirmModal] = useState(false);
-  
-  // Feature selector state
   const [showFeatureSelector, setShowFeatureSelector] = useState(false);
-  const [selectedFeatures, setSelectedFeatures] = useState<SelectedFeature[]>([]);
-  
-  // Validation state
-  const [validationResults, setValidationResults] = useState<Record<number, ValidationResult>>({});
-  const [isValidating, setIsValidating] = useState(false);
-  const [categoryAttributes, setCategoryAttributes] = useState<any[]>([]); // Store DB attributes for validation
   
   // Performance optimization refs
-  const isMountedRef = useRef(true); // Track if component is mounted
-  const debouncedValidator = useRef(createDebouncedValidator(300));
+  const isMountedRef = useRef(true);
   const formDataRef = useRef(formData);
-  const lastSavedDataRef = useRef<string>(''); // Track last saved data to avoid redundant saves
-  
-  // Autosave state
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [isAutoSaving, setIsAutoSaving] = useState(false);
-  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
-  const [hasShownDraftAlert, setHasShownDraftAlert] = useState(false);
-  const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastAutosaveTimeRef = useRef<number>(0); // Track last autosave time for throttling
-  const AUTOSAVE_KEY = useMemo(() => `listing_draft_${user?.id || 'anonymous'}`, [user?.id]);
   const [selectedCategory, setSelectedCategory] = useState<DbCategory | null>(null);
   
-  // Animation for autosave indicator
-  const autosaveOpacity = useRef(new Animated.Value(0)).current;
-  const fadeOutTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Legacy state (kept for database draft ID tracking)
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
+  const [hasShownDraftAlert, setHasShownDraftAlert] = useState(false);
   
-  // Autosave configuration
-  const AUTOSAVE_DEBOUNCE_MS = 3000; // Wait 3 seconds after user stops typing
-  const AUTOSAVE_THROTTLE_MS = 15000; // Minimum 15 seconds between database saves
+  // ✅ Autosave animation is now handled by useListingAutosave hook
   
-  // Cleanup on unmount to prevent memory leaks and state updates after unmount
+  // Cleanup on unmount
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
-      // Clear autosave timeout on unmount
-      if (autosaveTimeoutRef.current) {
-        clearTimeout(autosaveTimeoutRef.current);
-        autosaveTimeoutRef.current = null;
-      }
-      // Clear fade out timeout on unmount
-      if (fadeOutTimeoutRef.current) {
-        clearTimeout(fadeOutTimeoutRef.current);
-        fadeOutTimeoutRef.current = null;
-      }
     };
   }, []);
-
-  // Handle autosave indicator animation - only show when saved
-  useEffect(() => {
-    try {
-      // Only show indicator when content is saved (not saving, not unsaved)
-      if (!isAutoSaving && !hasUnsavedChanges && (formData.title || formData.description || formData.images.length > 0)) {
-        // Clear any existing fade-out timeout
-        if (fadeOutTimeoutRef.current) {
-          clearTimeout(fadeOutTimeoutRef.current);
-          fadeOutTimeoutRef.current = null;
-        }
-        
-        // Fade in
-        Animated.timing(autosaveOpacity, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }).start();
-        
-        // Show for 2 seconds then fade out
-        fadeOutTimeoutRef.current = setTimeout(() => {
-          try {
-            Animated.timing(autosaveOpacity, {
-              toValue: 0,
-              duration: 500,
-              useNativeDriver: true,
-            }).start();
-          } catch (animError) {
-            console.warn('Animation fade-out error:', animError);
-          }
-        }, 2000) as any;
-      } else {
-        // Hide immediately if saving or unsaved
-        autosaveOpacity.setValue(0);
-      }
-    } catch (error) {
-      console.warn('Autosave animation error:', error);
-    }
-  }, [isAutoSaving, hasUnsavedChanges, formData.title, formData.description, formData.images.length, autosaveOpacity]);
 
   // Feature selection handler
   const handleFeaturesSelected = useCallback((features: SelectedFeature[]) => {
     setSelectedFeatures(features);
-    setHasUnsavedChanges(true);
-  }, []);
+  }, [setSelectedFeatures]);
 
-  // Load saved draft on component mount
+  // ✅ REFACTORED: Load saved draft using hooks
   const loadDraft = useCallback(async () => {
     try {
-      const savedDraft = await AsyncStorage.getItem(AUTOSAVE_KEY);
-      if (savedDraft && !hasShownDraftAlert) {
-        const parsedDraft = JSON.parse(savedDraft);
-        // Only load if it's not empty and we haven't shown the alert yet
-        if (parsedDraft.title || parsedDraft.description || parsedDraft.images?.length > 0) {
+      // Load draft from storage
+      const { data, exists } = await loadDraftFromStorage();
+      
+      if (exists && data && !hasShownDraftAlert) {
+        // Only load if it's not empty
+        if (data.title || data.description || data.images?.length > 0) {
           setHasShownDraftAlert(true);
-          setDraftData(parsedDraft);
-          setShowDraftModal(true);
+          // Use hook's handleDraftFound to show modal
+          handleDraftFound(data);
         }
       }
       
@@ -267,7 +213,7 @@ function CreateListingScreen() {
     } catch (error) {
       console.error('Failed to load draft:', error);
     }
-  }, [AUTOSAVE_KEY, user, hasShownDraftAlert]);
+  }, [loadDraftFromStorage, user, hasShownDraftAlert, handleDraftFound]);
 
   const checkListingLimits = useCallback(async () => {
     if (!user) return;
@@ -292,126 +238,19 @@ function CreateListingScreen() {
     loadDraft();
   }, [checkListingLimits, loadDraft]);
 
-  // Save draft to AsyncStorage and database
-  // showAlert: whether to show "Draft Saved" alert (only for explicit manual saves)
-  // bypassThrottle: whether to bypass the throttle timer (for step changes)
+  // ✅ REFACTORED: Simplified saveDraft wrapper (AsyncStorage only - hook handles this automatically)
+  // Database draft saving removed for better performance
   const saveDraft = useCallback(async (data: ListingFormData, showAlert = false, bypassThrottle = false) => {
-    // Don't save if component is unmounted
-    if (!isMountedRef.current) return;
-    
-    try {
-      // Check if data actually changed to avoid redundant saves
-      const currentDataString = JSON.stringify(data);
-      if (!showAlert && !bypassThrottle && currentDataString === lastSavedDataRef.current) {
-        return; // Skip save if nothing changed
-      }
-      
-      if (!isMountedRef.current) return; // Double check before state update
-      setIsAutoSaving(true);
-      
-      // Always save to AsyncStorage for instant local persistence (fast, no cost)
-      await AsyncStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
-      lastSavedDataRef.current = currentDataString;
-      
-      // Throttle database saves to reduce costs and network requests
-      const now = Date.now();
-      const timeSinceLastSave = now - lastAutosaveTimeRef.current;
-      const shouldSaveToDatabase = bypassThrottle || timeSinceLastSave >= AUTOSAVE_THROTTLE_MS;
-      
-      // Only save to database if:
-      // 1. Manual save OR throttle period has passed
-      // 2. Has meaningful content AND category is selected
-      if (shouldSaveToDatabase && (data.title?.trim() || data.description?.trim() || data.images?.length > 0) && data.categoryId) {
-        lastAutosaveTimeRef.current = now; // Update last save time
-        // CategoryId from CategoryPicker is already a valid UUID
-        const categoryUUID = data.categoryId;
+    // Hook already auto-saves to AsyncStorage
+    // This function is kept for compatibility with existing code
+    // The hook's autosave is triggered automatically on data change
+  }, []);
 
-        const draftData: any = {
-          user_id: user!.id,
-          title: data.title?.trim() || 'Untitled Draft',
-          description: data.description?.trim() || '',
-          price: data.price ? Number(data.price) : 0,
-          currency: 'GHS',
-          category_id: categoryUUID,
-          condition: 'good', // Default condition to satisfy NOT NULL constraint
-          quantity: data.quantity || 1,
-          location: data.location || '',
-          images: data.images?.map(img => img.uri) || [],
-          accept_offers: data.acceptOffers || true,
-          attributes: data.categoryAttributes || {},
-          status: 'draft'
-        };
-        
-        // Only add attributes if they exist
-        if (data.categoryAttributes && Object.keys(data.categoryAttributes).length > 0) {
-          draftData.attributes = data.categoryAttributes;
-        }
-
-        // Check if we already have a draft for this session
-        if (currentDraftId) {
-          // Update existing draft with minimal fields
-          const updateData = {
-            title: draftData.title,
-            description: draftData.description,
-            price: draftData.price,
-            location: draftData.location,
-            images: draftData.images,
-            attributes: draftData.attributes,
-            updated_at: new Date().toISOString()
-          };
-          
-          const { error } = await supabase
-            .from('listings')
-            .update(updateData)
-            .eq('id', currentDraftId);
-
-          if (error) {
-            // If update fails, create new draft
-            const { data: newDraft, error: insertError } = await supabase
-              .from('listings')
-              .insert(draftData)
-              .select('id')
-              .single();
-
-            if (!insertError && newDraft) {
-              setCurrentDraftId(newDraft.id);
-            }
-          }
-        } else {
-          // Create new draft
-          const { data: newDraft, error } = await supabase
-            .from('listings')
-            .insert(draftData)
-            .select('id')
-            .single();
-
-          if (!error && newDraft) {
-            setCurrentDraftId(newDraft.id);
-          }
-        }
-      }
-      
-      if (!isMountedRef.current) return; // Check before state updates
-      setHasUnsavedChanges(false);
-      
-      // Show success message only for explicit manual saves (not step transitions)
-      if (showAlert && isMountedRef.current) {
-        Alert.alert('Draft Saved', 'Your listing has been saved as a draft. You can continue editing it later from My Listings.');
-      }
-    } catch (error) {
-      console.error('Failed to save draft:', error);
-    } finally {
-      if (isMountedRef.current) {
-        setIsAutoSaving(false);
-      }
-    }
-  }, [AUTOSAVE_KEY, user, currentDraftId]);
-
-  // Clear draft from AsyncStorage and database
+  // ✅ REFACTORED: Clear draft using hook + database cleanup
   const clearDraft = useCallback(async () => {
     try {
-      // Clear from AsyncStorage
-      await AsyncStorage.removeItem(AUTOSAVE_KEY);
+      // Clear from AsyncStorage using hook
+      await clearDraftFromStorage();
       
       // Clear current draft from database if it exists
       if (currentDraftId) {
@@ -427,46 +266,25 @@ function CreateListingScreen() {
       }
       
       // Reset form data to initial state
-      setFormData({
-        title: '',
-        description: '',
-        price: '',
-        categoryId: '',
-        categoryAttributes: {},
-        quantity: 1,
-        location: '',
-        images: [],
-        acceptOffers: true,
-      });
-      
-      // Reset stepper to first step
-      setCurrentStep(0);
-      
-      // Reset selected features
-      setSelectedFeatures([]);
-      
-      // Reset validation results
-      setValidationResults({});
+      resetForm();
       
       // Reset draft alert flag
       setHasShownDraftAlert(false);
-      
-      setHasUnsavedChanges(false);
     } catch (error) {
       console.error('Failed to clear draft:', error);
     }
-  }, [AUTOSAVE_KEY, currentDraftId]);
+  }, [clearDraftFromStorage, currentDraftId, resetForm]);
 
 
 
-  // Handle back button and navigation - only on create screen
+  // ✅ REFACTORED: Handle back button using hook
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
         // Show alert if there's any content (saved or unsaved)
         const hasContent = formData.title?.trim() || formData.description?.trim() || formData.images.length > 0;
         if (hasContent) {
-          setShowExitModal(true);
+          showExitConfirmation();
           return true;
         }
         // If no content, just navigate back
@@ -475,66 +293,40 @@ function CreateListingScreen() {
 
       const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () => subscription.remove();
-    }, [formData])
+    }, [formData, showExitConfirmation])
   );
 
-  // Update form data with validation and autosave
+  // ✅ REFACTORED: Simplified wrapper - autosave and validation handled by hooks
   const updateFormData = useCallback((updates: Partial<ListingFormData>) => {
-    setFormData(prev => {
-      const newData = { ...prev, ...updates };
-      formDataRef.current = newData;
-      return newData;
-    });
+    // Update using hook (autosave and validation happen automatically)
+    updateMultipleFields(updates);
     
-    // Use React's automatic batching for state updates
-    React.startTransition(() => {
-      setHasUnsavedChanges(true);
-      
-      // Clear existing timeout
-      if (autosaveTimeoutRef.current) {
-        clearTimeout(autosaveTimeoutRef.current);
-      }
-      
-      // Set new timeout for autosave (debounced)
-      autosaveTimeoutRef.current = setTimeout(() => {
-        const currentData = formDataRef.current;
-        saveDraft(currentData, false); // false = autosave, not manual save
-      }, AUTOSAVE_DEBOUNCE_MS) as any;
-      
-      // Debounced validation with proper async handling
-      setIsValidating(true);
-      debouncedValidator.current(currentStep, formDataRef.current, (result) => {
-        // Use startTransition to avoid scheduling updates during render
-        React.startTransition(() => {
-          setValidationResults(prev => ({ ...prev, [currentStep]: result }));
-          setIsValidating(false);
-        });
-      }, categoryAttributes);
-    });
-  }, [currentStep, saveDraft, categoryAttributes]);
+    // Update ref for immediate access
+    const newData = { ...formData, ...updates };
+      formDataRef.current = newData;
+  }, [updateMultipleFields, formData]);
 
+  // ✅ REFACTORED: Use hook's validation
   const validateStep = useCallback((step: number): boolean => {
-    const validation = validationResults[step] || validateListingStep(step, formData, categoryAttributes);
-    return validation.isValid;
-  }, [formData, validationResults, categoryAttributes]);
+    return isStepValidFromHook(step);
+  }, [isStepValidFromHook]);
 
   const canProceed = useMemo(() => validateStep(currentStep), [currentStep, validateStep]);
 
-  const nextStep = useCallback(() => {
+  // ✅ REFACTORED: Navigation functions using hook with autosave
+  const goToNextStep = useCallback(() => {
     if (currentStep < STEPS.length - 1 && canProceed) {
-      // Save draft silently when moving to next step (important milestone, but no alert needed)
-      saveDraft(formDataRef.current, false, true); // false = no alert, true = bypass throttle
-      setCurrentStep(currentStep + 1);
+      saveDraft(formDataRef.current, false, true);
+      nextStep(); // Use hook's nextStep
     }
-  }, [currentStep, canProceed, saveDraft]);
+  }, [currentStep, canProceed, saveDraft, nextStep]);
 
-  const previousStep = useCallback(() => {
+  const goToPreviousStep = useCallback(() => {
     if (currentStep > 0) {
-      // Save draft silently when going back (no need to annoy user with alert)
-      saveDraft(formDataRef.current, false, true); // false = no alert, true = bypass throttle
-      setCurrentStep(currentStep - 1);
+      saveDraft(formDataRef.current, false, true);
+      previousStep(); // Use hook's previousStep
     }
-  }, [currentStep, saveDraft]);
+  }, [currentStep, saveDraft, previousStep]);
 
   const handleSubmit = async () => {
     // Check if payment is needed for additional listings first
@@ -552,7 +344,7 @@ function CreateListingScreen() {
       setShowPaymentModal(true);
       return;
     }
-    
+
     // If only has features (no credits needed), show feature confirmation
     if (selectedFeatures.length > 0) {
       setShowFeatureConfirmModal(true);
@@ -632,7 +424,7 @@ function CreateListingScreen() {
         }
       }
       
-      // Now create the listing
+      // ✅ REFACTORED: Create the listing using hook
       await createListing();
     } catch (listingError) {
       console.log('🔄 Listing creation failed, checking for refunds...');
@@ -649,468 +441,40 @@ function CreateListingScreen() {
     }
   };
 
+  // ✅ REFACTORED: Simplified wrapper using useListingSubmission hook
   const createListing = async () => {
     if (!isMountedRef.current) return;
-    setLoading(true);
     
     try {
-      // Validate user is authenticated
-      if (!user?.id) {
-        throw new Error('You must be signed in to create a listing');
+      // Call hook's submitListing function
+      const result = await submitListing({
+        userId: user!.id,
+        formData,
+        selectedFeatures,
+        selectedCategory,
+        onProgressUpdate: (progress) => {
+          // Progress is handled by the hook
+        },
+      });
+
+      if (!result.success) {
+        throw result.error || new Error('Failed to create listing');
       }
       
-      // Validate form data
-      if (!formData.title?.trim()) {
-        throw new Error('Please enter a title for your listing');
-      }
-      
-      if (!formData.categoryId) {
-        throw new Error('Please select a category');
-      }
-      
-      if (!formData.price || Number(formData.price) <= 0) {
-        throw new Error('Please enter a valid price');
-      }
-      
-      // Check network connectivity first (with lenient timeout handling)
-      console.log('Checking network connectivity...');
-      try {
-        const networkStatus = await networkUtils.checkNetworkStatus();
-        
-        if (!networkStatus.isConnected) {
-          throw new Error('No internet connection. Please check your network and try again.');
-        }
-        
-        // Don't fail if Supabase check times out - we'll try the actual operation anyway
-        if (!networkStatus.canReachSupabase) {
-          console.warn('Supabase connectivity check failed, but proceeding anyway:', networkStatus.error);
-        }
-        
-        console.log('Network connectivity check passed');
-      } catch (networkError) {
-        // If network check itself fails, log but continue
-        console.warn('Network check failed, proceeding anyway:', networkError);
-      }
-      
-      // Skip detailed storage checks - they're too slow and cause timeouts
-      // Just proceed with upload - if it fails, we'll get a proper error
-      console.log('Proceeding with image upload...');
-      
-      // Upload images first with progress tracking
-      let imageUrls: string[] = [];
-      if (formData.images && formData.images.length > 0) {
-        console.log(`Starting upload of ${formData.images.length} images`);
-        if (isMountedRef.current) setUploadProgress(0);
-        
-        try {
-          // Validate images before upload
-          const validImages = formData.images.filter(img => img && img.uri);
-          if (validImages.length === 0) {
-            throw new Error('No valid images to upload');
-          }
-          
-          // Use the updated storage helper with proper bucket
-          const imageUris = validImages.map(img => img.uri);
-          const uploadResults = await storageHelpers.uploadMultipleImages(
-            imageUris,
-            STORAGE_BUCKETS.LISTINGS,
-            'listing', // folder name
-            user!.id,
-            (progress) => {
-              if (isMountedRef.current) setUploadProgress(progress);
-            }
-          );
-          
-          // Validate upload results
-          if (!uploadResults || uploadResults.length === 0) {
-            throw new Error('Image upload failed - no results returned');
-          }
-          
-          imageUrls = uploadResults.map(result => result.url).filter(url => url);
-          if (imageUrls.length === 0) {
-            throw new Error('Image upload failed - no valid URLs returned');
-          }
-          
-          console.log('All images uploaded successfully');
-        } catch (uploadError) {
-          console.error('Image upload failed:', uploadError);
-          throw new Error(`Failed to upload images: ${uploadError instanceof Error ? uploadError.message : 'Unknown error'}`);
-        }
-      }
-
-      // Sanitize and optimize data with safe guards
-      const sanitizedTitle = sanitizeInput(formData.title || '');
-      const sanitizedDescription = sanitizeInput(formData.description || '');
-      const seoTitle = generateSEOFriendlyTitle(sanitizedTitle, selectedCategory?.name || 'Uncategorized');
-      const keywords = extractKeywords(sanitizedTitle, sanitizedDescription);
-
-      // Create listing with optimized data including category attributes
-      // CategoryId from CategoryPicker is already a valid UUID, no mapping needed
-      const categoryUUID = formData.categoryId;
-      
-      const listingData = {
-        user_id: user!.id,
-        title: sanitizedTitle,
-        description: sanitizedDescription,
-        price: Number(formData.price) || 0,
-        currency: 'GHS',
-        category_id: categoryUUID, // Use mapped category UUID
-        condition: 'good', // Will be set properly below after mapping
-        quantity: formData.quantity || 1,
-        location: formData.location || '',
-        images: imageUrls,
-        accept_offers: formData.acceptOffers ?? true,
-        attributes: formData.categoryAttributes || {},
-        seo_title: seoTitle,
-        keywords: keywords,
-        status: 'active'
-      };
-
-      // Condition is now handled via category attributes
-      // Map condition attribute values to valid database values
-      const conditionMapping: Record<string, string> = {
-        'new': 'new',
-        'like_new': 'like_new',
-        'good': 'good',
-        'fair': 'fair',
-        'poor': 'poor',
-        'brand_new': 'new',
-        'Brand New': 'new',
-        'Like New': 'like_new',
-        'Good': 'good',
-        'Fair': 'fair',
-        'Poor': 'poor',
-        'foreign_used': 'good',
-        'Foreign Used': 'good',
-        'locally_used': 'fair',
-        'Locally Used': 'fair',
-        'excellent': 'like_new',
-        'Excellent': 'like_new',
-        'for_parts': 'poor',
-        'For Parts': 'poor',
-        'acceptable': 'fair',
-        'Acceptable': 'fair',
-      };
-      
-      // Handle condition safely (could be string or string[])
-      const conditionRaw = formData.categoryAttributes.condition;
-      const conditionValue = Array.isArray(conditionRaw) ? conditionRaw[0] : (conditionRaw as string) || 'good';
-      listingData.condition = conditionMapping[conditionValue] || 'good';
-
-
-
-      // Category information is now displayed in the ItemDetailsTable
-      // No need to append it to the description
-      listingData.description = sanitizedDescription;
-
-      // Content moderation check
-      console.log('Running content moderation...');
-      let moderationResult;
-      try {
-        moderationResult = await contentModerationService.moderateContent({
-          id: 'temp-listing-id', // Temporary ID for moderation
-          type: 'listing',
-          content: `${listingData.title}\n\n${listingData.description}`,
-          images: imageUrls,
-          userId: user!.id,
-          metadata: {
-            category: formData.categoryId,
-            price: listingData.price,
-            location: listingData.location,
-          },
-        });
-      } catch (moderationError) {
-        console.error('Content moderation failed:', moderationError);
-        // If moderation fails due to a system error, reject the content to be safe
-        setLoading(false);
-        Alert.alert(
-          'Moderation Error',
-          'Unable to verify content at this time. Please try again or contact support if the issue persists.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      // Handle moderation results
-      if (!moderationResult.isApproved) {
-        setLoading(false);
-        
-        // Extract specific violations with user-friendly messages
-        const flagReasons = moderationResult.flags
-          .map(flag => {
-            if (flag.type === 'profanity') {
-              return 'Inappropriate language detected';
-            } else if (flag.type === 'personal_info') {
-              return 'Too much personal information (multiple phone numbers/emails)';
-            } else if (flag.type === 'spam') {
-              return 'Spam-like content detected';
-            } else if (flag.type === 'inappropriate') {
-              return 'Inappropriate content detected';
-            } else if (flag.type === 'suspicious_links') {
-              return 'Suspicious or shortened links detected';
-            }
-            return flag.details;
-          })
-          .join('\n• ');
-        
-        Alert.alert(
-          'Cannot Publish Listing',
-          `Your listing cannot be published:\n\n• ${flagReasons}\n\nPlease review and modify your content, then try again.`,
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      const { data: listing, error: listingError } = await dbHelpers.createListing(listingData);
-
-      if (listingError) {
-        console.error('Database error creating listing:', listingError);
-        throw new Error(listingError.message || 'Failed to create listing in database');
-      }
-      
-      if (!listing || !listing.id) {
-        throw new Error('Listing was created but no data was returned');
-      }
-
-      // Apply selected features to the newly created listing
-      // NOTE: Credits for features have already been deducted in handlePayForListing
-      // We just need to apply the features to the listing directly
-      if (selectedFeatures.length > 0 && listing) {
-        console.log(`Applying ${selectedFeatures.length} features to listing ${listing.id}`);
-        
-        const failedFeatures: Array<{ feature: SelectedFeature; error: string }> = [];
-        
-        try {
-          for (const feature of selectedFeatures) {
-            try {
-              // Apply the feature directly to the listing by updating the appropriate timestamp column
-              // Credits have already been deducted, so we just need to set the expiry dates
-              const now = new Date();
-              let updateData: Record<string, any> = {};
-              
-              // Map feature keys to listing columns and durations
-              switch (feature.key) {
-                case 'pulse_boost_24h':
-                  updateData.boost_until = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
-                  break;
-                case 'mega_pulse_7d':
-                  updateData.boost_until = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
-                  break;
-                case 'category_spotlight_3d':
-                  updateData.spotlight_until = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString();
-                  break;
-                case 'listing_highlight':
-                  updateData.highlight_until = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
-                  break;
-                case 'urgent_badge':
-                  updateData.urgent_until = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString();
-                  break;
-                case 'ad_refresh':
-                  // Ad refresh just updates the updated_at timestamp
-                  updateData.updated_at = now.toISOString();
-                  break;
-                default:
-                  console.warn(`Unknown feature key: ${feature.key}`);
-                  failedFeatures.push({ 
-                    feature, 
-                    error: 'Unknown feature type' 
-                  });
-                  continue;
-              }
-              
-              // Update the listing with the feature
-              const { error: updateError } = await supabase
-                .from('listings')
-                .update(updateData)
-                .eq('id', listing.id);
-
-              if (updateError) {
-                console.error(`Failed to apply feature ${feature.key}:`, updateError);
-                failedFeatures.push({ 
-                  feature, 
-                  error: updateError.message || 'Unknown error' 
-                });
-              } else {
-                console.log(`Successfully applied feature ${feature.key} to listing`);
-                
-                // Create feature purchase record for tracking
-                await supabase
-                  .from('feature_purchases')
-                  .insert({
-                    user_id: user!.id,
-                    listing_id: listing.id,
-                    feature_key: feature.key,
-                    credits_spent: feature.credits,
-                    status: 'active',
-                  });
-              }
-            } catch (featureError) {
-              console.error(`Exception applying feature ${feature.key}:`, featureError);
-              failedFeatures.push({ 
-                feature, 
-                error: featureError instanceof Error ? featureError.message : 'Unknown error' 
-              });
-            }
-          }
-          
-          // If any features failed, refund them
-          if (failedFeatures.length > 0) {
-            console.log(`Refunding ${failedFeatures.length} failed features`);
-            
-            for (const { feature, error } of failedFeatures) {
-              try {
-                // Get current balance for transaction record
-                const { data: userCredits } = await supabase
-                  .from('user_credits')
-                  .select('balance')
-                  .eq('user_id', user!.id)
-                  .single();
-                
-                const currentBalance = userCredits?.balance || 0;
-                
-                // Create refund transaction for each failed feature
-                await supabase
-                  .from('credit_transactions')
-                  .insert({
-                    user_id: user!.id,
-                    amount: feature.credits,
-                    type: 'refunded',
-                    balance_before: currentBalance,
-                    balance_after: currentBalance + feature.credits,
-                    reference_id: listing.id,
-                    reference_type: 'feature_purchase',
-                    metadata: {
-                      description: `Refund for failed feature: ${feature.name}`,
-                      reason: 'feature_purchase_failed',
-                      feature_key: feature.key,
-                      feature_name: feature.name,
-                      listing_id: listing.id,
-                      error: error,
-                      timestamp: new Date().toISOString(),
-                    },
-                  });
-                
-                // Increment balance
-                await supabase.rpc('increment_field', {
-                  table_name: 'user_credits',
-                  field_name: 'balance',
-                  increment_by: feature.credits,
-                  match_column: 'user_id',
-                  match_value: user!.id,
-                });
-                
-                console.log(`Refunded ${feature.credits} credits for failed feature: ${feature.name}`);
-              } catch (refundError) {
-                console.error(`Failed to refund feature ${feature.name}:`, refundError);
-              }
-            }
-            
-            // Show alert about failed features
-            const failedFeaturesList = failedFeatures
-              .map(f => `• ${f.feature.name} (${f.feature.credits} credits refunded)`)
-              .join('\n');
-            
-            Alert.alert(
-              'Some Features Failed',
-              `Your listing was created successfully, but some features could not be applied:\n\n${failedFeaturesList}\n\nCredits have been refunded.`,
-              [{ text: 'OK' }]
-            );
-          }
-          
-          // Refresh credits after feature application
-          await refreshCredits();
-        } catch (featureError) {
-          console.error('Error applying features:', featureError);
-          // Don't fail the entire listing creation if features fail
-          // The listing is already created, so we just log the error
-        }
-      }
-      
-      // Award reputation points for listing creation
-      try {
-        await reputationService.awardPoints(user!.id, 'listing_created', listing.id);
-        console.log('Reputation points awarded for listing creation');
-      } catch (repError) {
-        console.error('Failed to award reputation points:', repError);
-        // Don't fail listing creation if reputation update fails
-      }
-      
-      // Clear draft after successful creation
+      // ✅ Success! Clear draft and show success modal
       await clearDraft();
       
-      if (!isMountedRef.current) return;
+      // Show success modal
       setShowSuccess(true);
-      
-      // Reset form after success
-      setTimeout(() => {
-        if (!isMountedRef.current) return; // Don't navigate if unmounted
-        
-        try {
-          // Check if router is available before navigating
-          if (router && typeof router.replace === 'function') {
-            router.replace('/(tabs)/home');
-          } else {
-            console.log('Router not available, just resetting form');
-            if (isMountedRef.current) {
-              setFormData({
-                images: [],
-                title: '',
-                description: '',
-                categoryId: '',
-                categoryAttributes: {},
-                price: '',
-                quantity: 1,
-                acceptOffers: true,
-                location: '',
-              });
-              setSelectedFeatures([]);
-              setCurrentStep(0);
-            }
-          }
-        } catch (navError) {
-          console.log('Navigation error (safe to ignore):', navError);
-          // Fallback: just reset the form without navigation
-          if (isMountedRef.current) {
-            setFormData({
-              images: [],
-              title: '',
-              description: '',
-              categoryId: '',
-              categoryAttributes: {},
-              price: '',
-              quantity: 1,
-              acceptOffers: true,
-              location: '',
-            });
-            setCurrentStep(0);
-          }
-        }
-      }, 2000);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Listing creation error:', error);
-      console.error('Error stack:', error?.stack);
-      console.error('Error details:', JSON.stringify(error, null, 2));
       
-      if (!isMountedRef.current) return; // Don't show alerts if unmounted
-      
-      let errorMessage = 'Failed to create listing. Please try again.';
-      
-      if (error instanceof Error) {
-        if (error.message.includes('Network request failed')) {
-          errorMessage = 'Network connection failed. Please check your internet connection and try again.';
-        } else if (error.message.includes('Upload failed') || error.message.includes('Image upload failed')) {
-          errorMessage = 'Failed to upload images. Please check your internet connection and try again.';
-        } else if (error.message.includes('No authenticated session') || error.message.includes('signed in')) {
-          errorMessage = 'Your session has expired. Please sign in again.';
-        } else if (error.message.includes('title') || error.message.includes('category') || error.message.includes('price')) {
-          errorMessage = error.message; // Show validation errors directly
-        } else {
-          errorMessage = error.message;
-        }
-      }
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'An unexpected error occurred. Please try again.';
       
       Alert.alert(
-        'Upload Failed',
+        'Unable to Create Listing',
         errorMessage,
         [
           { text: 'Cancel', style: 'cancel' },
@@ -1118,23 +482,33 @@ function CreateListingScreen() {
             text: 'Retry', 
             onPress: () => {
               if (!isMountedRef.current) return;
-              // Reset progress and retry
-              setUploadProgress(0);
               createListing();
             }
           }
         ]
       );
       
-      // Re-throw error so it can be caught by handleSubmit/handlePayForListing for refund
+      // Re-throw error for refund handling
       throw error;
-    } finally {
-      if (isMountedRef.current) {
-        setLoading(false);
-        setUploadProgress(0);
-      }
     }
   };
+
+  // ✅ REFACTORED: Handle success modal actions using hooks
+  const handleCreateAnother = useCallback(() => {
+    setShowSuccess(false);
+    resetForm(); // Use hook's resetForm
+  }, [resetForm]);
+
+  const handleGoToHome = useCallback(() => {
+    setShowSuccess(false);
+    try {
+      if (router && typeof router.replace === 'function') {
+        router.replace('/(tabs)/home');
+      }
+    } catch (navError) {
+      console.log('Navigation error (safe to ignore):', navError);
+    }
+  }, []);
 
   const handlePayForListing = async () => {
     const requiredCredits = 10;
@@ -1173,7 +547,7 @@ function CreateListingScreen() {
         
         // Try to create the listing
         try {
-          await createListing();
+        await createListing();
           // Success! Credits were spent and listing was created with features applied
         } catch (listingError) {
           // Listing creation failed - refund ALL the credits
@@ -1296,20 +670,20 @@ function CreateListingScreen() {
 
   // Stable input handlers to prevent keyboard dismissal
   const handleTitleChange = useCallback((text: string) => {
-    updateFormData({ title: text });
-  }, [updateFormData]);
+    updateMultipleFields({ title: text });
+  }, [updateMultipleFields]);
 
   const handleDescriptionChange = useCallback((text: string) => {
-    updateFormData({ description: text });
-  }, [updateFormData]);
+    updateMultipleFields({ description: text });
+  }, [updateMultipleFields]);
 
   const handlePriceChange = useCallback((text: string) => {
-    updateFormData({ price: text });
-  }, [updateFormData]);
+    updateMultipleFields({ price: text });
+  }, [updateMultipleFields]);
 
   const handleImagesChange = useCallback((images: SelectedImage[]) => {
-    updateFormData({ images });
-  }, [updateFormData]);
+    updateMultipleFields({ images });
+  }, [updateMultipleFields]);
 
 
 
@@ -1320,7 +694,7 @@ function CreateListingScreen() {
     }
     
     // Clear category attributes when category changes
-    updateFormData({ categoryId, categoryAttributes: {} });
+    updateMultipleFields({ categoryId, categoryAttributes: {} });
     
     // Fetch category attributes from database for validation
     try {
@@ -1340,27 +714,27 @@ function CreateListingScreen() {
   }, [updateFormData]);
 
   const handleCategoryAttributeChange = useCallback((slug: string, value: any) => {
-    updateFormData({ 
+    updateMultipleFields({ 
       categoryAttributes: { 
         ...(formData.categoryAttributes || {}), 
         [slug]: value 
       } 
     });
-  }, [updateFormData, formData.categoryAttributes]);
+  }, [updateMultipleFields, formData.categoryAttributes]);
 
   const handleLocationSelect = useCallback((location: string) => {
-    updateFormData({ location });
-  }, [updateFormData]);
+    updateMultipleFields({ location });
+  }, [updateMultipleFields]);
 
   // Condition is now handled via category attributes, not separately
 
   const handleQuantityChange = useCallback((quantity: number) => {
-    updateFormData({ quantity });
-  }, [updateFormData]);
+    updateMultipleFields({ quantity });
+  }, [updateMultipleFields]);
 
   const handleAcceptOffersChange = useCallback((acceptOffers: boolean) => {
-    updateFormData({ acceptOffers });
-  }, [updateFormData]);
+    updateMultipleFields({ acceptOffers });
+  }, [updateMultipleFields]);
 
   const getStepColor = (colorName: string) => {
     switch (colorName) {
@@ -1407,57 +781,57 @@ function CreateListingScreen() {
           </View>
       {/* Photos & Videos Section */}
       <View>
-        <CustomImagePicker
-          limit={8}
-          value={formData.images}
-          onChange={handleImagesChange}
-          disabled={loading}
+      <CustomImagePicker
+        limit={8}
+        value={formData.images}
+        onChange={handleImagesChange}
+        disabled={loading}
           title={hasBusinessPlan() ? "Upload Photos & Video *" : "Upload Photo(s) *"}
           allowVideos={true}
           maxVideoDuration={30}
           isSellarPro={hasBusinessPlan()}
-        />
-        
-        {loading && uploadProgress > 0 && (
-          <View style={{
-            backgroundColor: theme.colors.surfaceVariant,
-            borderRadius: theme.borderRadius.md,
-            padding: theme.spacing.md,
+      />
+      
+      {loading && uploadProgress > 0 && (
+        <View style={{
+          backgroundColor: theme.colors.surfaceVariant,
+          borderRadius: theme.borderRadius.md,
+          padding: theme.spacing.md,
             marginTop: theme.spacing.sm,
+        }}>
+          <Text variant="bodySmall" color="secondary" style={{ textAlign: 'center', marginBottom: theme.spacing.sm }}>
+            Uploading images... {Math.round(uploadProgress * 100)}%
+          </Text>
+          <View style={{
+            height: 4,
+            backgroundColor: theme.colors.border,
+            borderRadius: 2,
+            overflow: 'hidden',
           }}>
-            <Text variant="bodySmall" color="secondary" style={{ textAlign: 'center', marginBottom: theme.spacing.sm }}>
-              Uploading images... {Math.round(uploadProgress * 100)}%
-            </Text>
             <View style={{
-              height: 4,
-              backgroundColor: theme.colors.border,
-              borderRadius: 2,
-              overflow: 'hidden',
-            }}>
-              <View style={{
-                height: '100%',
-                width: `${uploadProgress * 100}%`,
-                backgroundColor: theme.colors.primary,
-              }} />
-            </View>
+              height: '100%',
+              width: `${uploadProgress * 100}%`,
+              backgroundColor: theme.colors.primary,
+            }} />
           </View>
-        )}
+        </View>
+      )}
 
-        {formData.images.length === 0 && (
-          <View style={{
-            backgroundColor: theme.colors.warning + '10',
-            borderColor: theme.colors.warning,
-            borderWidth: 1,
-            borderRadius: theme.borderRadius.md,
+      {formData.images.length === 0 && (
+        <View style={{
+          backgroundColor: theme.colors.warning + '10',
+          borderColor: theme.colors.warning,
+          borderWidth: 1,
+          borderRadius: theme.borderRadius.md,
             padding: theme.spacing.md,
-            alignItems: 'center',
+          alignItems: 'center',
             marginTop: theme.spacing.sm,
-          }}>
+        }}>
             <Text variant="bodySmall" style={{ color: theme.colors.warning, textAlign: 'center' }}>
               {hasBusinessPlan() ? "📸 At least one photo or video is required" : "📸 At least one photo is required"}
-            </Text>
-          </View>
-        )}
+          </Text>
+        </View>
+      )}
       </View>
 
       {/* Basic Info Section */}
@@ -1467,28 +841,28 @@ function CreateListingScreen() {
         </Text>
 
         <View style={{ gap: theme.spacing.md }}>
-          <Input
+      <Input
             label="Title *"
-            placeholder="e.g. Samsung Galaxy Note 20"
-            value={formData.title}
-            onChangeText={handleTitleChange}
+        placeholder="e.g. Samsung Galaxy Note 20"
+        value={formData.title}
+        onChangeText={handleTitleChange}
             helper={validationResults[0]?.warnings.title || "Be descriptive and specific (min. 10 characters)"}
             error={validationResults[0]?.errors.title}
-          />
+      />
 
-          <Input
-            variant="multiline"
+      <Input
+        variant="multiline"
             label="Describe your item *"
-            placeholder="Describe your item in detail..."
-            value={formData.description}
-            onChangeText={handleDescriptionChange}
+        placeholder="Describe your item in detail..."
+        value={formData.description}
+        onChangeText={handleDescriptionChange}
             helper={validationResults[0]?.warnings.description || "Include condition, age, reason for selling, etc. (min. 20 characters)"}
-            containerStyle={{ minHeight: 120 }}
+        containerStyle={{ minHeight: 120 }}
             error={validationResults[0]?.errors.description}
           />
 
-        </View>
       </View>
+    </View>
     </View>
   ), [formData.images, formData.title, formData.description, loading, uploadProgress, validationResults, theme, handleImagesChange, handleTitleChange, handleDescriptionChange]);
 
@@ -1526,10 +900,10 @@ function CreateListingScreen() {
         {formData.categoryId && (
           <CategoryAttributesForm
             categoryId={formData.categoryId}
-            values={formData.categoryAttributes}
-            onChange={handleCategoryAttributeChange}
+              values={formData.categoryAttributes}
+              onChange={handleCategoryAttributeChange}
             errors={validationResults[1]?.errors || {}}
-          />
+            />
         )}
 
         <View>
@@ -1562,65 +936,65 @@ function CreateListingScreen() {
 
         {/* Pricing & Selling Details */}
         <View style={{ marginTop: theme.spacing.xl }}>
-          <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+        <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
             Pricing & Details
-          </Text>
+        </Text>
 
           <View style={{ gap: theme.spacing.lg }}>
-            <Input
+      <Input
               label="Price (GH₵) *"
-              placeholder="0.00"
-              value={formData.price}
-              onChangeText={handlePriceChange}
-              keyboardType="numeric"
+        placeholder="0.00"
+        value={formData.price}
+        onChangeText={handlePriceChange}
+        keyboardType="numeric"
               helper={validationResults[2]?.warnings.price || "Set a competitive price"}
               error={validationResults[2]?.errors.price}
-            />
+      />
 
-            {formData.price && !isNaN(Number(formData.price)) && Number(formData.price) > 0 && (
-              <View style={{ alignItems: 'center', marginVertical: theme.spacing.md }}>
-                <PriceDisplay amount={Number(formData.price)} size="xl" />
-              </View>
-            )}
+      {formData.price && !isNaN(Number(formData.price)) && Number(formData.price) > 0 && (
+        <View style={{ alignItems: 'center', marginVertical: theme.spacing.md }}>
+          <PriceDisplay amount={Number(formData.price)} size="xl" />
+        </View>
+      )}
 
             <View style={{ alignItems: 'center' }}>
               <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.md, textAlign: 'center' }}>
                 How many are you selling?
               </Text>
-              <Stepper
-                value={formData.quantity}
-                onValueChange={handleQuantityChange}
-                min={1}
-                max={99}
+      <Stepper
+        value={formData.quantity}
+        onValueChange={handleQuantityChange}
+        min={1}
+        max={99}
                 showLabel={false}
-              />
+      />
             </View>
 
             <View style={{ alignItems: 'center' }}>
               <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.md, textAlign: 'center' }}>
-                How do you want to sell your item?
-              </Text>
+          How do you want to sell your item?
+        </Text>
               <View style={{ flexDirection: 'row', gap: theme.spacing.md, justifyContent: 'center' }}>
-                <Chip
-                  text="Fixed Price"
-                  variant="filter"
-                  selected={!formData.acceptOffers}
-                  onPress={() => handleAcceptOffersChange(false)}
-                />
-                <Chip
-                  text="Accept Offers"
-                  variant="filter"
-                  selected={formData.acceptOffers}
-                  onPress={() => handleAcceptOffersChange(true)}
-                />
-              </View>
-              {formData.acceptOffers && (
+          <Chip
+            text="Fixed Price"
+            variant="filter"
+            selected={!formData.acceptOffers}
+            onPress={() => handleAcceptOffersChange(false)}
+          />
+          <Chip
+            text="Accept Offers"
+            variant="filter"
+            selected={formData.acceptOffers}
+            onPress={() => handleAcceptOffersChange(true)}
+          />
+        </View>
+        {formData.acceptOffers && (
                 <Text variant="caption" color="muted" style={{ marginTop: theme.spacing.sm, textAlign: 'center' }}>
-                  Buyers can negotiate the price with you
-                </Text>
-              )}
-            </View>
-          </View>
+            Buyers can negotiate the price with you
+          </Text>
+        )}
+      </View>
+    </View>
         </View>
       </View>
     );
@@ -1724,7 +1098,7 @@ function CreateListingScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.sm }}>
           <PriceDisplay amount={Number(formData.price)} size="lg" />
           {formData.acceptOffers && (
-            <Badge text="Offers accepted" variant="success" style={{ marginLeft: theme.spacing.sm }} />
+            <Badge text="Offers accepted" size="sm" variant="success" style={{ marginLeft: theme.spacing.sm }} />
           )}
         </View>
 
@@ -1732,11 +1106,6 @@ function CreateListingScreen() {
           <Text variant="caption" color="muted">
             Category: {selectedCategory?.name}
           </Text>
-          {formData.categoryAttributes.condition && (
-            <Text variant="caption" color="muted">
-              Condition: {formatCondition(formData.categoryAttributes.condition)}
-            </Text>
-          )}
           <Text variant="caption" color="muted">
             Quantity: {formData.quantity}
           </Text>
@@ -1758,6 +1127,23 @@ function CreateListingScreen() {
                 };
                 
                 const formatSingleValue = (val: string): string => {
+                  // Special handling for condition values
+                  const conditionLabels: Record<string, string> = {
+                    'new': 'New',
+                    'brand_new': 'Brand New',
+                    'like_new': 'Like New',
+                    'good': 'Good',
+                    'fair': 'Fair',
+                    'poor': 'Poor',
+                    'foreign_used': 'Foreign Used',
+                    'locally_used': 'Locally Used',
+                  };
+                  
+                  // Check if it's a known condition value
+                  if (conditionLabels[val]) {
+                    return conditionLabels[val];
+                  }
+                  
                   // Common words that should remain lowercase (except at the beginning)
                   const lowercaseWords = new Set([
                     'and', 'or', 'of', 'the', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'from',
@@ -1782,9 +1168,9 @@ function CreateListingScreen() {
                 };
                 
                 return (
-                  <Text key={key} variant="caption" color="muted">
+                <Text key={key} variant="caption" color="muted">
                     {key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}: {formatAttributeValue(value)}
-                  </Text>
+                </Text>
                 );
               })}
             </>
@@ -2021,7 +1407,7 @@ function CreateListingScreen() {
           }}>
             <Text variant="bodySmall" style={{ color: theme.colors.primary, textAlign: 'center', fontWeight: '600' }}>
               💡 Upgrade to Sellar Pro for unlimited listings + auto-refresh every 2 hours!
-            </Text>
+          </Text>
           </View>
         </View>
       )}
@@ -2082,7 +1468,7 @@ function CreateListingScreen() {
               gap: theme.spacing.xs,
             }}
           >
-            <View style={{
+        <View style={{
               backgroundColor: theme.colors.primary + '15',
               borderRadius: theme.borderRadius.full,
               gap: theme.spacing.sm,
@@ -2094,11 +1480,11 @@ function CreateListingScreen() {
               <Text variant="bodySmall" style={{ color: theme.colors.primary, fontWeight: '700' }}>
                 {currentStep + 1}
               </Text>
-            </View>
+          </View>
             <Text variant="bodySmall" style={{ color: theme.colors.text.secondary, fontWeight: '600' }}>
               {STEPS[currentStep].title}
             </Text>
-          </View>
+        </View>
         ]}
       />
 
@@ -2126,38 +1512,38 @@ function CreateListingScreen() {
 
         {/* Navigation Buttons */}
         <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.colors.surface }}>
-          <View style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
+        <View style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
             paddingHorizontal: theme.spacing.md,
             paddingVertical: theme.spacing.sm,
-            backgroundColor: theme.colors.surface,
-            borderTopWidth: 1,
-            borderTopColor: theme.colors.border,
-            gap: theme.spacing.md,
-          }}>
-            <Button
+          backgroundColor: theme.colors.surface,
+          borderTopWidth: 1,
+          borderTopColor: theme.colors.border,
+          gap: theme.spacing.md,
+        }}>
+          <Button
               variant="outline"
-              onPress={currentStep === 0 ? () => router.back() : previousStep}
-              disabled={loading}
-              icon={currentStep === 0 ? undefined : <ArrowLeft size={18} color={theme.colors.text.primary} />}
+              onPress={currentStep === 0 ? () => router.back() : goToPreviousStep}
+            disabled={loading}
+            icon={currentStep === 0 ? undefined : <ArrowLeft size={18} color={theme.colors.text.primary} />}
               style={{ flex: 1, borderColor: theme.colors.error}}
-            >
-              {currentStep === 0 ? 'Cancel' : 'Previous'}
-            </Button>
+          >
+            {currentStep === 0 ? 'Cancel' : 'Previous'}
+          </Button>
 
-            <Button
-              variant="primary"
-              onPress={currentStep === STEPS.length - 1 ? handleSubmit : nextStep}
-              disabled={!canProceed || loading}
-              loading={loading && currentStep === STEPS.length - 1}
-              icon={currentStep === STEPS.length - 1 ? undefined : <ArrowRight size={18} color={theme.colors.primaryForeground} />}
-              style={{ flex: 1 }}
-            >
-              {currentStep === STEPS.length - 1 ? 'Publish Listing' : 'Next'}
-            </Button>
-          </View>
+          <Button
+            variant="primary"
+              onPress={currentStep === STEPS.length - 1 ? handleSubmit : goToNextStep}
+            disabled={!canProceed || loading}
+            loading={loading && currentStep === STEPS.length - 1}
+            icon={currentStep === STEPS.length - 1 ? undefined : <ArrowRight size={18} color={theme.colors.primaryForeground} />}
+            style={{ flex: 1 }}
+          >
+            {currentStep === STEPS.length - 1 ? 'Publish Listing' : 'Next'}
+          </Button>
+        </View>
         </SafeAreaView>
       </KeyboardAvoidingView>
 
@@ -2173,14 +1559,14 @@ function CreateListingScreen() {
         }}
         secondaryAction={{
           text: 'Upgrade to Sellar Pro',
-          onPress: () => {
-            setShowPaymentModal(false);
-            try {
+                  onPress: () => {
+          setShowPaymentModal(false);
+          try {
               router.push('/subscription-plans');
-            } catch (e) {
-              console.log('Navigation error:', e);
-            }
-          },
+          } catch (e) {
+            console.log('Navigation error:', e);
+          }
+        },
         }}
       >
         <View style={{ gap: theme.spacing.lg }}>
@@ -2253,7 +1639,7 @@ function CreateListingScreen() {
               }}>
                 <Text variant="bodySmall" style={{ color: theme.colors.primary, textAlign: 'center', fontWeight: '600' }}>
                   💡 Or upgrade to Sellar Pro for unlimited listings + auto-refresh every 2 hours!
-                </Text>
+              </Text>
               </View>
             </View>
           )}
@@ -2334,8 +1720,8 @@ function CreateListingScreen() {
         </View>
       </AppModal>
 
-      {/* Success Toast */}
-      <Toast
+      {/* Success Toast - Disabled in favor of modal */}
+      {/* <Toast
         visible={showSuccess}
         message="Listing created successfully! 🎉"
         variant="success"
@@ -2344,7 +1730,7 @@ function CreateListingScreen() {
           text: 'View Listing',
           onPress: () => setShowSuccess(false),
         }}
-      />
+      /> */}
 
       {/* Feature Selector Modal */}
       <ListingFeatureSelector
@@ -2792,13 +2178,14 @@ function CreateListingScreen() {
         </ScrollView>
       </AppModal>
 
-      {/* Draft Found Modal */}
+      {/* ✅ REFACTORED: Draft Found Modal using hook */}
       <AppModal
         visible={showDraftModal}
         onClose={() => {
-          setShowDraftModal(false);
-          setDraftData(null);
-          setHasShownDraftAlert(false);
+          handleStartFresh(() => {
+            clearDraft();
+            setHasShownDraftAlert(false);
+          });
         }}
         title="Draft Found"
         size="sm"
@@ -2812,11 +2199,10 @@ function CreateListingScreen() {
             <Button
               variant="primary"
               onPress={() => {
-                if (draftData) {
-                  setFormData(draftData);
-                }
-                setShowDraftModal(false);
-                setDraftData(null);
+                handleLoadDraft((data, step) => {
+                  loadFormData(data);
+                  setCurrentStep(step);
+                });
               }}
             >
               Continue Editing
@@ -2828,10 +2214,10 @@ function CreateListingScreen() {
                 borderColor: theme.colors.primary,
               }}
               onPress={() => {
-                clearDraft();
-                setShowDraftModal(false);
-                setDraftData(null);
-                setHasShownDraftAlert(false);
+                handleStartFresh(() => {
+                  clearDraft();
+                  setHasShownDraftAlert(false);
+                });
               }}
             >
               Start Fresh
@@ -2840,16 +2226,16 @@ function CreateListingScreen() {
         </View>
       </AppModal>
 
-      {/* Exit Confirmation Modal */}
+      {/* ✅ REFACTORED: Exit Confirmation Modal using hook */}
       <AppModal
         visible={showExitModal}
-        onClose={() => setShowExitModal(false)}
-        title={hasUnsavedChanges ? 'Unsaved Changes' : 'Draft Saved'}
+        onClose={handleExitCancel}
+        title={!isSaved ? 'Unsaved Changes' : 'Draft Saved'}
         size="sm"
       >
         <View style={{ padding: theme.spacing.lg }}>
           <Text variant="body" color="secondary" style={{ marginBottom: theme.spacing.xl }}>
-            {hasUnsavedChanges 
+            {!isSaved 
               ? 'You have unsaved changes. Would you like to save them as a draft before leaving?'
               : 'Your draft has been saved. Would you like to keep it or discard it?'}
           </Text>
@@ -2858,14 +2244,13 @@ function CreateListingScreen() {
             <Button
               variant="primary"
               onPress={() => {
-                if (hasUnsavedChanges) {
-                  saveDraft(formData, true);
-                }
-                setShowExitModal(false);
-                router.back();
+                handleExitConfirm(() => {
+                  // Hook handles autosave automatically
+                  router.back();
+                });
               }}
             >
-              {hasUnsavedChanges ? 'Save Draft' : 'Keep Draft'}
+              {!isSaved ? 'Save & Exit' : 'Keep Draft'}
             </Button>
             
             <Button
@@ -2874,20 +2259,21 @@ function CreateListingScreen() {
                 borderColor: theme.colors.error,
               }}
               onPress={() => {
-                clearDraft();
-                setShowExitModal(false);
-                router.back();
+                handleExitConfirm(() => {
+                  clearDraft();
+                  router.back();
+                });
               }}
             >
               Discard
             </Button>
             
             <Button
-                variant="outline"
+              variant="outline"
               style={{
                 borderColor: theme.colors.primary,
               }}
-              onPress={() => setShowExitModal(false)}
+              onPress={handleExitCancel}
             >
               Cancel
             </Button>
@@ -3044,6 +2430,49 @@ function CreateListingScreen() {
             </Button>
           </View>
         </ScrollView>
+      </AppModal>
+
+      {/* Success Modal */}
+      <AppModal
+        visible={showSuccess}
+        onClose={() => {}}
+        title="🎉 Listing Published!"
+        size="md"
+        dismissOnBackdrop={false}
+      >
+        <View style={{ padding: theme.spacing.lg, gap: theme.spacing.xl }}>
+          <Text variant="body" color="secondary" style={{ textAlign: 'center', marginBottom: theme.spacing.md }}>
+            Your listing has been successfully published and is now live!
+          </Text>
+
+          <View style={{ 
+            backgroundColor: theme.colors.success + '10', 
+            borderRadius: theme.borderRadius.md, 
+            padding: theme.spacing.md,
+            marginBottom: theme.spacing.md,
+          }}>
+            <Text variant="bodySmall" style={{ textAlign: 'center', color: theme.colors.success }}>
+              ✓ Buyers can now see and contact you about this item
+            </Text>
+          </View>
+
+          {/* Action Buttons */}
+          <View style={{ gap: theme.spacing.md }}>
+            <Button
+              variant="primary"
+              onPress={handleCreateAnother}
+            >
+              Create Another Listing
+            </Button>
+            
+            <Button
+              variant="outline"
+              onPress={handleGoToHome}
+            >
+              Go to Home
+            </Button>
+          </View>
+        </View>
       </AppModal>
 
     </SafeAreaWrapper>

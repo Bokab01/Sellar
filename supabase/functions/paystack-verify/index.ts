@@ -277,8 +277,8 @@ async function validatePaymentAmount(transaction: any, paystackData: any, supaba
   
   // For subscriptions, validate against stored amount
   if (transaction.purchase_type === 'subscription') {
-    const expectedAmount = transaction.amount; // Already in pesewas from initialization
-    const actualAmount = paystackData.amount;
+    const expectedAmount = Math.round(transaction.amount * 100); // Convert from GHS to pesewas
+    const actualAmount = paystackData.amount; // Already in pesewas
     
     if (actualAmount !== expectedAmount) {
       throw new Error(
@@ -416,19 +416,88 @@ async function processPayment(supabase: any, transaction: any, paystackData: any
       // to avoid duplicate notifications. Do not create notification here.
 
     } else if (transaction.purchase_type === 'subscription') {
-      // Activate subscription
-      const { error: subError } = await supabase
+      // Get subscription details first
+      const { data: subscription, error: fetchError } = await supabase
         .from('user_subscriptions')
-        .update({
-          status: 'active',
-          payment_reference: transaction.reference,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', transaction.purchase_id);
+        .select('*, subscription_plans(*)')
+        .eq('id', transaction.purchase_id)
+        .single();
 
-      if (subError) {
-        console.error('Failed to activate subscription:', subError);
-        throw subError;
+      if (fetchError || !subscription) {
+        console.error('Failed to fetch subscription:', fetchError);
+        throw new Error('Subscription not found');
+      }
+
+      // If it's a trial conversion, use the database function
+      if (subscription.is_trial) {
+        const { data: conversionResult, error: conversionError } = await supabase
+          .rpc('convert_trial_to_paid', {
+            p_subscription_id: transaction.purchase_id,
+            p_user_id: transaction.user_id,
+          });
+
+        if (conversionError || !conversionResult || !conversionResult[0]?.success) {
+          console.error('Failed to convert trial:', conversionError || conversionResult?.[0]?.error);
+          throw new Error(conversionResult?.[0]?.error || 'Failed to convert trial');
+        }
+      } else {
+        // For direct subscription (not trial conversion), just activate
+        const { error: subError } = await supabase
+          .from('user_subscriptions')
+          .update({
+            status: 'active',
+            payment_reference: transaction.reference,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', transaction.purchase_id);
+
+        if (subError) {
+          console.error('Failed to activate subscription:', subError);
+          throw subError;
+        }
+      }
+
+      // Create transaction history record for subscription payment
+      // Check if transaction already exists to prevent duplicates
+      const { data: existingTx } = await supabase
+        .from('credit_transactions')
+        .select('id')
+        .eq('reference_type', 'paystack_payment')
+        .eq('reference_id', transaction.id)
+        .eq('type', 'subscription_payment')
+        .single();
+
+      if (!existingTx) {
+        const { error: txError } = await supabase
+          .from('credit_transactions')
+          .insert({
+            user_id: transaction.user_id,
+            amount: 0, // Subscriptions don't affect credit balance
+            type: 'subscription_payment',
+            balance_before: 0,
+            balance_after: 0,
+            reference_type: 'paystack_payment',
+            reference_id: transaction.id,
+            metadata: {
+              subscription_id: transaction.purchase_id,
+              plan_name: subscription.subscription_plans?.name || 'Sellar Pro',
+              amount_paid: transaction.amount,
+              currency: 'GHS',
+              payment_method: transaction.payment_method,
+              source: subscription.is_trial ? 'trial_conversion' : 'subscription_purchase',
+              paystack_reference: transaction.reference,
+              is_trial_conversion: subscription.is_trial,
+            },
+          });
+
+        if (txError) {
+          console.error('Failed to record subscription transaction:', txError);
+          // Don't throw - subscription was already activated
+        } else {
+          console.log('✅ Subscription transaction recorded successfully');
+        }
+      } else {
+        console.log('ℹ️ Subscription transaction already exists, skipping duplicate');
       }
 
       // Create notification for user
@@ -437,10 +506,13 @@ async function processPayment(supabase: any, transaction: any, paystackData: any
         .insert({
           user_id: transaction.user_id,
           type: 'subscription_activated',
-          title: 'Sellar Pro Activated',
-          body: 'Your Sellar Pro subscription is now active!',
+          title: subscription.is_trial ? 'Trial Upgraded!' : 'Sellar Pro Activated',
+          body: subscription.is_trial 
+            ? 'Your free trial has been converted to a paid subscription. Thank you!' 
+            : 'Your Sellar Pro subscription is now active!',
           data: {
             reference: transaction.reference,
+            subscription_id: transaction.purchase_id,
           },
         });
     }

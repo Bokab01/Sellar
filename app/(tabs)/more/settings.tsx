@@ -204,7 +204,6 @@ export default function SettingsScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-        <SafeAreaWrapper style={{ backgroundColor: theme.colors.background }}>
           <ScrollView 
             contentContainerStyle={{ padding: theme.spacing.lg }}
             style={{ backgroundColor: theme.colors.background }}
@@ -213,7 +212,6 @@ export default function SettingsScreen() {
               <LoadingSkeleton key={index} width="100%" height={200} borderRadius={theme.borderRadius.lg} style={{ marginBottom: theme.spacing.lg }} />
             ))}
           </ScrollView>
-        </SafeAreaWrapper>
       </View>
     );
   }
@@ -460,9 +458,8 @@ export default function SettingsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <SafeAreaWrapper style={{ backgroundColor: theme.colors.background }}>
         <ScrollView 
-          contentContainerStyle={{ paddingBottom: theme.spacing.xl }}
+          contentContainerStyle={{ paddingBottom: theme.spacing.xl, paddingTop: theme.spacing.md }}
           style={{ backgroundColor: theme.colors.background }}
           refreshControl={
             <RefreshControl
@@ -813,7 +810,6 @@ export default function SettingsScreen() {
           variant="success"
           onHide={() => setShowToast(false)}
         />
-      </SafeAreaWrapper>
     </View>
   );
 }

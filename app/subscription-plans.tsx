@@ -22,7 +22,8 @@ import {
   AppModal,
 } from '@/components';
 import type { PaymentRequest } from '@/components';
-import { Building, Star, Crown, Check, Zap, ChartBar as BarChart, Headphones, Award } from 'lucide-react-native';
+import { Building, Star, Crown, Check, Zap, ChartBar as BarChart, Headphones, Award, TrendingUp } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Subscription plan type from database
 interface SubscriptionPlan {
@@ -77,6 +78,7 @@ export default function SubscriptionPlansScreen() {
   const [paymentRequest, setPaymentRequest] = useState<PaymentRequest | null>(null);
   const [isEligibleForTrial, setIsEligibleForTrial] = useState(false);
   const [showTrialConfirmModal, setShowTrialConfirmModal] = useState(false);
+  const [showUpgradeConfirmModal, setShowUpgradeConfirmModal] = useState(false);
 
   // Fetch subscription plans from database
   const fetchPlans = async () => {
@@ -284,7 +286,12 @@ export default function SubscriptionPlansScreen() {
     }
   };
 
+  const handleConvertTrialClick = () => {
+    setShowUpgradeConfirmModal(true);
+  };
+
   const handleConvertTrial = async () => {
+    setShowUpgradeConfirmModal(false);
     setSubscribing(true);
 
     try {
@@ -350,16 +357,6 @@ export default function SubscriptionPlansScreen() {
 
       <ScrollView contentContainerStyle={{ paddingBottom: theme.spacing.xl }}>
         <Container>
-          {/* Trial Badge */}
-          {isOnTrial && trialEndsAt && (
-            <TrialBadge
-              trialEndsAt={trialEndsAt}
-              onUpgradePress={handleConvertTrial}
-              variant="full"
-              style={{ marginBottom: theme.spacing.xl }}
-            />
-          )}
-
           {/* Current Plan Status */}
           {currentPlan && !isOnTrial && (
             console.log('📋 Rendering current plan:', currentPlan),
@@ -585,7 +582,7 @@ export default function SubscriptionPlansScreen() {
                           isCurrentPlan(plan.id) 
                             ? undefined 
                             : isOnTrial 
-                            ? handleConvertTrial 
+                            ? handleConvertTrialClick 
                             : () => handleSubscribe(plan.id)
                         }
                         loading={subscribing && selectedPlan === plan.id}
@@ -757,17 +754,32 @@ export default function SubscriptionPlansScreen() {
               What's included:
             </Text>
             
-            {[
-              '✨ Video uploads for listings',
-              '🔄 Auto-refresh every 2 hours',
-              '📊 Advanced analytics',
-              '⚡ Priority support',
-              '♾️ Unlimited active listings',
-            ].map((feature, index) => (
-              <Text key={index} variant="caption" color="secondary">
-                {feature}
-              </Text>
-            ))}
+            {plans.length > 0 && plans[0].highlights && plans[0].highlights.length > 0 ? (
+              plans[0].highlights.map((highlight, index) => (
+                <View key={index} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.sm }}>
+                  <Check size={14} color={theme.colors.success} style={{ marginTop: 2 }} />
+                  <Text variant="caption" color="secondary" style={{ flex: 1, lineHeight: 18 }}>
+                    {highlight}
+                  </Text>
+                </View>
+              ))
+            ) : (
+              // Fallback to hardcoded features if database fetch fails
+              [
+                'Video uploads for listings',
+                'Auto-refresh every 2 hours',
+                'Advanced analytics',
+                'Priority support',
+                'Unlimited active listings',
+              ].map((feature, index) => (
+                <View key={index} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.sm }}>
+                  <Check size={14} color={theme.colors.success} style={{ marginTop: 2 }} />
+                  <Text variant="caption" color="secondary" style={{ flex: 1, lineHeight: 18 }}>
+                    {feature}
+                  </Text>
+                </View>
+              ))
+            )}
           </View>
 
           {/* Important Note */}
@@ -785,6 +797,134 @@ export default function SubscriptionPlansScreen() {
             </Text>
           </View>
         </View>
+      </AppModal>
+
+      {/* Upgrade to Paid Subscription Confirmation Modal */}
+      <AppModal
+        visible={showUpgradeConfirmModal}
+        onClose={() => setShowUpgradeConfirmModal(false)}
+        title="Upgrade to Paid Subscription"
+        size="md"
+        position="bottom"
+      >
+        <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.colors.surface }}>
+          <View style={{ gap: theme.spacing.lg, paddingHorizontal: theme.spacing.lg }}>
+            {/* Icon */}
+            <View
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: theme.borderRadius.full,
+                backgroundColor: theme.colors.primary + '15',
+                justifyContent: 'center',
+                alignItems: 'center',
+                alignSelf: 'center',
+              }}
+            >
+              <Crown size={32} color={theme.colors.primary} />
+            </View>
+
+            {/* Message */}
+            <View style={{ gap: theme.spacing.sm }}>
+              <Text variant="h3" style={{ textAlign: 'center' }}>
+                Continue Your Pro Journey
+              </Text>
+              <Text variant="body" color="secondary" style={{ textAlign: 'center', lineHeight: 22 }}>
+                Convert your free trial to a paid subscription and keep enjoying all Sellar Pro benefits without interruption.
+              </Text>
+            </View>
+
+            {/* Price Info */}
+            <View
+              style={{
+                backgroundColor: theme.colors.surfaceVariant,
+                borderRadius: theme.borderRadius.md,
+                padding: theme.spacing.md,
+                alignItems: 'center',
+              }}
+            >
+              <Text variant="caption" color="secondary" style={{ marginBottom: theme.spacing.xs }}>
+                Monthly Subscription
+              </Text>
+              <PriceDisplay
+                amount={plans[0]?.price_ghs || 4}
+                size="lg"
+              />
+              <Text variant="caption" color="muted">
+                per month
+              </Text>
+            </View>
+
+            {/* Features List */}
+            <View style={{ gap: theme.spacing.sm }}>
+              {[
+                { icon: Zap, text: 'Auto-refresh every 2 hours' },
+                { icon: TrendingUp, text: 'Unlimited listings' },
+                { icon: Crown, text: 'Priority support, video uploads, analytics & more' },
+              ].map((feature, index) => (
+                <View
+                  key={index}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: theme.spacing.sm,
+                    backgroundColor: theme.colors.surfaceVariant,
+                    padding: theme.spacing.sm,
+                    borderRadius: theme.borderRadius.md,
+                  }}
+                >
+                  <feature.icon size={20} color={theme.colors.primary} />
+                  <Text variant="body" style={{ flex: 1 }}>
+                    {feature.text}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Trial Info */}
+            {trialEndsAt && (
+              <View
+                style={{
+                  backgroundColor: theme.colors.info + '10',
+                  borderRadius: theme.borderRadius.md,
+                  padding: theme.spacing.sm,
+                  borderWidth: 1,
+                  borderColor: theme.colors.info + '30',
+                }}
+              >
+                <Text variant="bodySmall" style={{ textAlign: 'center', lineHeight: 20 }}>
+                  💡 Your trial continues until {new Date(trialEndsAt).toLocaleDateString()}. Upgrade now to ensure seamless access.
+                </Text>
+              </View>
+            )}
+
+            {/* Action Buttons */}
+            <View style={{ gap: theme.spacing.sm }}>
+              <Button
+                variant="primary"
+                onPress={handleConvertTrial}
+                loading={subscribing}
+                disabled={subscribing}
+                style={{
+                  width: '100%',
+                }}
+              >
+                {subscribing ? 'Processing...' : 'Continue to Payment'}
+              </Button>
+
+              <Button
+                variant="outline"
+                onPress={() => setShowUpgradeConfirmModal(false)}
+                disabled={subscribing}
+                style={{
+                  width: '100%',
+                }}
+              >
+                Maybe Later
+              </Button>
+            </View>
+          </View>
+        </SafeAreaView>
       </AppModal>
 
       {/* Payment Modal */}

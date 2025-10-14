@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, TouchableOpacity, ScrollView, Dimensions, Alert } from 'react-native';
+import React, { useState, useEffect, useImperativeHandle, forwardRef, useRef } from 'react';
+import { View, TouchableOpacity, ScrollView, Dimensions, Alert, Animated } from 'react-native';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -32,7 +32,11 @@ interface BusinessAnalyticsProps {
   onTabChange: (tab: 'overview' | 'boost' | 'analytics' | 'support') => void;
 }
 
-export const BusinessAnalytics: React.FC<BusinessAnalyticsProps> = ({ onTabChange }) => {
+export interface BusinessAnalyticsHandle {
+  handleRefresh: () => Promise<void>;
+}
+
+export const BusinessAnalytics = forwardRef<BusinessAnalyticsHandle, BusinessAnalyticsProps>(({ onTabChange }, ref) => {
   const { theme } = useTheme();
   const { getBusinessAnalytics } = useAnalytics();
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
@@ -40,6 +44,9 @@ export const BusinessAnalytics: React.FC<BusinessAnalyticsProps> = ({ onTabChang
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState(false);
+  
+  // Animation for refresh button
+  const rotateAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadAnalytics();
@@ -59,6 +66,16 @@ export const BusinessAnalytics: React.FC<BusinessAnalyticsProps> = ({ onTabChang
 
   const handleRefresh = async () => {
     setRefreshing(true);
+    
+    // Start rotation animation
+    Animated.loop(
+      Animated.timing(rotateAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      })
+    ).start();
+    
     try {
       // ✅ Clear cache and fetch fresh data
       const { analyticsService } = await import('@/lib/analyticsService');
@@ -70,8 +87,15 @@ export const BusinessAnalytics: React.FC<BusinessAnalyticsProps> = ({ onTabChang
       console.error('Error refreshing analytics:', error);
     } finally {
       setRefreshing(false);
+      // Reset animation
+      rotateAnim.setValue(0);
     }
   };
+
+  // Expose handleRefresh to parent component
+  useImperativeHandle(ref, () => ({
+    handleRefresh,
+  }));
 
   const handleExport = async (format: 'csv' | 'pdf') => {
     if (!analyticsData) {
@@ -138,10 +162,21 @@ export const BusinessAnalytics: React.FC<BusinessAnalyticsProps> = ({ onTabChang
               borderColor: theme.colors.border,
             }}
           >
-            <RefreshCw 
-              size={20} 
-              color={refreshing ? theme.colors.text.secondary : theme.colors.primary} 
-            />
+            <Animated.View
+              style={{
+                transform: [{
+                  rotate: rotateAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0deg', '360deg'],
+                  }),
+                }],
+              }}
+            >
+              <RefreshCw 
+                size={20} 
+                color={refreshing ? theme.colors.text.secondary : theme.colors.primary} 
+              />
+            </Animated.View>
           </TouchableOpacity>
         </View>
 
@@ -674,4 +709,4 @@ export const BusinessAnalytics: React.FC<BusinessAnalyticsProps> = ({ onTabChang
       </ScrollView>
     </Container>
   );
-};
+});

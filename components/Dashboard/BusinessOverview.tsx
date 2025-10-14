@@ -100,6 +100,8 @@ export const BusinessOverview: React.FC<BusinessOverviewProps> = ({
                   {planName}
                 </Text>
                 <Badge 
+                  size='small'
+                  style={{ paddingHorizontal: theme.spacing.sm }}
                   text={currentSubscription?.status === 'cancelled' ? 'Cancelled' : 'Active'} 
                   variant={currentSubscription?.status === 'cancelled' ? 'warning' : 'success'} 
                 />
@@ -206,7 +208,7 @@ export const BusinessOverview: React.FC<BusinessOverviewProps> = ({
               <Text variant="h3" style={{ color: theme.colors.primary, fontWeight: '700', marginTop: theme.spacing.xs }}>
                 {loading ? '...' : quickStats.profileViews}
               </Text>
-              <Text variant="caption" color="secondary" style={{ fontWeight: '600' }}>
+              <Text variant="caption" color="secondary" style={{ fontWeight: '600', textAlign: 'center' }}>
                 Profile Views
               </Text>
             </View>
@@ -485,9 +487,9 @@ export const BusinessOverview: React.FC<BusinessOverviewProps> = ({
             borderColor: theme.colors.border,
           }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: theme.spacing.lg }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: theme.spacing.md }}>
                 <TrendingUp size={24} color={theme.colors.primary} />
-                <Text variant="h3" style={{ marginLeft: theme.spacing.sm, color: theme.colors.primary }}>
+                <Text variant="h3" style={{ marginLeft: theme.spacing.sm, color: theme.colors.primary, flexShrink: 1 }}>
                   This Week's Performance
                 </Text>
               </View>

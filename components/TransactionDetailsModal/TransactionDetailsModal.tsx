@@ -34,8 +34,14 @@ export function TransactionDetailsModal({
   if (!transaction) return null;
 
   const isIncoming = transaction.type === 'earned';
+  const isSubscriptionPayment = transaction.type === 'subscription_payment';
 
   const getTransactionTitle = () => {
+    // For subscription payments, show plan name
+    if (isSubscriptionPayment) {
+      return transaction.metadata?.plan_name || 'Sellar Pro Subscription';
+    }
+    
     if (transaction.metadata?.reason) {
       return transaction.metadata.reason;
     }
@@ -76,11 +82,16 @@ export function TransactionDetailsModal({
     // Map feature keys to proper display names
     const featureNameMap: Record<string, string> = {
       'pulse_boost_24h': 'Pulse Boost (24h)',
+      'pulse_boost': 'Pulse Boost',
       'mega_pulse_7d': 'Mega Pulse (7 days)',
+      'mega_pulse': 'Mega Pulse',
       'category_spotlight_3d': 'Category Spotlight (3 days)',
+      'category_spotlight': 'Category Spotlight',
       'ad_refresh': 'Ad Refresh',
       'listing_highlight': 'Listing Highlight (7 days)',
+      'listing_highlight_7d': 'Listing Highlight (7 days)',
       'urgent_badge': 'Urgent Badge (3 days)',
+      'urgent_badge_3d': 'Urgent Badge (3 days)',
     };
     
     return featureNameMap[featureName] || featureName.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
@@ -90,8 +101,9 @@ export function TransactionDetailsModal({
     if (transaction.metadata?.description) {
       return transaction.metadata.description;
     }
-    if (transaction.metadata?.feature_name) {
-      return `Applied ${formatFeatureName(transaction.metadata.feature_name)} to listing`;
+    if (transaction.metadata?.feature_name || transaction.metadata?.feature_key) {
+      const featureName = transaction.metadata.feature_name || transaction.metadata.feature_key;
+      return `Applied ${formatFeatureName(featureName)} to listing`;
     }
     if (transaction.metadata?.reward_type) {
       switch (transaction.metadata.reward_type) {
@@ -141,6 +153,12 @@ export function TransactionDetailsModal({
   };
 
   const formatAmount = () => {
+    // For subscription payments, show the GHS amount paid
+    if (isSubscriptionPayment) {
+      const amountPaid = transaction.metadata?.amount_paid || transaction.metadata?.payment_amount;
+      return amountPaid ? `GHS ${Number(amountPaid).toFixed(2)}` : 'Subscription';
+    }
+    
     const sign = isIncoming ? '+' : '-';
     return `${sign}${transaction.amount}`;
   };
@@ -245,18 +263,18 @@ export function TransactionDetailsModal({
             <Text 
               variant="h1" 
               style={{ 
-                color: isIncoming ? theme.colors.success : theme.colors.error,
+                color: isSubscriptionPayment ? theme.colors.primary : (isIncoming ? theme.colors.success : theme.colors.error),
                 fontWeight: '700',
                 marginBottom: theme.spacing.xs,
               }}
             >
-              {formatAmount()} Credits
+              {formatAmount()}{!isSubscriptionPayment && ' Credits'}
             </Text>
 
             {/* Type Badge */}
             <Badge
-              text={isIncoming ? 'Earned' : 'Spent'}
-              variant={isIncoming ? 'success' : 'error'}
+              text={isSubscriptionPayment ? 'Subscription' : (isIncoming ? 'Earned' : 'Spent')}
+              variant={isSubscriptionPayment ? 'primary' : (isIncoming ? 'success' : 'error')}
               size="md"
             />
           </View>
@@ -298,18 +316,23 @@ export function TransactionDetailsModal({
               value={transaction.id.split('-')[0].toUpperCase()}
             />
 
-            <InfoRow
-              icon={<CreditCard size={18} color={theme.colors.primary} />}
-              label="Balance Before"
-              value={`${transaction.balance_before} credits`}
-            />
+            {/* Only show balance for credit transactions */}
+            {!isSubscriptionPayment && (
+              <>
+                <InfoRow
+                  icon={<CreditCard size={18} color={theme.colors.primary} />}
+                  label="Balance Before"
+                  value={`${transaction.balance_before} credits`}
+                />
 
-            <InfoRow
-              icon={<CreditCard size={18} color={theme.colors.primary} />}
-              label="Balance After"
-              value={`${transaction.balance_after} credits`}
-              valueColor={theme.colors.primary}
-            />
+                <InfoRow
+                  icon={<CreditCard size={18} color={theme.colors.primary} />}
+                  label="Balance After"
+                  value={`${transaction.balance_after} credits`}
+                  valueColor={theme.colors.primary}
+                />
+              </>
+            )}
 
             <InfoRow
               icon={<CheckCircle size={18} color={theme.colors.success} />}
@@ -342,11 +365,11 @@ export function TransactionDetailsModal({
               </Text>
 
               {/* Feature Name */}
-              {transaction.metadata.feature_name && (
+              {(transaction.metadata.feature_name || transaction.metadata.feature_key) && (
                 <InfoRow
                   icon={<Package size={18} color={theme.colors.primary} />}
                   label="Feature"
-                  value={formatFeatureName(transaction.metadata.feature_name)}
+                  value={formatFeatureName(transaction.metadata.feature_name || transaction.metadata.feature_key)}
                 />
               )}
 

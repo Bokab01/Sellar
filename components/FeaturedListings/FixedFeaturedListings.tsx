@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, ScrollView, TouchableOpacity, FlatList } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
@@ -14,6 +14,8 @@ interface FeaturedListing {
   id: string;
   title: string;
   price: number;
+  previous_price?: number;
+  price_changed_at?: string;
   currency: string;
   images: string[];
   location: string;
@@ -221,6 +223,8 @@ export function FixedFeaturedListings({
             id,
             title,
             price,
+            previous_price,
+            price_changed_at,
             currency,
             images,
             location,
@@ -334,6 +338,8 @@ export function FixedFeaturedListings({
             id: listing.id,
             title: listing.title,
             price: listing.price,
+            previous_price: listing.previous_price || null,
+            price_changed_at: listing.price_changed_at || null,
             currency: listing.currency || 'GHS',
             images: Array.isArray(listing.images) ? listing.images : [],
             location: listing.location || '',
@@ -434,6 +440,54 @@ export function FixedFeaturedListings({
     });
   }, [user, favorites, toggleGlobalFavorite, incrementListingFavoriteCount, decrementListingFavoriteCount, refreshStats]);
 
+  // ✅ CRITICAL: All hooks must be defined BEFORE any conditional returns
+  // ✅ OPTIMIZED: Memoized render item for horizontal FlatList
+  const renderHorizontalItem = useCallback(({ item: listing }: { item: FeaturedListing }) => {
+    const isFavorited = favorites[listing.id] || false;
+    const favCount = listingFavoriteCounts[listing.id] ?? 0;
+    const views = viewCounts[listing.id] || 0;
+    const isOwnListing = user?.id === listing.seller.id;
+
+    return (
+      <View style={{ width: 190, marginBottom: theme.spacing.md, marginRight: theme.spacing.sm - 5 }}>
+        <ProductCard
+          variant="compact"
+          width={190}
+          shadowSize="sm"
+          layout="grid"
+          listingId={listing.id}
+          image={listing.images}
+          title={listing.title}
+          price={listing.price}
+          previousPrice={listing.previous_price}
+          priceChangedAt={listing.price_changed_at}
+          currency={listing.currency}
+          seller={listing.seller}
+          location={listing.location}
+          viewCount={views}
+          favoritesCount={favCount}
+          isFavorited={isFavorited}
+          onFavoritePress={isOwnListing ? undefined : () => handleFavoriteToggle(listing.id, listing.seller.id)}
+          onPress={() => handleListingPress(listing.id)}
+          borderColor={theme.colors.primary}
+        />
+      </View>
+    );
+  }, [theme, favorites, listingFavoriteCounts, viewCounts, user, handleFavoriteToggle, handleListingPress]);
+
+  // ✅ OPTIMIZED: Key extractor
+  const keyExtractor = useCallback((item: FeaturedListing) => item.id, []);
+
+  // ✅ OPTIMIZED: getItemLayout for better scroll performance
+  const getItemLayout = useCallback(
+    (_: any, index: number) => ({
+      length: 190 + (theme.spacing.sm - 5), // width + marginRight
+      offset: (190 + (theme.spacing.sm - 5)) * index,
+      index,
+    }),
+    [theme]
+  );
+
   if (loading) {
     return (
       <View style={{ padding: theme.spacing.lg }}>
@@ -532,6 +586,8 @@ export function FixedFeaturedListings({
                 image={listing.images}
                 title={listing.title}
                 price={listing.price}
+                previousPrice={listing.previous_price}
+                priceChangedAt={listing.price_changed_at}
                 currency={listing.currency}
                 seller={listing.seller}
                 location={listing.location}
@@ -549,47 +605,28 @@ export function FixedFeaturedListings({
       );
     }
 
-    // Horizontal layout
+    // ✅ OPTIMIZED: Horizontal layout with FlatList virtualization
     return (
-      <ScrollView
+      <FlatList
+        data={listings}
+        renderItem={renderHorizontalItem}
+        keyExtractor={keyExtractor}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{
           paddingHorizontal: theme.spacing.sm,
-          gap: theme.spacing.sm - 5,
         }}
-      >
-        {listings.map((listing) => {
-          const isFavorited = favorites[listing.id] || false;
-          const favCount = listingFavoriteCounts[listing.id] ?? 0;
-          const views = viewCounts[listing.id] || 0;
-          const isOwnListing = user?.id === listing.seller.id;
-
-          return (
-            <View key={listing.id} style={{ width: 190, marginBottom: theme.spacing.md }}>
-              <ProductCard
-                variant="compact"
-                width={190}
-                shadowSize="sm"
-                layout="grid"
-                listingId={listing.id}
-                image={listing.images}
-                title={listing.title}
-                price={listing.price}
-                currency={listing.currency}
-                seller={listing.seller}
-                location={listing.location}
-                viewCount={views}
-                favoritesCount={favCount}
-                isFavorited={isFavorited}
-                onFavoritePress={isOwnListing ? undefined : () => handleFavoriteToggle(listing.id, listing.seller.id)}
-                onPress={() => handleListingPress(listing.id)}
-                borderColor={theme.colors.primary}
-              />
-            </View>
-          );
-        })}
-      </ScrollView>
+        // ✅ Performance optimizations
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={5}
+        windowSize={3}
+        initialNumToRender={3}
+        updateCellsBatchingPeriod={50}
+        getItemLayout={getItemLayout}
+        // ✅ Smooth scrolling
+        decelerationRate="fast"
+        scrollEventThrottle={16}
+      />
     );
   };
 

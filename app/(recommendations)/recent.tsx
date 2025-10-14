@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { View, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, SectionList, RefreshControl, TouchableOpacity } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useRecommendations } from '@/hooks/useRecommendations';
-import { RecommendationSection } from '@/components/Recommendations';
+import { useRecommendations, RecommendationListing } from '@/hooks/useRecommendations';
+import { useMultipleListingStats } from '@/hooks/useListingStats';
+import { useFavoritesStore } from '@/store/useFavoritesStore';
+import { ProductCard } from '@/components/Card/Card';
 import { Text } from '@/components/Typography/Text';
 import { SafeAreaWrapper } from '@/components/Layout';
 import { AppHeader } from '@/components/AppHeader/AppHeader';
@@ -14,7 +16,16 @@ import { Eye, Trash2 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { RecommendationService } from '@/lib/recommendationService';
 
+// ✅ Section types for SectionList
+type SectionData = {
+  title: string;
+  subtitle?: string;
+  icon: React.ReactNode;
+  data: RecommendationListing[][]; // Array of pairs
+};
+
 export default function RecentlyViewedScreen() {
+  // ✅ CRITICAL: ALL hooks MUST be at the top, before any conditional returns
   const { theme } = useTheme();
   const { user } = useAuthStore();
   const { 
@@ -23,11 +34,47 @@ export default function RecentlyViewedScreen() {
     refreshRecommendations
   } = useRecommendations();
 
-  const [recentlyViewed, setRecentlyViewed] = useState<any[]>([]);
+  const [recentlyViewed, setRecentlyViewed] = useState<RecommendationListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadRecentlyViewed = async () => {
+  // Get all listing IDs for stats
+  const listingIds = useMemo(() => 
+    recentlyViewed.map(r => r.listing_id).filter(Boolean), 
+    [recentlyViewed]
+  );
+
+  const { viewCounts, refreshStats } = useMultipleListingStats({ listingIds });
+  const { 
+    favorites, 
+    listingFavoriteCounts,
+    toggleFavorite: toggleGlobalFavorite,
+    incrementListingFavoriteCount,
+    decrementListingFavoriteCount
+  } = useFavoritesStore();
+
+  // ✅ Create section list data structure with pairs for 2-column grid
+  const sections = useMemo<SectionData[]>(() => {
+    if (recentlyViewed.length === 0) return [];
+
+    // Helper to create pairs
+    const createPairs = (items: RecommendationListing[]): RecommendationListing[][] => {
+      const pairs: RecommendationListing[][] = [];
+      for (let i = 0; i < items.length; i += 2) {
+        pairs.push([items[i], items[i + 1]].filter(Boolean));
+      }
+      return pairs as any;
+    };
+
+    return [{
+      title: 'Recently Viewed',
+      subtitle: 'Items you\'ve looked at',
+      icon: <Eye size={20} color={theme.colors.primary} />,
+      data: createPairs(recentlyViewed) as any
+    }];
+  }, [recentlyViewed, theme]);
+
+  const loadRecentlyViewed = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -39,15 +86,16 @@ export default function RecentlyViewedScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, getRecentlyViewed]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadRecentlyViewed();
+    await refreshStats();
     setRefreshing(false);
-  };
+  }, [loadRecentlyViewed, refreshStats]);
 
-  const handleListingPress = async (listingId: string) => {
+  const handleListingPress = useCallback(async (listingId: string) => {
     if (user) {
       await trackInteraction(listingId, 'view', {
         source: 'recently_viewed',
@@ -55,7 +103,38 @@ export default function RecentlyViewedScreen() {
       });
     }
     router.push(`/(tabs)/home/${listingId}`);
-  };
+  }, [user, trackInteraction]);
+
+  const handleFavoritePress = useCallback(async (listingId: string) => {
+    const isFavorited = favorites[listingId] || false;
+    
+    // Optimistic update
+    toggleGlobalFavorite(listingId);
+    if (isFavorited) {
+      decrementListingFavoriteCount(listingId);
+    } else {
+      incrementListingFavoriteCount(listingId);
+    }
+
+    try {
+      const { toggleFavorite } = await import('@/lib/favoritesAndViews');
+      const result = await toggleFavorite(listingId);
+      
+      if (result.error) {
+        // Revert on error
+        toggleGlobalFavorite(listingId);
+        if (isFavorited) {
+          incrementListingFavoriteCount(listingId);
+        } else {
+          decrementListingFavoriteCount(listingId);
+        }
+      } else {
+        refreshStats();
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  }, [favorites, toggleGlobalFavorite, incrementListingFavoriteCount, decrementListingFavoriteCount, refreshStats]);
 
   const handleClearHistory = async () => {
     if (!user) return;
@@ -70,9 +149,119 @@ export default function RecentlyViewedScreen() {
     }
   };
 
+  // ✅ Render section header
+  const renderSectionHeader = useCallback(({ section }: { section: SectionData }) => (
+    <View style={{ 
+      paddingHorizontal: theme.spacing.lg,
+      paddingTop: theme.spacing.lg,
+      paddingBottom: theme.spacing.md,
+      backgroundColor: theme.colors.background,
+    }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, marginBottom: theme.spacing.xs }}>
+        {section.icon}
+        <Text variant="h3">{section.title}</Text>
+      </View>
+      {section.subtitle && (
+        <Text variant="bodySmall" color="muted">
+          {section.subtitle}
+        </Text>
+      )}
+    </View>
+  ), [theme]);
+
+  // ✅ Render row of 2 items for SectionList
+  const renderItem = useCallback(({ item: pair }: { item: RecommendationListing[] }) => {
+    const renderCard = (listing: RecommendationListing) => {
+      const isSellarPro = listing.is_sellar_pro === true;
+      
+      let badge;
+      if (listing.status === 'reserved') {
+        badge = { text: 'Reserved', variant: 'warning' as const };
+      } else if (listing.urgent_until && new Date(listing.urgent_until) > new Date()) {
+        badge = { text: 'Urgent Sale', variant: 'urgent' as const };
+      } else if (listing.spotlight_until && new Date(listing.spotlight_until) > new Date()) {
+        badge = { text: 'Spotlight', variant: 'spotlight' as const };
+      } else if (listing.boost_until && new Date(listing.boost_until) > new Date()) {
+        badge = { text: 'Boosted', variant: 'featured' as const };
+      } else if (isSellarPro) {
+        badge = { text: '⭐ PRO', variant: 'primary' as const };
+      }
+
+      return (
+        <View style={{ flex: 1, paddingHorizontal: 2 }}>
+          <ProductCard
+            image={Array.isArray(listing.images) ? listing.images[0] : (listing.images || '')}
+            title={listing.title || 'Untitled'}
+            price={listing.price || 0}
+            previousPrice={listing.previous_price}
+            priceChangedAt={listing.price_changed_at}
+            currency={listing.currency || 'GHS'}
+            seller={{
+              id: listing.user_id || '',
+              name: listing.seller_name || 'Unknown',
+              avatar: listing.seller_avatar || undefined,
+              rating: 0
+            }}
+            badge={badge}
+            location={listing.location || 'Unknown'}
+            layout="grid"
+            fullWidth={false}
+            shadowSize="sm"
+            borderRadius={theme.borderRadius.sm}  
+            listingId={listing.listing_id}
+            isFavorited={favorites[listing.listing_id] || false}
+            viewCount={viewCounts[listing.listing_id] || 0}
+            favoritesCount={listingFavoriteCounts[listing.listing_id] ?? listing.favorites_count ?? 0}
+            onPress={() => handleListingPress(listing.listing_id)}
+            onFavoritePress={user?.id !== listing.user_id ? () => handleFavoritePress(listing.listing_id) : undefined}
+            showReportButton={false}
+            currentUserId={user?.id || ""}
+          />
+        </View>
+      );
+    };
+
+    return (
+      <View style={{ flexDirection: 'row', marginBottom: theme.spacing.sm, paddingHorizontal: theme.spacing.xs }}>
+        {pair.map((listing) => (
+          <React.Fragment key={listing.listing_id}>
+            {renderCard(listing)}
+          </React.Fragment>
+        ))}
+        {/* Add spacer if only one item in pair */}
+        {pair.length === 1 && <View style={{ flex: 1 }} />}
+      </View>
+    );
+  }, [theme, favorites, viewCounts, listingFavoriteCounts, user, handleListingPress, handleFavoritePress]);
+
+  const keyExtractor = useCallback((item: RecommendationListing[], index: number) => 
+    `row-${index}-${item.map(i => i.listing_id).join('-')}`,
+    []
+  );
+
+  const renderFooter = useCallback(() => (
+    <View style={{ marginTop: theme.spacing.xl, marginBottom: theme.spacing.xl, paddingHorizontal: theme.spacing.lg }}>
+      <Button
+        variant="secondary"
+        onPress={handleClearHistory}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: theme.spacing.sm,
+        }}
+      >
+        <Trash2 size={16} color={theme.colors.text.muted} />
+        <Text variant="button" color="muted">
+          Clear History
+        </Text>
+      </Button>
+    </View>
+  ), [theme, handleClearHistory]);
+
   useEffect(() => {
     loadRecentlyViewed();
-  }, [user]);
+  }, [loadRecentlyViewed]);
 
   if (!user) {
     return (
@@ -138,8 +327,12 @@ export default function RecentlyViewedScreen() {
         ]}
       />
       
-      <ScrollView
-        style={{ flex: 1 }}
+      <SectionList
+        sections={sections}
+        renderItem={renderItem}
+        renderSectionHeader={renderSectionHeader}
+        keyExtractor={keyExtractor}
+        ListFooterComponent={renderFooter}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -148,38 +341,14 @@ export default function RecentlyViewedScreen() {
           />
         }
         showsVerticalScrollIndicator={false}
-      >
-        {/* Recently Viewed Items */}
-        <RecommendationSection
-          title="Recently Viewed"
-          subtitle="Items you've looked at"
-          icon={<Eye size={20} color={theme.colors.primary} />}
-          type="recently_viewed"
-          limit={50}
-          layout="grid"
-          showViewAll={false}
-          onListingPress={handleListingPress}
-        />
-
-        {/* Clear History Button */}
-        <View style={{ marginTop: theme.spacing.xl, paddingHorizontal: theme.spacing.lg }}>
-          <Button
-            variant="secondary"
-            onPress={handleClearHistory}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: theme.spacing.sm,
-            }}
-          >
-            <Trash2 size={16} color={theme.colors.text.muted} />
-            <Text variant="button" color="muted">
-              Clear History
-            </Text>
-          </Button>
-        </View>
-      </ScrollView>
+        stickySectionHeadersEnabled={false}
+        // ✅ Performance optimizations
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        initialNumToRender={10}
+        updateCellsBatchingPeriod={50}
+      />
     </SafeAreaWrapper>
   );
 }

@@ -113,13 +113,13 @@ export function Input({
 
   const inputContainerStyles = {
     flexDirection: 'row' as const,
-    alignItems: 'center' as const,
+    alignItems: (isMultiline && leftIcon) ? 'flex-start' as const : 'center' as const,
     borderWidth: 1,
     borderColor: getBorderColor(),
     borderRadius: theme.borderRadius.md,
     backgroundColor: getBackgroundColor(),
     paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
+    paddingVertical: isMultiline ? theme.spacing.md : theme.spacing.sm,
     minHeight: isMultiline ? (shouldAutoExpand ? inputHeight : 52) : 52,
     ...(variant === 'search' && {
       paddingLeft: theme.spacing.sm,
@@ -161,8 +161,9 @@ export function Input({
         <View style={{ 
           marginRight: theme.spacing.sm,
           alignItems: 'center',
-          justifyContent: 'center',
-          height: 40,
+          justifyContent: isMultiline ? 'flex-start' : 'center',
+          paddingTop: isMultiline ? theme.spacing.sm : 0,
+          height: isMultiline ? '100%' : 40,
           width: 20,
         }}>
           {leftIcon}

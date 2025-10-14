@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { View, TouchableOpacity, RefreshControl, ScrollView } from 'react-native';
+import { View, TouchableOpacity, RefreshControl, ScrollView, FlatList } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -191,6 +191,143 @@ const RecommendationSection = memo(function RecommendationSection({
     router.push(`/(tabs)/home/${listingId}`);
   }, []);
 
+  // ✅ OPTIMIZED: Memoized render item for horizontal FlatList
+  const renderHorizontalItem = useCallback(({ item, index }: { item: RecommendationListing; index: number }) => {
+    // Ensure we have valid data before rendering
+    if (!item || !item.listing_id || !item.title) {
+      return null;
+    }
+    
+    // ✅ Use pre-computed is_sellar_pro flag (optimal performance)
+    const isSellarPro = item.is_sellar_pro === true;
+    
+    // Determine badge based on status (Priority: Reserved > Urgent > Spotlight > Boosted > PRO)
+    let badge;
+    if (item.status === 'reserved') {
+      badge = { text: 'Reserved', variant: 'warning' as const };
+    } else if (item.urgent_until && new Date(item.urgent_until) > new Date()) {
+      badge = { text: 'Urgent Sale', variant: 'urgent' as const };
+    } else if (item.spotlight_until && new Date(item.spotlight_until) > new Date()) {
+      badge = { text: 'Spotlight', variant: 'spotlight' as const };
+    } else if (item.boost_until && new Date(item.boost_until) > new Date()) {
+      badge = { text: 'Boosted', variant: 'featured' as const };
+    } else if (isSellarPro) {
+      badge = { text: '⭐ PRO', variant: 'primary' as const };
+    }
+    
+    return (
+      <View style={{ width: 180, marginRight: theme.spacing.sm }}>
+        <ProductCard
+          image={Array.isArray(item.images) ? item.images[0] : (item.images || '')}
+          title={item.title || 'Untitled'}
+          price={item.price || 0}
+          previousPrice={item.previous_price}
+          priceChangedAt={item.price_changed_at}
+          currency={item.currency || 'GHS'}
+          seller={{
+            id: item.user_id || '',
+            name: item.seller_name || 'Unknown',
+            avatar: item.seller_avatar || undefined,
+            rating: 0
+          }}
+          badge={badge}
+          location={item.location || 'Unknown'}
+          layout="grid"
+          shadowSize="sm"
+          listingId={item.listing_id}
+          isFavorited={favorites[item.listing_id] || false}
+          viewCount={viewCounts[item.listing_id] || 0}
+          favoritesCount={listingFavoriteCounts[item.listing_id] ?? item.favorites_count ?? 0}
+          onPress={() => onListingPress?.(item.listing_id)}
+          onFavoritePress={user?.id !== item.user_id ? () => handleFavoritePress(item.listing_id) : undefined}
+          onViewPress={() => handleViewPress(item.listing_id)}
+          showReportButton={false}
+          currentUserId={user?.id || ""}
+        />
+      </View>
+    );
+  }, [theme, favorites, viewCounts, listingFavoriteCounts, user, onListingPress, handleFavoritePress, handleViewPress]);
+
+  // ✅ OPTIMIZED: Key extractor
+  const keyExtractor = useCallback((item: RecommendationListing, index: number) => 
+    item?.listing_id || `recommendation-${index}`, 
+    []
+  );
+
+  // ✅ OPTIMIZED: getItemLayout for better scroll performance
+  const getItemLayout = useCallback(
+    (_: any, index: number) => ({
+      length: 180 + theme.spacing.sm, // width + marginRight
+      offset: (180 + theme.spacing.sm) * index,
+      index,
+    }),
+    [theme]
+  );
+
+  // ✅ OPTIMIZED: Slice data to limit for FlatList
+  const displayedRecommendations = useMemo(() => 
+    recommendations.slice(0, limit), 
+    [recommendations, limit]
+  );
+
+  // ✅ OPTIMIZED: Memoized render item for grid FlatList
+  const renderGridItem = useCallback(({ item, index }: { item: RecommendationListing; index: number }) => {
+    // Ensure we have valid data before rendering
+    if (!item || !item.listing_id || !item.title) {
+      return null;
+    }
+    
+    // ✅ Use pre-computed is_sellar_pro flag (optimal performance)
+    const isSellarPro = item.is_sellar_pro === true;
+    
+    // Determine badge based on status (Priority: Reserved > Urgent > Spotlight > Boosted > PRO)
+    let badge;
+    if (item.status === 'reserved') {
+      badge = { text: 'Reserved', variant: 'warning' as const };
+    } else if (item.urgent_until && new Date(item.urgent_until) > new Date()) {
+      badge = { text: 'Urgent Sale', variant: 'urgent' as const };
+    } else if (item.spotlight_until && new Date(item.spotlight_until) > new Date()) {
+      badge = { text: 'Spotlight', variant: 'spotlight' as const };
+    } else if (item.boost_until && new Date(item.boost_until) > new Date()) {
+      badge = { text: 'Boosted', variant: 'featured' as const };
+    } else if (isSellarPro) {
+      badge = { text: '⭐ PRO', variant: 'primary' as const };
+    }
+    
+    return (
+      <View style={{ flex: 0.5, paddingHorizontal: theme.spacing.xs, marginBottom: theme.spacing.sm }}>
+        <ProductCard
+          image={Array.isArray(item.images) ? item.images[0] : (item.images || '')}
+          title={item.title || 'Untitled'}
+          price={item.price || 0}
+          previousPrice={item.previous_price}
+          priceChangedAt={item.price_changed_at}
+          currency={item.currency || 'GHS'}
+          seller={{
+            id: item.user_id || '',
+            name: item.seller_name || 'Unknown',
+            avatar: item.seller_avatar || undefined,
+            rating: 0
+          }}
+          badge={badge}
+          location={item.location || 'Unknown'}
+          layout="grid"
+          fullWidth={false}
+          shadowSize="sm"
+          listingId={item.listing_id}
+          isFavorited={favorites[item.listing_id] || false}
+          viewCount={viewCounts[item.listing_id] || 0}
+          favoritesCount={listingFavoriteCounts[item.listing_id] ?? item.favorites_count ?? 0}
+          onPress={() => onListingPress?.(item.listing_id)}
+          onFavoritePress={user?.id !== item.user_id ? () => handleFavoritePress(item.listing_id) : undefined}
+          onViewPress={() => handleViewPress(item.listing_id)}
+          showReportButton={false}
+          currentUserId={user?.id || ""}
+        />
+      </View>
+    );
+  }, [theme, favorites, viewCounts, listingFavoriteCounts, user, onListingPress, handleFavoritePress, handleViewPress]);
+
   useEffect(() => {
     loadRecommendations();
   }, [loadRecommendations, refreshTrigger]);
@@ -332,132 +469,48 @@ const RecommendationSection = memo(function RecommendationSection({
 
       {/* Recommendations List */}
       {layout === 'grid' ? (
-        <Grid columns={2} spacing={4}>
-          {recommendations.slice(0, limit).map((item, index) => {
-            // Ensure we have valid data before rendering
-            if (!item || !item.listing_id || !item.title) {
-              return null;
-            }
-            
-            // ✅ Use pre-computed is_sellar_pro flag (optimal performance)
-            const isSellarPro = item.is_sellar_pro === true;
-            
-            // Determine badge based on status (Priority: Reserved > Urgent > Spotlight > Boosted > PRO)
-            let badge;
-            if (item.status === 'reserved') {
-              badge = { text: 'Reserved', variant: 'warning' as const };
-            } else if (item.urgent_until && new Date(item.urgent_until) > new Date()) {
-              badge = { text: 'Urgent Sale', variant: 'urgent' as const };
-            } else if (item.spotlight_until && new Date(item.spotlight_until) > new Date()) {
-              badge = { text: 'Spotlight', variant: 'spotlight' as const };
-            } else if (item.boost_until && new Date(item.boost_until) > new Date()) {
-              badge = { text: 'Boosted', variant: 'featured' as const };
-            } else if (isSellarPro) {
-              badge = { text: '⭐ PRO', variant: 'primary' as const };
-            }
-            
-            return (
-              <View key={item.listing_id} style={{ position: 'relative', marginBottom: theme.spacing.sm }}>
-                <ProductCard
-                  image={Array.isArray(item.images) ? item.images[0] : (item.images || '')}
-                  title={item.title || 'Untitled'}
-                  price={item.price || 0}
-                  currency={item.currency || 'GHS'}
-                  seller={{
-                    id: item.user_id || '',
-                    name: item.seller_name || 'Unknown',
-                    avatar: item.seller_avatar || undefined,
-                    rating: 0
-                  }}
-                  badge={badge}
-                  location={item.location || 'Unknown'}
-                  layout="grid"
-                  fullWidth={false}
-                  shadowSize="sm"
-                  listingId={item.listing_id}
-                  isFavorited={favorites[item.listing_id] || false}
-                  viewCount={viewCounts[item.listing_id] || 0}
-                  favoritesCount={listingFavoriteCounts[item.listing_id] ?? item.favorites_count ?? 0}
-                  onPress={() => onListingPress?.(item.listing_id)}
-                  onFavoritePress={user?.id !== item.user_id ? () => handleFavoritePress(item.listing_id) : undefined}
-                  onViewPress={() => handleViewPress(item.listing_id)}
-                  showReportButton={false}
-                  currentUserId={user?.id || ""}
-                />
-              </View>
-            );
-          })}
-        </Grid>
+        <FlatList
+          data={displayedRecommendations}
+          renderItem={renderGridItem}
+          keyExtractor={keyExtractor}
+          numColumns={2}
+          columnWrapperStyle={{
+            paddingHorizontal: theme.spacing.sm,
+          }}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={false}
+          // ✅ Performance optimizations
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          initialNumToRender={10}
+          updateCellsBatchingPeriod={50}
+        />
       ) : (
-        <ScrollView
+        <FlatList
+          data={displayedRecommendations}
+          renderItem={renderHorizontalItem}
+          keyExtractor={keyExtractor}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{
             paddingHorizontal: theme.spacing.lg,
-            gap: theme.spacing.sm,
           }}
-          style={{ marginHorizontal: -theme.spacing.lg }}
+          style={{ marginHorizontal: -theme.spacing.lg, paddingVertical: theme.spacing.md}}
+          // ✅ Performance optimizations
           removeClippedSubviews={true}
-          scrollEventThrottle={32}
+          maxToRenderPerBatch={5}
+          windowSize={3}
+          initialNumToRender={3}
+          updateCellsBatchingPeriod={50}
+          getItemLayout={getItemLayout}
+          // ✅ Smooth scrolling
           decelerationRate="fast"
+          scrollEventThrottle={16}
           pagingEnabled={false}
-          snapToInterval={200}
+          snapToInterval={180 + theme.spacing.sm}
           snapToAlignment="start"
-        >
-          {recommendations.slice(0, limit).map((item, index) => {
-            // Ensure we have valid data before rendering
-            if (!item || !item.listing_id || !item.title) {
-              return null;
-            }
-            
-            // ✅ Use pre-computed is_sellar_pro flag (optimal performance)
-            const isSellarPro = item.is_sellar_pro === true;
-            
-            // Determine badge based on status (Priority: Reserved > Urgent > Spotlight > Boosted > PRO)
-            let badge;
-            if (item.status === 'reserved') {
-              badge = { text: 'Reserved', variant: 'warning' as const };
-            } else if (item.urgent_until && new Date(item.urgent_until) > new Date()) {
-              badge = { text: 'Urgent Sale', variant: 'urgent' as const };
-            } else if (item.spotlight_until && new Date(item.spotlight_until) > new Date()) {
-              badge = { text: 'Spotlight', variant: 'spotlight' as const };
-            } else if (item.boost_until && new Date(item.boost_until) > new Date()) {
-              badge = { text: 'Boosted', variant: 'featured' as const };
-            } else if (isSellarPro) {
-              badge = { text: '⭐ PRO', variant: 'primary' as const };
-            }
-            
-            return (
-              <View key={item.listing_id} style={{ width: 190, marginBottom: theme.spacing.sm }}>
-                <ProductCard
-                  image={Array.isArray(item.images) ? item.images[0] : (item.images || '')}
-                  title={item.title || 'Untitled'}
-                  price={item.price || 0}
-                  currency={item.currency || 'GHS'}
-                  seller={{
-                    id: item.user_id || '',
-                    name: item.seller_name || 'Unknown',
-                    avatar: item.seller_avatar || undefined,
-                    rating: 0
-                  }}
-                  badge={badge}
-                  location={item.location || 'Unknown'}
-                  layout="grid"
-                  shadowSize="sm"
-                  listingId={item.listing_id}
-                  isFavorited={favorites[item.listing_id] || false}
-                  viewCount={viewCounts[item.listing_id] || 0}
-                  favoritesCount={listingFavoriteCounts[item.listing_id] ?? item.favorites_count ?? 0}
-                  onPress={() => onListingPress?.(item.listing_id)}
-                  onFavoritePress={user?.id !== item.user_id ? () => handleFavoritePress(item.listing_id) : undefined}
-                  onViewPress={() => handleViewPress(item.listing_id)}
-                  showReportButton={false}
-                  currentUserId={user?.id || ""}
-                />
-              </View>
-            );
-          })}
-        </ScrollView>
+        />
       )}
     </View>
   );

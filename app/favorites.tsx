@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, ScrollView, RefreshControl, Alert, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, ScrollView, RefreshControl, Alert, TouchableOpacity, FlatList } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { supabase } from '@/lib/supabase';
@@ -148,31 +148,272 @@ export default function FavoritesScreen() {
     }
   };
 
-  // Transform favorites to product format
-  const transformedProducts = favorites.map((favorite) => {
-    const listing = favorite.listings;
-    const seller = listing.profiles;
-    
-    return {
-      id: listing.id,
-      favoriteId: favorite.id,
-      image: listing.images || ['https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg'],
-      title: listing.title,
-      price: listing.price,
-      seller: {
-        name: `${seller?.first_name} ${seller?.last_name}`,
-        avatar: seller?.avatar_url,
-        rating: seller?.rating || 0,
-        badges: seller?.account_type === 'business' ? ['business'] : [],
-      },
-      badge: listing.boost_until && new Date(listing.boost_until) > new Date() 
-        ? { text: 'Boosted', variant: 'featured' as const }
-        : undefined,
-      location: listing.location,
-      status: listing.status,
-      savedAt: new Date(favorite.created_at).toLocaleDateString(),
-    };
-  });
+  // ✅ Memoized data transformation for better performance
+  const transformedProducts = useMemo(() => {
+    return favorites.map((favorite) => {
+      const listing = favorite.listings;
+      const seller = listing.profiles;
+      
+      return {
+        id: listing.id,
+        favoriteId: favorite.id,
+        image: listing.images || ['https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg'],
+        title: listing.title,
+        price: listing.price,
+        previous_price: listing.previous_price || null,
+        price_changed_at: listing.price_changed_at || null,
+        seller: {
+          name: `${seller?.first_name} ${seller?.last_name}`,
+          avatar: seller?.avatar_url,
+          rating: seller?.rating || 0,
+          badges: seller?.account_type === 'business' ? ['business'] : [],
+        },
+        badge: listing.boost_until && new Date(listing.boost_until) > new Date() 
+          ? { text: 'Boosted', variant: 'featured' as const }
+          : undefined,
+        location: listing.location,
+        status: listing.status,
+        savedAt: new Date(favorite.created_at).toLocaleDateString(),
+      };
+    });
+  }, [favorites]);
+
+  // ✅ Group items into pairs for grid view (same as my listings)
+  const gridData = useMemo(() => {
+    if (viewMode !== 'grid') return [];
+    const pairs = [];
+    for (let i = 0; i < transformedProducts.length; i += 2) {
+      pairs.push([transformedProducts[i], transformedProducts[i + 1]]);
+    }
+    return pairs;
+  }, [transformedProducts, viewMode]);
+
+  // ✅ Render grid row (pairs of items)
+  const renderGridRow = useCallback(({ item: pair }: { item: any[] }) => (
+    <View style={{ 
+      flexDirection: 'row', 
+      paddingHorizontal: theme.spacing.lg,
+      marginBottom: theme.spacing.sm 
+    }}>
+      <View style={{ flex: 1, marginRight: theme.spacing.xs }}>
+        <View style={{ position: 'relative' }}>
+          <ProductCard
+            key={pair[0]?.id}
+            image={pair[0]?.image}
+            title={pair[0]?.title}
+            price={pair[0]?.price}
+            previousPrice={pair[0]?.previous_price}
+            priceChangedAt={pair[0]?.price_changed_at}
+            seller={pair[0]?.seller}
+            badge={pair[0]?.badge}
+            location={pair[0]?.location}
+            layout="grid"
+            fullWidth={false}
+            shadowSize="sm"
+            isFavorited={true}
+            onFavoritePress={() => handleToggleFavorite(pair[0]?.favoriteId, pair[0]?.title)}
+            onPress={() => router.push(`/(tabs)/home/${pair[0]?.id}`)}
+          />
+
+          {/* Status Indicator */}
+          {pair[0]?.status !== 'active' && (
+            <View
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0,0,0,0.7)',
+                borderRadius: theme.borderRadius.lg,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <Text variant="caption" style={{ color: 'white', fontWeight: '600' }}>
+                {pair[0]?.status === 'sold' ? 'SOLD' : pair[0]?.status?.toUpperCase()}
+              </Text>
+            </View>
+          )}
+
+          {/* Saved Date Indicator */}
+          <View
+            style={{
+              position: 'absolute',
+              bottom: theme.spacing.sm,
+              left: theme.spacing.sm,
+              backgroundColor: theme.colors.primary,
+              borderRadius: theme.borderRadius.full,
+              paddingHorizontal: theme.spacing.sm,
+              paddingVertical: theme.spacing.xs,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: theme.spacing.xs,
+            }}
+          >
+            <Clock size={10} color={theme.colors.primaryForeground} />
+            <Text 
+              variant="caption" 
+              style={{ 
+                color: theme.colors.primaryForeground,
+                fontWeight: '600',
+                fontSize: 10,
+              }}
+            >
+              Saved {pair[0]?.savedAt}
+            </Text>
+          </View>
+        </View>
+      </View>
+      <View style={{ flex: 1, marginLeft: theme.spacing.xs }}>
+        {pair[1] && (
+          <View style={{ position: 'relative' }}>
+            <ProductCard
+              key={pair[1]?.id}
+              image={pair[1]?.image}
+              title={pair[1]?.title}
+              price={pair[1]?.price}
+              previousPrice={pair[1]?.previous_price}
+              priceChangedAt={pair[1]?.price_changed_at}
+              seller={pair[1]?.seller}
+              badge={pair[1]?.badge}
+              location={pair[1]?.location}
+              layout="grid"
+              fullWidth={false}
+              shadowSize="sm"
+              isFavorited={true}
+              onFavoritePress={() => handleToggleFavorite(pair[1]?.favoriteId, pair[1]?.title)}
+              onPress={() => router.push(`/(tabs)/home/${pair[1]?.id}`)}
+            />
+
+            {/* Status Indicator */}
+            {pair[1]?.status !== 'active' && (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: 'rgba(0,0,0,0.7)',
+                  borderRadius: theme.borderRadius.lg,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <Text variant="caption" style={{ color: 'white', fontWeight: '600' }}>
+                  {pair[1]?.status === 'sold' ? 'SOLD' : pair[1]?.status?.toUpperCase()}
+                </Text>
+              </View>
+            )}
+
+            {/* Saved Date Indicator */}
+            <View
+              style={{
+                position: 'absolute',
+                bottom: theme.spacing.sm,
+                left: theme.spacing.sm,
+                backgroundColor: theme.colors.primary,
+                borderRadius: theme.borderRadius.full,
+                paddingHorizontal: theme.spacing.sm,
+                paddingVertical: theme.spacing.xs,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.xs,
+              }}
+            >
+              <Clock size={10} color={theme.colors.primaryForeground} />
+              <Text 
+                variant="caption" 
+                style={{ 
+                  color: theme.colors.primaryForeground,
+                  fontWeight: '600',
+                  fontSize: 10,
+                }}
+              >
+                Saved {pair[1]?.savedAt}
+              </Text>
+            </View>
+          </View>
+        )}
+      </View>
+    </View>
+  ), [theme, handleToggleFavorite]);
+
+  // ✅ Render list item
+  const renderListItem = useCallback(({ item: product }: { item: any }) => (
+    <View style={{ marginBottom: theme.spacing.sm, paddingHorizontal: theme.spacing.lg }}>
+      <View style={{ position: 'relative' }}>
+        <ProductCard
+          variant="list"
+          image={product.image}
+          title={product.title}
+          price={product.price}
+          previousPrice={product.previous_price}
+          priceChangedAt={product.price_changed_at}
+          seller={product.seller}
+          badge={product.badge}
+          location={product.location}
+          shadowSize="sm"
+          isFavorited={true}
+          onFavoritePress={() => handleToggleFavorite(product.favoriteId, product.title)}
+          onPress={() => router.push(`/(tabs)/home/${product.id}`)}
+        />
+
+        {/* Status Indicator */}
+        {product.status !== 'active' && (
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.7)',
+              borderRadius: theme.borderRadius.lg,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Text variant="caption" style={{ color: 'white', fontWeight: '600' }}>
+              {product.status === 'sold' ? 'SOLD' : product.status?.toUpperCase()}
+            </Text>
+          </View>
+        )}
+
+        {/* Saved Date Indicator */}
+        <View
+          style={{
+            position: 'absolute',
+            bottom: theme.spacing.sm,
+            left: theme.spacing.sm,
+            backgroundColor: theme.colors.primary,
+            borderRadius: theme.borderRadius.full,
+            paddingHorizontal: theme.spacing.sm,
+            paddingVertical: theme.spacing.xs,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: theme.spacing.xs,
+          }}
+        >
+          <Clock size={10} color={theme.colors.primaryForeground} />
+          <Text 
+            variant="caption" 
+            style={{ 
+              color: theme.colors.primaryForeground,
+              fontWeight: '600',
+              fontSize: 10,
+            }}
+          >
+            Saved {product.savedAt}
+          </Text>
+        </View>
+      </View>
+    </View>
+  ), [theme, handleToggleFavorite]);
+
+  // ✅ Optimized keyExtractor
+  const keyExtractor = useCallback((item: any) => item.id, []);
 
   if (loading) {
     return (
@@ -267,6 +508,8 @@ export default function FavoritesScreen() {
                         image={product.image}
                         title={product.title}
                         price={product.price}
+                        previousPrice={product.previous_price}
+                        priceChangedAt={product.price_changed_at}
                         seller={product.seller}
                         badge={product.badge}
                         location={product.location}
@@ -340,6 +583,8 @@ export default function FavoritesScreen() {
                         image={product.image}
                         title={product.title}
                         price={product.price}
+                        previousPrice={product.previous_price}
+                        priceChangedAt={product.price_changed_at}
                         seller={product.seller}
                         badge={product.badge}
                         location={product.location}

@@ -137,6 +137,9 @@ export { AlertBanner } from './Alert/AlertBanner';
 export type { AlertBannerProps, AlertBannerVariant, AlertBannerSize } from './Alert/AlertBanner';
 export { TrialBadge } from './TrialBadge/TrialBadge';
 export { TrialEndingModal } from './TrialEndingModal/TrialEndingModal';
+export { TrialImpactCard } from './TrialImpactCard/TrialImpactCard';
+export { TrialOnboardingGuide } from './TrialOnboardingGuide/TrialOnboardingGuide';
+export { QuickEditModal } from './QuickEditModal/QuickEditModal';
 
 // Auth Error Boundary
 export { AuthErrorBoundary } from './AuthErrorBoundary/AuthErrorBoundary';

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, ScrollView, TouchableOpacity, Alert, RefreshControl, Animated, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { View, FlatList, ScrollView, TouchableOpacity, Alert, RefreshControl, Animated, StyleSheet } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useListings } from '@/hooks/useListings';
@@ -144,6 +144,8 @@ export default function MyListingsScreen() {
           title,
           description,
           price,
+          previous_price,
+          price_changed_at,
           currency,
           category_id,
           condition,
@@ -609,11 +611,14 @@ export default function MyListingsScreen() {
   
   const { listingFavoriteCounts } = useFavoritesStore();
 
-  const transformedListings = filteredListings.map((listing: any) => ({
+  // ✅ OPTIMIZED: Memoize transformed listings to prevent recalculations
+  const transformedListings = useMemo(() => filteredListings.map((listing: any) => ({
     id: listing.id,
     image: listing.images || ['https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg'],
     title: listing.title,
     price: listing.price,
+    previous_price: listing.previous_price || null,
+    price_changed_at: listing.price_changed_at || null,
     seller: {
       name: `${user?.user_metadata?.first_name} ${user?.user_metadata?.last_name}`,
       avatar: user?.user_metadata?.avatar_url,
@@ -626,7 +631,241 @@ export default function MyListingsScreen() {
     // ✅ Use real-time counts from hooks instead of stale DB columns
     views: viewCounts[listing.id] || listing.views_count || 0,
     favorites: listingFavoriteCounts[listing.id] ?? listing.favorites_count ?? 0,
-  }));
+  })), [filteredListings, user, viewCounts, listingFavoriteCounts]);
+
+  // ✅ OPTIMIZED: Memoized render functions for FlatList
+  // ✅ OPTIMIZED: Single grid card component
+  const GridCard = ({ listing }: { listing: any }) => (
+    <View style={{ flex: 1, paddingHorizontal: theme.spacing.xs }}>
+      <TouchableOpacity
+        onLongPress={() => handleLongPress(listing.id)}
+        delayLongPress={500}
+        activeOpacity={1}
+        style={{
+          opacity: longPressedItem === listing.id ? 0.7 : 1,
+          transform: [{ scale: longPressedItem === listing.id ? 0.95 : 1 }],
+        }}
+      >
+        {/* Blur overlay - ONLY for moderation-hidden listings */}
+        {listing.status === 'hidden' && !listing.hidden_by_seller && (
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.3)',
+              borderRadius: theme.borderRadius.lg,
+              zIndex: 1,
+            }}
+          />
+        )}
+        <View style={{ 
+          opacity: (listing.status === 'hidden' && !listing.hidden_by_seller) ? 0.6 : 1,
+          borderWidth: (listing.status === 'hidden' && !listing.hidden_by_seller) ? 2 : 0,
+          borderColor: (listing.status === 'hidden' && !listing.hidden_by_seller) ? theme.colors.error : 'transparent',
+          borderRadius: theme.borderRadius.lg,
+          overflow: 'hidden'
+        }}>
+        <ProductCard
+          {...listing}
+          layout="grid"
+          fullWidth={true}
+          previousPrice={listing.previous_price}
+          priceChangedAt={listing.price_changed_at}
+            onPress={() => {
+              if (isSelectionMode) {
+                toggleListingSelection(listing.id);
+              } else {
+                router.push(`/(tabs)/home/${listing.id}` as any);
+              }
+            }}
+            onFavoritePress={undefined}
+            menuActions={!isSelectionMode && !(listing.status === 'hidden' && !listing.hidden_by_seller) ? [
+              ...(listing.status === 'sold' ? [{
+                label: 'Relist',
+                icon: <RefreshCw size={18} color={theme.colors.primary} />,
+                onPress: () => handleRelistListing(listing.id),
+              }] : [{
+                label: 'Edit',
+                icon: <Edit size={18} color={theme.colors.text.primary} />,
+                onPress: () => router.push(`/edit-listing/${listing.id}` as any),
+              }]),
+              {
+                label: listing.status === 'active' ? 'Hide' : 'Show',
+                icon: listing.status === 'active' ? <EyeOff size={18} color={theme.colors.warning} /> : <Eye size={18} color={theme.colors.success} />,
+                onPress: () => handleToggleStatus(listing.id, listing.status),
+              },
+              {
+                label: 'Delete',
+                icon: <Trash2 size={18} color={theme.colors.error} />,
+                onPress: () => {
+                  setSelectedListing(listing);
+                  setShowDeleteModal(true);
+                },
+                destructive: true,
+              },
+            ] : undefined}
+          />
+        </View>
+        {isSelectionMode && (
+          <TouchableOpacity
+            style={{
+              position: 'absolute',
+              top: theme.spacing.sm,
+              left: theme.spacing.sm,
+              zIndex: 10,
+              backgroundColor: selectedListings.has(listing.id) ? theme.colors.primary : theme.colors.surface,
+              borderRadius: theme.borderRadius.full,
+              padding: theme.spacing.xs,
+              borderWidth: 2,
+              borderColor: selectedListings.has(listing.id) ? theme.colors.primary : theme.colors.border,
+            }}
+            onPress={() => toggleListingSelection(listing.id)}
+          >
+            {selectedListings.has(listing.id) ? (
+              <Check size={16} color={theme.colors.surface} />
+            ) : (
+              <View style={{ width: 16, height: 16 }} />
+            )}
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderListItem = useCallback(({ item: listing }: { item: any }) => (
+    <View style={{ paddingHorizontal: theme.spacing.md, marginBottom: theme.spacing.sm }}>
+      <TouchableOpacity
+        onLongPress={() => handleLongPress(listing.id)}
+        delayLongPress={500}
+        activeOpacity={1}
+        style={{
+          opacity: longPressedItem === listing.id ? 0.7 : 1,
+          transform: [{ scale: longPressedItem === listing.id ? 0.98 : 1 }],
+        }}
+      >
+        {listing.status === 'hidden' && !listing.hidden_by_seller && (
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.3)',
+              borderRadius: theme.borderRadius.lg,
+              zIndex: 1,
+            }}
+          />
+        )}
+        <View style={{ 
+          opacity: (listing.status === 'hidden' && !listing.hidden_by_seller) ? 0.6 : 1,
+          borderWidth: (listing.status === 'hidden' && !listing.hidden_by_seller) ? 2 : 0,
+          borderColor: (listing.status === 'hidden' && !listing.hidden_by_seller) ? theme.colors.error : 'transparent',
+          borderRadius: theme.borderRadius.lg,
+          overflow: 'hidden'
+        }}>
+          <ProductCard
+            {...listing}
+            variant="list"
+            previousPrice={listing.previous_price}
+            priceChangedAt={listing.price_changed_at}
+            onPress={() => {
+              if (isSelectionMode) {
+                toggleListingSelection(listing.id);
+              } else {
+                router.push(`/(tabs)/home/${listing.id}` as any);
+              }
+            }}
+            onFavoritePress={undefined}
+            menuActions={!isSelectionMode && !(listing.status === 'hidden' && !listing.hidden_by_seller) ? [
+              ...(listing.status === 'sold' ? [{
+                label: 'Relist',
+                icon: <RefreshCw size={18} color={theme.colors.primary} />,
+                onPress: () => handleRelistListing(listing.id),
+              }] : [{
+                label: 'Edit',
+                icon: <Edit size={18} color={theme.colors.text.primary} />,
+                onPress: () => router.push(`/edit-listing/${listing.id}` as any),
+              }]),
+              {
+                label: listing.status === 'active' ? 'Hide' : 'Show',
+                icon: listing.status === 'active' ? <EyeOff size={18} color={theme.colors.warning} /> : <Eye size={18} color={theme.colors.success} />,
+                onPress: () => handleToggleStatus(listing.id, listing.status),
+              },
+              {
+                label: 'Delete',
+                icon: <Trash2 size={18} color={theme.colors.error} />,
+                onPress: () => {
+                  setSelectedListing(listing);
+                  setShowDeleteModal(true);
+                },
+                destructive: true,
+              },
+            ] : undefined}
+          />
+        </View>
+        {isSelectionMode && (
+          <TouchableOpacity
+            style={{
+              position: 'absolute',
+              top: theme.spacing.sm,
+              left: theme.spacing.sm,
+              zIndex: 10,
+              backgroundColor: selectedListings.has(listing.id) ? theme.colors.primary : theme.colors.surface,
+              borderRadius: theme.borderRadius.full,
+              padding: theme.spacing.xs,
+              borderWidth: 2,
+              borderColor: selectedListings.has(listing.id) ? theme.colors.primary : theme.colors.border,
+            }}
+            onPress={() => toggleListingSelection(listing.id)}
+          >
+            {selectedListings.has(listing.id) ? (
+              <Check size={16} color={theme.colors.surface} />
+            ) : (
+              <View style={{ width: 16, height: 16 }} />
+            )}
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
+    </View>
+  ), [theme, longPressedItem, isSelectionMode, selectedListings, handleLongPress, toggleListingSelection, handleToggleStatus, handleRelistListing, setSelectedListing, setShowDeleteModal]);
+
+  // ✅ OPTIMIZED: Key extractor
+  const keyExtractor = useCallback((item: any) => item.id, []);
+
+  // ✅ OPTIMIZED: Grid item layout (for getItemLayout optimization)
+  const getItemLayout = useCallback(
+    (_: any, index: number) => ({
+      length: viewMode === 'grid' ? 280 : 120, // Approximate item height
+      offset: (viewMode === 'grid' ? 280 : 120) * index,
+      index,
+    }),
+    [viewMode]
+  );
+
+  // ✅ OPTIMIZED: Render for grid with 2 columns
+  const renderGridRow = useCallback(({ item }: { item: any[] }) => (
+    <View style={{ flexDirection: 'row', paddingHorizontal: theme.spacing.sm, marginBottom: theme.spacing.sm }}>
+      {item.map((listing, idx) => listing ? (
+        <GridCard key={listing.id} listing={listing} />
+      ) : (
+        <View key={`empty-${idx}`} style={{ flex: 1 }} />
+      ))}
+    </View>
+  ), [theme, isSelectionMode, selectedListings, longPressedItem, handleLongPress, toggleListingSelection, handleToggleStatus, handleRelistListing, setSelectedListing, setShowDeleteModal]);
+
+  // ✅ Group items into pairs for grid view
+  const gridData = useMemo(() => {
+    if (viewMode !== 'grid') return [];
+    const pairs = [];
+    for (let i = 0; i < transformedListings.length; i += 2) {
+      pairs.push([transformedListings[i], transformedListings[i + 1]]);
+    }
+    return pairs;
+  }, [transformedListings, viewMode]);
 
   return (
     <SafeAreaWrapper>
@@ -867,7 +1106,17 @@ export default function MyListingsScreen() {
             )}
           </ScrollView>
         ) : filteredListings.length > 0 ? (
-          <ScrollView
+          // ✅ OPTIMIZED: FlatList for virtualization and better performance
+          <FlatList
+            data={viewMode === 'grid' ? (gridData as any) : (transformedListings as any)}
+            renderItem={viewMode === 'grid' ? (renderGridRow as any) : (renderListItem as any)}
+            keyExtractor={(item: any, index: number) => viewMode === 'grid' ? `row-${index}` : keyExtractor(item)}
+            // ✅ Performance optimizations
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={viewMode === 'grid' ? 5 : 10}
+            windowSize={5}
+            initialNumToRender={viewMode === 'grid' ? 5 : 10}
+            updateCellsBatchingPeriod={50}
             contentContainerStyle={{
               paddingBottom: theme.spacing.xl,
             }}
@@ -878,292 +1127,7 @@ export default function MyListingsScreen() {
                 tintColor={theme.colors.primary}
               />
             }
-          >
-            {viewMode === 'grid' ? (
-            <Grid columns={2} spacing={4}>
-              {transformedListings.map((listing) => (
-                <View key={listing.id} style={{ position: 'relative' }}>
-                   <TouchableOpacity
-                     onLongPress={() => handleLongPress(listing.id)}
-                     delayLongPress={500}
-                     activeOpacity={1}
-                     style={{
-                       opacity: longPressedItem === listing.id ? 0.7 : 1,
-                       transform: [{ scale: longPressedItem === listing.id ? 0.95 : 1 }],
-                     }}
-                   >
-                     {/* Blur overlay - ONLY for moderation-hidden listings */}
-                     {listing.status === 'hidden' && !listing.hidden_by_seller && (
-                       <View
-                         style={{
-                           position: 'absolute',
-                           top: 0,
-                           left: 0,
-                           right: 0,
-                           bottom: 0,
-                           backgroundColor: 'rgba(0,0,0,0.3)',
-                           borderRadius: theme.borderRadius.lg,
-                           zIndex: 1,
-                         }}
-                       />
-                     )}
-                     <View style={{ 
-                       opacity: (listing.status === 'hidden' && !listing.hidden_by_seller) ? 0.6 : 1,
-                       borderWidth: (listing.status === 'hidden' && !listing.hidden_by_seller) ? 2 : 0,
-                       borderColor: (listing.status === 'hidden' && !listing.hidden_by_seller) ? theme.colors.error : 'transparent',
-                       borderRadius: theme.borderRadius.lg,
-                       overflow: 'hidden'
-                     }}>
-                  <ProductCard
-                    image={listing.image}
-                    title={listing.title}
-                    price={listing.price}
-                    seller={listing.seller}
-                    badge={listing.badge}
-                    location={listing.location}
-                    layout="grid"
-                    fullWidth={true}
-                        viewCount={listing.views}
-                        favoritesCount={listing.favorites}
-                        onPress={() => {
-                          if (isSelectionMode) {
-                            toggleListingSelection(listing.id);
-                          } else if (listing.status === 'hidden' && !listing.hidden_by_seller) {
-                            // Don't navigate to moderation-hidden listings
-                            return;
-                          } else {
-                            router.push(`/(tabs)/home/${listing.id}`);
-                          }
-                        }}
-                        enableImageViewer={!isSelectionMode && !(listing.status === 'hidden' && !listing.hidden_by_seller)}
-                      />
-                     </View>
-                     
-                      {/* Hidden by Moderation Banner - Only for moderation-hidden listings */}
-                      {listing.status === 'hidden' && !listing.hidden_by_seller && (
-                        <View
-                          style={{
-                            position: 'absolute',
-                            top: theme.spacing.sm,
-                            left: theme.spacing.sm,
-                            right: theme.spacing.sm,
-                            backgroundColor: theme.colors.error + 'E6',
-                            borderWidth: 1,
-                            borderColor: theme.colors.error,
-                            borderRadius: theme.borderRadius.md,
-                            padding: theme.spacing.sm,
-                            zIndex: 20,
-                            shadowColor: '#000',
-                            shadowOffset: { width: 0, height: 2 },
-                            shadowOpacity: 0.25,
-                            shadowRadius: 4,
-                            elevation: 5,
-                          }}
-                        >
-                          <Text variant="caption" style={{ color: theme.colors.errorForeground, textAlign: 'center', fontWeight: '700' }}>
-                            ⚠️ Hidden due to community report
-                          </Text>
-                          <Text variant="caption" style={{ color: theme.colors.errorForeground, textAlign: 'center', marginTop: 2, fontWeight: '500' }}>
-                            Contact support if you believe this was an error
-                          </Text>
-                        </View>
-                      )}
-                   </TouchableOpacity>
-
-                  {/* Selection Checkbox */}
-                  {isSelectionMode && (
-                    <View
-                      style={{
-                        position: 'absolute',
-                        top: theme.spacing.sm,
-                        left: theme.spacing.sm,
-                        width: 24,
-                        height: 24,
-                        borderRadius: 12,
-                        backgroundColor: selectedListings.has(listing.id) 
-                          ? theme.colors.primary 
-                          : theme.colors.surface + 'E6',
-                        borderWidth: 2,
-                        borderColor: selectedListings.has(listing.id) 
-                          ? theme.colors.primary 
-                          : theme.colors.border,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        ...theme.shadows.sm,
-                      }}
-                    >
-                      {selectedListings.has(listing.id) && (
-                        <Check size={14} color={theme.colors.primaryForeground} />
-                      )}
-                    </View>
-                  )}
-
-                  {/* Action Overlay - Hide in selection mode and moderation-hidden listings */}
-                  {!isSelectionMode && !(listing.status === 'hidden' && !listing.hidden_by_seller) && (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      bottom: theme.spacing.md,
-                      right: theme.spacing.md,
-                      flexDirection: 'row',
-                      gap: theme.spacing.xs,
-                    }}
-                  >
-                    {/* Show relist button for sold items */}
-                    {listing.status === 'sold' ? (
-                    <Button
-                      variant="icon"
-                        icon={<RefreshCw size={14} color={theme.colors.primary} />}
-                        onPress={() => handleRelistListing(listing.id)}
-                        style={{
-                          width: 30,
-                          height: 30,
-                          backgroundColor: theme.colors.surface,
-                          borderRadius: theme.borderRadius.md,
-                          borderWidth: 1,
-                          borderColor: theme.colors.border,
-                        }}
-                      />
-                    ) : (
-                      <Button
-                        variant="icon"
-                        icon={<Edit size={14} color={theme.colors.text.primary} />}
-                      onPress={() => router.push(`/edit-listing/${listing.id}` as any)}
-                      style={{
-                          width: 30,
-                          height: 30,
-                        backgroundColor: theme.colors.surface,
-                        borderRadius: theme.borderRadius.md,
-                          borderWidth: 1,
-                          borderColor: theme.colors.border,
-                      }}
-                    />
-                    )}
-
-                    {listing.status !== 'sold' && (
-                    <Button
-                      variant="icon"
-                      icon={listing.status === 'active' ? 
-                          <EyeOff size={14} color={theme.colors.warning} /> : 
-                          <Eye size={14} color={theme.colors.success} />
-                      }
-                      onPress={() => handleToggleStatus(listing.id, listing.status)}
-                      style={{
-                          width: 30,
-                          height: 30,
-                        backgroundColor: theme.colors.surface,
-                        borderRadius: theme.borderRadius.md,
-                          borderWidth: 1,
-                          borderColor: theme.colors.border,
-                      }}
-                    />
-                    )}
-
-                    <Button
-                      variant="icon"
-                      icon={<Trash2 size={14} color={theme.colors.error} />}
-                      onPress={() => {
-                        setSelectedListing(listing);
-                        setShowDeleteModal(true);
-                      }}
-                      style={{
-                        width: 30,
-                        height: 30,
-                        backgroundColor: theme.colors.surface,
-                        borderRadius: theme.borderRadius.md,
-                        borderWidth: 1,
-                        borderColor: theme.colors.border,
-                      }}
-                    />
-                  </View>
-                  )}
-                </View>
-              ))}
-              </Grid>
-            ) : (
-              <View style={{ paddingHorizontal: theme.spacing.sm, paddingTop: theme.spacing.sm }}>
-                {transformedListings.map((listing) => {
-                  // ✅ Prepare badges - extract ONLY text and variant (NO icons or React components)
-                  const listBadges: Array<{ text: string; variant: 'primary' | 'success' | 'warning' | 'error' | 'info' | 'neutral' | 'secondary' }> = [];
-                  
-                  // Safely extract badge text and variant from the status badge (which contains an icon we must exclude)
-                  if (listing.badge?.text && listing.badge?.variant) {
-                    listBadges.push({ 
-                      text: String(listing.badge.text), 
-                      variant: String(listing.badge.variant) as any
-                    });
-                  }
-
-                  return (
-                    <View key={listing.id} style={{ position: 'relative' }}>
-                      <ProductCard
-                        variant="list"
-                        shadowSize="sm"
-                        listingId={String(listing.id)}
-                        image={Array.isArray(listing.image) ? listing.image[0] : String(listing.image)}
-                        title={String(listing.title)}
-                        price={listing.price}
-                        currency="GHS"
-                        seller={listing.seller || { id: '', name: 'Unknown' }}
-                        status={String(listing.status)}
-                        location={listing.location}
-                        viewCount={Number(listing.views) || 0}
-                        favoritesCount={Number(listing.favorites) || 0}
-                        badge={listBadges[0]}
-                        badges={listBadges}
-                        onPress={() => {
-                          if (isSelectionMode) {
-                            toggleListingSelection(listing.id);
-                          } else if (listing.status === 'hidden' && !listing.hidden_by_seller) {
-                            // Don't navigate to moderation-hidden listings
-                            return;
-                          } else {
-                            router.push(`/(tabs)/home/${listing.id}`);
-                          }
-                        }}
-                        onEdit={!(listing.status === 'hidden' && !listing.hidden_by_seller) && listing.status !== 'sold' ? () => router.push(`/edit-listing/${listing.id}` as any) : undefined}
-                        onDelete={!(listing.status === 'hidden' && !listing.hidden_by_seller) ? () => {
-                          setSelectedListing(listing);
-                          setShowDeleteModal(true);
-                        } : undefined}
-                        onToggleVisibility={!(listing.status === 'hidden' && !listing.hidden_by_seller) && listing.status !== 'sold' ? () => handleToggleStatus(listing.id, listing.status) : undefined}
-                      />
-                      
-                       {/* Hidden by Moderation Overlay for List View - Only for moderation-hidden listings */}
-                       {listing.status === 'hidden' && !listing.hidden_by_seller && (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: theme.spacing.md,
-                             left: theme.spacing.md,
-                      right: theme.spacing.md,
-                             backgroundColor: theme.colors.error + 'E6',
-                             borderWidth: 1,
-                             borderColor: theme.colors.error,
-                             borderRadius: theme.borderRadius.md,
-                             padding: theme.spacing.sm,
-                             zIndex: 20,
-                             shadowColor: '#000',
-                             shadowOffset: { width: 0, height: 2 },
-                             shadowOpacity: 0.25,
-                             shadowRadius: 4,
-                             elevation: 5,
-                           }}
-                         >
-                           <Text variant="caption" style={{ color: theme.colors.errorForeground, textAlign: 'center', fontWeight: '700' }}>
-                             ⚠️ Hidden due to community report
-                           </Text>
-                           <Text variant="caption" style={{ color: theme.colors.errorForeground, textAlign: 'center', marginTop: 2, fontWeight: '500' }}>
-                             Contact support if you believe this was an error
-                    </Text>
-                  </View>
-                       )}
-                </View>
-                  );
-                })}
-              </View>
-            )}
-          </ScrollView>
+          />
         ) : (
           <EmptyState
             icon={<Package size={64} color={theme.colors.text.muted} />}

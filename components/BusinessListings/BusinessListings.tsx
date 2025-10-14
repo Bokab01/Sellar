@@ -9,6 +9,8 @@ interface BusinessListing {
   id: string;
   title: string;
   price: number;
+  previous_price?: number;
+  price_changed_at?: string;
   currency: string;
   images: string[];
   location: string;
@@ -77,6 +79,8 @@ const BusinessListings = memo(function BusinessListings({
         image={listing.images}
         title={listing.title}
         price={listing.price}
+        previousPrice={listing.previous_price}
+        priceChangedAt={listing.price_changed_at}
         currency={listing.currency}
         seller={listing.seller}
         location={listing.location}

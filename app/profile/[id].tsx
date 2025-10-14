@@ -329,6 +329,8 @@ export default function UserProfileScreen() {
     image: listing.images || ['https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg'],
     title: listing.title,
     price: listing.price,
+    previous_price: listing.previous_price || null,
+    price_changed_at: listing.price_changed_at || null,
     seller: {
       name: displayName,
       avatar: profile.avatar_url,
@@ -357,6 +359,8 @@ export default function UserProfileScreen() {
                 image={listing.image}
                 title={listing.title}
                 price={listing.price}
+                previousPrice={listing.previous_price}
+                priceChangedAt={listing.price_changed_at}
                 seller={listing.seller}
                 location={listing.location}
                 layout="grid"
@@ -397,11 +401,11 @@ export default function UserProfileScreen() {
         return (
           <View style={{ gap: theme.spacing.md }}>
             {/* Reputation Display */}
-            <ReputationDisplay
+            {/* <ReputationDisplay
               userId={profileId!}
               variant="full"
               style={{ marginBottom: theme.spacing.md }}
-            />
+            /> */}
 
             {/* Professional About Section */}
             <View style={{

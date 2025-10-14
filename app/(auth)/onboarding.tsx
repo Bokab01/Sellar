@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, ScrollView, Dimensions } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, ScrollView, Dimensions, Animated, TouchableOpacity, Image } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import {
   Text,
@@ -18,75 +18,266 @@ import {
   Car, 
   Home,
   ArrowRight,
-  X
+  X,
+  Sparkles,
+  Sun,
+  Moon
 } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 interface MarketplaceItem {
   id: string;
-  icon: React.ReactNode;
+  image: any;
   title: string;
   category: string;
-  color: string;
+  gradient: string[];
 }
 
+// Animated Card Component
+const AnimatedCard = ({ item, index, theme }: { item: MarketplaceItem; index: number; theme: any }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+  const [pressed, setPressed] = useState(false);
+
+  useEffect(() => {
+    // Staggered entrance animation
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        delay: index * 100,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 8,
+        tension: 40,
+        delay: index * 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const handlePressIn = () => {
+    setPressed(true);
+    Animated.spring(scaleAnim, {
+      toValue: 0.95,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    setPressed(false);
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 3,
+      tension: 40,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  return (
+    <Animated.View
+      style={{
+        opacity: fadeAnim,
+        transform: [{ scale: scaleAnim }],
+        width: (screenWidth - theme.spacing.xl * 2 - theme.spacing.md * 2) / 3,
+        aspectRatio: 0.85,
+        marginBottom: theme.spacing.sm,
+      }}
+    >
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        style={{
+          flex: 1,
+          borderRadius: theme.borderRadius.lg,
+          overflow: 'hidden',
+        }}
+      >
+        {/* Image Background */}
+        <Image
+          source={item.image}
+          style={{
+            width: '100%',
+            height: '100%',
+            position: 'absolute',
+          }}
+          resizeMode="cover"
+        />
+        
+        {/* Gradient Overlay */}
+        <LinearGradient
+          colors={item.gradient as any}
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: '50%',
+          }}
+          locations={[0.4, 1, 1]}
+        />
+
+        {/* Content */}
+        <View style={{
+          flex: 1,
+          padding: theme.spacing.sm,
+          justifyContent: 'flex-end',
+        }}>
+          <Text 
+            variant="bodySmall" 
+            style={{ 
+              color: '#ffffff',
+              fontWeight: '700',
+              fontSize: 11,
+              textAlign: 'left',
+              marginBottom: 2,
+            }}
+          >
+            {item.title}
+          </Text>
+          <Text 
+            variant="caption" 
+            style={{ 
+              color: '#ffffff',
+              opacity: 0.95,
+              fontSize: 9,
+              textAlign: 'left',
+              lineHeight: 11,
+            }}
+          >
+            {item.category}
+          </Text>
+        </View>
+
+        {/* Shimmer Effect on Press */}
+        {pressed && (
+          <View style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+          }} />
+        )}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
 export default function OnboardingScreen() {
-  const { theme } = useTheme();
+  const { theme, isDarkMode, toggleTheme } = useTheme();
   const [showSignUpModal, setShowSignUpModal] = useState(false);
   const [showSignInModal, setShowSignInModal] = useState(false);
+  
+  // Theme toggle animation
+  const themeScale = useRef(new Animated.Value(1)).current;
+  const themeRotate = useRef(new Animated.Value(0)).current;
+  
+  const handleThemeToggle = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    // Animate the icon
+    Animated.parallel([
+      Animated.sequence([
+        Animated.timing(themeScale, {
+          toValue: 0.8,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.spring(themeScale, {
+          toValue: 1,
+          friction: 3,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.timing(themeRotate, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      themeRotate.setValue(0);
+    });
+    
+    toggleTheme();
+  };
+  
+  const rotateInterpolate = themeRotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
+  
+  // Parallax scroll animation
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, 100],
+    outputRange: [1, 0.3],
+    extrapolate: 'clamp',
+  });
 
   const marketplaceItems: MarketplaceItem[] = [
     {
       id: 'electronics',
-      icon: <Smartphone size={32} color="#ffffff" />,
+      image: require('@/assets/onboarding/electronics.webp'),
       title: 'Electronics',
-      category: 'Phones, Laptops & More',
-      color: '#3B82F6',
+      category: 'Phones & Laptops',
+      gradient: ['transparent', 'rgba(59, 130, 246, 0.8)', 'rgba(29, 78, 216, 0.95)'],
     },
     {
       id: 'fashion',
-      icon: <Shirt size={32} color="#ffffff" />,
+      image: require('@/assets/onboarding/fashion-ghana.webp'),
       title: 'Fashion',
-      category: 'Clothing & Accessories',
-      color: '#EC4899',
+      category: 'Clothing & Style',
+      gradient: ['transparent', 'rgba(236, 72, 153, 0.8)', 'rgba(219, 39, 119, 0.95)'],
     },
     {
-      id: 'audio',
-      icon: <Headphones size={32} color="#ffffff" />,
-      title: 'Audio',
-      category: 'Speakers & Headphones',
-      color: '#10B981',
-    },
-    {
-      id: 'automotive',
-      icon: <Car size={32} color="#ffffff" />,
-      title: 'Automotive',
-      category: 'Cars & Parts',
-      color: '#F59E0B',
+      id: 'vehicles',
+      image: require('@/assets/onboarding/vehicles.webp'),
+      title: 'Vehicles',
+      category: 'Cars & Bikes',
+      gradient: ['transparent', 'rgba(245, 158, 11, 0.8)', 'rgba(217, 119, 6, 0.95)'],
     },
     {
       id: 'home',
-      icon: <Home size={32} color="#ffffff" />,
-      title: 'Home & Garden',
-      category: 'Furniture & Decor',
-      color: '#8B5CF6',
+      image: require('@/assets/onboarding/home-and-furniture.webp'),
+      title: 'Home & Furniture',
+      category: 'Decor & Living',
+      gradient: ['transparent', 'rgba(139, 92, 246, 0.8)', 'rgba(109, 40, 217, 0.95)'],
     },
     {
-      id: 'general',
-      icon: <ShoppingBag size={32} color="#ffffff" />,
-      title: 'Everything Else',
-      category: 'Find Anything',
-      color: '#EF4444',
+      id: 'beauty',
+      image: require('@/assets/onboarding/health-and-beauty.webp'),
+      title: 'Health & Beauty',
+      category: 'Cosmetics & Care',
+      gradient: ['transparent', 'rgba(236, 72, 153, 0.8)', 'rgba(190, 24, 93, 0.95)'],
+    },
+    {
+      id: 'sports',
+      image: require('@/assets/onboarding/sports.webp'),
+      title: 'Sports',
+      category: 'Fitness & Gear',
+      gradient: ['transparent', 'rgba(16, 185, 129, 0.8)', 'rgba(5, 150, 105, 0.95)'],
     },
   ];
 
   const handleSignUp = () => {
-    setShowSignUpModal(true);
+    // Navigate directly to sign-up screen
+    router.push('/(auth)/sign-up');
+    // setShowSignUpModal(true);
   };
 
   const handleSignIn = () => {
-    setShowSignInModal(true);
+    // Navigate directly to sign-in screen
+    router.push('/(auth)/sign-in');
+    // setShowSignInModal(true);
   };
 
   const handleEmailSignUp = () => {
@@ -111,115 +302,154 @@ export default function OnboardingScreen() {
 
   return (
     <SafeAreaWrapper>
-      <ScrollView 
+      <Animated.ScrollView 
         contentContainerStyle={{ flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
+        )}
       >
         <Container padding='sm'>
-          <View style={{ flex: 1, paddingVertical: theme.spacing.xl }}>
+          <View style={{ flex: 1, paddingVertical: theme.spacing.md }}>
             
-            {/* Header */}
-            <View style={{ 
-              alignItems: 'center', 
-              marginBottom: theme.spacing['3xl'],
-              marginTop: theme.spacing.sm
+            {/* Theme Toggle Button - Top Right */}
+            <View style={{
+              position: 'absolute',
+              top: theme.spacing.lg,
+              right: theme.spacing.xs,
+              zIndex: 10,
             }}>
-              <Text 
-                variant="h1" 
-                style={{ 
-                  fontSize: 32,
-                  fontWeight: '800',
-                  color: theme.colors.text.primary,
-                  marginBottom: theme.spacing.sm
+              <TouchableOpacity
+                onPress={handleThemeToggle}
+                activeOpacity={0.7}
+                style={{
+                  width: 35,
+                  height: 35,
+                  borderRadius: theme.borderRadius.full,
+                  backgroundColor: theme.colors.surface,
+                  borderWidth: 1,
+                  borderColor: theme.colors.border,
+                  justifyContent: 'center',
+                  alignItems: 'center',
                 }}
               >
-                Sellar
-              </Text>
+                <Animated.View
+                  style={{
+                    transform: [
+                      { scale: themeScale },
+                      { rotate: rotateInterpolate },
+                    ],
+                  }}
+                >
+                  {isDarkMode ? (
+                    <Sun size={20} color={theme.colors.primary} />
+                  ) : (
+                    <Moon size={20} color={theme.colors.primary} />
+                  )}
+                </Animated.View>
+              </TouchableOpacity>
+            </View>
+            
+            {/* Header with Parallax Effect */}
+            <Animated.View style={{ 
+              alignItems: 'center', 
+              marginBottom: theme.spacing.lg,
+              marginTop: theme.spacing.xs,
+              opacity: headerOpacity,
+            }}>
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.xs,
+                marginBottom: 4,
+              }}>
+                <Text 
+                  variant="h1" 
+                  style={{ 
+                    fontSize: 28,
+                    fontWeight: '800',
+                    color: theme.colors.primary,
+                    letterSpacing: -0.5,
+                  }}
+                >
+                  Sellar
+                </Text>
+                <Sparkles size={20} color={theme.colors.primary} />
+              </View>
               <Text 
                 variant="body" 
                 color="muted"
                 style={{ 
-                  fontSize: 16,
-                  textAlign: 'center'
+                  fontSize: 13,
+                  textAlign: 'center',
+                  fontWeight: '500',
                 }}
               >
                 Made with you in mind
               </Text>
-            </View>
+            </Animated.View>
 
-            {/* Marketplace Items Grid */}
+            {/* Marketplace Items Grid with Animation */}
             <View style={{
-              marginBottom: theme.spacing['3xl'],
+              marginBottom: theme.spacing.xl,
             }}>
               <View style={{
                 flexDirection: 'row',
                 flexWrap: 'wrap',
                 justifyContent: 'space-between',
-                gap: theme.spacing.md,
               }}>
                 {marketplaceItems.map((item, index) => (
-                  <View
+                  <AnimatedCard
                     key={item.id}
-                    style={{
-                      width: (screenWidth - theme.spacing.xl * 2 - theme.spacing.md * 2) / 3,
-                      aspectRatio: 1,
-                      backgroundColor: item.color,
-                      borderRadius: theme.borderRadius.lg,
-                      padding: theme.spacing.md,
-                      justifyContent: 'space-between',
-                      ...theme.shadows.md,
-                    }}
-                  >
-                    <View style={{ alignItems: 'center' }}>
-                      {item.icon}
-                    </View>
-                    <View>
-                      <Text 
-                        variant="bodySmall" 
-                        style={{ 
-                          color: '#ffffff',
-                          fontWeight: '600',
-                          fontSize: 12,
-                          textAlign: 'center',
-                          marginBottom: 2
-                        }}
-                      >
-                        {item.title}
-                      </Text>
-                      <Text 
-                        variant="caption" 
-                        style={{ 
-                          color: '#ffffff',
-                          opacity: 0.8,
-                          fontSize: 10,
-                          textAlign: 'center',
-                          lineHeight: 12
-                        }}
-                      >
-                        {item.category}
-                      </Text>
-                    </View>
-                  </View>
+                    item={item}
+                    index={index}
+                    theme={theme}
+                  />
                 ))}
               </View>
             </View>
 
-            {/* Call to Action */}
+            {/* Call to Action with Enhanced Typography */}
             <View style={{
               alignItems: 'center',
-              marginBottom: theme.spacing.sm,
+              marginBottom: theme.spacing.md,
+              paddingHorizontal: theme.spacing.xs,
             }}>
+              <View style={{
+                backgroundColor: theme.colors.primary + '10',
+                paddingHorizontal: theme.spacing.md,
+                paddingVertical: 6,
+                borderRadius: theme.borderRadius.full,
+                marginBottom: theme.spacing.md,
+              }}>
+                <Text 
+                  variant="bodySmall" 
+                  style={{ 
+                    color: theme.colors.primary,
+                    fontWeight: '600',
+                    fontSize: 11,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  Ghana's Marketplace
+                </Text>
+              </View>
+
               <Text 
                 variant="h2" 
                 style={{ 
-                  fontSize: 24,
-                  fontWeight: '700',
+                  fontSize: 22,
+                  fontWeight: '800',
                   textAlign: 'center',
-                  marginBottom: theme.spacing.lg,
-                  lineHeight: 32
+                  marginBottom: theme.spacing.sm,
+                  lineHeight: 28,
+                  letterSpacing: -0.5,
                 }}
               >
-                Join and sell & buy items you love
+                Discover, Buy & Sell{'\n'}Items You Love
               </Text>
               
               <Text 
@@ -227,37 +457,47 @@ export default function OnboardingScreen() {
                 color="muted"
                 style={{ 
                   textAlign: 'center',
-                  lineHeight: 22,
-                  marginBottom: theme.spacing['2xl'],
-                  paddingHorizontal: theme.spacing.lg
+                  lineHeight: 20,
+                  marginBottom: theme.spacing.lg,
+                  paddingHorizontal: theme.spacing.sm,
+                  fontSize: 14,
                 }}
               >
-                Connect with buyers and sellers across Ghana. List your items, chat securely, and make deals with confidence.
+                Connect with thousands of buyers and sellers across Ghana. List items, chat securely, and close deals with confidence.
               </Text>
             </View>
 
-            {/* Action Buttons */}
-            <View style={{ gap: theme.spacing.md }}>
+            {/* Action Buttons with Enhanced Design */}
+            <View style={{ gap: theme.spacing.sm }}>
               <Button
                 variant="primary"
                 onPress={handleSignUp}
                 fullWidth
-                size='lg'
+                size='md'
                 style={{
                   backgroundColor: theme.colors.primary,
-                  paddingVertical: theme.spacing.md,
+                  paddingVertical: theme.spacing.md + 2,
+                  borderRadius: theme.borderRadius.xl,
+                  ...theme.shadows.sm,
                 }}
               >
-                <Text 
-                  variant="body" 
-                  style={{ 
-                    color: theme.colors.primaryForeground,
-                    fontWeight: '600',
-                    fontSize: 16
-                  }}
-                >
-                  Sign up for Sellar
-                </Text>
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: theme.spacing.sm,
+                }}>
+                  <Text 
+                    variant="body" 
+                    style={{ 
+                      color: theme.colors.primaryForeground,
+                      fontWeight: '700',
+                      fontSize: 16,
+                    }}
+                  >
+                    Get Started
+                  </Text>
+                  <ArrowRight size={18} color={theme.colors.primaryForeground} />
+                </View>
               </Button>
 
               <Button
@@ -266,20 +506,22 @@ export default function OnboardingScreen() {
                 fullWidth
                 size="md"
                 style={{
-                  borderColor: theme.colors.primary,
-                  borderWidth: 1,
-                  paddingVertical: theme.spacing.md,
+                  borderColor: theme.colors.border,
+                  borderWidth: 1.5,
+                  paddingVertical: theme.spacing.md + 2,
+                  borderRadius: theme.borderRadius.xl,
+                  backgroundColor: theme.colors.surface,
                 }}
               >
                 <Text 
                   variant="body" 
                   style={{ 
-                    color: theme.colors.primary,
+                    color: theme.colors.text.primary,
                     fontWeight: '600',
-                    fontSize: 16
+                    fontSize: 16,
                   }}
                 >
-                  I already have an account
+                  Sign In
                 </Text>
               </Button>
             </View>
@@ -287,15 +529,15 @@ export default function OnboardingScreen() {
             {/* Footer */}
             <View style={{
               alignItems: 'center',
-              marginTop: theme.spacing['2xl'],
-              paddingTop: theme.spacing.lg,
+              marginTop: theme.spacing.lg,
+              paddingTop: theme.spacing.md,
             }}>
               <LinkButton
                 variant="muted"
                 onPress={() => router.push('/(auth)/about')}
                 style={{
-                  paddingVertical: theme.spacing.xs,
-                  paddingHorizontal: theme.spacing.sm,
+                  paddingVertical: theme.spacing.sm,
+                  paddingHorizontal: theme.spacing.md,
                 }}
               >
                 <Text 
@@ -303,334 +545,18 @@ export default function OnboardingScreen() {
                   color="muted"
                   style={{ 
                     textAlign: 'center',
-                    fontSize: 12,
-                    lineHeight: 16
+                    fontSize: 13,
+                    lineHeight: 16,
+                    fontWeight: '500',
                   }}
                 >
-                  About Sellar
+                  Learn more about Sellar
                 </Text>
               </LinkButton>
             </View>
           </View>
         </Container>
-      </ScrollView>
-
-      {/* Sign Up Modal */}
-      <AppModal
-        visible={showSignUpModal}
-        onClose={() => setShowSignUpModal(false)}
-        title="Join Sellar"
-        position="bottom"
-        size="md"
-        showCloseButton={true}
-        dismissOnBackdrop={true}
-      >
-        <View style={{ padding: theme.spacing.md }}>
-
-          {/* Auth Options */}
-          <View style={{ gap: theme.spacing.sm }}>
-            {/* Google Auth */}
-            <Button
-              variant="tertiary"
-              onPress={handleGoogleAuth}
-              fullWidth
-              size="md"
-              style={{
-                borderColor: theme.colors.border,
-                borderWidth: 1,
-                paddingVertical: theme.spacing.md,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: theme.spacing.md,
-              }}>
-                {/* Google Icon */}
-                <View style={{
-                  width: 20,
-                  height: 20,
-                  borderRadius: 2,
-                  backgroundColor: '#4285F4',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: 'bold' }}>G</Text>
-                </View>
-                <Text 
-                  variant="body" 
-                  style={{ 
-                    color: theme.colors.text.primary,
-                    fontWeight: '500',
-                    fontSize: 16
-                  }}
-                >
-                  Continue with Google
-                </Text>
-              </View>
-            </Button>
-
-            {/* Facebook Auth */}
-            <Button
-              variant="tertiary"
-              onPress={handleFacebookAuth}
-              fullWidth
-              size="md"
-              style={{
-                borderColor: theme.colors.border,
-                borderWidth: 1,
-                paddingVertical: theme.spacing.md,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: theme.spacing.md,
-              }}>
-                {/* Facebook Icon */}
-                <View style={{
-                  width: 20,
-                  height: 20,
-                  borderRadius: 10,
-                  backgroundColor: '#1877F2',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: 'bold' }}>f</Text>
-                </View>
-                <Text 
-                  variant="body" 
-                  style={{ 
-                    color: theme.colors.text.primary,
-                    fontWeight: '500',
-                    fontSize: 16
-                  }}
-                >
-                  Continue with Facebook
-                </Text>
-              </View>
-            </Button>
-
-            {/* Divider */}
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginVertical: theme.spacing.md,
-            }}>
-              <View style={{
-                flex: 1,
-                height: 1,
-                backgroundColor: theme.colors.border,
-              }} />
-              <Text 
-                variant="bodySmall" 
-                color="muted"
-                style={{ 
-                  marginHorizontal: theme.spacing.md,
-                  fontSize: 14
-                }}
-              >
-                or
-              </Text>
-              <View style={{
-                flex: 1,
-                height: 1,
-                backgroundColor: theme.colors.border,
-              }} />
-            </View>
-
-            {/* Email Sign Up */}
-            <Button
-              variant="ghost"
-              onPress={handleEmailSignUp}
-              fullWidth
-              size="md"
-              style={{
-                paddingVertical: theme.spacing.md,
-              }}
-            >
-              <Text 
-                variant="body" 
-                style={{ 
-                  color: theme.colors.primary,
-                  fontWeight: '600',
-                  fontSize: 16
-                }}
-              >
-                Continue with email
-              </Text>
-            </Button>
-          </View>
-
-          {/* Bottom Spacer */}
-          <View style={{ height: theme.spacing.sm }} />
-        </View>
-      </AppModal>
-
-      {/* Sign In Modal */}
-      <AppModal
-        visible={showSignInModal}
-        onClose={() => setShowSignInModal(false)}
-        title="Log in to Sellar"
-        position="bottom"
-        size="md"
-        showCloseButton={true}
-        dismissOnBackdrop={true}
-      >
-        <View style={{ padding: theme.spacing.md }}>
-
-          {/* Auth Options */}
-          <View style={{ gap: theme.spacing.sm }}>
-            {/* Google Auth */}
-            <Button
-              variant="tertiary"
-              onPress={handleGoogleAuth}
-              fullWidth
-              size="md"
-              style={{
-                borderColor: theme.colors.border,
-                borderWidth: 1,
-                paddingVertical: theme.spacing.md,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: theme.spacing.md,
-              }}>
-                {/* Google Icon */}
-                <View style={{
-                  width: 20,
-                  height: 20,
-                  borderRadius: 10,
-                  backgroundColor: '#ffffff',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderWidth: 1,
-                  borderColor: theme.colors.border,
-                }}>
-                  <Text style={{ color: '#4285F4', fontSize: 12, fontWeight: 'bold' }}>G</Text>
-                </View>
-                <Text 
-                  variant="body" 
-                  style={{ 
-                    color: theme.colors.text.primary,
-                    fontWeight: '500',
-                    fontSize: 16
-                  }}
-                >
-                  Continue with Google
-                </Text>
-              </View>
-            </Button>
-
-            {/* Facebook Auth */}
-            <Button
-              variant="tertiary"
-              onPress={handleFacebookAuth}
-              fullWidth
-              size="md"
-              style={{
-                borderColor: theme.colors.border,
-                borderWidth: 1,
-                paddingVertical: theme.spacing.md,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: theme.spacing.md,
-              }}>
-                {/* Facebook Icon */}
-                <View style={{
-                  width: 20,
-                  height: 20,
-                  borderRadius: 10,
-                  backgroundColor: '#1877F2',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: 'bold' }}>f</Text>
-                </View>
-                <Text 
-                  variant="body" 
-                  style={{ 
-                    color: theme.colors.text.primary,
-                    fontWeight: '500',
-                    fontSize: 16
-                  }}
-                >
-                  Continue with Facebook
-                </Text>
-              </View>
-            </Button>
-
-            {/* Divider */}
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginVertical: theme.spacing.sm,
-            }}>
-              <View style={{
-                flex: 1,
-                height: 1,
-                backgroundColor: theme.colors.border,
-              }} />
-              <Text 
-                variant="bodySmall" 
-                color="muted"
-                style={{ 
-                  marginHorizontal: theme.spacing.sm,
-                  fontSize: 14
-                }}
-              >
-                or
-              </Text>
-              <View style={{
-                flex: 1,
-                height: 1,
-                backgroundColor: theme.colors.border,
-              }} />
-            </View>
-
-            {/* Email Sign In */}
-            <Button
-              variant="ghost"
-              onPress={handleEmailSignIn}
-              fullWidth
-              size="md"
-              style={{
-                paddingVertical: theme.spacing.md,
-              }}
-            >
-              <Text 
-                variant="bodySmall" 
-                style={{ 
-                  color: theme.colors.primary,
-                  fontWeight: '600',
-                }}
-              >
-                Continue with email
-              </Text>
-            </Button>
-          </View>
-
-          {/* Bottom Spacer */}
-          <View style={{ height: theme.spacing.sm }} />
-        </View>
-      </AppModal>
+      </Animated.ScrollView>
     </SafeAreaWrapper>
   );
 }

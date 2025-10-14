@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Alert, Platform, TouchableOpacity } from 'react-native';
+import { View, Platform, TouchableOpacity } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useSecureAuth } from '@/hooks/useSecureAuth';
 import { validateSignUpForm } from '@/utils/validation';
@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { checkUserStatus, getUserStatusActions } from '@/utils/checkUserStatus';
 import { sanitizeEmail, sanitizeName, sanitizePassword, InputSanitizer } from '@/utils/inputSanitization';
 import { AuthRateLimiters, rateLimitUtils } from '@/utils/rateLimiter';
-// import { checkMultipleUniqueness } from '@/utils/uniquenessValidation'; // Temporarily disabled
+import { checkPhoneUniqueness } from '@/utils/uniquenessValidation';
 import {
   Text,
   SafeAreaWrapper,
@@ -17,6 +17,7 @@ import {
   LinkButton,
   LocationPicker,
   HybridKeyboardAvoidingView,
+  AppModal,
 } from '@/components';
 import { router } from 'expo-router';
 import { Mail, Lock, User, Phone, ArrowLeft, Check } from 'lucide-react-native';
@@ -36,6 +37,15 @@ export default function SignUpScreen() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [referralCode, setReferralCode] = useState('');
+  const [checkingPhone, setCheckingPhone] = useState(false);
+  
+  // Modal states
+  const [showModal, setShowModal] = useState(false);
+  const [modalConfig, setModalConfig] = useState<{
+    title: string;
+    message: string;
+    actions?: Array<{ text: string; onPress: () => void; variant?: 'primary' | 'secondary' | 'tertiary' }>;
+  }>({ title: '', message: '' });
 
   // Process referral code from URL parameters
   useEffect(() => {
@@ -56,6 +66,135 @@ export default function SignUpScreen() {
 
     processReferralCode();
   }, []);
+
+  // Helper function to show modal
+  const showAlertModal = (
+    title: string, 
+    message: string, 
+    actions?: Array<{ text: string; onPress: () => void; variant?: 'primary' | 'secondary' | 'tertiary' }>
+  ) => {
+    setModalConfig({ title, message, actions });
+    setShowModal(true);
+  };
+
+  // Validate Ghanaian phone number format
+  const validatePhoneNumber = (phoneNumber: string): { isValid: boolean; error?: string } => {
+    // Remove all spaces and special characters
+    const cleanPhone = phoneNumber.replace(/[\s\-()]/g, '');
+    
+    // Ghanaian phone number patterns
+    // Format 1: 0XXXXXXXXX (10 digits starting with 0)
+    // Format 2: +233XXXXXXXXX (13 characters starting with +233)
+    // Format 3: 233XXXXXXXXX (12 digits starting with 233)
+    
+    const pattern1 = /^0[2-5][0-9]{8}$/; // 0XX XXXX XXXX (MTN, Vodafone, AirtelTigo)
+    const pattern2 = /^\+233[2-5][0-9]{8}$/; // +233 XX XXXX XXXX
+    const pattern3 = /^233[2-5][0-9]{8}$/; // 233 XX XXXX XXXX
+    
+    if (pattern1.test(cleanPhone) || pattern2.test(cleanPhone) || pattern3.test(cleanPhone)) {
+      return { isValid: true };
+    }
+    
+    // Provide specific error messages
+    if (cleanPhone.length < 10) {
+      return { 
+        isValid: false, 
+        error: 'Phone number is too short. Use format: 0XX XXX XXXX or +233 XX XXX XXXX' 
+      };
+    }
+    
+    if (cleanPhone.length > 13) {
+      return { 
+        isValid: false, 
+        error: 'Phone number is too long. Use format: 0XX XXX XXXX or +233 XX XXX XXXX' 
+      };
+    }
+    
+    if (cleanPhone.startsWith('0') && cleanPhone.length !== 10) {
+      return { 
+        isValid: false, 
+        error: 'Invalid format. Ghanaian numbers starting with 0 must be 10 digits' 
+      };
+    }
+    
+    if (cleanPhone.startsWith('+233') && cleanPhone.length !== 13) {
+      return { 
+        isValid: false, 
+        error: 'Invalid format. Use +233 XX XXX XXXX (13 characters)' 
+      };
+    }
+    
+    if (cleanPhone.startsWith('233') && !cleanPhone.startsWith('+') && cleanPhone.length !== 12) {
+      return { 
+        isValid: false, 
+        error: 'Invalid format. Use 233 XX XXX XXXX (12 digits)' 
+      };
+    }
+    
+    // Check if second digit (after country code) is valid (2-5)
+    let secondDigit = '';
+    if (cleanPhone.startsWith('0')) {
+      secondDigit = cleanPhone[1];
+    } else if (cleanPhone.startsWith('+233')) {
+      secondDigit = cleanPhone[4];
+    } else if (cleanPhone.startsWith('233')) {
+      secondDigit = cleanPhone[3];
+    }
+    
+    if (secondDigit && !['2', '3', '4', '5'].includes(secondDigit)) {
+      return { 
+        isValid: false, 
+        error: 'Invalid Ghanaian number. Must start with 02, 03, 04, or 05' 
+      };
+    }
+    
+    return { 
+      isValid: false, 
+      error: 'Invalid phone number format. Use: 0XX XXX XXXX or +233 XX XXX XXXX' 
+    };
+  };
+
+  // Check phone number uniqueness when user finishes entering
+  const handlePhoneBlur = async () => {
+    const trimmedPhone = phone.trim();
+    
+    // Only check if phone is provided (it's optional)
+    if (!trimmedPhone) {
+      // Clear any previous phone errors
+      if (errors.phone) {
+        setErrors(prev => ({ ...prev, phone: '' }));
+      }
+      return;
+    }
+
+    // Validate phone format and length first
+    const validation = validatePhoneNumber(trimmedPhone);
+    if (!validation.isValid) {
+      setErrors(prev => ({ ...prev, phone: validation.error || 'Invalid phone number' }));
+      return;
+    }
+
+    // Check uniqueness in database
+    setCheckingPhone(true);
+    try {
+      const result = await checkPhoneUniqueness(trimmedPhone);
+      
+      if (!result.isUnique) {
+        setErrors(prev => ({ 
+          ...prev, 
+          phone: result.error || 'This phone number is already registered'
+        }));
+      } else {
+        // Clear error if phone is unique and valid
+        setErrors(prev => ({ ...prev, phone: '' }));
+      }
+    } catch (error) {
+      console.error('Phone check error:', error);
+      // Don't block signup on check failure, just log it
+    } finally {
+      setCheckingPhone(false);
+    }
+  };
 
   // Check if form is valid and complete
   const isFormValid = () => {
@@ -97,27 +236,31 @@ export default function SignUpScreen() {
 
       if (error) {
         console.error('Resend confirmation error:', error);
-        Alert.alert('Error', `Failed to resend confirmation email: ${error.message}`);
+        showAlertModal('Error', `Failed to resend confirmation email: ${error.message}`);
       } else {
         console.log('Confirmation email resent successfully');
-        Alert.alert(
+        showAlertModal(
           'Email Sent!',
           'A new confirmation email has been sent to your inbox. Please check your email and click the verification link.',
           [
-            { text: 'OK' },
+            { text: 'OK', onPress: () => setShowModal(false) },
             { 
               text: 'Go to Verification Screen', 
-              onPress: () => router.push({
-                pathname: '/(auth)/verify-email',
-                params: { email }
-              })
+              onPress: () => {
+                setShowModal(false);
+                router.push({
+                  pathname: '/(auth)/verify-email',
+                  params: { email }
+                });
+              },
+              variant: 'primary'
             }
           ]
         );
       }
     } catch (error: any) {
       console.error('Resend confirmation catch error:', error);
-      Alert.alert('Error', 'Failed to resend confirmation email. Please try again.');
+      showAlertModal('Error', 'Failed to resend confirmation email. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -135,7 +278,7 @@ export default function SignUpScreen() {
       
       if (!rateLimitCheck.allowed) {
         const message = rateLimitUtils.getRateLimitMessage(rateLimitCheck, 'registration');
-        Alert.alert('Registration Limit Reached', message);
+        showAlertModal('Registration Limit Reached', message);
         setLoading(false);
         return;
       }
@@ -159,10 +302,9 @@ export default function SignUpScreen() {
       if (allThreats.length > 0) {
         const criticalThreats = allThreats.filter(t => t.severity === 'critical');
         if (criticalThreats.length > 0) {
-          Alert.alert(
+          showAlertModal(
             'Security Alert',
-            'Your input contains potentially harmful content. Please review and try again.',
-            [{ text: 'OK' }]
+            'Your input contains potentially harmful content. Please review and try again.'
           );
           setLoading(false);
           return;
@@ -185,7 +327,7 @@ export default function SignUpScreen() {
       if (!validation.isValid) {
         setErrors(validation.errors);
         const firstError = Object.values(validation.errors)[0];
-        Alert.alert('Validation Error', firstError);
+        showAlertModal('Validation Error', firstError);
         setLoading(false);
         return;
       }
@@ -193,7 +335,7 @@ export default function SignUpScreen() {
       // Step 2.5: Check terms acceptance
       if (!acceptedTerms) {
         setErrors({ terms: 'You must accept the Terms and Conditions and Privacy Policy to continue.' });
-        Alert.alert('Terms Required', 'Please accept the Terms and Conditions and Privacy Policy to create your account.');
+        showAlertModal('Terms Required', 'Please accept the Terms and Conditions and Privacy Policy to create your account.');
         setLoading(false);
         return;
       }
@@ -209,10 +351,11 @@ export default function SignUpScreen() {
           setErrors({ email: userStatus.message });
           
           const actions = getUserStatusActions(userStatus);
-          const alertButtons = actions.map(action => ({
+          const modalActions = actions.map(action => ({
             text: action.text,
-            style: action.style,
+            variant: (action.style === 'cancel' ? 'secondary' : 'primary') as 'primary' | 'secondary' | 'tertiary',
             onPress: () => {
+              setShowModal(false);
               switch (action.action) {
                 case 'signin':
                   router.replace('/(auth)/sign-in');
@@ -231,10 +374,10 @@ export default function SignUpScreen() {
             }
           }));
           
-          Alert.alert(
+          showAlertModal(
             userStatus.isConfirmed ? 'Account Already Verified' : 'Account Exists',
             userStatus.message,
-            alertButtons
+            modalActions
           );
           
           setLoading(false);
@@ -269,9 +412,9 @@ export default function SignUpScreen() {
         // Handle specific signup errors
         if (result.error?.includes('already registered') || result.error?.includes('already exists')) {
           setErrors({ email: 'This email address is already registered. Please sign in instead.' });
-          Alert.alert('Account Exists', 'This email address is already registered. Please sign in instead.');
+          showAlertModal('Account Exists', 'This email address is already registered. Please sign in instead.');
         } else {
-          Alert.alert('Sign Up Failed', result.error || 'Unknown error occurred');
+          showAlertModal('Sign Up Failed', result.error || 'Unknown error occurred');
         }
       } else {
         // Navigate to email verification screen
@@ -283,7 +426,7 @@ export default function SignUpScreen() {
       
     } catch (error) {
       console.error('Signup error:', error);
-      Alert.alert('Sign Up Failed', 'An unexpected error occurred. Please try again.');
+      showAlertModal('Sign Up Failed', 'An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -294,10 +437,9 @@ export default function SignUpScreen() {
       <HybridKeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
-        extraScrollHeight={150}
+        extraScrollHeight={100}
         contentContainerStyle={{ 
           flexGrow: 1,
-          paddingBottom: theme.spacing['4xl'],
         }}
       >
         <Container padding='sm'>
@@ -313,6 +455,7 @@ export default function SignUpScreen() {
                 padding: 0,
                 justifyContent: 'center',
                 alignItems: 'center',
+                marginBottom: theme.spacing.xs,
               }}
             >
               <ArrowLeft size={20} color={theme.colors.text.primary} />
@@ -320,17 +463,15 @@ export default function SignUpScreen() {
     
           <View
             style={{
-              minHeight: '100%',
-              justifyContent: 'center',
-              paddingVertical: theme.spacing['xs'],
+              flex: 1,
             }}
           >
             {/* Header */}
-            <View style={{ alignItems: 'center', marginBottom: theme.spacing['xl'] }}>
-              <Text variant="h1" style={{ marginBottom: theme.spacing.md }}>
+            <View style={{ alignItems: 'center', marginBottom: theme.spacing['lg'] }}>
+              <Text variant="h2" style={{ marginBottom: theme.spacing.lg }}>
                 Join Sellar
               </Text>
-              <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
+              <Text variant="bodySmall" color="secondary" style={{ textAlign: 'center' }}>
                 Create your account to start buying and selling
               </Text>
             </View>
@@ -340,8 +481,7 @@ export default function SignUpScreen() {
               <View style={{ flexDirection: 'row', marginBottom: theme.spacing.md}}>
                 <View style={{ flex: 1, marginRight: theme.spacing.md }}>
                   <Input
-                    label="First Name"
-                    placeholder="First name"
+                    placeholder="First name *"
                     value={firstName}
                     onChangeText={(text) => {
                       setFirstName(text);
@@ -355,8 +495,7 @@ export default function SignUpScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Input
-                    label="Last Name"
-                    placeholder="Last name"
+                    placeholder="Last name *"
                     value={lastName}
                     onChangeText={(text) => {
                       setLastName(text);
@@ -370,8 +509,7 @@ export default function SignUpScreen() {
               </View>
 
               <Input
-                label="Email"
-                placeholder="Enter your email"
+                placeholder="Enter your email *"
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
@@ -387,8 +525,7 @@ export default function SignUpScreen() {
               />
 
               <Input
-                label="Phone (Optional)"
-                placeholder="Enter your phone number"
+                placeholder="Phone number (Optional)"
                 value={phone}
                 onChangeText={(text) => {
                   setPhone(text);
@@ -396,16 +533,17 @@ export default function SignUpScreen() {
                     setErrors(prev => ({ ...prev, phone: '' }));
                   }
                 }}
+                onBlur={handlePhoneBlur}
                 keyboardType="phone-pad"
                 leftIcon={<Phone size={20} color={theme.colors.text.muted} />}
                 error={errors.phone}
+                helper={checkingPhone ? 'Checking availability...' : undefined}
                 style={{ marginBottom: theme.spacing.lg }}
               />
 
               <Input
                 variant="password"
-                label="Password"
-                placeholder="Create password"
+                placeholder="Create password (6+ characters) *"
                 value={password}
                 onChangeText={(text) => {
                   setPassword(text);
@@ -420,8 +558,7 @@ export default function SignUpScreen() {
 
               <Input
                 variant="password"
-                label="Confirm Password"
-                placeholder="Confirm password"
+                placeholder="Confirm password *"
                 value={confirmPassword}
                 onChangeText={(text) => {
                   setConfirmPassword(text);
@@ -435,8 +572,7 @@ export default function SignUpScreen() {
               />
 
               <Input
-                label="Referral Code (Optional)"
-                placeholder="Enter referral code if you have one"
+                placeholder="Referral code (Optional)"
                 value={referralCode}
                 onChangeText={(text) => {
                   setReferralCode(text.toUpperCase());
@@ -447,13 +583,13 @@ export default function SignUpScreen() {
                 autoCapitalize="characters"
                 maxLength={8}
                 error={errors.referralCode}
-                style={{ marginBottom: theme.spacing.xl }}
+                style={{ marginBottom: theme.spacing.md}}
               />
 
               {/* Terms and Conditions Checkbox */}
               <View style={{ 
-                marginBottom: theme.spacing.xl,
-                marginTop: theme.spacing.lg 
+                marginBottom: theme.spacing.md,
+                marginTop: theme.spacing.md 
               }}>
                 <View style={{
                   flexDirection: 'row',
@@ -545,7 +681,7 @@ export default function SignUpScreen() {
               </Button>
 
               {/* Form validation helper text */}
-              {!isFormValid() && !loading && (
+           {/*    {!isFormValid() && !loading && (
                 <Text variant="bodySmall" style={{
                   textAlign: 'center',
                   color: theme.colors.text.muted,
@@ -571,13 +707,13 @@ export default function SignUpScreen() {
                     return `Please provide ${missing.slice(0, -1).join(', ')} and ${missing[missing.length - 1]}`;
                   })()}
                 </Text>
-              )}
+              )} */}
             </View>
 
             {/* Footer Links */}
-            <View style={{ alignItems: 'center', marginTop: theme.spacing['2xl'] }}>
+            <View style={{ alignItems: 'center', marginTop: theme.spacing['lg'] }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text variant="body" color="secondary">
+                <Text variant="bodySmall" color="secondary">
                   Already have an account?{' '}
                 </Text>
                 <LinkButton
@@ -591,6 +727,44 @@ export default function SignUpScreen() {
           </View>
         </Container>
       </HybridKeyboardAvoidingView>
+
+      {/* Alert Modal */}
+      <AppModal
+        visible={showModal}
+        onClose={() => setShowModal(false)}
+        title={modalConfig.title}
+        position="center"
+        size="md"
+      >
+        <View style={{ padding: theme.spacing.md }}>
+          <Text variant="body" style={{ marginBottom: theme.spacing.lg }}>
+            {modalConfig.message}
+          </Text>
+          
+          <View style={{ gap: theme.spacing.sm }}>
+            {modalConfig.actions && modalConfig.actions.length > 0 ? (
+              modalConfig.actions.map((action, index) => (
+                <Button
+                  key={index}
+                  variant={action.variant || 'primary'}
+                  onPress={action.onPress}
+                  fullWidth
+                >
+                  {action.text}
+                </Button>
+              ))
+            ) : (
+              <Button
+                variant="primary"
+                onPress={() => setShowModal(false)}
+                fullWidth
+              >
+                OK
+              </Button>
+            )}
+          </View>
+        </View>
+      </AppModal>
     </SafeAreaWrapper>
   );
 }

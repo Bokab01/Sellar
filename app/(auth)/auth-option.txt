@@ -1,0 +1,311 @@
+ /* Sign Up Modal - Commented out for direct navigation 
+      <AppModal
+        visible={showSignUpModal}
+        onClose={() => setShowSignUpModal(false)}
+        title="Join Sellar"
+        position="bottom"
+        size="md"
+        showCloseButton={true}
+        dismissOnBackdrop={true}
+      >
+        <View style={{ padding: theme.spacing.md }}>
+
+          {/* Auth Options */}
+          <View style={{ gap: theme.spacing.sm }}>
+            {/* Google Auth */}
+            <Button
+              variant="tertiary"
+              onPress={handleGoogleAuth}
+              fullWidth
+              size="md"
+              style={{
+                borderColor: theme.colors.border,
+                borderWidth: 1,
+                paddingVertical: theme.spacing.md,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.md,
+              }}>
+                {/* Google Icon */}
+                <View style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 2,
+                  backgroundColor: '#4285F4',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: 'bold' }}>G</Text>
+                </View>
+                <Text 
+                  variant="body" 
+                  style={{ 
+                    color: theme.colors.text.primary,
+                    fontWeight: '500',
+                    fontSize: 16
+                  }}
+                >
+                  Continue with Google
+                </Text>
+              </View>
+            </Button>
+
+            {/* Facebook Auth */}
+            <Button
+              variant="tertiary"
+              onPress={handleFacebookAuth}
+              fullWidth
+              size="md"
+              style={{
+                borderColor: theme.colors.border,
+                borderWidth: 1,
+                paddingVertical: theme.spacing.md,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.md,
+              }}>
+                {/* Facebook Icon */}
+                <View style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  backgroundColor: '#1877F2',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: 'bold' }}>f</Text>
+                </View>
+                <Text 
+                  variant="body" 
+                  style={{ 
+                    color: theme.colors.text.primary,
+                    fontWeight: '500',
+                    fontSize: 16
+                  }}
+                >
+                  Continue with Facebook
+                </Text>
+              </View>
+            </Button>
+
+            {/* Divider */}
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginVertical: theme.spacing.md,
+            }}>
+              <View style={{
+                flex: 1,
+                height: 1,
+                backgroundColor: theme.colors.border,
+              }} />
+              <Text 
+                variant="bodySmall" 
+                color="muted"
+                style={{ 
+                  marginHorizontal: theme.spacing.md,
+                  fontSize: 14
+                }}
+              >
+                or
+              </Text>
+              <View style={{
+                flex: 1,
+                height: 1,
+                backgroundColor: theme.colors.border,
+              }} />
+            </View>
+
+            {/* Email Sign Up */}
+            <Button
+              variant="ghost"
+              onPress={handleEmailSignUp}
+              fullWidth
+              size="md"
+              style={{
+                paddingVertical: theme.spacing.md,
+              }}
+            >
+              <Text 
+                variant="body" 
+                style={{ 
+                  color: theme.colors.primary,
+                  fontWeight: '600',
+                  fontSize: 16
+                }}
+              >
+                Continue with email
+              </Text>
+            </Button>
+          </View>
+
+          {/* Bottom Spacer 
+          <View style={{ height: theme.spacing.sm }} />
+        </View>
+      </AppModal>
+
+      Sign In Modal - Commented out for direct navigation
+      <AppModal
+        visible={showSignInModal}
+        onClose={() => setShowSignInModal(false)}
+        title="Log in to Sellar"
+        position="bottom"
+        size="md"
+        showCloseButton={true}
+        dismissOnBackdrop={true}
+      >
+        <View style={{ padding: theme.spacing.md }}>
+
+          {/* Auth Options */}
+          <View style={{ gap: theme.spacing.sm }}>
+            {/* Google Auth */}
+            <Button
+              variant="tertiary"
+              onPress={handleGoogleAuth}
+              fullWidth
+              size="md"
+              style={{
+                borderColor: theme.colors.border,
+                borderWidth: 1,
+                paddingVertical: theme.spacing.md,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.md,
+              }}>
+                {/* Google Icon */}
+                <View style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  backgroundColor: '#ffffff',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 1,
+                  borderColor: theme.colors.border,
+                }}>
+                  <Text style={{ color: '#4285F4', fontSize: 12, fontWeight: 'bold' }}>G</Text>
+                </View>
+                <Text 
+                  variant="body" 
+                  style={{ 
+                    color: theme.colors.text.primary,
+                    fontWeight: '500',
+                    fontSize: 16
+                  }}
+                >
+                  Continue with Google
+                </Text>
+              </View>
+            </Button>
+
+            {/* Facebook Auth */}
+            <Button
+              variant="tertiary"
+              onPress={handleFacebookAuth}
+              fullWidth
+              size="md"
+              style={{
+                borderColor: theme.colors.border,
+                borderWidth: 1,
+                paddingVertical: theme.spacing.md,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.md,
+              }}>
+                {/* Facebook Icon */}
+                <View style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  backgroundColor: '#1877F2',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: 'bold' }}>f</Text>
+                </View>
+                <Text 
+                  variant="body" 
+                  style={{ 
+                    color: theme.colors.text.primary,
+                    fontWeight: '500',
+                    fontSize: 16
+                  }}
+                >
+                  Continue with Facebook
+                </Text>
+              </View>
+            </Button>
+
+            {/* Divider */}
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginVertical: theme.spacing.sm,
+            }}>
+              <View style={{
+                flex: 1,
+                height: 1,
+                backgroundColor: theme.colors.border,
+              }} />
+              <Text 
+                variant="bodySmall" 
+                color="muted"
+                style={{ 
+                  marginHorizontal: theme.spacing.sm,
+                  fontSize: 14
+                }}
+              >
+                or
+              </Text>
+              <View style={{
+                flex: 1,
+                height: 1,
+                backgroundColor: theme.colors.border,
+              }} />
+            </View>
+
+            {/* Email Sign In */}
+            <Button
+              variant="ghost"
+              onPress={handleEmailSignIn}
+              fullWidth
+              size="md"
+              style={{
+                paddingVertical: theme.spacing.md,
+              }}
+            >
+              <Text 
+                variant="bodySmall" 
+                style={{ 
+                  color: theme.colors.primary,
+                  fontWeight: '600',
+                }}
+              >
+                Continue with email
+              </Text>
+            </Button>
+          </View>

@@ -5,6 +5,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { dbHelpers, supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
+import { formatNotificationTimestamp } from '@/utils/dateUtils';
 import {
   Text,
   SafeAreaWrapper,
@@ -107,7 +108,7 @@ export default function NotificationsScreen() {
     if (notificationToDelete) {
       await deleteNotification(notificationToDelete);
       setToastMessage('Notification deleted');
-      setShowToast(true);
+    setShowToast(true);
       setNotificationToDelete(null);
     }
     setDeleteAlertVisible(false);
@@ -167,9 +168,25 @@ export default function NotificationsScreen() {
     setSelectedNotifications(newSelected);
   };
 
-  const selectAllNotifications = () => {
-    const allIds = new Set(notifications.map(notification => notification.id));
-    setSelectedNotifications(allIds);
+  const toggleSelectAll = () => {
+    // Provide haptic feedback
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (error) {
+      // Haptic feedback not available on this device
+    }
+    
+    // Check if all notifications are selected
+    const allSelected = selectedNotifications.size === notifications.length;
+    
+    if (allSelected) {
+      // Deselect all
+      setSelectedNotifications(new Set());
+    } else {
+      // Select all
+      const allIds = new Set(notifications.map(notification => notification.id));
+      setSelectedNotifications(allIds);
+    }
   };
 
   const clearSelection = () => {
@@ -260,7 +277,7 @@ export default function NotificationsScreen() {
     } catch (error) {
       console.error('Bulk mark as unread error:', error);
       setToastMessage('Failed to mark notifications as unread');
-      setShowToast(true);
+            setShowToast(true);
     } finally {
       setBulkActionLoading(prev => ({ ...prev, markAsUnread: false }));
     }
@@ -299,7 +316,7 @@ export default function NotificationsScreen() {
       });
       
       setToastMessage(`${selectedNotifications.size} notifications deleted`);
-      setShowToast(true);
+          setShowToast(true);
       
       clearSelection();
       setIsSelectionMode(false);
@@ -359,19 +376,28 @@ export default function NotificationsScreen() {
         showBackButton
         onBackPress={() => router.back()}
         rightActions={notifications.length > 0 ? [
-          isSelectionMode && selectedNotifications.size > 0 && (
-            <Button
+          isSelectionMode && (
+            <TouchableOpacity
               key="select-all"
-              variant="icon"
-              size="sm"
-              icon={<CheckSquare size={20} color={theme.colors.primary} />}
-              onPress={selectAllNotifications}
+              onPress={toggleSelectAll}
               style={{
+                paddingHorizontal: theme.spacing.md,
+                paddingVertical: theme.spacing.xs,
                 backgroundColor: theme.colors.primary + '15',
-                borderRadius: 20,
+                borderRadius: theme.borderRadius.md,
                 marginRight: theme.spacing.sm,
               }}
-            />
+            >
+              <Text 
+                variant="bodySmall" 
+                style={{ 
+                  color: theme.colors.primary,
+                  fontWeight: '600',
+                }}
+              >
+                {selectedNotifications.size === notifications.length ? 'Deselect All' : 'Select All'}
+              </Text>
+            </TouchableOpacity>
           ),
           // Selection mode toggle
           <Button
@@ -467,7 +493,7 @@ export default function NotificationsScreen() {
       <View style={{ flex: 1 }}>
         {notifications.length > 0 ? (
           <ScrollView
-            contentContainerStyle={{ paddingBottom: theme.spacing.xl }}
+            contentContainerStyle={{ paddingBottom: theme.spacing.xl}}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -498,8 +524,8 @@ export default function NotificationsScreen() {
             <View
               style={{
                 backgroundColor: theme.colors.surface,
-                marginHorizontal: theme.spacing.lg,
-                marginTop: theme.spacing.lg,
+                marginHorizontal: theme.spacing.sm,
+                marginTop: theme.spacing.md,
                 borderRadius: theme.borderRadius.lg,
                 overflow: 'hidden',
                 borderWidth: 1,
@@ -519,14 +545,12 @@ export default function NotificationsScreen() {
                       borderBottomColor: theme.colors.border,
                       backgroundColor: notification.is_read 
                         ? 'transparent' 
-                        : theme.colors.primary + '05',
-                      // Add subtle visual cue for clickable notifications
-                      ...(hasActionableContent && {
-                        borderLeftWidth: 3,
-                        borderLeftColor: notification.is_read 
-                          ? theme.colors.text.muted 
-                          : theme.colors.primary,
-                      }),
+                        : theme.colors.primary + '10',
+                      // Add visual cue for unread notifications
+                      borderLeftWidth: 4,
+                      borderLeftColor: notification.is_read 
+                        ? 'transparent'
+                        : theme.colors.primary,
                     }}
                   >
                     <TouchableOpacity
@@ -541,8 +565,8 @@ export default function NotificationsScreen() {
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',
-                        paddingVertical: theme.spacing.lg,
-                        paddingHorizontal: theme.spacing.lg,
+                        paddingVertical: theme.spacing.md,
+                        paddingHorizontal: theme.spacing.md,
                       }}
                       activeOpacity={0.7}
                     >
@@ -574,42 +598,61 @@ export default function NotificationsScreen() {
 
                       {/* Content */}
                       <View style={{ flex: 1 }}>
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            marginBottom: theme.spacing.xs,
-                          }}
-                        >
+                        {/* Title with unread indicator */}
+                        <View style={{ 
+                          flexDirection: 'row', 
+                          alignItems: 'center', 
+                          marginBottom: theme.spacing.xs,
+                        }}>
+                          {/* Unread Indicator Dot */}
+                          {!notification.is_read && (
+                            <View
+                              style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: 4,
+                                backgroundColor: theme.colors.primary,
+                                marginRight: theme.spacing.xs,
+                              }}
+                            />
+                          )}
                           <Text
                             variant="body"
                             numberOfLines={1}
                             style={{
                               flex: 1,
-                              fontWeight: notification.is_read ? '500' : '600',
-                              marginRight: theme.spacing.sm,
+                              fontWeight: notification.is_read ? '500' : '700',
+                              color: notification.is_read 
+                                ? theme.colors.text.primary 
+                                : theme.colors.text.primary,
                             }}
                           >
                             {notification.title}
                           </Text>
-
-                          <Text
-                            variant="caption"
-                            color="muted"
-                            style={{ fontSize: 11 }}
-                          >
-                            {new Date(notification.created_at).toLocaleString()}
-                          </Text>
                         </View>
 
+                        {/* Body */}
                         <Text
                           variant="bodySmall"
-                          color="muted"
                           numberOfLines={2}
-                          style={{ lineHeight: 18 }}
+                          style={{ 
+                            lineHeight: 18,
+                            color: notification.is_read 
+                              ? theme.colors.text.muted 
+                              : theme.colors.text.secondary,
+                            marginBottom: theme.spacing.xs,
+                          }}
                         >
                           {notification.body}
+                        </Text>
+
+                        {/* Timestamp */}
+                        <Text
+                          variant="caption"
+                          color="muted"
+                          style={{ fontSize: 10 }}
+                        >
+                          {formatNotificationTimestamp(notification.created_at)}
                         </Text>
                       </View>
 

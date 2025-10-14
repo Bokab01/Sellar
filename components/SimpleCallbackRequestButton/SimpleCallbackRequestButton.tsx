@@ -218,6 +218,7 @@ export function SimpleCallbackRequestButton({
           size={size}
           disabled={true}
           icon={<CheckCircle size={16} color={theme.colors.success} />}
+          fullWidth
         >
           Request Sent
         </Button>
@@ -237,14 +238,14 @@ export function SimpleCallbackRequestButton({
         onPress={() => setShowConfirmModal(true)}
         icon={showIcon ? <PhoneCall size={16} color={variant === 'primary' ? theme.colors.surface : theme.colors.primary} /> : undefined}
       >
-        Request Callback
+        Call me back
       </Button>
 
       {/* Simple Confirmation Modal */}
       <AppModal
         visible={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}
-        title="Request Callback"
+        title="Call Me Back"
         size="lg"
         primaryAction={{
           text: 'Yes, Call Me',

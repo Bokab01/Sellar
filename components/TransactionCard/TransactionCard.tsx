@@ -39,6 +39,7 @@ export function TransactionCard({
 }: TransactionCardProps) {
   const { theme } = useTheme();
   const isIncoming = transaction.type === 'earned';
+  const isSubscriptionPayment = transaction.type === 'subscription_payment';
 
   const getTransactionIcon = () => {
     const iconProps = { size: compact ? 20 : 24 };
@@ -51,11 +52,22 @@ export function TransactionCard({
   };
 
   const formatTransactionAmount = () => {
+    // For subscription payments, show the GHS amount paid instead of credits
+    if (isSubscriptionPayment) {
+      const amountPaid = transaction.metadata?.amount_paid || transaction.metadata?.payment_amount;
+      return amountPaid ? `GHS ${Number(amountPaid).toFixed(2)}` : 'Subscription';
+    }
+    
     const sign = isIncoming ? '+' : '-';
     return `${sign}${transaction.amount} credits`;
   };
 
   const getTransactionTitle = () => {
+    // For subscription payments, show plan name
+    if (isSubscriptionPayment) {
+      return transaction.metadata?.plan_name || 'Sellar Pro Subscription';
+    }
+    
     if (transaction.metadata?.reason) {
       return transaction.metadata.reason;
     }
@@ -89,6 +101,14 @@ export function TransactionCard({
   };
 
   const getTransactionDescription = () => {
+    // For subscription payments, show specific message
+    if (isSubscriptionPayment) {
+      const isTrialConversion = transaction.metadata?.is_trial_conversion || transaction.metadata?.source === 'trial_conversion';
+      return isTrialConversion 
+        ? 'Free trial converted to paid subscription' 
+        : 'Subscription payment processed successfully';
+    }
+    
     if (transaction.metadata?.description) {
       return transaction.metadata.description;
     }
@@ -279,7 +299,7 @@ export function TransactionCard({
           <Text 
             variant={compact ? "body" : "h4"}
             style={{ 
-              color: isIncoming ? theme.colors.success : theme.colors.error,
+              color: isSubscriptionPayment ? theme.colors.primary : (isIncoming ? theme.colors.success : theme.colors.error),
               fontWeight: '600',
               marginBottom: theme.spacing.xs,
             }}
@@ -287,16 +307,18 @@ export function TransactionCard({
             {formatTransactionAmount()}
           </Text>
           
-          {/* Balance info */}
-          <Text 
-            variant="caption" 
-            style={{ 
-              color: theme.colors.text.secondary,
-              opacity: 0.8,
-            }}
-          >
-            Balance: {transaction.balance_after}
-          </Text>
+          {/* Balance info - Only show for credit transactions */}
+          {!isSubscriptionPayment && (
+            <Text 
+              variant="caption" 
+              style={{ 
+                color: theme.colors.text.secondary,
+                opacity: 0.8,
+              }}
+            >
+              Balance: {transaction.balance_after}
+            </Text>
+          )}
         </View>
       </View>
 

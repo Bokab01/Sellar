@@ -12,6 +12,9 @@ interface PriceDisplayProps {
   size?: PriceSize;
   variant?: PriceVariant;
   originalPrice?: number;
+  previousPrice?: number; // Auto-detect price drops
+  priceChangedAt?: string; // When price changed
+  showPriceDropBadge?: boolean; // Show "X% OFF" badge
   showCurrency?: boolean;
   style?: any;
 }
@@ -22,10 +25,28 @@ export function PriceDisplay({
   size = 'md',
   variant = 'default',
   originalPrice,
+  previousPrice,
+  priceChangedAt,
+  showPriceDropBadge = true,
   showCurrency = true,
   style,
 }: PriceDisplayProps) {
   const { theme } = useTheme();
+
+  // Auto-detect price drop from previousPrice
+  const hasPriceDrop = previousPrice && amount < previousPrice;
+  const discountPercent = hasPriceDrop 
+    ? Math.round(((previousPrice! - amount) / previousPrice!) * 100)
+    : 0;
+
+  // Check if price drop is recent (within 7 days)
+  const isRecentPriceDrop = hasPriceDrop && priceChangedAt 
+    ? (new Date().getTime() - new Date(priceChangedAt).getTime()) / (1000 * 60 * 60 * 24) <= 7
+    : false;
+
+  // Auto-set variant to discount if there's a price drop
+  const effectiveVariant = hasPriceDrop && variant === 'default' ? 'discount' : variant;
+  const displayedOriginalPrice = hasPriceDrop ? previousPrice : originalPrice;
 
   const formatPrice = (price: number, currencyCode: string) => {
     // Format for Ghana Cedis and other currencies
@@ -64,7 +85,7 @@ export function PriceDisplay({
   };
 
   const getPriceColor = () => {
-    switch (variant) {
+    switch (effectiveVariant) {
       case 'discount':
         return theme.colors.error;
       case 'original':
@@ -78,9 +99,9 @@ export function PriceDisplay({
   };
 
   const formattedPrice = showCurrency ? formatPrice(amount || 0, currency) : ((amount || 0)).toLocaleString();
-  const formattedOriginalPrice = originalPrice && showCurrency 
-    ? formatPrice(originalPrice, currency) 
-    : (originalPrice || 0).toLocaleString();
+  const formattedOriginalPrice = displayedOriginalPrice && showCurrency 
+    ? formatPrice(displayedOriginalPrice, currency) 
+    : (displayedOriginalPrice || 0).toLocaleString();
 
   if (variant === 'free') {
     return (
@@ -100,30 +121,56 @@ export function PriceDisplay({
   }
 
   return (
-    <View style={[{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }, style]}>
+    <View style={[{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: theme.spacing.sm }, style]}>
+      {/* Current Price */}
       <Text
         variant={getTextVariant()}
         style={{
           color: getPriceColor(),
           fontSize: getFontSize(),
           fontWeight: '700',
-          textDecorationLine: variant === 'original' ? 'line-through' : 'none',
+          textDecorationLine: effectiveVariant === 'original' ? 'line-through' : 'none',
         }}
       >
         {formattedPrice}
       </Text>
 
-      {originalPrice && variant === 'discount' && (
+      {/* Previous/Original Price with Strikethrough */}
+      {displayedOriginalPrice && effectiveVariant === 'discount' && (
         <Text
           variant="bodySmall"
           style={{
             color: theme.colors.text.muted,
-            fontSize: getFontSize() * 0.8,
+            fontSize: getFontSize() * 0.75,
             textDecorationLine: 'line-through',
+            fontWeight: '500',
           }}
         >
           {formattedOriginalPrice}
         </Text>
+      )}
+
+      {/* Price Drop Badge (only if recent) */}
+      {hasPriceDrop && isRecentPriceDrop && showPriceDropBadge && discountPercent > 0 && (
+        <View style={{
+          backgroundColor: theme.colors.error + '15',
+          borderRadius: theme.borderRadius.sm,
+          paddingHorizontal: theme.spacing.xs,
+          paddingVertical: 2,
+          borderWidth: 1,
+          borderColor: theme.colors.error + '30',
+        }}>
+          <Text
+            variant="caption"
+            style={{
+              color: theme.colors.error,
+              fontSize: getFontSize() * 0.6,
+              fontWeight: '700',
+            }}
+          >
+            -{discountPercent}%
+          </Text>
+        </View>
       )}
     </View>
   );

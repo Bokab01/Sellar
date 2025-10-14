@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { dbHelpers, supabase } from '@/lib/supabase';
-import { useChatRealtime, useOffersRealtime } from './useRealtime';
+import { useChatRealtime, useOffersRealtime, useConversationsRealtime } from './useRealtime';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useChatStore } from '@/store/useChatStore';
 
@@ -105,6 +105,18 @@ export function useConversations() {
     fetchConversations();
   }, [user]);
 
+  // Real-time updates for conversations
+  const handleConversationUpdate = useCallback(() => {
+    console.log('📨 Conversation update detected, refreshing list...');
+    // Use skipLoading to avoid showing loading state for real-time updates
+    fetchConversations(true);
+  }, []);
+
+  // Set up real-time subscriptions
+  if (user?.id) {
+    useConversationsRealtime(user.id, handleConversationUpdate);
+  }
+
   return {
     conversations,
     loading,
@@ -140,24 +152,11 @@ export function useMessages(conversationId: string) {
   }, [conversationId]);
 
   // Real-time message updates
-  const handleNewMessage = useCallback(async (newMessage: any) => {
+  const handleNewMessage = useCallback((newMessage: any) => {
     console.log('📨 New message received via real-time:', newMessage);
     
-    // For offer messages, fetch the complete message data including offers
-    if (newMessage.message_type === 'offer') {
-      try {
-        const { data: completeMessage, error } = await dbHelpers.getMessages(conversationId);
-        if (!error && completeMessage) {
-          const messageWithOffers = completeMessage.find(msg => (msg as any).id === (newMessage as any).id);
-          if (messageWithOffers) {
-            newMessage = messageWithOffers;
-            console.log('📨 Fetched complete offer message:', newMessage);
-          }
-        }
-      } catch (err) {
-        console.error('📨 Error fetching complete message:', err);
-      }
-    }
+    // useChatRealtime now fetches complete message data with joins,
+    // so we don't need to fetch again here
     
     setMessages(prev => {
       // Check if message already exists
@@ -181,7 +180,7 @@ export function useMessages(conversationId: string) {
       console.log('📨 Updated messages count:', updatedMessages.length);
       return updatedMessages;
     });
-  }, [conversationId]);
+  }, []);
 
   useChatRealtime(conversationId, handleNewMessage);
 

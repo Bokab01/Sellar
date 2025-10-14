@@ -7,6 +7,8 @@ export interface RecommendationListing {
   listing_id: string;
   title: string;
   price: number;
+  previous_price?: number;
+  price_changed_at?: string;
   currency: string;
   images: string[];
   location: string;
@@ -157,7 +159,6 @@ export function useRecommendations() {
 
     try {
       const { data, error } = await supabase.rpc('get_trending_near_user', {
-        p_user_id: user.id,
         p_user_location: options.userLocation || null,
         p_limit: options.limit || 20,
         p_offset: options.offset || 0

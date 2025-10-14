@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, ScrollView, RefreshControl, TouchableOpacity, Alert, Animated } from 'react-native';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { View, ScrollView, RefreshControl, TouchableOpacity, Alert, Animated, FlatList } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useConversations } from '@/hooks/useChat';
@@ -329,60 +329,186 @@ export default function InboxScreen() {
   };
 
   // Transform database conversations to component format
-  const transformedConversations = conversations.map((conv: any) => {
-    // Get the other participant (not the current user)
-    const { user } = useAuthStore.getState();
-    
-    const otherParticipant = conv.participant_1 === user?.id 
-      ? conv.participant_2_profile 
-      : conv.participant_1_profile;
-    
-    const lastMessage = conv.messages?.[0];
-    const typingUsers = getTypingUsers(conv.id);
-    const isOtherUserTyping = typingUsers.includes(otherParticipant?.id);
-    
-    // Get proper display name based on business settings
-    const displayNameResult = getDisplayName(otherParticipant, false);
-    const safeTitle = otherParticipant ? displayNameResult.displayName : 'Anonymous User';
-    
-    const safeSubtitle = conv.listing?.title ? `About ${String(conv.listing.title)}` : 'General conversation';
-    
-    const safeDescription = isOtherUserTyping 
-      ? 'typing...' 
-      : (lastMessage?.content ? String(lastMessage.content) : 'No messages yet');
-    
-    return {
-      id: conv.id,
-      title: safeTitle,
-      subtitle: safeSubtitle,
-      description: safeDescription,
-      timestamp: conv.last_message_at 
-        ? formatConversationTimestamp(conv.last_message_at)
-        : '',
-      unreadCount: unreadCounts[conv.id] || 0,
-      avatar: {
-        name: safeTitle,
-        source: otherParticipant?.avatar_url,
-        isOnline: isUserOnline(otherParticipant?.id),
-      },
-      listing: conv.listing ? {
-        title: String(conv.listing.title),
-        price: conv.listing.price,
-        image: conv.listing.images?.[0],
-      } : null,
-      isTyping: isOtherUserTyping,
-      lastMessage: lastMessage, // Include lastMessage for filtering
-      is_sellar_pro: Boolean(otherParticipant?.is_sellar_pro), // ✅ Sellar Pro status
-    };
-  });
+  const transformedConversations = useMemo(() => {
+    return conversations.map((conv: any) => {
+      // Get the other participant (not the current user)
+      const { user } = useAuthStore.getState();
+      
+      const otherParticipant = conv.participant_1 === user?.id 
+        ? conv.participant_2_profile 
+        : conv.participant_1_profile;
+      
+      const lastMessage = conv.messages?.[0];
+      const typingUsers = getTypingUsers(conv.id);
+      const isOtherUserTyping = typingUsers.includes(otherParticipant?.id);
+      
+      // Get proper display name based on business settings
+      const displayNameResult = getDisplayName(otherParticipant, false);
+      const safeTitle = otherParticipant ? displayNameResult.displayName : 'Anonymous User';
+      
+      const safeSubtitle = conv.listing?.title ? `About ${String(conv.listing.title)}` : 'General conversation';
+      
+      const safeDescription = isOtherUserTyping 
+        ? 'typing...' 
+        : (lastMessage?.content ? String(lastMessage.content) : 'No messages yet');
+      
+      return {
+        id: conv.id,
+        title: safeTitle,
+        subtitle: safeSubtitle,
+        description: safeDescription,
+        timestamp: conv.last_message_at 
+          ? formatConversationTimestamp(conv.last_message_at)
+          : '',
+        unreadCount: unreadCounts[conv.id] || 0,
+        avatar: {
+          name: safeTitle,
+          source: otherParticipant?.avatar_url,
+          isOnline: isUserOnline(otherParticipant?.id),
+        },
+        listing: conv.listing ? {
+          title: String(conv.listing.title),
+          price: conv.listing.price,
+          image: conv.listing.images?.[0],
+        } : null,
+        isTyping: isOtherUserTyping,
+        lastMessage: lastMessage, // Include lastMessage for filtering
+        is_sellar_pro: Boolean(otherParticipant?.is_sellar_pro), // ✅ Sellar Pro status
+      };
+    });
+  }, [conversations, unreadCounts, getTypingUsers, isUserOnline]);
 
-  const filteredConversations = transformedConversations
-    .filter(conv => conv.lastMessage) // Filter out conversations without messages
-    .filter(conv =>
-      conv.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      conv.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (conv.listing?.title && conv.listing.title.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+  const filteredConversations = useMemo(() => {
+    return transformedConversations
+      .filter(conv => conv.lastMessage) // Filter out conversations without messages
+      .filter(conv =>
+        conv.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        conv.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (conv.listing?.title && conv.listing.title.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+      .sort((a, b) => {
+        // Sort by last message timestamp (most recent first)
+        const aTime = new Date(a.timestamp).getTime();
+        const bTime = new Date(b.timestamp).getTime();
+        return bTime - aTime;
+      });
+  }, [transformedConversations, searchQuery]);
+
+  // Memoized conversation renderer
+  const renderConversation = useCallback(({ item: conversation }: { item: any }) => (
+    <View key={conversation.id}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        {/* Selection Checkbox */}
+        {isSelectionMode && (
+          <TouchableOpacity
+            onPress={() => toggleConversationSelection(conversation.id)}
+            onLongPress={() => handleLongPress(conversation.id)}
+            style={{
+              padding: theme.spacing.sm,
+              alignItems: 'center',
+              justifyContent: 'center',
+              transform: [{ scale: longPressedItem === conversation.id ? 1.1 : 1 }],
+            }}
+            activeOpacity={0.7}
+          >
+            {selectedConversations.has(conversation.id) ? (
+              <CheckSquare size={24} color={theme.colors.primary} />
+            ) : (
+              <Square size={24} color={theme.colors.text.muted} />
+            )}
+          </TouchableOpacity>
+        )}
+        
+        {/* Conversation Item */}
+        <View style={{ flex: 1 }}>
+          <TouchableOpacity
+            onPress={() => {
+              if (isSelectionMode) {
+                toggleConversationSelection(conversation.id);
+              } else {
+                router.push(`/chat-detail/${conversation.id}` as any);
+              }
+            }}
+            onLongPress={() => handleLongPress(conversation.id)}
+            delayLongPress={500}
+            activeOpacity={0.7}
+          >
+            <ListItem
+              title={String(conversation.title)}
+              subtitle={conversation.listing?.title ? String(conversation.listing.title) : undefined}
+              description={String(conversation.description)}
+              timestamp={conversation.timestamp}
+              unreadCount={conversation.unreadCount}
+              avatar={conversation.avatar}
+              badge={conversation.is_sellar_pro ? { text: '⭐ PRO', variant: 'info' as const } : undefined}
+              showChevron={!isSelectionMode}
+              onPress={undefined}
+              style={{
+                backgroundColor: longPressedItem === conversation.id
+                  ? theme.colors.primary + '15'
+                  : conversation.isTyping 
+                  ? theme.colors.primary + '05'
+                  : selectedConversations.has(conversation.id)
+                  ? theme.colors.primary + '08'
+                  : theme.colors.surface,
+                borderLeftWidth: selectedConversations.has(conversation.id) ? 3 : 0,
+                borderLeftColor: selectedConversations.has(conversation.id) ? theme.colors.primary : 'transparent',
+                marginHorizontal: selectedConversations.has(conversation.id) ? theme.spacing.xs : 0,
+                borderRadius: selectedConversations.has(conversation.id) ? theme.borderRadius.md : 0,
+                shadowColor: selectedConversations.has(conversation.id) ? theme.colors.primary : 'transparent',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.1,
+                shadowRadius: 2,
+                elevation: selectedConversations.has(conversation.id) ? 2 : 0,
+              }}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Listing Context */}
+      {conversation.listing && (
+        <View
+          style={{
+            backgroundColor: theme.colors.surfaceVariant,
+            marginHorizontal: theme.spacing.lg,
+            marginTop: -theme.spacing.sm,
+            marginBottom: theme.spacing.sm,
+            padding: theme.spacing.md,
+            borderRadius: theme.borderRadius.md,
+            borderTopLeftRadius: 0,
+            borderTopRightRadius: 0,
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text 
+              variant="caption" 
+              color="muted"
+              numberOfLines={1}
+              style={{ flex: 1, marginRight: theme.spacing.sm }}
+            >
+              💼 {String(conversation.listing.title)}
+            </Text>
+            <Text 
+              variant="caption" 
+              style={{ 
+                color: theme.colors.primary, 
+                fontWeight: '600',
+                flexShrink: 0
+              }}
+            >
+              GHS {(conversation.listing.price || 0).toLocaleString()}
+            </Text>
+          </View>
+        </View>
+      )}
+    </View>
+  ), [isSelectionMode, selectedConversations, longPressedItem, theme, toggleConversationSelection, handleLongPress]);
+
+  // Optimized keyExtractor
+  const keyExtractor = useCallback((item: any) => item.id, []);
 
   return (
     <SafeAreaWrapper>
@@ -528,139 +654,46 @@ export default function InboxScreen() {
 
         {/* Conversations List */}
         {loading ? (
-          <View style={{ flex: 1 }}>
-            {Array.from({ length: 5 }).map((_, index) => (
-              <ChatListSkeleton key={index} />
-            ))}
-          </View>
+          <FlatList
+            data={Array.from({ length: 5 })}
+            keyExtractor={(_, index) => `skeleton-${index}`}
+            renderItem={({ index }) => <ChatListSkeleton key={index} />}
+            style={{ flex: 1 }}
+            // ✅ Performance optimizations for skeleton loading
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={5}
+            windowSize={3}
+            initialNumToRender={5}
+            showsVerticalScrollIndicator={false}
+          />
         ) : error ? (
           <ErrorState
             message={error}
             onRetry={refresh}
           />
         ) : filteredConversations.length > 0 ? (
-          <ScrollView 
+          <FlatList
+            data={filteredConversations}
+            keyExtractor={keyExtractor}
+            renderItem={renderConversation}
             style={{ flex: 1 }}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
                 tintColor={theme.colors.primary}
+                colors={[theme.colors.primary]}
               />
             }
-          >
-            {filteredConversations.map((conversation) => (
-              <View key={conversation.id}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  {/* Selection Checkbox */}
-                  {isSelectionMode && (
-                    <TouchableOpacity
-                      onPress={() => toggleConversationSelection(conversation.id)}
-                      onLongPress={() => handleLongPress(conversation.id)}
-                      style={{
-                        padding: theme.spacing.sm,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transform: [{ scale: longPressedItem === conversation.id ? 1.1 : 1 }],
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      {selectedConversations.has(conversation.id) ? (
-                        <CheckSquare size={24} color={theme.colors.primary} />
-                      ) : (
-                        <Square size={24} color={theme.colors.text.muted} />
-                      )}
-                    </TouchableOpacity>
-                  )}
-                  
-                  {/* Conversation Item */}
-                  <View style={{ flex: 1 }}>
-                    <TouchableOpacity
-                      onPress={() => {
-                        if (isSelectionMode) {
-                        toggleConversationSelection(conversation.id);
-                      } else {
-                        router.push(`/chat-detail/${conversation.id}` as any);
-                      }
-                      }}
-                      onLongPress={() => handleLongPress(conversation.id)}
-                      delayLongPress={500}
-                      activeOpacity={0.7}
-                    >
-                      <ListItem
-                        title={String(conversation.title)}
-                        subtitle={conversation.listing?.title ? String(conversation.listing.title) : undefined}
-                        description={String(conversation.description)}
-                        timestamp={conversation.timestamp}
-                        unreadCount={conversation.unreadCount}
-                        avatar={conversation.avatar}
-                        badge={conversation.is_sellar_pro ? { text: '⭐ PRO', variant: 'info' as const } : undefined}
-                        showChevron={!isSelectionMode}
-                        onPress={undefined} // Remove onPress from ListItem since TouchableOpacity handles it
-                        style={{
-                          backgroundColor: longPressedItem === conversation.id
-                            ? theme.colors.primary + '15'
-                            : conversation.isTyping 
-                            ? theme.colors.primary + '05'
-                            : selectedConversations.has(conversation.id)
-                            ? theme.colors.primary + '08'
-                            : theme.colors.surface,
-                          borderLeftWidth: selectedConversations.has(conversation.id) ? 3 : 0,
-                          borderLeftColor: selectedConversations.has(conversation.id) ? theme.colors.primary : 'transparent',
-                          marginHorizontal: selectedConversations.has(conversation.id) ? theme.spacing.xs : 0,
-                          borderRadius: selectedConversations.has(conversation.id) ? theme.borderRadius.md : 0,
-                          shadowColor: selectedConversations.has(conversation.id) ? theme.colors.primary : 'transparent',
-                          shadowOffset: { width: 0, height: 1 },
-                          shadowOpacity: 0.1,
-                          shadowRadius: 2,
-                          elevation: selectedConversations.has(conversation.id) ? 2 : 0,
-                        }}
-                      />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Listing Context */}
-                {conversation.listing && (
-                  <View
-                    style={{
-                      backgroundColor: theme.colors.surfaceVariant,
-                      marginHorizontal: theme.spacing.lg,
-                      marginTop: -theme.spacing.sm,
-                      marginBottom: theme.spacing.sm,
-                      padding: theme.spacing.md,
-                      borderRadius: theme.borderRadius.md,
-                      borderTopLeftRadius: 0,
-                      borderTopRightRadius: 0,
-                      borderWidth: 1,
-                      borderColor: theme.colors.border,
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Text 
-                        variant="caption" 
-                        color="muted"
-                        numberOfLines={1}
-                        style={{ flex: 1, marginRight: theme.spacing.sm }}
-                      >
-                        💼 {String(conversation.listing.title)}
-                      </Text>
-                      <Text 
-                        variant="caption" 
-                        style={{ 
-                          color: theme.colors.primary, 
-                          fontWeight: '600',
-                          flexShrink: 0
-                        }}
-                      >
-                        GHS {(conversation.listing.price || 0).toLocaleString()}
-                      </Text>
-                    </View>
-                  </View>
-                )}
-              </View>
-            ))}
-          </ScrollView>
+            // ✅ Performance optimizations for smooth scrolling
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={10}
+            windowSize={5}
+            initialNumToRender={10}
+            updateCellsBatchingPeriod={50}
+            decelerationRate="fast"
+            showsVerticalScrollIndicator={false}
+          />
         ) : (
           <EmptyState
             icon={<MessageCircle size={64} color={theme.colors.text.muted} />}

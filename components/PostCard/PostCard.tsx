@@ -101,7 +101,7 @@ export function PostCard({
   hideViewPost = false,
   style,
 }: PostCardProps) {
-  const { theme } = useTheme();
+  const { theme, isDarkMode } = useTheme();
   const { user } = useAuthStore();
   
   // Local state for like functionality
@@ -121,9 +121,15 @@ export function PostCard({
   const isOwnPost = user?.id === post.author.id;
   const isOfficial = isOfficialSellarContent(post.author.id);
   
-  // Get display name and avatar
+  // Get display name and avatar for official content
   const displayName = isOfficial ? getOfficialDisplayName() : post.author.name;
-  const avatarSource = isOfficial ? require('../../assets/icon/icon-light.png') : post.author.avatar;
+  
+  // Get theme-aware official icon
+  const officialIcon = isDarkMode
+    ? require('../../assets/icon/icon-dark.png')
+    : require('../../assets/icon/icon-light.png');
+  
+  const avatarSource = isOfficial ? officialIcon : post.author.avatar;
 
 
   // Initialize ImageViewer for post images
@@ -371,12 +377,33 @@ export function PostCard({
               activeOpacity={isOwnPost || isOfficial ? 1 : 0.7}
               disabled={isOwnPost || isOfficial}
             >
-              <Avatar
-                source={avatarSource}
-                name={displayName}
-                size="md"
-                style={{ marginRight: theme.spacing.sm }}
-              />
+              {isOfficial ? (
+                <View
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 24,
+                    backgroundColor: theme.colors.surface,
+                    marginRight: theme.spacing.sm,
+                    overflow: 'hidden',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Image
+                    source={officialIcon}
+                    style={{ width: 48, height: 48 }}
+                    resizeMode="cover"
+                  />
+                </View>
+              ) : (
+                <Avatar
+                  source={avatarSource}
+                  name={displayName}
+                  size="md"
+                  style={{ marginRight: theme.spacing.sm }}
+                />
+              )}
             </TouchableOpacity>
             
             <View style={{ flex: 1 }}>

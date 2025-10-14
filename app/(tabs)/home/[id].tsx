@@ -29,6 +29,7 @@ import {
   Grid,
   ProductCard,
   SimpleCallbackRequestButton,
+  QuickEditModal,
 } from '@/components';
 
 // Lazy load heavy MediaViewer component (supports images and videos)
@@ -175,6 +176,9 @@ export default function ListingDetailScreen() {
   const [showCallbackModal, setShowCallbackModal] = useState(false);
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [callbackRequested, setCallbackRequested] = useState(false);
+  
+  // Quick edit modal
+  const [showQuickEditModal, setShowQuickEditModal] = useState(false);
   
   // Form states
   const [messageText, setMessageText] = useState('');
@@ -1173,7 +1177,7 @@ export default function ListingDetailScreen() {
 
   if (loading) {
     const screenHeight = Dimensions.get('window').height;
-    const imageHeight = screenHeight * 0.6;
+    const imageHeight = screenHeight * 0.7;
     
     return (
       <SafeAreaWrapper>
@@ -1310,7 +1314,7 @@ export default function ListingDetailScreen() {
   const canMakeOffer = listing.accept_offers && !isOwnListing && !pendingOffer;
   const screenHeight = Dimensions.get('window').height;
   const screenWidth = Dimensions.get('window').width;
-  const imageHeight = screenHeight * 0.6; // More than half of screen
+  const imageHeight = screenHeight * 0.7; // 70% of screen height for better image display
 
   return (
     <SafeAreaWrapper>
@@ -1687,7 +1691,7 @@ export default function ListingDetailScreen() {
             style={{ 
               backgroundColor: theme.colors.surface,
               paddingHorizontal: theme.spacing.lg,
-              paddingVertical: theme.spacing.lg,
+              paddingVertical: theme.spacing.md,
               borderBottomWidth: 1,
               borderBottomColor: theme.colors.border,
             }}
@@ -1719,11 +1723,11 @@ export default function ListingDetailScreen() {
                 <Text variant="bodySmall" color="secondary" style={{ marginTop: theme.spacing.xs }}>
                   {listing.profiles.location}
                 </Text>
-                {!isOwnListing && (
+               {/*  {!isOwnListing && (
                   <Text variant="caption" color="muted" style={{ marginTop: theme.spacing.xs }}>
                     Tap to view profile
                   </Text>
-                )}
+                )} */}
               </View>
               
               {/* Call Seller Button */}
@@ -1734,7 +1738,8 @@ export default function ListingDetailScreen() {
                     backgroundColor: theme.colors.primary,
                     paddingHorizontal: theme.spacing.md,
                     paddingVertical: theme.spacing.sm,
-                    borderRadius: theme.borderRadius.sm,
+                    borderRadius: theme.borderRadius.xl,
+                    marginRight: theme.spacing.sm,
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: theme.spacing.xs,
@@ -1753,17 +1758,44 @@ export default function ListingDetailScreen() {
 
         <View style={{ paddingHorizontal: theme.spacing.lg }}>
           {/* Title and Price */}
-          <View style={{ marginTop: theme.spacing.lg, marginBottom: theme.spacing.lg }}>
-            <Text variant="h2" style={{ marginBottom: theme.spacing.md }}>
+          <View style={{ marginTop: theme.spacing.md, marginBottom: theme.spacing.md }}>
+            <Text variant="h4" style={{ marginBottom: theme.spacing.sm }}>
               {listing.title}
             </Text>
             
-            <PriceDisplay
-              amount={listing.price}
-              currency={listing.currency}
-              size="xl"
-              style={{ marginBottom: theme.spacing.md }}
-            />
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <PriceDisplay
+                amount={listing.price}
+                currency={listing.currency}
+                previousPrice={listing.previous_price}
+                priceChangedAt={listing.price_changed_at}
+                size="lg"
+                style={{ fontWeight: '600', color: theme.colors.primary }}
+              />
+              
+              {/* Quick Edit Button - Only for sellers' own listings */}
+              {isOwnListing && listing.status !== 'sold' && (
+                <TouchableOpacity
+                  onPress={() => setShowQuickEditModal(true)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: theme.colors.primary + '10',
+                    borderRadius: theme.borderRadius.md,
+                    paddingHorizontal: theme.spacing.sm,
+                    paddingVertical: theme.spacing.xs,
+                    borderWidth: 1,
+                    borderColor: theme.colors.primary + '30',
+                    gap: theme.spacing.xs,
+                  }}
+                >
+                  <Edit size={14} color={theme.colors.primary} />
+                  <Text variant="caption" style={{ color: theme.colors.primary, fontWeight: '600' }}>
+                    Quick Edit
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
             {/* Professional Badge Section */}
             <View style={{ 
@@ -1804,7 +1836,7 @@ export default function ListingDetailScreen() {
                 borderWidth: 1,
                 borderColor: theme.colors.primary + '30',
                 borderRadius: theme.borderRadius.full,
-                paddingHorizontal: theme.spacing.md,
+                paddingHorizontal: theme.spacing.sm,
                 paddingVertical: theme.spacing.sm,
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -1830,7 +1862,7 @@ export default function ListingDetailScreen() {
                   borderWidth: 1,
                   borderColor: theme.colors.success + '30',
                   borderRadius: theme.borderRadius.full,
-                  paddingHorizontal: theme.spacing.md,
+                  paddingHorizontal: theme.spacing.sm,
                   paddingVertical: theme.spacing.sm,
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -1912,7 +1944,7 @@ export default function ListingDetailScreen() {
                 borderWidth: 2,
                 borderRadius: theme.borderRadius.lg,
                 padding: theme.spacing.sm,
-                marginBottom: theme.spacing.lg,
+                marginBottom: theme.spacing.md,
                 overflow: 'hidden',
               }}
             >
@@ -2010,8 +2042,8 @@ export default function ListingDetailScreen() {
                 borderColor: theme.colors.success + '30',
                 borderWidth: 1,
                 borderRadius: theme.borderRadius.lg,
-                padding: theme.spacing.lg,
-                marginBottom: theme.spacing.lg,
+                padding: theme.spacing.md,
+                marginBottom: theme.spacing.md,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: theme.spacing.md,
@@ -2083,8 +2115,8 @@ export default function ListingDetailScreen() {
                 borderColor: theme.colors.warning + '30',
                 borderWidth: 1,
                 borderRadius: theme.borderRadius.lg,
-                padding: theme.spacing.lg,
-                marginBottom: theme.spacing.lg,
+                padding: theme.spacing.md,
+                marginBottom: theme.spacing.md,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: theme.spacing.md,
@@ -2120,8 +2152,8 @@ export default function ListingDetailScreen() {
                 borderWidth: 1,
                 borderColor: theme.colors.text.muted + '30',
                 borderRadius: theme.borderRadius.md,
-                padding: theme.spacing.lg,
-                marginBottom: theme.spacing.lg,
+                padding: theme.spacing.md,
+                marginBottom: theme.spacing.md,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: theme.spacing.md,
@@ -2152,18 +2184,18 @@ export default function ListingDetailScreen() {
           )}
 
           {/* Description */}
-          <View style={{ marginBottom: theme.spacing.xl }}>
-            <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+          <View style={{ marginBottom: theme.spacing.lg }}>
+            <Text variant="h4" style={{ marginBottom: theme.spacing.sm }}>
               Description
             </Text>
-            <Text variant="body" style={{ lineHeight: 24 }}>
+            <Text variant="body" style={{ lineHeight: 22 }}>
               {listing.description?.split('\n\n📋')[0] || listing.description}
             </Text>
           </View>
 
           {/* Action Buttons - Moved from bottom */}
           {!isOwnListing && listing.status !== 'sold' && listing.status !== 'reserved' && (
-            <View style={{ marginBottom: theme.spacing.xl }}>
+            <View style={{ marginBottom: theme.spacing.lg }}>
               <View style={{ gap: theme.spacing.md }}>
                 {/* Make an Offer Button */}
                 {canMakeOffer && offerLimitStatus.canMakeOffer && !pendingOffer ? (
@@ -2269,13 +2301,13 @@ export default function ListingDetailScreen() {
           )}
 
           {/* Item Details Table */}
-          <View style={{ marginBottom: theme.spacing.xl }}>
+          <View style={{ marginBottom: theme.spacing.lg }}>
             <ItemDetailsTable listing={listing} />
           </View>
 
           {/* Location */}
-          <View style={{ marginBottom: theme.spacing.xl }}>
-            <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+          <View style={{ marginBottom: theme.spacing.lg }}>
+            <Text variant="h4" style={{ marginBottom: theme.spacing.sm }}>
               Location
             </Text>
             <Text variant="body" color="secondary">
@@ -2284,7 +2316,7 @@ export default function ListingDetailScreen() {
           </View>
 
           {/* Listing Statistics Table */}
-          <View style={{ marginBottom: theme.spacing.xl }}>
+          <View style={{ marginBottom: theme.spacing.lg }}>
             <ListingStatsTable 
               listing={listing} 
               viewCount={viewCount}
@@ -2294,7 +2326,7 @@ export default function ListingDetailScreen() {
         </View>
 
         {/* Related Items Tabs */}
-        <View style={{ marginTop: theme.spacing.xl }}>
+        <View style={{ marginTop: theme.spacing.lg }}>
           {/* Tab Headers */}
           <View
             style={{
@@ -2308,8 +2340,8 @@ export default function ListingDetailScreen() {
               onPress={() => setActiveRelatedTab('seller')}
               style={{
                 flex: 1,
-                paddingVertical: theme.spacing.lg,
-                paddingHorizontal: theme.spacing.lg,
+                paddingVertical: theme.spacing.md,
+                paddingHorizontal: theme.spacing.md,
                 borderBottomWidth: 2,
                 borderBottomColor: activeRelatedTab === 'seller' ? theme.colors.primary : 'transparent',
                 alignItems: 'center',
@@ -2331,8 +2363,8 @@ export default function ListingDetailScreen() {
               onPress={() => setActiveRelatedTab('similar')}
               style={{
                 flex: 1,
-                paddingVertical: theme.spacing.lg,
-                paddingHorizontal: theme.spacing.lg,
+                paddingVertical: theme.spacing.md,
+                paddingHorizontal: theme.spacing.md,
                 borderBottomWidth: 2,
                 borderBottomColor: activeRelatedTab === 'similar' ? theme.colors.primary : 'transparent',
                 alignItems: 'center',
@@ -2353,7 +2385,7 @@ export default function ListingDetailScreen() {
           </View>
 
           {/* Tab Content with Lazy Loading */}
-          <View style={{ backgroundColor: theme.colors.surface, paddingTop: theme.spacing.lg }}>
+          <View style={{ backgroundColor: theme.colors.surface, paddingTop: theme.spacing.md }}>
             {activeRelatedTab === 'seller' ? (
               <View>
                 {sellerListingsLoading ? (
@@ -2409,7 +2441,7 @@ export default function ListingDetailScreen() {
                         variant="tertiary"
                         onPress={() => router.push(`/profile/${listing.user_id}`)}
                         fullWidth
-                        style={{ marginTop: theme.spacing.lg, marginHorizontal: theme.spacing.lg }}
+                        style={{ marginTop: theme.spacing.md, marginHorizontal: theme.spacing.lg }}
                       >
                         View All {sellerListings.length} Items
                       </Button>
@@ -2483,7 +2515,7 @@ export default function ListingDetailScreen() {
                           router.push('/(tabs)/home');
                         }}
                         fullWidth
-                        style={{ marginTop: theme.spacing.lg, marginHorizontal: theme.spacing.lg }}
+                        style={{ marginTop: theme.spacing.md, marginHorizontal: theme.spacing.lg }}
                       >
                         View All Similar Items
                       </Button>
@@ -2530,7 +2562,7 @@ export default function ListingDetailScreen() {
           onPress: () => setShowContactModal(false),
         }}
       >
-        <View style={{ gap: theme.spacing.lg }}>
+        <View style={{ gap: theme.spacing.md }}>
           <Text variant="body" color="secondary">
             Send a message to {listing.profiles?.first_name} about this listing
           </Text>
@@ -2561,7 +2593,7 @@ export default function ListingDetailScreen() {
           onPress: () => setShowCallbackModal(false),
         }}
       >
-        <View style={{ gap: theme.spacing.lg }}>
+        <View style={{ gap: theme.spacing.md }}>
           <Text variant="body" color="secondary">
             Request a callback from {listing.profiles?.first_name} about this listing
           </Text>
@@ -2634,24 +2666,24 @@ export default function ListingDetailScreen() {
           onPress: () => setShowOfferModal(false),
         }}
       >
-        <View style={{ gap: theme.spacing.lg }}>
+        <View style={{ gap: theme.spacing.md }}>
           <View
             style={{
               backgroundColor: theme.colors.surfaceVariant,
               borderRadius: theme.borderRadius.md,
-              padding: theme.spacing.md,
+              padding: theme.spacing.sm,
             }}
           >
-            <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.sm }}>
+            <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.xs }}>
               Making offer for:
             </Text>
-            <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.sm }}>
+            <Text variant="body" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
               {listing.title}
             </Text>
             <PriceDisplay
               amount={listing.price}
               size="md"
-              style={{ marginBottom: theme.spacing.sm }}
+              style={{ marginBottom: theme.spacing.xs }}
             />
             <Text variant="caption" color="muted">
               Seller accepts offers
@@ -2677,6 +2709,63 @@ export default function ListingDetailScreen() {
           />
         </View>
       </AppModal>
+
+      {/* Quick Edit Modal */}
+      {listing && (
+        <QuickEditModal
+          visible={showQuickEditModal}
+          onClose={() => setShowQuickEditModal(false)}
+          listing={{
+            id: listing.id,
+            title: listing.title,
+            price: listing.price,
+            description: listing.description,
+            previous_price: listing.previous_price,
+          }}
+          onSuccess={async (updatedListing) => {
+            // Debug: Log what we received from quick edit
+            console.log('📥 Received from quick edit:', updatedListing);
+            
+            // Refetch the listing to get the trigger-updated fields (previous_price, price_changed_at)
+            try {
+              const { data: refreshedListing, error: refreshError } = await supabase
+                .from('listings_with_pro_status')
+                .select('*')
+                .eq('id', listing.id)
+                .single();
+
+              if (!refreshError && refreshedListing) {
+                console.log('📥 Refetched listing:', {
+                  price: refreshedListing.price,
+                  previous_price: refreshedListing.previous_price,
+                  price_changed_at: refreshedListing.price_changed_at
+                });
+                setListing((prev: any) => ({
+                  ...prev,
+                  ...refreshedListing,
+                }));
+              } else {
+                console.log('⚠️ Refetch failed, using manual update');
+                // Fallback to manual update if refetch fails
+                setListing((prev: any) => ({
+                  ...prev,
+                  price: updatedListing.price,
+                  description: updatedListing.description,
+                  previous_price: updatedListing.previous_price,
+                  price_changed_at: updatedListing.price_changed_at,
+                }));
+              }
+            } catch (err) {
+              console.error('Error refetching listing:', err);
+            }
+            
+            // Show success toast
+            setToastMessage('Listing updated successfully!');
+            setToastVariant('success');
+            setShowToast(true);
+          }}
+        />
+      )}
 
       {/* Toast */}
       <Toast

@@ -16,7 +16,7 @@ export type TransactionStatus =
 export interface FinancialTransaction {
   id: string;
   user_id: string;
-  type: 'earned' | 'spent';
+  type: 'earned' | 'spent' | 'subscription_payment';
   amount: number;
   balance_before: number;
   balance_after: number;

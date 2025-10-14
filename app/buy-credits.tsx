@@ -156,7 +156,7 @@ export default function BuyCreditsScreen() {
         // Handle price mismatch specifically
         if (errorData?.error === 'Price mismatch' && errorData?.new_price) {
           setToastMessage(`Price updated! Package now costs GHS ${errorData.new_price}. Refreshing...`);
-          setToastVariant('warning');
+          setToastVariant('error');
           setShowToast(true);
           
           // Refresh packages to get latest prices

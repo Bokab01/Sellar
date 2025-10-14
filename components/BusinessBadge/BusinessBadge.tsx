@@ -29,7 +29,7 @@ export function BusinessBadge({
       case 'business':
         return {
           text: 'Pro',
-          icon: '⭐',
+          icon: Star,
           color: theme.colors.primary,
           backgroundColor: theme.colors.primary + '20',
           borderColor: theme.colors.primary,

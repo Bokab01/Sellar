@@ -675,15 +675,17 @@ export const useMonetizationStore = create<MonetizationState>()(
 
       if (planError) throw planError;
 
-      // Initialize payment
+      // Initialize payment with unique reference (includes timestamp to prevent duplicates)
+      const reference = `trial_convert_${currentPlan.id}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      
       const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
         'paystack-initialize',
         {
           body: {
             amount: plan.price_ghs * 100, // Convert to pesewas
             email: user.email,
-            reference: `trial_convert_${currentPlan.id}`,
-            purpose: 'trial_conversion',
+            reference,
+            purpose: 'subscription', // Use 'subscription' for trial conversion
             purpose_id: currentPlan.id,
           },
         }

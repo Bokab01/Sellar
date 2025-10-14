@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import { View, TouchableOpacity, Image, ImageSourcePropType } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
@@ -13,6 +13,7 @@ import { ImageViewer } from '@/components/ImageViewer/ImageViewer';
 import { useImageViewer } from '@/hooks/useImageViewer';
 import { Heart, Eye, MoreVertical, Play, Edit, Trash2, EyeOff, MapPin } from 'lucide-react-native';
 import { ReportButton } from '@/components/ReportButton/ReportButton';
+import { AppModal } from '@/components/Modal/Modal';
 
 // Helper function to detect if URL is a video
 const isVideoUrl = (url: string): boolean => {
@@ -27,6 +28,8 @@ interface ProductCardProps {
   imagePath?: string; // For optimized images from storage
   title: string;
   price: number;
+  previousPrice?: number; // NEW: For showing price drops with strikethrough
+  priceChangedAt?: string; // NEW: When price was last changed
   currency?: string;
   seller: {
     id?: string;
@@ -72,6 +75,13 @@ interface ProductCardProps {
     variant: 'new' | 'sold' | 'featured' | 'discount' | 'info' | 'success' | 'neutral' | 'warning' | 'error' | 'urgent' | 'spotlight' | 'primary' | 'secondary';
   }>;
   borderColor?: string; // NEW: Custom border color
+  menuActions?: Array<{ // NEW: Menu actions for three-dot menu
+    label: string;
+    icon: React.ReactNode;
+    onPress: () => void;
+    destructive?: boolean;
+  }>;
+  borderRadius?: number; // NEW: Custom border radius
 }
 
 const ProductCard = memo<ProductCardProps>(function ProductCard({
@@ -79,6 +89,8 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
   imagePath,
   title,
   price,
+  previousPrice,
+  priceChangedAt,
   currency = 'GHS',
   seller,
   badge,
@@ -113,9 +125,12 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
   onToggleVisibility,
   badges = [],
   borderColor,
+  menuActions,
+  borderRadius,
 }) {
   const { theme } = useTheme();
   const { shouldLoadHeavyComponent } = useMemoryManager();
+  const [showMenu, setShowMenu] = useState(false);
 
   // Handle different image formats for ImageViewer
   const images = Array.isArray(image) 
@@ -179,7 +194,7 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
           style={{
             flexDirection: 'row',
             backgroundColor: theme.colors.surface,
-            borderRadius: theme.borderRadius.lg,
+            borderRadius: borderRadius ?? theme.borderRadius.lg,
             ...(shadowSize ? theme.shadows[shadowSize] : theme.shadows.sm),
             overflow: 'hidden',
             marginBottom: theme.spacing.sm,
@@ -217,6 +232,8 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
             {/* Price */}
             <PriceDisplay 
               amount={price}
+              previousPrice={previousPrice}
+              priceChangedAt={priceChangedAt}
               currency={currency}
               size="sm"
               style={{ marginBottom: 2 }}
@@ -251,130 +268,78 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
             )}
           </View>
 
-          {/* Right Side Container - Action Buttons OR Stats Icons */}
+          {/* Right Side Container - Menu AND Stats Icons */}
           <View style={{ flexDirection: 'column', justifyContent: 'space-between', marginLeft: theme.spacing.sm, minHeight: 100 }}>
-            {(onEdit || onDelete || onToggleVisibility) ? (
-              // Action Buttons (for My Listings)
-              <View style={{ flexDirection: 'column', gap: theme.spacing.xs, justifyContent: 'center' }}>
-                {onEdit && (
-                  <TouchableOpacity
-                    onPress={onEdit}
-                    style={{
-                      backgroundColor: theme.colors.primary,
-                      borderRadius: theme.borderRadius.md,
-                      width: 30,
-                      height: 30,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderWidth: 1,
-                      borderColor: theme.colors.border,
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Edit size={14} color={theme.colors.primaryForeground} />
-                  </TouchableOpacity>
-                )}
+            {/* Three-Dot Menu (for My Listings) OR Heart Icon */}
+            <View style={{ alignSelf: 'flex-start' }}>
+              {menuActions ? (
+                <TouchableOpacity
+                  onPress={() => setShowMenu(true)}
+                  style={{
+                    backgroundColor: theme.colors.surface,
+                    borderRadius: theme.borderRadius.md,
+                    width: 30,
+                    height: 30,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <MoreVertical size={18} color={theme.colors.text.secondary} />
+                </TouchableOpacity>
+              ) : onFavoritePress ? (
+                <TouchableOpacity
+                  onPress={onFavoritePress}
+                  style={{
+                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                    borderRadius: 16,
+                    width: 26,
+                    height: 26,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Heart 
+                    size={14}
+                    color={isFavorited ? '#ff4757' : '#ffffff'} 
+                    fill={isFavorited ? '#ff4757' : 'transparent'}
+                  />
+                </TouchableOpacity>
+              ) : null}
+            </View>
 
-                {onToggleVisibility && (
-                  <TouchableOpacity
-                    onPress={onToggleVisibility}
-                    style={{
-                      backgroundColor: status === 'hidden' ? theme.colors.success : theme.colors.warning,
-                      borderRadius: theme.borderRadius.md,
-                      width: 30,
-                      height: 30,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderWidth: 1,
-                      borderColor: theme.colors.border,
+            {/* View Count - Bottom (Always show if available) */}
+            {viewCount > 0 && (
+              <View style={{ alignSelf: 'flex-start' }}>
+                <TouchableOpacity
+                  onPress={onViewPress}
+                  style={{
+                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                    borderRadius: 8,
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 2,
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Eye size={10} color="#ffffff" />
+                  <Text 
+                    variant="caption" 
+                    style={{ 
+                      color: '#ffffff',
+                      fontSize: 9,
+                      fontWeight: '600'
                     }}
-                    activeOpacity={0.7}
                   >
-                    {status === 'hidden' ? (
-                      <Eye size={14} color={theme.colors.primaryForeground} />
-                    ) : (
-                      <EyeOff size={14} color={theme.colors.primaryForeground} />
-                    )}
-                  </TouchableOpacity>
-                )}
-
-                {onDelete && (
-                  <TouchableOpacity
-                    onPress={onDelete}
-                    style={{
-                      backgroundColor: theme.colors.error,
-                      borderRadius: theme.borderRadius.md,
-                      width: 30,
-                      height: 30,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderWidth: 1,
-                      borderColor: theme.colors.border,
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Trash2 size={14} color={theme.colors.primaryForeground} />
-                  </TouchableOpacity>
-                )}
+                    {viewCount}
+                  </Text>
+                </TouchableOpacity>
               </View>
-            ) : (
-              // Stats Icons (for Search Results) - Vertical with space between
-              <>
-                {/* Heart/Favorite - Top */}
-                {onFavoritePress && (
-                  <View style={{ alignSelf: 'flex-start' }}>
-                    <TouchableOpacity
-                      onPress={onFavoritePress}
-                      style={{
-                        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                        borderRadius: 16,
-                        width: 26,
-                        height: 26,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Heart 
-                        size={14}
-                        color={isFavorited ? '#ff4757' : '#ffffff'} 
-                        fill={isFavorited ? '#ff4757' : 'transparent'}
-                      />
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {/* View Count - Bottom */}
-                {viewCount > 0 && (
-                  <View style={{ alignSelf: 'flex-start' }}>
-                    <TouchableOpacity
-                      onPress={onViewPress}
-                      style={{
-                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                        borderRadius: 8,
-                        paddingHorizontal: 6,
-                        paddingVertical: 2,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 2,
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Eye size={10} color="#ffffff" />
-                      <Text 
-                        variant="caption" 
-                        style={{ 
-                          color: '#ffffff',
-                          fontSize: 9,
-                          fontWeight: '600'
-                        }}
-                      >
-                        {viewCount}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </>
             )}
           </View>
         </TouchableOpacity>
@@ -386,6 +351,51 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
           initialIndex={imageViewerIndex}
           onClose={closeImageViewer}
         />
+
+        {/* Menu Actions Modal */}
+        {menuActions && (
+          <AppModal
+            visible={showMenu}
+            onClose={() => setShowMenu(false)}
+            title="Actions"
+            position="bottom"
+          >
+            <View style={{ gap: theme.spacing.sm }}>
+              {menuActions.map((action, index) => (
+                <TouchableOpacity
+                  key={index}
+                  onPress={() => {
+                    setShowMenu(false);
+                    setTimeout(() => action.onPress(), 300); // Delay to allow modal to close
+                  }}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    padding: theme.spacing.md,
+                    backgroundColor: theme.colors.surface,
+                    borderRadius: theme.borderRadius.md,
+                    gap: theme.spacing.md,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                  }}
+                  activeOpacity={0.7}
+                >
+                  {action.icon}
+                  <Text 
+                    variant="body" 
+                    style={{ 
+                      flex: 1,
+                      color: action.destructive ? theme.colors.error : theme.colors.text.primary,
+                      fontWeight: '500',
+                    }}
+                  >
+                    {action.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </AppModal>
+        )}
       </>
     );
   }
@@ -398,7 +408,7 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
         onLongPress={handleLongPress}
         style={{
           backgroundColor: theme.colors.surface,
-          borderRadius: fullWidth ? theme.borderRadius.sm : theme.borderRadius.lg,
+          borderRadius: borderRadius ?? (fullWidth ? theme.borderRadius.sm : theme.borderRadius.lg),
           ...(shadowSize ? theme.shadows[shadowSize] : (fullWidth ? theme.shadows.sm : theme.shadows.md)),
           overflow: 'hidden',
           marginBottom: isGridLayout ? 0 : theme.spacing.md,
@@ -544,6 +554,27 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
           </View>
         )}
 
+        {/* Three-Dot Menu (for My Listings - Grid/Default Layout) */}
+        {menuActions && !onFavoritePress && (
+          <TouchableOpacity
+            onPress={() => setShowMenu(true)}
+            style={{
+              position: 'absolute',
+              top: theme.spacing.xs,
+              right: theme.spacing.xs,
+              backgroundColor: 'rgba(0, 0, 0, 0.6)',
+              borderRadius: isGridLayout ? 16 : 20,
+              padding: isGridLayout ? 6 : 8,
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2,
+            }}
+            activeOpacity={0.7}
+          >
+            <MoreVertical size={18} color="#ffffff" />
+          </TouchableOpacity>
+        )}
+
         {/* View Count */}
         {viewCount > 0 && (
           <TouchableOpacity
@@ -629,7 +660,9 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
           </Text>
 
           <PriceDisplay 
-            amount={price} 
+            amount={price}
+            previousPrice={previousPrice}
+            priceChangedAt={priceChangedAt}
             currency={currency}
             size={isGridLayout ? 'sm' : 'lg'}
             style={{ marginBottom: isGridLayout ? theme.spacing.xs : theme.spacing.md }}
@@ -709,6 +742,51 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
         initialIndex={imageViewerIndex}
         onClose={closeImageViewer}
       />
+    )}
+
+    {/* Menu Actions Modal */}
+    {menuActions && (
+      <AppModal
+        visible={showMenu}
+        onClose={() => setShowMenu(false)}
+        title="Actions"
+        position="bottom"
+      >
+        <View style={{ gap: theme.spacing.sm }}>
+          {menuActions.map((action, index) => (
+            <TouchableOpacity
+              key={index}
+              onPress={() => {
+                setShowMenu(false);
+                setTimeout(() => action.onPress(), 300); // Delay to allow modal to close
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                padding: theme.spacing.md,
+                backgroundColor: theme.colors.surface,
+                borderRadius: theme.borderRadius.md,
+                gap: theme.spacing.md,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+              }}
+              activeOpacity={0.7}
+            >
+              {action.icon}
+              <Text 
+                variant="body" 
+                style={{ 
+                  flex: 1,
+                  color: action.destructive ? theme.colors.error : theme.colors.text.primary,
+                  fontWeight: '500',
+                }}
+              >
+                {action.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </AppModal>
     )}
   </>
   );

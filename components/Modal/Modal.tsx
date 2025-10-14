@@ -286,11 +286,8 @@ export function AppModal({
                   ) : (
                     <View
                       style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
                         paddingHorizontal: theme.spacing.lg,
-                        paddingTop: position === 'bottom' ? theme.spacing.lg : theme.spacing.lg,
+                        paddingTop: position === 'bottom' ? theme.spacing.md : theme.spacing.lg,
                         paddingBottom: theme.spacing.sm,
                         backgroundColor: theme.colors.surface,
                       }}
@@ -299,18 +296,23 @@ export function AppModal({
                       {position === 'bottom' && (
                         <View
                           style={{
-                            position: 'absolute',
-                            top: theme.spacing.sm,
-                            left: '50%',
-                            marginLeft: -20,
+                            alignSelf: 'center',
                             width: 40,
                             height: 4,
                             borderRadius: 2,
                             backgroundColor: theme.colors.border,
+                            marginBottom: theme.spacing.md,
                           }}
                         />
                       )}
                       
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                        }}
+                      >
                       {title ? (
                         <Text 
                           variant="h4" 
@@ -344,6 +346,7 @@ export function AppModal({
                           <X size={18} color={theme.colors.text.secondary} />
                         </TouchableOpacity>
                       )}
+                      </View>
                     </View>
                   )
                 )}

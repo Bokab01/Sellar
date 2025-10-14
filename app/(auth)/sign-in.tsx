@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, ScrollView, Alert } from 'react-native';
+import { View, ScrollView } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useSecureAuth } from '@/hooks/useSecureAuth';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -13,6 +13,7 @@ import {
   Input,
   Button,
   LinkButton,
+  AppModal,
 } from '@/components';
 import { router } from 'expo-router';
 import { Mail, Lock, ArrowLeft, RefreshCw } from 'lucide-react-native';
@@ -28,6 +29,24 @@ export default function SignInScreen() {
   const [emailError, setEmailError] = useState('');
   const [showResendOption, setShowResendOption] = useState(false);
   const [resendingEmail, setResendingEmail] = useState(false);
+  
+  // Modal states
+  const [showModal, setShowModal] = useState(false);
+  const [modalConfig, setModalConfig] = useState<{
+    title: string;
+    message: string;
+    actions?: Array<{ text: string; onPress: () => void; variant?: 'primary' | 'secondary' | 'tertiary' }>;
+  }>({ title: '', message: '' });
+
+  // Helper function to show modal
+  const showAlertModal = (
+    title: string, 
+    message: string, 
+    actions?: Array<{ text: string; onPress: () => void; variant?: 'primary' | 'secondary' | 'tertiary' }>
+  ) => {
+    setModalConfig({ title, message, actions });
+    setShowModal(true);
+  };
 
   const handleSignIn = async () => {
     // Clear previous errors and resend option
@@ -35,7 +54,7 @@ export default function SignInScreen() {
     setShowResendOption(false);
 
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+      showAlertModal('Error', 'Please fill in all fields');
       return;
     }
 
@@ -45,7 +64,7 @@ export default function SignInScreen() {
     
     if (!rateLimitCheck.allowed) {
       const message = rateLimitUtils.getRateLimitMessage(rateLimitCheck, 'login');
-      Alert.alert('Too Many Attempts', message);
+      showAlertModal('Too Many Attempts', message);
       return;
     }
 
@@ -58,10 +77,9 @@ export default function SignInScreen() {
     const criticalThreats = allThreats.filter(t => t.severity === 'critical');
     
     if (criticalThreats.length > 0) {
-      Alert.alert(
+      showAlertModal(
         'Security Alert',
-        'Your input contains potentially harmful content. Please review and try again.',
-        [{ text: 'OK' }]
+        'Your input contains potentially harmful content. Please review and try again.'
       );
       return;
     }
@@ -86,7 +104,7 @@ export default function SignInScreen() {
     
     if (!result.success) {
       if (result.requiresMFA) {
-        Alert.alert('MFA Required', 'Please enter your two-factor authentication code');
+        showAlertModal('MFA Required', 'Please enter your two-factor authentication code');
         // In a real app, you'd show an MFA input screen here
       } else {
         // Check if the error is related to email verification
@@ -95,22 +113,27 @@ export default function SignInScreen() {
             errorMessage.toLowerCase().includes('email not verified') ||
             errorMessage.toLowerCase().includes('confirm your email')) {
           setShowResendOption(true);
-          Alert.alert(
+          showAlertModal(
             'Email Not Confirmed',
             'Please check your email and click the confirmation link to verify your account.',
             [
               {
                 text: 'Resend Confirmation',
-                onPress: () => handleResendConfirmation(),
+                onPress: () => {
+                  setShowModal(false);
+                  handleResendConfirmation();
+                },
+                variant: 'primary'
               },
               {
                 text: 'OK',
-                style: 'cancel',
+                onPress: () => setShowModal(false),
+                variant: 'secondary'
               },
             ]
           );
         } else {
-          Alert.alert('Sign In Failed', result.error || 'Unknown error occurred');
+          showAlertModal('Sign In Failed', result.error || 'Unknown error occurred');
         }
       }
     } else {
@@ -122,7 +145,7 @@ export default function SignInScreen() {
 
   const handleResendConfirmation = async () => {
     if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email address first');
+      showAlertModal('Error', 'Please enter your email address first');
       return;
     }
 
@@ -132,17 +155,16 @@ export default function SignInScreen() {
       const result = await resendVerification(email.trim());
       
       if (result.error) {
-        Alert.alert('Error', result.error);
+        showAlertModal('Error', result.error);
       } else {
-        Alert.alert(
+        showAlertModal(
           'Confirmation Email Sent',
-          'Please check your email and click the confirmation link to verify your account.',
-          [{ text: 'OK' }]
+          'Please check your email and click the confirmation link to verify your account.'
         );
         setShowResendOption(false);
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to resend confirmation email. Please try again.');
+      showAlertModal('Error', 'Failed to resend confirmation email. Please try again.');
     } finally {
       setResendingEmail(false);
     }
@@ -224,7 +246,7 @@ export default function SignInScreen() {
                 variant="primary"
                 onPress={handleSignIn}
                 loading={loading}
-                disabled={loading}
+                disabled={loading || !email.trim() || !password.trim()}
                 fullWidth
                 size="lg"
               >
@@ -278,6 +300,44 @@ export default function SignInScreen() {
           </View>
         </Container>
       </ScrollView>
+
+      {/* Alert Modal */}
+      <AppModal
+        visible={showModal}
+        onClose={() => setShowModal(false)}
+        title={modalConfig.title}
+        position="center"
+        size="md"
+      >
+        <View style={{ padding: theme.spacing.md }}>
+          <Text variant="body" style={{ marginBottom: theme.spacing.lg }}>
+            {modalConfig.message}
+          </Text>
+          
+          <View style={{ gap: theme.spacing.sm }}>
+            {modalConfig.actions && modalConfig.actions.length > 0 ? (
+              modalConfig.actions.map((action, index) => (
+                <Button
+                  key={index}
+                  variant={action.variant || 'primary'}
+                  onPress={action.onPress}
+                  fullWidth
+                >
+                  {action.text}
+                </Button>
+              ))
+            ) : (
+              <Button
+                variant="primary"
+                onPress={() => setShowModal(false)}
+                fullWidth
+              >
+                OK
+              </Button>
+            )}
+          </View>
+        </View>
+      </AppModal>
     </SafeAreaWrapper>
   );
 }

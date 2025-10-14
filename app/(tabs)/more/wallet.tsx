@@ -230,7 +230,6 @@ export default function WalletScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-        <SafeAreaWrapper style={{ backgroundColor: theme.colors.background }}>
           <ScrollView 
             contentContainerStyle={{ padding: theme.spacing.lg }}
             style={{ backgroundColor: theme.colors.background }}
@@ -241,7 +240,6 @@ export default function WalletScreen() {
               <LoadingSkeleton key={index} width="100%" height={60} style={styles.loadingItem} />
             ))}
           </ScrollView>
-        </SafeAreaWrapper>
       </View>
     );
   }
@@ -249,9 +247,8 @@ export default function WalletScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <SafeAreaWrapper style={{ backgroundColor: theme.colors.background }}>
         <ScrollView 
-          contentContainerStyle={styles.scrollContentContainer}
+          contentContainerStyle={{ ...styles.scrollContentContainer, paddingTop: theme.spacing.md }}
           style={{ backgroundColor: theme.colors.background }}
           refreshControl={
             <RefreshControl
@@ -570,7 +567,6 @@ export default function WalletScreen() {
           variant={toastVariant}
           onHide={() => setShowToast(false)}
         />
-      </SafeAreaWrapper>
     </View>
   );
 }

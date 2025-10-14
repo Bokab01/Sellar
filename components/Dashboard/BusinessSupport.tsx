@@ -259,7 +259,7 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
                     </Text>
                   </View>
                 </View>
-                <Badge text="Online" variant="success" />
+                <Badge text="Online" variant="success" size='small' />
               </View>
             </TouchableOpacity>
 
@@ -517,7 +517,7 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
                     </Text>
                   </View>
                 </View>
-                <Badge text="Live" variant="success" />
+                <Badge text="Live" variant="success" size='small' />
               </View>
             </TouchableOpacity>
 
@@ -547,9 +547,9 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
                     </Text>
                   </View>
                 </View>
-                <Text variant="caption" style={{ color: theme.colors.info }}>
+                {/* <Text variant="caption" style={{ color: theme.colors.info }}>
                   5.2k members
-                </Text>
+                </Text> */}
               </View>
             </TouchableOpacity>
 
@@ -587,41 +587,7 @@ export const BusinessSupport: React.FC<BusinessSupportProps> = ({ onTabChange })
         </View>
 
         {/* Support Satisfaction */}
-        <View style={{
-          backgroundColor: theme.colors.surface,
-          borderRadius: theme.borderRadius.lg,
-          padding: theme.spacing.lg,
-          borderWidth: 1,
-          borderColor: theme.colors.border,
-        }}>
-          <Text variant="h4" style={{ marginBottom: theme.spacing.lg }}>
-            Support Satisfaction
-          </Text>
-          
-          <View style={{
-            backgroundColor: theme.colors.background,
-            borderRadius: theme.borderRadius.lg,
-            padding: theme.spacing.lg,
-            alignItems: 'center',
-          }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md }}>
-              <Star size={24} color={theme.colors.warning} />
-              <Text variant="h2" style={{ marginLeft: theme.spacing.sm, color: theme.colors.warning, fontWeight: '700' }}>
-                4.9
-              </Text>
-              <Text variant="body" color="secondary" style={{ marginLeft: theme.spacing.sm }}>
-                / 5.0
-              </Text>
-            </View>
-            
-            <Text variant="body" style={{ textAlign: 'center', marginBottom: theme.spacing.sm }}>
-              <Text style={{ fontWeight: '600' }}>Excellent Support Rating</Text>
-            </Text>
-            <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
-              Based on 2,847 Sellar Pro customer reviews
-            </Text>
-          </View>
-        </View>
+        
       </ScrollView>
     </Container>
   );

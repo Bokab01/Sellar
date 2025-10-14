@@ -23,13 +23,20 @@ export const getOfficialDisplayName = (): string => {
 };
 
 /**
- * Get the official Sellar avatar (logo)
- * Note: In React Native, use require() directly in components
+ * Get the official Sellar avatar (logo) based on theme
+ * Note: In React Native, use require() directly in components with theme.mode check
+ * 
+ * Example:
+ * ```tsx
+ * const officialIcon = theme.mode === 'dark' || theme.mode === 'amoled'
+ *   ? require('../../assets/icon/icon-dark.png')
+ *   : require('../../assets/icon/icon-light.png');
+ * ```
  */
-export const getOfficialAvatarUrl = (): any => {
-  // For React Native, return the require path
-  // Components should use: require('../assets/icon/icon-light.png')
-  return '../assets/icon/icon-light.png';
+export const getOfficialAvatarPath = (isDarkMode: boolean): string => {
+  return isDarkMode 
+    ? '../assets/icon/icon-dark.png'
+    : '../assets/icon/icon-light.png';
 };
 
 /**
@@ -52,7 +59,7 @@ export const transformOfficialUser = (user: {
       full_name: getOfficialDisplayName(),
       first_name: 'Sellar',
       last_name: 'Ghana',
-      avatar_url: getOfficialAvatarUrl(),
+      avatar_url: getOfficialAvatarPath(false), // Default to light mode path
       is_official: true,
     };
   }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, Alert, RefreshControl } from 'react-native';
+import { View, ScrollView, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -20,6 +20,7 @@ import {
   CompactUserBadges,
   LoadingSkeleton,
   Toast,
+  AppModal,
 } from '@/components';
 import { 
   User, 
@@ -62,6 +63,7 @@ export default function MoreScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
   
   // Track if we've already loaded data to prevent unnecessary refreshes
   const hasLoadedData = React.useRef(false);
@@ -142,35 +144,27 @@ export default function MoreScreen() {
     setRefreshing(false);
   };
 
-  const handleSignOut = async () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // ✅ FIX: Reset monetization store before signing out
-              useMonetizationStore.getState().resetStore();
-              
-              await signOut();
-              
-              // Navigate to auth screen immediately
-              router.replace('/(auth)/onboarding');
-            } catch (error) {
-              console.error('Sign out error:', error);
-              // ✅ FIX: Still reset store even if sign out fails
-              useMonetizationStore.getState().resetStore();
-              // Still navigate even if sign out fails
-              router.replace('/(auth)/onboarding');
-            }
-          },
-        },
-      ]
-    );
+  const handleSignOut = () => {
+    setShowSignOutModal(true);
+  };
+
+  const confirmSignOut = async () => {
+    setShowSignOutModal(false);
+    try {
+      // ✅ FIX: Reset monetization store before signing out
+      useMonetizationStore.getState().resetStore();
+      
+      await signOut();
+      
+      // Navigate to auth screen immediately
+      router.replace('/(auth)/onboarding');
+    } catch (error) {
+      console.error('Sign out error:', error);
+      // ✅ FIX: Still reset store even if sign out fails
+      useMonetizationStore.getState().resetStore();
+      // Still navigate even if sign out fails
+      router.replace('/(auth)/onboarding');
+    }
   };
 
   // Pre-compute values to prevent recalculation flash
@@ -324,9 +318,9 @@ export default function MoreScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-        <SafeAreaWrapper style={{ backgroundColor: theme.colors.background }}>
           <ScrollView 
             contentContainerStyle={{ 
+              paddingTop: theme.spacing.md,
               padding: theme.spacing.lg,
               flexGrow: 1 
             }}
@@ -337,16 +331,14 @@ export default function MoreScreen() {
               <LoadingSkeleton key={index} width="100%" height={200} borderRadius={theme.borderRadius.lg} style={{ marginBottom: theme.spacing.lg }} />
             ))}
           </ScrollView>
-        </SafeAreaWrapper>
       </View>
     );
   }
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <SafeAreaWrapper style={{ backgroundColor: theme.colors.background }}>
         <ScrollView 
-        contentContainerStyle={{ flexGrow: 1, paddingBottom: contentBottomPadding }}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: contentBottomPadding, paddingTop: theme.spacing.md }}
         style={{ backgroundColor: theme.colors.background }}
         refreshControl={
           <RefreshControl
@@ -543,7 +535,38 @@ export default function MoreScreen() {
           variant="success"
           onHide={() => setShowToast(false)}
         />
-      </SafeAreaWrapper>
+
+        {/* Sign Out Confirmation Modal */}
+        <AppModal
+          visible={showSignOutModal}
+          onClose={() => setShowSignOutModal(false)}
+          title="Sign Out"
+          position="center"
+          size="md"
+        >
+          <View style={{ padding: theme.spacing.md }}>
+            <Text variant="body" style={{ marginBottom: theme.spacing.xl, textAlign: 'center' }}>
+              Are you sure you want to sign out?
+            </Text>
+            
+            <View style={{ gap: theme.spacing.sm }}>
+              <Button
+                variant="primary"
+                onPress={confirmSignOut}
+                fullWidth
+              >
+                Sign Out
+              </Button>
+              <Button
+                variant="outline"
+                onPress={() => setShowSignOutModal(false)}
+                fullWidth
+              >
+                Cancel
+              </Button>
+            </View>
+          </View>
+        </AppModal>
     </View>
   );
 }
