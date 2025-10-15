@@ -8,7 +8,7 @@ import { Badge } from '@/components/Badge/Badge';
 import { PriceDisplay } from '@/components/PriceDisplay/PriceDisplay';
 import { CompactUserBadges } from '@/components/UserBadges/UserBadges';
 import { ListingImage } from '@/components/OptimizedImage/OptimizedImage';
-import { useMemoryManager } from '@/utils/memoryManager';
+// Removed useMemoryManager for better performance
 import { ImageViewer } from '@/components/ImageViewer/ImageViewer';
 import { useImageViewer } from '@/hooks/useImageViewer';
 import { Heart, Eye, MoreVertical, Play, Edit, Trash2, EyeOff, MapPin } from 'lucide-react-native';
@@ -129,7 +129,6 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
   borderRadius,
 }) {
   const { theme } = useTheme();
-  const { shouldLoadHeavyComponent } = useMemoryManager();
   const [showMenu, setShowMenu] = useState(false);
 
   // Handle different image formats for ImageViewer
@@ -447,7 +446,7 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
             width={isGridLayout ? 300 : 400}
             height={imageHeight}
             resizeMode="cover"
-            enableLazyLoading={shouldLoadHeavyComponent()}
+            enableLazyLoading={true}
           />
         ) : (
           <Image

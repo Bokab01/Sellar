@@ -546,22 +546,22 @@ export default function ListingDetailScreen() {
       let sellerData = null;
       if (sellerResult.status === 'fulfilled') {
         let { data, error: sellerError } = sellerResult.value;
+
+      // Fallback for schema cache issues
+      if (sellerError && sellerError.message.includes('schema cache')) {
+        const { data: basicSellerData } = await supabase
+          .from('listings')
+          .select('*')
+          .eq('user_id', listing.user_id)
+          .eq('status', 'active')
+          .neq('id', listingId)
+          .order('created_at', { ascending: false })
+          .limit(8);
         
-        // Fallback for schema cache issues
-        if (sellerError && sellerError.message.includes('schema cache')) {
-          const { data: basicSellerData } = await supabase
-            .from('listings')
-            .select('*')
-            .eq('user_id', listing.user_id)
-            .eq('status', 'active')
-            .neq('id', listingId)
-            .order('created_at', { ascending: false })
-            .limit(8);
-          
-          sellerData = (basicSellerData as any[] || []).map(item => ({
-            ...item,
-            profiles: listing.profiles // Use the main listing's profile data
-          })) || [];
+        sellerData = (basicSellerData as any[] || []).map(item => ({
+          ...item,
+          profiles: listing.profiles // Use the main listing's profile data
+        })) || [];
         } else {
           sellerData = data;
         }
@@ -596,23 +596,23 @@ export default function ListingDetailScreen() {
       let similarData = null;
       if (similarResult.status === 'fulfilled') {
         let { data, error: similarError } = similarResult.value;
+
+      // Fallback for schema cache issues
+      if (similarError && similarError.message.includes('schema cache')) {
+        const { data: basicSimilarData } = await supabase
+          .from('listings')
+          .select('*')
+          .eq('category_id', listing.category_id)
+          .eq('status', 'active')
+          .neq('user_id', listing.user_id)
+          .neq('id', listingId)
+          .order('created_at', { ascending: false })
+          .limit(8);
         
-        // Fallback for schema cache issues
-        if (similarError && similarError.message.includes('schema cache')) {
-          const { data: basicSimilarData } = await supabase
-            .from('listings')
-            .select('*')
-            .eq('category_id', listing.category_id)
-            .eq('status', 'active')
-            .neq('user_id', listing.user_id)
-            .neq('id', listingId)
-            .order('created_at', { ascending: false })
-            .limit(8);
-          
-          similarData = (basicSimilarData as any[] || []).map(item => ({
-            ...item,
-            profiles: null // We don't have profile data for similar items in fallback
-          })) || [];
+        similarData = (basicSimilarData as any[] || []).map(item => ({
+          ...item,
+          profiles: null // We don't have profile data for similar items in fallback
+        })) || [];
         } else {
           similarData = data;
         }
@@ -1555,9 +1555,9 @@ export default function ListingDetailScreen() {
                   const isVideo = isVideoUrl(mediaUrl);
                   
                   return (
-                    <TouchableOpacity
+                  <TouchableOpacity
                       onPress={() => openMediaViewer(index)}
-                      activeOpacity={0.9}
+                    activeOpacity={0.9}
                       style={{ width: screenWidth }}
                     >
                       {isVideo ? (
@@ -1569,21 +1569,21 @@ export default function ListingDetailScreen() {
                           theme={theme}
                         />
                       ) : (
-                        <Image
+                    <Image
                           source={{ uri: mediaUrl }}
-                          style={{
-                            width: screenWidth,
-                            height: imageHeight,
-                            backgroundColor: theme.colors.surfaceVariant,
-                          }}
-                          resizeMode="cover"
+                      style={{
+                        width: screenWidth,
+                        height: imageHeight,
+                        backgroundColor: theme.colors.surfaceVariant,
+                      }}
+                      resizeMode="cover"
                           // Performance optimizations
                           loadingIndicatorSource={{ uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' }}
                           onLoadStart={() => console.log(`Loading media ${index}`)}
                           onLoadEnd={() => console.log(`Loaded media ${index}`)}
-                        />
+                    />
                       )}
-                    </TouchableOpacity>
+                  </TouchableOpacity>
                   );
                 }}
                 // Performance optimizations
@@ -1615,32 +1615,32 @@ export default function ListingDetailScreen() {
                     {listing.images.map((mediaUrl: string, index: number) => {
                       const isVideo = isVideoUrl(mediaUrl);
                       return (
-                        <TouchableOpacity
-                          key={index}
-                          onPress={() => {
-                            setCurrentImageIndex(index);
-                            // Scroll main image to selected thumbnail
+                      <TouchableOpacity
+                        key={index}
+                        onPress={() => {
+                          setCurrentImageIndex(index);
+                          // Scroll main image to selected thumbnail
                             imageScrollViewRef.current?.scrollToIndex({ index, animated: true });
-                          }}
-                          style={{
-                            width: 60,
-                            height: 60,
-                            borderRadius: theme.borderRadius.md,
-                            overflow: 'hidden',
-                            borderWidth: currentImageIndex === index ? 2 : 0,
-                            borderColor: theme.colors.primary,
-                            opacity: currentImageIndex === index ? 1 : 0.7,
-                          }}
-                        >
-                          <Image
+                        }}
+                        style={{
+                          width: 60,
+                          height: 60,
+                          borderRadius: theme.borderRadius.md,
+                          overflow: 'hidden',
+                          borderWidth: currentImageIndex === index ? 2 : 0,
+                          borderColor: theme.colors.primary,
+                          opacity: currentImageIndex === index ? 1 : 0.7,
+                        }}
+                      >
+                        <Image
                             source={{ uri: mediaUrl }}
-                            style={{ width: '100%', height: '100%' }}
-                            resizeMode="cover"
-                          />
+                          style={{ width: '100%', height: '100%' }}
+                          resizeMode="cover"
+                        />
                           {isVideo && (
-                            <View
-                              style={{
-                                position: 'absolute',
+                <View
+                  style={{
+                    position: 'absolute',
                                 top: 0,
                                 left: 0,
                                 right: 0,
@@ -1651,8 +1651,8 @@ export default function ListingDetailScreen() {
                               }}
                             >
                               <Play size={20} color="#FFFFFF" fill="#FFFFFF" />
-                            </View>
-                          )}
+                </View>
+              )}
                         </TouchableOpacity>
                       );
                     })}
@@ -1764,9 +1764,9 @@ export default function ListingDetailScreen() {
             </Text>
             
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <PriceDisplay
-                amount={listing.price}
-                currency={listing.currency}
+            <PriceDisplay
+              amount={listing.price}
+              currency={listing.currency}
                 previousPrice={listing.previous_price}
                 priceChangedAt={listing.price_changed_at}
                 size="lg"

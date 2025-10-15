@@ -8,6 +8,7 @@ import { useChatStore } from '@/store/useChatStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useAppResume } from '@/hooks/useAppResume';
 import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   Text,
   SafeAreaWrapper,
@@ -33,15 +34,33 @@ export default function InboxScreen() {
   const { isUserOnline, getTypingUsers } = usePresence();
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const lastRefreshTime = useRef<number>(0);
+  const REFRESH_COOLDOWN = 5000; // 5 seconds cooldown between refreshes
 
   // App resume handling - refresh conversations when app comes back from background
   const { isRefreshing, isReconnecting } = useAppResume({
     onResume: async () => {
-      console.log('📱 Inbox screen: App resumed, refreshing conversations...');
       await refresh();
     },
     debug: true,
   });
+
+  // Smart refresh when screen comes into focus (e.g., returning from chat detail)
+  useFocusEffect(
+    useCallback(() => {
+      const now = Date.now();
+      const timeSinceLastRefresh = now - lastRefreshTime.current;
+      
+      // Only refresh if:
+      // 1. It's been more than 5 seconds since last refresh (avoid rapid refreshes)
+      // 2. We have conversations loaded (avoid refreshing on first mount)
+      if (timeSinceLastRefresh > REFRESH_COOLDOWN && conversations.length > 0) {
+        // Silent refresh without showing loading state
+        refresh(true); // Pass true to skip loading state
+        lastRefreshTime.current = now;
+      }
+    }, [conversations.length])
+  );
   
   // Bulk operations state
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -91,6 +110,7 @@ export default function InboxScreen() {
   const handleRefresh = async () => {
     setRefreshing(true);
     await refresh();
+    lastRefreshTime.current = Date.now();
     setRefreshing(false);
   };
 

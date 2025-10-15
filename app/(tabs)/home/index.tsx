@@ -3,12 +3,9 @@ import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl, Animate
 
 // Create animated FlatList for scroll animations
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList<any>);
-
-// Memoized ProductCard component to prevent unnecessary re-renders
-const MemoizedProductCard = React.memo(ProductCard);
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+// Removed Haptics import - not used
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useAppStore } from '@/store/useAppStore';
@@ -27,21 +24,15 @@ import { useNewUserDetection } from '@/hooks/useNewUserDetection';
 // import { useMemoryManager } from '@/utils/memoryManager';
 import { supabase } from '@/lib/supabase';
 import { getDisplayName } from '@/hooks/useDisplayName';
-import {
+import { 
   Text,
   ProductCard,
-  SearchBar,
-  Grid,
-  Avatar,
   EmptyState,
   LoadingSkeleton,
-  ProfessionalBadge,
-  BoostBadge,
-  VerifiedBadge,
   EnhancedSearchHeader,
   SafeAreaWrapper,
 } from '@/components';
-import { VirtualizedList } from '@/components/VirtualizedList/VirtualizedList';
+// Removed VirtualizedList import - not used
 import { HomeScreenSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
 // Advanced code splitting for better performance
 import { CodeSplitting } from '@/lib/codeSplitting';
@@ -93,6 +84,15 @@ export default function HomeScreen() {
       router.replace('/(auth)/welcome');
     }
   }, [isNewUser, newUserLoading]);
+
+  // Cleanup scroll timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollUpdateTimeout.current) {
+        clearTimeout(scrollUpdateTimeout.current);
+      }
+    };
+  }, []);
   const { 
     currentLocation, 
     setCurrentLocation,
@@ -134,12 +134,8 @@ export default function HomeScreen() {
   const [categories, setCategories] = useState<any[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
 
-  // Category scroll indicator
+  // Category scroll reference (simplified - removed complex animations)
   const categoryScrollRef = useRef<ScrollView>(null);
-  const [categoryContentWidth, setCategoryContentWidth] = useState(0);
-  const [categoryScrollViewWidth, setCategoryScrollViewWidth] = useState(0);
-  const categoryScrollX = useRef(new Animated.Value(0)).current;
-  const scrollIndicatorOpacity = useRef(new Animated.Value(1)).current;
 
   // Scroll animation values
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -148,12 +144,8 @@ export default function HomeScreen() {
   const lastScrollY = useRef(0);
   const scrollDirection = useRef<'up' | 'down'>('down');
 
-  // Animated values for header and search bar
+  // Animated values for header and floating search (simplified)
   const headerTranslateY = useRef(new Animated.Value(0)).current;
-  const searchBarOpacity = useRef(new Animated.Value(0)).current;
-  const searchBarTranslateY = useRef(new Animated.Value(-searchBarHeight)).current;
-
-  // Animated values for floating search input
   const floatingSearchTranslateY = useRef(new Animated.Value(0)).current;
   const floatingSearchOpacity = useRef(new Animated.Value(1)).current;
   
@@ -205,8 +197,11 @@ export default function HomeScreen() {
     router.push(`/(tabs)/home/${listingId}`);
   }, [user, trackInteraction]);
 
+  // ✅ Optimized favorite toggle handler - Will be defined after variables are declared
 
-  // Handle scroll animations
+  // ✅ Optimized scroll handler with debouncing
+  const scrollUpdateTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
   const handleScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
     {
@@ -215,9 +210,14 @@ export default function HomeScreen() {
         const currentScrollY = event.nativeEvent.contentOffset.y;
         const diff = currentScrollY - lastScrollY.current;
         
-        // Show/hide scroll-to-top FAB with professional animations
-        if (currentScrollY > 300) {
-          if (!showScrollToTop) {
+        // Throttle scroll-to-top FAB updates
+        if (scrollUpdateTimeout.current) {
+          clearTimeout(scrollUpdateTimeout.current);
+        }
+        
+        scrollUpdateTimeout.current = setTimeout(() => {
+          // Show/hide scroll-to-top FAB
+          if (currentScrollY > 300 && !showScrollToTop) {
             setShowScrollToTop(true);
             Animated.parallel([
               Animated.timing(scrollToTopOpacity, {
@@ -233,9 +233,7 @@ export default function HomeScreen() {
                 overshootClamping: true,
               }),
             ]).start();
-          }
-        } else {
-          if (showScrollToTop) {
+          } else if (currentScrollY <= 300 && showScrollToTop) {
             setShowScrollToTop(false);
             Animated.parallel([
               Animated.timing(scrollToTopOpacity, {
@@ -250,76 +248,56 @@ export default function HomeScreen() {
               }),
             ]).start();
           }
-        }
+        }, 100); // Debounce FAB updates
         
-        // Determine scroll direction
-        if (diff > 0 && currentScrollY > 50) {
-          // Scrolling down
-          if (scrollDirection.current !== 'down') {
-            scrollDirection.current = 'down';
-            // Hide header, show sticky search, hide floating search
-            Animated.parallel([
-              Animated.timing(headerTranslateY, {
-                toValue: -headerHeight,
-                duration: 300,
-                useNativeDriver: true,
-              }),
-              Animated.timing(searchBarOpacity, {
-                toValue: 1,
-                duration: 300,
-                useNativeDriver: true,
-              }),
-              Animated.timing(searchBarTranslateY, {
-                toValue: 0,
-                duration: 300,
-                useNativeDriver: true,
-              }),
-              // Hide floating search input
-              Animated.timing(floatingSearchTranslateY, {
-                toValue: -100,
-                duration: 300,
-                useNativeDriver: true,
-              }),
-              Animated.timing(floatingSearchOpacity, {
-                toValue: 0,
-                duration: 300,
-                useNativeDriver: true,
-              }),
-            ]).start();
-          }
-        } else if (diff < 0 || currentScrollY <= 50) {
-          // Scrolling up or at top
-          if (scrollDirection.current !== 'up') {
-            scrollDirection.current = 'up';
-            // Show header, hide sticky search, show floating search
-            Animated.parallel([
-              Animated.timing(headerTranslateY, {
-                toValue: 0,
-                duration: 300,
-                useNativeDriver: true,
-              }),
-              Animated.timing(searchBarOpacity, {
-                toValue: 0,
-                duration: 300,
-                useNativeDriver: true,
-              }),
-              Animated.timing(searchBarTranslateY, {
-                toValue: -searchBarHeight,
-                duration: 300,
-                useNativeDriver: true,
-              }),
-              // Show floating search input
-              Animated.timing(floatingSearchTranslateY, {
-                toValue: 0,
-                duration: 300,
-                useNativeDriver: true,
-              }),
-              Animated.timing(floatingSearchOpacity, {
-                toValue: 1,
-                duration: 300,
-                useNativeDriver: true,
-              }),
-            ]).start();
+        // Determine scroll direction with threshold to prevent jitter
+        if (Math.abs(diff) > 5) { // Only trigger on significant scroll
+          if (diff > 0 && currentScrollY > 50) {
+            // Scrolling down
+            if (scrollDirection.current !== 'down') {
+              scrollDirection.current = 'down';
+              // Simplified animations - hide header, show sticky search
+              Animated.parallel([
+                Animated.timing(headerTranslateY, {
+                  toValue: -headerHeight,
+                  duration: 250,
+                  useNativeDriver: true,
+                }),
+                Animated.timing(floatingSearchTranslateY, {
+                  toValue: -100,
+                  duration: 250,
+                  useNativeDriver: true,
+                }),
+                Animated.timing(floatingSearchOpacity, {
+                  toValue: 0,
+                  duration: 250,
+                  useNativeDriver: true,
+                }),
+              ]).start();
+            }
+          } else if (diff < -5 || currentScrollY <= 50) {
+            // Scrolling up or at top
+            if (scrollDirection.current !== 'up') {
+              scrollDirection.current = 'up';
+              // Show header and floating search
+              Animated.parallel([
+                Animated.timing(headerTranslateY, {
+                  toValue: 0,
+                  duration: 250,
+                  useNativeDriver: true,
+                }),
+                Animated.timing(floatingSearchTranslateY, {
+                  toValue: 0,
+                  duration: 250,
+                  useNativeDriver: true,
+                }),
+                Animated.timing(floatingSearchOpacity, {
+                  toValue: 1,
+                  duration: 250,
+                  useNativeDriver: true,
+                }),
+              ]).start();
+            }
           }
         }
         
@@ -581,51 +559,35 @@ export default function HomeScreen() {
     decrementListingFavoriteCount,
     updateListingFavoriteCount
   } = useFavoritesStore();
-  
-  // Use global favorites from store (merged with hook favorites for backward compatibility)
-  const favorites = useMemo(() => ({
-    ...hookFavorites,
-    ...globalFavorites
-  }), [hookFavorites, globalFavorites]);
 
-  // Memoized favorite toggle handler to prevent inline function creation
-  const handleFavoritePress = useCallback(async (productId: string, sellerId: string) => {
-    // Don't allow users to favorite their own listings
-    if (user?.id === sellerId) {
-      return;
-    }
-
-    const isFavorited = favorites[productId] || false;
-    
-    // Optimistic update using global store (syncs across all instances)
+  // ✅ Optimized favorite toggle handler - Now defined after variables
+  const handleFavoriteToggle = useCallback(async (productId: string, isFavorited: boolean) => {
+    // Optimistic update
     toggleGlobalFavorite(productId);
-    
-    // Update the listing's favorite count optimistically
     if (isFavorited) {
       decrementListingFavoriteCount(productId);
     } else {
       incrementListingFavoriteCount(productId);
     }
-    
-    // Perform actual database toggle
+
+    // Lazy load the favorites module
     try {
       const { toggleFavorite } = await import('@/lib/favoritesAndViews');
       const result = await toggleFavorite(productId);
       
       if (result.error) {
-        // Revert optimistic updates on error
+        // Revert on error
         toggleGlobalFavorite(productId);
         if (isFavorited) {
           incrementListingFavoriteCount(productId);
-      } else {
+        } else {
           decrementListingFavoriteCount(productId);
         }
       } else {
-        // Refresh stats after successful toggle
         refreshStats();
       }
     } catch (error) {
-      // Revert optimistic updates on error
+      // Revert on error
       toggleGlobalFavorite(productId);
       if (isFavorited) {
         incrementListingFavoriteCount(productId);
@@ -633,49 +595,13 @@ export default function HomeScreen() {
         decrementListingFavoriteCount(productId);
       }
     }
-  }, [user, favorites, toggleGlobalFavorite, incrementListingFavoriteCount, decrementListingFavoriteCount, refreshStats]);
-
-  // Memoized view press handler
-  const handleViewPress = useCallback((productId: string) => {
-    router.push(`/(tabs)/home/${productId}`);
-  }, []);
-
-  // Memoized renderItem function to prevent inline function creation
-  const renderItem = useCallback(({ item: product }: { item: any }) => (
-    <View style={{ flex: 0.5, padding: 2 }}>
-      <MemoizedProductCard
-        image={product.image}
-        title={product.title}
-        price={product.price}
-        previousPrice={product.previous_price}
-        priceChangedAt={product.price_changed_at}
-        seller={product.seller}
-        badge={product.badge}
-        location={product.location}
-        layout="grid"
-        fullWidth={true}
-        borderRadius={theme.borderRadius.sm}
-        listingId={product.id}
-        isFavorited={favorites[product.id] || false}
-        viewCount={viewCounts[product.id] || 0}
-        favoritesCount={listingFavoriteCounts[product.id] ?? product.favorites ?? 0}
-        isHighlighted={product.isHighlighted}
-        onPress={() => handleListingPress(product.id)}
-        onFavoritePress={user?.id !== product.seller.id ? () => handleFavoritePress(product.id, product.seller.id) : undefined}
-        onViewPress={() => handleViewPress(product.id)}
-        />
-      </View>
-  ), [theme.borderRadius.sm, favorites, viewCounts, listingFavoriteCounts, user, handleListingPress, handleFavoritePress, handleViewPress]);
-
-  // Memoized keyExtractor for stable keys
-  const keyExtractor = useCallback((item: any) => item.id, []);
-
-  // Memoized getItemLayout for better scroll performance
-  const getItemLayout = useCallback((data: any, index: number) => ({
-    length: 280, // Approximate height of ProductCard in grid layout
-    offset: 280 * Math.floor(index / 2), // Account for 2 columns
-    index,
-  }), []);
+  }, [globalFavorites, toggleGlobalFavorite, incrementListingFavoriteCount, decrementListingFavoriteCount, refreshStats]);
+  
+  // Use global favorites from store (merged with hook favorites for backward compatibility)
+  const favorites = useMemo(() => ({
+    ...hookFavorites,
+    ...globalFavorites
+  }), [hookFavorites, globalFavorites]);
   
   // Merge transformed products with optimistic favorite counts from global store
   const transformedProductsWithOptimisticCounts = useMemo(() => {
@@ -746,217 +672,186 @@ export default function HomeScreen() {
   const lastName = profile?.last_name || user?.user_metadata?.last_name || '';
   const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
 
-  // ✅ Create a completely stable header using useMemo
+  // ✅ Memoize category items to prevent re-creating on every render
+  const categoryItems = useMemo(() => {
+    return categories.map((category) => {
+      const isSelected = filters.categories?.includes(category.label);
+      return {
+        ...category,
+        isSelected,
+      };
+    });
+  }, [categories, filters.categories]);
+
+  // ✅ Optimized category render item
+  const renderCategoryItem = useCallback((category: any) => {
+    return (
+      <Pressable
+        key={category.id}
+        onPress={() => handleCategoryToggle(category.id)}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: theme.spacing.lg,
+          paddingVertical: theme.spacing.md,
+          borderRadius: theme.borderRadius.full,
+          backgroundColor: category.isSelected ? theme.colors.primary : theme.colors.surface,
+          borderWidth: 1,
+          borderColor: category.isSelected ? theme.colors.primary : theme.colors.border,
+          gap: theme.spacing.sm,
+          minHeight: 48,
+          shadowColor: theme.colors.text.primary,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: category.isSelected ? 0.2 : 0.1,
+          shadowRadius: pressed ? 8 : 4,
+          elevation: pressed ? 4 : 2,
+          transform: [{ scale: pressed ? 0.98 : 1 }],
+        })}
+      >
+        <View style={{ 
+          width: 24, 
+          height: 24, 
+          justifyContent: 'center', 
+          alignItems: 'center' 
+        }}>
+          {React.cloneElement(category.icon as React.ReactElement, {
+            size: 20,
+            color: category.isSelected ? theme.colors.primaryForeground : theme.colors.primary,
+          } as any)}
+        </View>
+        
+        <Text
+          variant="body"
+          style={{
+            color: category.isSelected ? theme.colors.primaryForeground : theme.colors.text.primary,
+            fontWeight: '700',
+            fontSize: 13,
+          }}
+        >
+          {category.label}
+        </Text>
+      </Pressable>
+    );
+  }, [theme, handleCategoryToggle]);
+
+  // ✅ Memoized render function for list items
+  const renderProductItem = useCallback(({ item: product }: { item: any }) => (
+    <View style={{ flex: 0.5, padding: 2 }}>
+      <ProductCard
+        image={product.image}
+        title={product.title}
+        price={product.price}
+        previousPrice={product.previous_price}
+        priceChangedAt={product.price_changed_at}
+        seller={product.seller}
+        badge={product.badge}
+        location={product.location}
+        layout="grid"
+        fullWidth={true}
+        borderRadius={theme.borderRadius.sm}
+        listingId={product.id}
+        isFavorited={favorites[product.id] || false}
+        viewCount={viewCounts[product.id] || 0}
+        favoritesCount={listingFavoriteCounts[product.id] ?? product.favorites ?? 0}
+        isHighlighted={product.isHighlighted}
+        onPress={() => handleListingPress(product.id)}
+        onFavoritePress={user?.id !== product.seller.id 
+          ? () => handleFavoriteToggle(product.id, favorites[product.id] || false)
+          : undefined
+        }
+        onViewPress={() => router.push(`/(tabs)/home/${product.id}`)}
+      />
+    </View>
+  ), [theme, favorites, viewCounts, listingFavoriteCounts, user?.id, handleListingPress, handleFavoriteToggle]);
+
+  // ✅ Create a lighter, more stable header component
   const ListHeader = useMemo(() => (
     <View>
-               {/* Professional Location Display */}
-              <View
+      {/* Professional Location Display */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginHorizontal: theme.spacing.lg,
+          marginVertical: theme.spacing.md,
+        }}
+      >
+        <View
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: 12,
+            backgroundColor: theme.colors.primary + '15',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: theme.spacing.sm,
+          }}
+        >
+          <MapPin size={16} color={theme.colors.primary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text
+            variant="button"
             style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-                  marginHorizontal: theme.spacing.lg,
-                  marginVertical: theme.spacing.md,
-                }}
-              >
-                <View
-              style={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: 12,
-                    backgroundColor: theme.colors.primary + '15',
-                  alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: theme.spacing.sm,
-                  }}
-                >
-                  <MapPin size={16} color={theme.colors.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-            
-                <Text 
-                    variant="button"
-                  style={{ 
-                      color: theme.colors.text.primary,
-                      fontWeight: '600',
-                      marginTop: 2,
-                  }}
-                >
-                    {currentLocation}
-                </Text>
-                </View>
-               
-              </View>
+              color: theme.colors.text.primary,
+              fontWeight: '600',
+              marginTop: 2,
+            }}
+          >
+            {currentLocation}
+          </Text>
+        </View>
+      </View>
 
-              {/* Enhanced Categories with Icons and Scroll Indicator */}
-              <View style={{ paddingVertical: theme.spacing.md, position: 'relative' }}>
-                {/* Professional Scroll Indicator - Top Right */}
-                {categoryContentWidth > categoryScrollViewWidth && (
-          <Animated.View
-                    style={{
-                      position: 'absolute',
-                      top: theme.spacing.sm,
-                      right: theme.spacing.lg,
-              width: screenWidth / 5,
-              height: 4,
-                      backgroundColor: theme.colors.border,
-                      borderRadius: 1.5,
-                      overflow: 'hidden',
-                      zIndex: 10,
-              opacity: scrollIndicatorOpacity,
-                    }}
-                  >
-            <Animated.View
-                      style={{
-                        height: '100%',
-                        backgroundColor: theme.colors.primary,
-                        borderRadius: 1.5,
-                        width: `${Math.min(100, (categoryScrollViewWidth / categoryContentWidth) * 100)}%`,
-                        transform: [
-                          {
-                    translateX: categoryScrollX.interpolate({
-                      inputRange: [0, Math.max(1, categoryContentWidth - categoryScrollViewWidth)],
-                      outputRange: [
-                        0, 
-                        Math.max(0, (screenWidth / 5) * (1 - (categoryScrollViewWidth / categoryContentWidth)))
-                      ],
-                      extrapolate: 'clamp',
-                    }),
-                          },
-                        ],
-                      }}
-                    />
-          </Animated.View>
-                )}
-                
-                <ScrollView
-                  ref={categoryScrollRef}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
+      {/* Enhanced Categories - Simplified without complex animations */}
+      <View style={{ paddingVertical: theme.spacing.md }}>
+        <ScrollView
+          ref={categoryScrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
           decelerationRate="fast"
           scrollEventThrottle={16}
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { x: categoryScrollX } } }],
-            { useNativeDriver: false }
-          )}
-          onMomentumScrollEnd={() => {
-            Animated.sequence([
-              Animated.timing(scrollIndicatorOpacity, {
-                toValue: 0.7,
-                duration: 100,
-                useNativeDriver: true,
-              }),
-              Animated.timing(scrollIndicatorOpacity, {
-                toValue: 1,
-                duration: 200,
-                useNativeDriver: true,
-              }),
-            ]).start();
-                  }}
-                  onContentSizeChange={(width) => {
-                    setCategoryContentWidth(width);
-            if (width > categoryScrollViewWidth) {
-              Animated.spring(scrollIndicatorOpacity, {
-                toValue: 1,
-                useNativeDriver: true,
-                tension: 100,
-                friction: 8,
-              }).start();
-            }
-                  }}
-                  onLayout={(event) => {
-                    setCategoryScrollViewWidth(event.nativeEvent.layout.width);
-                  }}
-                  contentContainerStyle={{
+          contentContainerStyle={{
             paddingHorizontal: theme.spacing.md,
             marginVertical: theme.spacing.sm,
-                    gap: theme.spacing.sm,
-                    alignItems: 'center',
+            gap: theme.spacing.sm,
+            alignItems: 'center',
             paddingTop: theme.spacing.md,
-                  }}
-                >
-                  {categories.map((category) => {
-            const isSelected = filters.categories?.includes(category.label);
-            
-                    return (
-              <Pressable
-                        key={category.id}
-                        onPress={() => handleCategoryToggle(category.id)}
-                style={({ pressed }) => ({
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          paddingHorizontal: theme.spacing.lg,
-                          paddingVertical: theme.spacing.md,
-                          borderRadius: theme.borderRadius.full,
-                  backgroundColor: isSelected ? theme.colors.primary : theme.colors.surface,
-                          borderWidth: 1,
-                  borderColor: isSelected ? theme.colors.primary : theme.colors.border,
-                          gap: theme.spacing.sm,
-                          minHeight: 48,
-                  shadowColor: theme.colors.text.primary,
-                          shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: isSelected ? 0.2 : 0.1,
-                  shadowRadius: pressed ? 8 : 4,
-                  elevation: pressed ? 4 : 2,
-                  transform: [{ scale: pressed ? 0.98 : 1 }],
-                })}
-              >
-                        <View style={{ 
-                          width: 24, 
-                          height: 24, 
-                          justifyContent: 'center', 
-                          alignItems: 'center' 
-                        }}>
-                          {React.cloneElement(category.icon as React.ReactElement, {
-                            size: 20,
-                    color: isSelected ? theme.colors.primaryForeground : theme.colors.primary,
-                          } as any)}
-                        </View>
-                        
-                        <Text
-                          variant="body"
-                          style={{
-                    color: isSelected ? theme.colors.primaryForeground : theme.colors.text.primary,
-                    fontWeight: '700',
-                    fontSize: 13,
-                          }}
-                        >
-                          {category.label}
-                        </Text>
-              </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </View>
+          }}
+        >
+          {categoryItems.map(renderCategoryItem)}
+        </ScrollView>
+      </View>
 
-      {/* Featured Business Listings - Only show when no filters are active */}
+      {/* Featured Business Listings - Removed Suspense for better performance */}
       {!searchQuery && !filters.categories?.length && !filters.location && !filters.condition?.length && !filters.priceRange.min && !filters.priceRange.max && (
-        <Suspense fallback={<LoadingSkeleton width="100%" height={200} />}>
+        <View style={{ minHeight: 200 }}>
           <CodeSplitting.FixedFeaturedListings
             maxItems={10}
-                layout="horizontal"
-                onViewAll={() => {
+            layout="horizontal"
+            onViewAll={() => {
               navigation.home.goToBusinessListings();
             }}
           />
-        </Suspense>
+        </View>
       )}
 
-      {/* Recommendation Feed - Only show when no filters are active */}
+      {/* Recommendation Feed - Removed Suspense for better performance */}
       {user && !searchQuery && !filters.categories?.length && !filters.location && !filters.condition?.length && !filters.priceRange.min && !filters.priceRange.max && (
-        <Suspense fallback={<LoadingSkeleton width="100%" height={300} />}>
+        <View style={{ minHeight: 250 }}>
           <CodeSplitting.RecommendationFeed
             onListingPress={handleListingPress}
             onViewAllPersonalized={() => navigation.recommendations.goToPersonalized()}
             onViewAllTrending={() => navigation.recommendations.goToTrending()}
             onViewAllRecentlyViewed={() => navigation.recommendations.goToRecent()}
           />
-        </Suspense>
+        </View>
       )}
 
       {/* All Listings Section - Dynamic Title */}
-                    <View style={{
-                      flexDirection: 'row',
-                            alignItems: 'center',
+      <View style={{ 
+        flexDirection: 'row', 
+        alignItems: 'center',
         justifyContent: 'space-between',
         marginBottom: theme.spacing.lg,
         paddingHorizontal: theme.spacing.lg
@@ -971,7 +866,7 @@ export default function HomeScreen() {
                 : 'More Listings From Sellers'
               }
             </Text>
-                    </View>
+          </View>
           <Text variant="bodySmall" color="muted" style={{ marginTop: theme.spacing.xs }}>
             {filters.categories?.length > 0 
               ? `${transformedProducts.length} ${transformedProducts.length === 1 ? 'item' : 'items'} found in ${filters.categories[0]}`
@@ -980,7 +875,7 @@ export default function HomeScreen() {
               : 'Browse all available items'
             }
           </Text>
-                  </View>
+        </View>
 
         {/* Clear Filter Button - Show when filters are active */}
         {(filters.categories?.length > 0 || searchQuery || filters.location || filters.condition?.length > 0) && (
@@ -995,7 +890,7 @@ export default function HomeScreen() {
                 sortBy: 'newest',
               });
             }}
-                            style={{
+            style={{
               paddingHorizontal: theme.spacing.md,
               paddingVertical: theme.spacing.sm,
               borderRadius: theme.borderRadius.md,
@@ -1006,33 +901,35 @@ export default function HomeScreen() {
           >
             <Text variant="bodySmall" style={{ color: theme.colors.primary, fontWeight: '600' }}>
               Clear
-                          </Text>
-                      </TouchableOpacity>
-          )}
-        </View>
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
+    </View>
   ), [
-    // Only re-create when these specific values change
+    // Reduced dependencies for better performance
+    categoryItems,
+    renderCategoryItem,
     searchQuery,
-    filters.categories?.length,
+    filters.categories,
     filters.location,
-    filters.condition?.length,
+    filters.condition,
     filters.priceRange.min,
     filters.priceRange.max,
     transformedProducts.length,
     user?.id,
-    theme, // ✅ Add theme dependency for proper theme switching
-    currentLocation, // ✅ Add currentLocation dependency for instant location updates
+    theme,
+    currentLocation,
   ]);
 
   return (
     <SafeAreaWrapper>
       {/* Enhanced Search Header - Floating */}
       <Animated.View style={{ 
-            position: 'absolute',
+        position: 'absolute',
         top: theme.spacing['3xl'],
-            left: 0,
-            right: 0,
+        left: 0,
+        right: 0,
         zIndex: 12,
         transform: [{ translateY: floatingSearchTranslateY }],
         opacity: floatingSearchOpacity,
@@ -1096,16 +993,16 @@ export default function HomeScreen() {
                   setSearchQuery('');
                         setFilters({
                           categories: [],
-            priceRange: { min: undefined, max: undefined },
-            condition: [],
-            location: '',
+                          priceRange: { min: undefined, max: undefined },
+                          condition: [],
+                          location: '',
                           sortBy: 'newest',
-          });
+                        });
                       }
                     : () => router.push('/(tabs)/create'),
-        }}
-      />
-    </View>
+                }}
+              />
+            </View>
           ) : (
             <AnimatedFlatList
               ref={mainScrollViewRef as any}
@@ -1118,15 +1015,8 @@ export default function HomeScreen() {
                 paddingTop: 100, // Add top padding to account for floating search input
                 paddingBottom: contentBottomPadding,
               }}
-              keyExtractor={keyExtractor}
-              renderItem={renderItem}
-              // Performance optimizations for virtualized rendering
-              removeClippedSubviews={true}
-              initialNumToRender={8}
-              maxToRenderPerBatch={5}
-              windowSize={7}
-              updateCellsBatchingPeriod={100}
-              getItemLayout={getItemLayout}
+              keyExtractor={(item) => item.id}
+              renderItem={renderProductItem}
               ListHeaderComponent={ListHeader}
               refreshControl={
                 <RefreshControl
@@ -1140,8 +1030,19 @@ export default function HomeScreen() {
                 />
               }
               onScroll={handleScroll}
-              scrollEventThrottle={16}
+              scrollEventThrottle={32}
+              // ✅ Enhanced performance optimizations for smooth scrolling
+              removeClippedSubviews={true}
+              maxToRenderPerBatch={6}
+              windowSize={7}
+              initialNumToRender={8}
+              updateCellsBatchingPeriod={100}
               decelerationRate="fast"
+              getItemLayout={(data, index) => ({
+                length: 290, // Approximate card height + padding
+                offset: 290 * Math.floor(index / 2), // Account for 2 columns
+                index,
+              })}
             />
           )}
         </View>
