@@ -3,6 +3,7 @@ import { View, ScrollView, Alert, Pressable, BackHandler, Image, TouchableOpacit
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useAppStore } from '@/store/useAppStore';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { dbHelpers, supabase } from '@/lib/supabase';
 import { storageHelpers, STORAGE_BUCKETS } from '@/lib/storage';
@@ -85,6 +86,7 @@ const STEPS = [
 function CreateListingScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
+  const { currentLocation } = useAppStore();
   const { balance, getMaxListings, spendCredits, hasUnlimitedListings, refreshCredits, hasBusinessPlan } = useMonetizationStore();
   
   // ✅ REFACTORED: Form state using useListingForm hook
@@ -100,6 +102,25 @@ function CreateListingScreen() {
     setCurrentStep,
     setSelectedFeatures,
   } = useListingForm();
+
+  // Local location state for dynamic location picker behavior
+  const [location, setLocation] = useState(currentLocation || '');
+  
+  // Sync location state when currentLocation changes
+  React.useEffect(() => {
+    if (currentLocation && !location) {
+      setLocation(currentLocation);
+      // Also update form data to ensure validation works
+      updateMultipleFields({ location: currentLocation });
+    }
+  }, [currentLocation, location, updateMultipleFields]);
+
+  // Initial load: if currentLocation exists and formData.location is empty, update it
+  React.useEffect(() => {
+    if (currentLocation && !formData.location) {
+      updateMultipleFields({ location: currentLocation });
+    }
+  }, [currentLocation, formData.location, updateMultipleFields]);
   
   // ✅ REFACTORED: Autosave logic using useListingAutosave hook
   const {
@@ -722,8 +743,9 @@ function CreateListingScreen() {
     });
   }, [updateMultipleFields, formData.categoryAttributes]);
 
-  const handleLocationSelect = useCallback((location: string) => {
-    updateMultipleFields({ location });
+  const handleLocationSelect = useCallback((selectedLocation: string) => {
+    setLocation(selectedLocation);
+    updateMultipleFields({ location: selectedLocation });
   }, [updateMultipleFields]);
 
   // Condition is now handled via category attributes, not separately
@@ -906,33 +928,76 @@ function CreateListingScreen() {
             />
         )}
 
+        {/* Dynamic Location Section */}
+        <View>
+          {currentLocation && location ? (
+            // User has location set AND location state is not empty - show it as auto-filled
         <View>
           <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
-            Location *
+            Location
           </Text>
-          <LocationPicker
-            value={formData.location}
-            onLocationSelect={handleLocationSelect}
-            placeholder="Select your location"
-            showAllOptions={false}
-          />
-
-          {formData.location && (
-            <View style={{ 
-              backgroundColor: theme.colors.success + '10',
-              padding: theme.spacing.md,
+              <View
+                style={{
+                  backgroundColor: theme.colors.surface,
               borderRadius: theme.borderRadius.md,
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginTop: theme.spacing.sm,
-            }}>
-              <CheckCircle size={20} color={theme.colors.success} style={{ marginRight: theme.spacing.sm }} />
-              <Text variant="body" style={{ color: theme.colors.success }}>
-                Location: {formData.location}
+                padding: theme.spacing.md,
+                borderWidth: 1,
+                  borderColor: theme.colors.border,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: theme.spacing.sm,
+                }}
+              >
+                <View
+                  style={{
+                width: 20,
+                height: 20,
+                borderRadius: 10,
+                    backgroundColor: theme.colors.primary + '15',
+                alignItems: 'center',
+                justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ color: theme.colors.primary, fontSize: 12, fontWeight: '600' }}>📍</Text>
+              </View>
+                <Text variant="body" style={{ flex: 1, color: theme.colors.text.primary }}>
+                  {location || currentLocation}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setLocation('')}
+                  style={{
+                    padding: theme.spacing.xs,
+                    borderRadius: theme.borderRadius.sm,
+                    backgroundColor: theme.colors.text.muted + '20',
+                  }}
+                >
+                  <Text variant="bodySmall" color="muted">
+                    Change
+                </Text>
+                </TouchableOpacity>
+              </View>
+              <Text variant="caption" color="muted" style={{ marginTop: theme.spacing.xs }}>
+                Using your current location. Tap "Change" to select a different location.
+              </Text>
+        </View>
+          ) : (
+            // User has no location set OR location state is empty - show required location picker
+            <View>
+              <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+                Location <Text style={{ color: theme.colors.error }}>*</Text>
+              </Text>
+              <LocationPicker
+                value={location}
+                onLocationSelect={handleLocationSelect}
+                placeholder="Where are you listing from? (Required)"
+                showAllOptions={false}
+              />
+              <Text variant="caption" color="muted" style={{ marginTop: theme.spacing.xs }}>
+                Location is required to help buyers find your listing.
               </Text>
             </View>
           )}
-        </View>
+      </View>
 
         {/* Pricing & Selling Details */}
         <View style={{ marginTop: theme.spacing.xl }}>
@@ -998,7 +1063,7 @@ function CreateListingScreen() {
         </View>
       </View>
     );
-  }, [formData.categoryId, formData.location, formData.categoryAttributes, formData.price, formData.quantity, formData.acceptOffers, selectedCategory, validationResults, theme, handleCategorySelect, handleLocationSelect, handleCategoryAttributeChange, handlePriceChange, handleQuantityChange, handleAcceptOffersChange]);
+  }, [formData.categoryId, formData.location, formData.categoryAttributes, formData.price, formData.quantity, formData.acceptOffers, selectedCategory, validationResults, theme, handleCategorySelect, handleLocationSelect, handleCategoryAttributeChange, handlePriceChange, handleQuantityChange, handleAcceptOffersChange, currentLocation, location]);
 
   // DetailsStep merged into CategoryStep above
 
@@ -1110,7 +1175,7 @@ function CreateListingScreen() {
             Quantity: {formData.quantity}
           </Text>
           <Text variant="caption" color="muted">
-            Location: {formData.location}
+            Location: {location || formData.location}
           </Text>
           
           {/* Category Attributes */}

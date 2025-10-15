@@ -206,7 +206,7 @@ export function EnhancedSearchHeader({
               onPress={() => router.push('/notifications')}
               activeOpacity={0.7}
             >
-              <Bell size={20} color={theme.colors.text.primary} />
+              <Bell size={24} color={theme.colors.text.primary} />
               {unreadCount > 0 && (
                 <View
                   style={{
@@ -214,9 +214,9 @@ export function EnhancedSearchHeader({
                     top: -1,
                     right: -1,
                     backgroundColor: theme.colors.error,
-                    borderRadius: 8,
-                    minWidth: 16,
-                    height: 16,
+                    borderRadius: 9,
+                    minWidth: 18,
+                    height: 18,
                     justifyContent: 'center',
                     alignItems: 'center',
                     padding: 0,
@@ -262,7 +262,7 @@ export function EnhancedSearchHeader({
               activeOpacity={0.7}
             >
               <Heart 
-                size={20} 
+                size={24} 
                 color={favoritesCount > 0 ? theme.colors.error : theme.colors.text.primary}
                 fill={favoritesCount > 0 ? theme.colors.error : 'transparent'}
               />
@@ -273,9 +273,9 @@ export function EnhancedSearchHeader({
                     top: -1,
                     right: -1,
                     backgroundColor: theme.colors.primary,
-                    borderRadius: 8,
-                    minWidth: 16,
-                    height: 16,
+                    borderRadius: 9,
+                    minWidth: 18,
+                    height: 18,
                     justifyContent: 'center',
                     alignItems: 'center',
                     padding: 0,
@@ -317,7 +317,7 @@ export function EnhancedSearchHeader({
             onPress={onFilterPress}
             activeOpacity={0.7}
           >
-            <ListFilterPlus size={20} color={theme.colors.text.primary} />
+            <ListFilterPlus size={24} color={theme.colors.text.primary} />
           </TouchableOpacity>
         </View>
     </Animated.View>

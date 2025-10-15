@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import { dbHelpers, supabase } from '@/lib/supabase';
 import { useCommunityRealtime } from './useRealtime';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useAppStore } from '@/store/useAppStore';
 import { addProfileRefreshListener } from './useProfile';
 import { useRealtimeConnection } from './useRealtimeConnection';
 import { contentModerationService } from '@/lib/contentModerationService';
@@ -15,6 +16,7 @@ export function useCommunityPosts(options: {
   location?: string | null;
 } = {}) {
   const { user } = useAuthStore();
+  const { currentLocation } = useAppStore();
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -196,12 +198,19 @@ export function useCommunityPosts(options: {
         };
       }
 
+      const finalLocation = location || currentLocation || null;
+      console.log('📍 Creating post with location:', { 
+        providedLocation: location, 
+        currentLocation, 
+        finalLocation 
+      });
+      
       const postData = {
         user_id: user.id,
         content,
         images,
         listing_id: listingId,
-        location: location || null,
+        location: finalLocation, // Use current location as default
         type: type || 'general', // Default to 'general' if no type provided
         status: moderationResult.requiresManualReview ? 'hidden' : 'active', // Hide if requires review
       };

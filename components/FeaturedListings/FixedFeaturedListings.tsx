@@ -94,7 +94,6 @@ export function FixedFeaturedListings({
         setLoading(true);
         setError(null);
 
-        console.log('🔍 [FixedFeaturedListings] Starting fetch...');
 
         // Fetch featured listings - mix of business users and regular users with boosted listings
         const { data: businessUsers, error: businessError } = await supabase
@@ -123,11 +122,6 @@ export function FixedFeaturedListings({
           `)
           .in('status', ['active', 'trialing', 'cancelled']); // ✅ FIX: Include 'trialing' for free trial users
 
-        console.log('🔍 [FixedFeaturedListings] Subscription query result:', {
-          error: businessError,
-          count: businessUsers?.length || 0,
-          users: businessUsers?.map(u => ({ id: u.user_id, status: u.status }))
-        });
 
         // Also fetch users who have business profiles but might not have active subscriptions
         let businessProfileUsers: any[] = [];
@@ -151,7 +145,7 @@ export function FixedFeaturedListings({
             .not('id', 'in', `(${businessUserIds.join(',')})`);
 
           if (businessProfileError) {
-            console.warn('Error fetching business profile users:', businessProfileError);
+            // Handle error silently
           } else {
             businessProfileUsers = profileUsers || [];
           }
@@ -174,7 +168,7 @@ export function FixedFeaturedListings({
             .eq('is_business', true);
 
           if (businessProfileError) {
-            console.warn('Error fetching business profile users:', businessProfileError);
+            // Handle error silently
           } else {
             businessProfileUsers = profileUsers || [];
           }
@@ -200,16 +194,9 @@ export function FixedFeaturedListings({
 
         const businessUserIds = allBusinessUsers.map(user => user.user_id);
 
-        console.log('📊 Featured Listings - Found business users:', {
-          subscriptionUsers: businessUsers?.length || 0,
-          profileBusinessUsers: businessProfileUsers?.length || 0,
-          totalBusinessUsers: allBusinessUsers.length,
-          businessUserIds: businessUserIds.length
-        });
 
         // ✅ FIX: If no business users found, return empty array instead of running invalid query
         if (businessUserIds.length === 0) {
-          console.log('⚠️ No business users found for featured listings');
           if (isMounted) {
             setListings([]);
           }
@@ -239,16 +226,11 @@ export function FixedFeaturedListings({
 
         if (businessListingsError) throw businessListingsError;
 
-        console.log('📊 Featured Listings - Query result:', {
-          listingsFound: businessListings?.length || 0,
-          listings: businessListings?.map(l => ({ id: l.id, title: l.title, user_id: l.user_id }))
-        });
 
         // Use only business listings - no regular users in "Featured Sellar Pro"
         const allListings = businessListings || [];
 
         if (allListings.length === 0) {
-          console.log('⚠️ No listings found for business users');
         }
 
         // Get unique user IDs for profile fetching
@@ -276,7 +258,7 @@ export function FixedFeaturedListings({
             .in('id', regularUserIds);
 
           if (regularProfilesError) {
-            console.warn('Error fetching regular user profiles:', regularProfilesError);
+            // Handle error silently
           } else {
             regularUserProfiles = regularProfiles || [];
           }
@@ -289,7 +271,6 @@ export function FixedFeaturedListings({
 
         let missingProfiles: any[] = [];
         if (missingProfileUserIds.length > 0) {
-          console.log('🔍 Fetching missing profiles for:', missingProfileUserIds);
           const { data: fetchedProfiles, error: missingProfilesError } = await supabase
             .from('profiles')
             .select(`
@@ -307,7 +288,7 @@ export function FixedFeaturedListings({
             .in('id', missingProfileUserIds);
 
           if (missingProfilesError) {
-            console.warn('Error fetching missing profiles:', missingProfilesError);
+            // Handle error silently
           } else {
             missingProfiles = fetchedProfiles || [];
           }
@@ -358,16 +339,12 @@ export function FixedFeaturedListings({
           };
         }) || [];
 
-        console.log('✅ [FixedFeaturedListings] Final transformed listings:', {
-          count: transformedListings?.length || 0,
-          listings: transformedListings?.map(l => ({ id: l.id, seller: l.seller.name }))
-        });
 
         if (isMounted) {
           setListings(transformedListings);
         }
       } catch (err) {
-        console.error('❌ [FixedFeaturedListings] Error fetching featured listings:', err);
+        // Handle error silently
         if (isMounted) {
           setError('Failed to load featured listings');
         }

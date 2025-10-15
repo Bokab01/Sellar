@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useAppStore } from '@/store/useAppStore';
 import { useCommunityPosts } from '@/hooks/useCommunity';
 import { useListings } from '@/hooks/useListings';
 import { storageHelpers } from '@/lib/storage';
@@ -28,13 +29,21 @@ import { router } from 'expo-router';
 export default function CreatePostScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
+  const { currentLocation } = useAppStore();
   const { createPost } = useCommunityPosts();
   const { listings: userListings, loading: listingsLoading } = useListings({ userId: user?.id });
   
   const [content, setContent] = useState('');
   const [images, setImages] = useState<SelectedImage[]>([]);
-  const [location, setLocation] = useState('');
+  const [location, setLocation] = useState(currentLocation || '');
   const [loading, setLoading] = useState(false);
+  
+  // Sync location state when currentLocation changes
+  React.useEffect(() => {
+    if (currentLocation && !location) {
+      setLocation(currentLocation);
+    }
+  }, [currentLocation]);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [showSuccess, setShowSuccess] = useState(false);
   const [moderationError, setModerationError] = useState('');
@@ -58,6 +67,12 @@ export default function CreatePostScreen() {
 
     if (!user) {
       Alert.alert('Error', 'You must be logged in to create a post');
+      return;
+    }
+
+    // Validate location - required if user doesn't have current location
+    if (!currentLocation && !location.trim()) {
+      Alert.alert('Location Required', 'Please select a location for your post. This helps others find your content.');
       return;
     }
 
@@ -213,7 +228,7 @@ export default function CreatePostScreen() {
             variant="primary"
             onPress={handleSubmit}
             loading={loading}
-            disabled={loading || !content.trim()}
+            disabled={loading || !content.trim() || (!currentLocation && !location.trim())}
           >
             Post
           </Button>,
@@ -403,16 +418,75 @@ export default function CreatePostScreen() {
             )}
           </View>
 
-          {/* Location (Optional) */}
+          {/* Dynamic Location Section */}
           <View style={{ marginBottom: theme.spacing.xl }}>
-            <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
-              Add Location (Optional)
-            </Text>
-            <LocationPicker
-              value={location}
-              onLocationSelect={setLocation}
-              placeholder="Where are you posting from?"
-            />
+            {currentLocation && location ? (
+              // User has location set AND location state is not empty - show it as auto-filled
+              <View>
+                <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+                  Location
+                </Text>
+                <View
+                  style={{
+                    backgroundColor: theme.colors.surface,
+                    borderRadius: theme.borderRadius.md,
+                    padding: theme.spacing.md,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: theme.spacing.sm,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      backgroundColor: theme.colors.primary + '15',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text style={{ color: theme.colors.primary, fontSize: 12, fontWeight: '600' }}>📍</Text>
+                  </View>
+                  <Text variant="body" style={{ flex: 1, color: theme.colors.text.primary }}>
+                    {location || currentLocation}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setLocation('')}
+                    style={{
+                      padding: theme.spacing.xs,
+                      borderRadius: theme.borderRadius.sm,
+                      backgroundColor: theme.colors.text.muted + '20',
+                    }}
+                  >
+                    <Text variant="bodySmall" color="muted">
+                      Change
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <Text variant="caption" color="muted" style={{ marginTop: theme.spacing.xs }}>
+                  Using your current location. Tap "Change" to select a different location.
+                </Text>
+              </View>
+            ) : (
+              // User has no location set OR location state is empty - show required location picker
+              <View>
+                <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+                  Location <Text style={{ color: theme.colors.error }}>*</Text>
+                </Text>
+                <LocationPicker
+                  value={location}
+                  onLocationSelect={setLocation}
+                  placeholder="Where are you posting from? (Required)"
+                  showAllOptions={false}
+                />
+                <Text variant="caption" color="muted" style={{ marginTop: theme.spacing.xs }}>
+                  Location is required to help others find your post.
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Submit Button */}
@@ -420,7 +494,7 @@ export default function CreatePostScreen() {
             variant="primary"
             onPress={handleSubmit}
             loading={loading}
-            disabled={loading || !content.trim()}
+            disabled={loading || !content.trim() || (!currentLocation && !location.trim())}
             fullWidth
             size="lg"
             icon={<Send size={18} color={theme.colors.primaryForeground} />}

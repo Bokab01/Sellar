@@ -45,34 +45,56 @@ export default function CommunityScreen() {
     location: null,
   });
   const { posts, loading, error, refreshing, refresh, updatePost, deletePost } = useCommunityPosts(filters);
+  
+  // Debug logging for filters
   const { followingStates, followUser, unfollowUser, isFollowing, refreshAllFollowStates } = useFollowState();
 
-  // Scroll to top function
-  const scrollToTop = () => {
+  // Enhanced scroll to top function with smooth UX
+  const scrollToTop = useCallback(() => {
     if (scrollViewRef.current) {
-      scrollViewRef.current.scrollTo({ y: 0, animated: true });
+      // Smooth scroll to top with easing
+      scrollViewRef.current.scrollTo({ 
+        y: 0, 
+        animated: true 
+      });
+      
+      // Hide FAB immediately for better UX
+      setShowScrollToTop(false);
+      Animated.parallel([
+        Animated.timing(scrollToTopOpacity, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scrollToTopScale, {
+          toValue: 0.8,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
     }
-  };
+  }, [scrollToTopOpacity, scrollToTopScale]);
 
   // Handle scroll for FAB visibility
   const handleScroll = (event: any) => {
     const currentScrollY = event.nativeEvent.contentOffset.y;
     
-    // Show/hide scroll-to-top FAB
+    // Show/hide scroll-to-top FAB with professional animations
     if (currentScrollY > 300) {
       if (!showScrollToTop) {
         setShowScrollToTop(true);
         Animated.parallel([
           Animated.timing(scrollToTopOpacity, {
             toValue: 1,
-            duration: 200,
+            duration: 250,
             useNativeDriver: true,
           }),
           Animated.spring(scrollToTopScale, {
             toValue: 1,
             useNativeDriver: true,
-            tension: 100,
-            friction: 8,
+            tension: 120,
+            friction: 7,
+            overshootClamping: true,
           }),
         ]).start();
       }
@@ -109,7 +131,6 @@ export default function CommunityScreen() {
   // App resume handling - refresh posts when app comes back from background
   const { isRefreshing, isReconnecting } = useAppResume({
     onResume: async () => {
-      console.log('📱 Community screen: App resumed, refreshing posts...');
       await refresh();
       lastRefreshTime.current = Date.now(); // Update refresh time
     },
@@ -131,16 +152,10 @@ export default function CommunityScreen() {
       // 2. It's been more than 30 seconds since last refresh
       // 3. We have no posts (likely an error state)
       if (!hasInitialData.current || timeSinceLastRefresh > REFRESH_COOLDOWN || posts.length === 0) {
-        console.log('🔄 Community: Smart refresh triggered', {
-          hasInitialData: hasInitialData.current,
-          timeSinceLastRefresh,
-          postsCount: posts.length
-        });
         refresh();
         lastRefreshTime.current = now;
         hasInitialData.current = true;
       } else {
-        console.log('⏭️ Community: Skipping refresh (cooldown active)');
       }
       
       // Always refresh follow states (lightweight operation)
@@ -165,10 +180,9 @@ export default function CommunityScreen() {
 
   // Handle edit post
   const handleEditPost = (postId: string) => {
-    console.log('Attempting to edit post with ID:', postId, typeof postId);
     
     if (!postId || postId === 'unknown' || postId === 'undefined') {
-      console.error('Invalid post ID for editing:', postId);
+      // Handle error silently
       Alert.alert('Error', 'Cannot edit post: Invalid post ID');
       return;
     }
@@ -178,10 +192,9 @@ export default function CommunityScreen() {
 
   // Handle delete post
   const handleDeletePost = async (postId: string) => {
-    console.log('Attempting to delete post with ID:', postId, typeof postId);
     
     if (!postId || postId === 'unknown' || postId === 'undefined') {
-      console.error('Invalid post ID for deletion:', postId);
+      // Handle error silently
       Alert.alert('Error', 'Cannot delete post: Invalid post ID');
       return;
     }
@@ -189,7 +202,7 @@ export default function CommunityScreen() {
     try {
       const { error } = await deletePost(postId);
       if (error) {
-        console.error('Error deleting post:', error);
+        // Handle error silently
         Alert.alert('Error', `Failed to delete post: ${error}`);
       } else {
         Alert.alert('Success', 'Post deleted successfully');
@@ -205,7 +218,7 @@ export default function CommunityScreen() {
     return posts.map((post: any) => {
       // Safety check for post data
       if (!post || typeof post !== 'object') {
-        console.warn('Invalid post data:', post);
+        // Handle error silently
         return null;
       }
 
@@ -240,14 +253,6 @@ export default function CommunityScreen() {
         } : undefined,
       };
 
-      // Debug log for posts with invalid IDs
-      if (!post.id || post.id === 'unknown') {
-        console.warn('Post with invalid ID detected:', { 
-          originalId: post.id, 
-          transformedId: transformedPost.id,
-          postData: post 
-        });
-      }
 
       return transformedPost;
     }).filter(Boolean); // Remove any null entries
@@ -263,12 +268,10 @@ export default function CommunityScreen() {
         post={post}
         isFollowing={isFollowing(post.author.id)}
         onLike={() => {
-          console.log('Liked post:', post.id);
           // TODO: Implement like functionality
         }}
         onComment={() => router.push(`/(tabs)/community/${post.id}`)}
         onShare={() => {
-          console.log('Shared post:', post.id);
           // TODO: Implement share functionality
         }}
         onEdit={() => handleEditPost(post.id)}
@@ -276,7 +279,6 @@ export default function CommunityScreen() {
         onFollow={() => handleFollow(post.author.id)}
         onUnfollow={() => handleUnfollow(post.author.id)}
         onReport={() => {
-          console.log('Reported post:', post.id);
           // TODO: Implement report functionality
         }}
       />
@@ -472,7 +474,7 @@ export default function CommunityScreen() {
       <Animated.View
         style={{
           position: 'absolute',
-          bottom: insets.bottom + theme.spacing.xl,
+          bottom: insets.bottom + theme.spacing.xl + contentBottomPadding,
           right: theme.spacing.lg,
           zIndex: 1000,
           opacity: scrollToTopOpacity,
@@ -483,17 +485,30 @@ export default function CommunityScreen() {
           onPress={scrollToTop}
           style={{
             backgroundColor: theme.colors.primary,
-            width: 56,
-            height: 56,
-            borderRadius: 28,
+            width: 50,
+            height: 50,
+            borderRadius: 25,
             justifyContent: 'center',
             alignItems: 'center',
             ...theme.shadows.lg,
             elevation: 8,
+            shadowColor: theme.colors.primary,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            borderWidth: 2,
+            borderColor: theme.colors.primaryForeground,
           }}
-          activeOpacity={0.8}
+          activeOpacity={0.7}
+          accessibilityLabel="Scroll to top"
+          accessibilityHint="Double tap to scroll to the top of the page"
+          accessibilityRole="button"
         >
-          <ChevronUp size={24} color={theme.colors.primaryForeground} />
+          <ChevronUp 
+            size={24} 
+            color={theme.colors.primaryForeground} 
+            strokeWidth={2.5}
+          />
         </TouchableOpacity>
       </Animated.View>
     </SafeAreaWrapper>

@@ -685,7 +685,8 @@ export default function EditProfileScreen() {
                   value={formData.location}
                   onLocationSelect={(location) => updateFormField('location', location)}
                   placeholder="Select your location"
-              />
+                  showAllOptions={false}
+                />
             </View>
           </View>
           )}

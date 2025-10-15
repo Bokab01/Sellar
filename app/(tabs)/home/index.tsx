@@ -3,7 +3,12 @@ import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl, Animate
 
 // Create animated FlatList for scroll animations
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList<any>);
+
+// Memoized ProductCard component to prevent unnecessary re-renders
+const MemoizedProductCard = React.memo(ProductCard);
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useAppStore } from '@/store/useAppStore';
@@ -63,7 +68,9 @@ import {
   ListFilterPlus,
   ChevronUp,
   Grid2X2,
-  House
+  House,
+  Wifi,
+  WifiOff
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 
@@ -83,7 +90,6 @@ export default function HomeScreen() {
   // Check if user should see welcome screen after mounting
   useEffect(() => {
     if (!newUserLoading && isNewUser === true) {
-      console.log('🎉 New user detected, navigating to welcome screen');
       router.replace('/(auth)/welcome');
     }
   }, [isNewUser, newUserLoading]);
@@ -119,6 +125,9 @@ export default function HomeScreen() {
 
   // Real user credit from database
   const [userCredit, setUserCredit] = useState<number>(0);
+  
+  // Local loading state for retry functionality
+  const [isRetrying, setIsRetrying] = useState(false);
   const [creditLoading, setCreditLoading] = useState(true);
   
   // Categories state
@@ -158,15 +167,34 @@ export default function HomeScreen() {
 
   // Smart search modal removed - now using dedicated screen
 
-  // Scroll to top function
-  const scrollToTop = () => {
+  // Enhanced scroll to top function with smooth UX
+  const scrollToTop = useCallback(() => {
     if (mainScrollViewRef.current) {
-      mainScrollViewRef.current.scrollTo({ y: 0, animated: true });
+      // Smooth scroll to top with easing (FlatList uses scrollToOffset)
+      mainScrollViewRef.current.scrollToOffset({ 
+        offset: 0, 
+        animated: true 
+      });
+      
+      // Hide FAB immediately for better UX
+      setShowScrollToTop(false);
+      Animated.parallel([
+        Animated.timing(scrollToTopOpacity, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scrollToTopScale, {
+          toValue: 0.8,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
     }
-  };
+  }, [scrollToTopOpacity, scrollToTopScale]);
 
   // Handle listing press with interaction tracking
-  const handleListingPress = async (listingId: string) => {
+  const handleListingPress = useCallback(async (listingId: string) => {
     if (user) {
       // Track view interaction
       await trackInteraction(listingId, 'view', {
@@ -175,7 +203,8 @@ export default function HomeScreen() {
       });
     }
     router.push(`/(tabs)/home/${listingId}`);
-  };
+  }, [user, trackInteraction]);
+
 
   // Handle scroll animations
   const handleScroll = Animated.event(
@@ -186,21 +215,22 @@ export default function HomeScreen() {
         const currentScrollY = event.nativeEvent.contentOffset.y;
         const diff = currentScrollY - lastScrollY.current;
         
-        // Show/hide scroll-to-top FAB
+        // Show/hide scroll-to-top FAB with professional animations
         if (currentScrollY > 300) {
           if (!showScrollToTop) {
             setShowScrollToTop(true);
             Animated.parallel([
               Animated.timing(scrollToTopOpacity, {
                 toValue: 1,
-                duration: 200,
+                duration: 250,
                 useNativeDriver: true,
               }),
               Animated.spring(scrollToTopScale, {
                 toValue: 1,
                 useNativeDriver: true,
-                tension: 100,
-                friction: 8,
+                tension: 120,
+                friction: 7,
+                overshootClamping: true,
               }),
             ]).start();
           }
@@ -316,13 +346,13 @@ export default function HomeScreen() {
         .single();
 
       if (creditError) {
-        console.log('Error fetching user credits:', creditError.message);
+        // Handle error silently
         setUserCredit(0);
       } else {
         setUserCredit((creditData as any)?.balance || 0);
       }
     } catch (err) {
-      console.log('Failed to fetch user credits:', err);
+      // Handle error silently
       setUserCredit(0);
     } finally {
       setCreditLoading(false);
@@ -376,7 +406,7 @@ export default function HomeScreen() {
         
         setCategories(categoriesWithIcons);
       } catch (error) {
-        console.error('Error loading categories:', error);
+        // Handle error silently
         // Fallback to empty array
         setCategories([]);
       } finally {
@@ -413,7 +443,6 @@ export default function HomeScreen() {
       // Check if we have fresh cached data
       if (listingsCache.current && 
           (now - listingsCache.current.timestamp) < LISTINGS_CACHE_DURATION) {
-        console.log('📱 Using cached listings data for smooth navigation back');
         return; // Don't refetch if we have fresh data
       }
     }, [])
@@ -454,7 +483,6 @@ export default function HomeScreen() {
 
   // App resume handling - refresh listings when app comes back from background
   const onResumeCallback = React.useCallback(async () => {
-    console.log('📱 Home screen: App resumed, refreshing listings...');
     await refresh();
     // Also refresh user credit and notifications
     await fetchUserCredit();
@@ -477,16 +505,6 @@ export default function HomeScreen() {
     // ✅ Use pre-computed is_sellar_pro flag from database view (optimal performance)
     const isSellarPro = listing.is_sellar_pro === true;
     
-    // Debug logging for first listing
-    if (products.indexOf(listing) === 0) {
-      console.log('🔍 Debug listing data:', {
-        listingId: listing.id,
-        userId: listing.user_id,
-        isSellarPro: listing.is_sellar_pro,
-        subscriptionPlan: listing.subscription_plan_name,
-        subscriptionStatus: listing.subscription_status,
-      });
-    }
     
     // Determine the highest priority badge (only show ONE badge per listing)
     let primaryBadge = null;
@@ -569,6 +587,95 @@ export default function HomeScreen() {
     ...hookFavorites,
     ...globalFavorites
   }), [hookFavorites, globalFavorites]);
+
+  // Memoized favorite toggle handler to prevent inline function creation
+  const handleFavoritePress = useCallback(async (productId: string, sellerId: string) => {
+    // Don't allow users to favorite their own listings
+    if (user?.id === sellerId) {
+      return;
+    }
+
+    const isFavorited = favorites[productId] || false;
+    
+    // Optimistic update using global store (syncs across all instances)
+    toggleGlobalFavorite(productId);
+    
+    // Update the listing's favorite count optimistically
+    if (isFavorited) {
+      decrementListingFavoriteCount(productId);
+    } else {
+      incrementListingFavoriteCount(productId);
+    }
+    
+    // Perform actual database toggle
+    try {
+      const { toggleFavorite } = await import('@/lib/favoritesAndViews');
+      const result = await toggleFavorite(productId);
+      
+      if (result.error) {
+        // Revert optimistic updates on error
+        toggleGlobalFavorite(productId);
+        if (isFavorited) {
+          incrementListingFavoriteCount(productId);
+      } else {
+          decrementListingFavoriteCount(productId);
+        }
+      } else {
+        // Refresh stats after successful toggle
+        refreshStats();
+      }
+    } catch (error) {
+      // Revert optimistic updates on error
+      toggleGlobalFavorite(productId);
+      if (isFavorited) {
+        incrementListingFavoriteCount(productId);
+      } else {
+        decrementListingFavoriteCount(productId);
+      }
+    }
+  }, [user, favorites, toggleGlobalFavorite, incrementListingFavoriteCount, decrementListingFavoriteCount, refreshStats]);
+
+  // Memoized view press handler
+  const handleViewPress = useCallback((productId: string) => {
+    router.push(`/(tabs)/home/${productId}`);
+  }, []);
+
+  // Memoized renderItem function to prevent inline function creation
+  const renderItem = useCallback(({ item: product }: { item: any }) => (
+    <View style={{ flex: 0.5, padding: 2 }}>
+      <MemoizedProductCard
+        image={product.image}
+        title={product.title}
+        price={product.price}
+        previousPrice={product.previous_price}
+        priceChangedAt={product.price_changed_at}
+        seller={product.seller}
+        badge={product.badge}
+        location={product.location}
+        layout="grid"
+        fullWidth={true}
+        borderRadius={theme.borderRadius.sm}
+        listingId={product.id}
+        isFavorited={favorites[product.id] || false}
+        viewCount={viewCounts[product.id] || 0}
+        favoritesCount={listingFavoriteCounts[product.id] ?? product.favorites ?? 0}
+        isHighlighted={product.isHighlighted}
+        onPress={() => handleListingPress(product.id)}
+        onFavoritePress={user?.id !== product.seller.id ? () => handleFavoritePress(product.id, product.seller.id) : undefined}
+        onViewPress={() => handleViewPress(product.id)}
+        />
+      </View>
+  ), [theme.borderRadius.sm, favorites, viewCounts, listingFavoriteCounts, user, handleListingPress, handleFavoritePress, handleViewPress]);
+
+  // Memoized keyExtractor for stable keys
+  const keyExtractor = useCallback((item: any) => item.id, []);
+
+  // Memoized getItemLayout for better scroll performance
+  const getItemLayout = useCallback((data: any, index: number) => ({
+    length: 280, // Approximate height of ProductCard in grid layout
+    offset: 280 * Math.floor(index / 2), // Account for 2 columns
+    index,
+  }), []);
   
   // Merge transformed products with optimistic favorite counts from global store
   const transformedProductsWithOptimisticCounts = useMemo(() => {
@@ -644,28 +751,20 @@ export default function HomeScreen() {
     <View>
                {/* Professional Location Display */}
               <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  marginTop: theme.spacing.md,
-                  marginLeft: theme.spacing.lg,
-                  marginRight: theme.spacing.lg,
-                  paddingVertical: theme.spacing.sm,
-                  paddingHorizontal: theme.spacing.md,
-                  backgroundColor: theme.colors.surface,
-                  borderRadius: theme.borderRadius.lg,
-                  borderWidth: 1,
-                  borderColor: theme.colors.border,
-                  ...theme.shadows.sm,
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+                  marginHorizontal: theme.spacing.lg,
+                  marginVertical: theme.spacing.md,
                 }}
               >
                 <View
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 16,
+              style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 12,
                     backgroundColor: theme.colors.primary + '15',
-                    alignItems: 'center',
+                  alignItems: 'center',
                     justifyContent: 'center',
                     marginRight: theme.spacing.sm,
                   }}
@@ -674,26 +773,18 @@ export default function HomeScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
             
-                  <Text
+                <Text 
                     variant="button"
-                    style={{
+                  style={{ 
                       color: theme.colors.text.primary,
                       fontWeight: '600',
                       marginTop: 2,
-                    }}
-                  >
-                    {currentLocation}
-                  </Text>
-                </View>
-                <View
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
-                    backgroundColor: theme.colors.success,
-                    marginLeft: theme.spacing.sm,
                   }}
-                />
+                >
+                    {currentLocation}
+                </Text>
+                </View>
+               
               </View>
 
               {/* Enhanced Categories with Icons and Scroll Indicator */}
@@ -832,18 +923,18 @@ export default function HomeScreen() {
                           {category.label}
                         </Text>
               </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
+                    );
+                  })}
+                </ScrollView>
+              </View>
 
       {/* Featured Business Listings - Only show when no filters are active */}
       {!searchQuery && !filters.categories?.length && !filters.location && !filters.condition?.length && !filters.priceRange.min && !filters.priceRange.max && (
         <Suspense fallback={<LoadingSkeleton width="100%" height={200} />}>
           <CodeSplitting.FixedFeaturedListings
             maxItems={10}
-            layout="horizontal"
-            onViewAll={() => {
+                layout="horizontal"
+                onViewAll={() => {
               navigation.home.goToBusinessListings();
             }}
           />
@@ -863,8 +954,8 @@ export default function HomeScreen() {
       )}
 
       {/* All Listings Section - Dynamic Title */}
-      <View style={{ 
-        flexDirection: 'row', 
+                    <View style={{
+                      flexDirection: 'row',
                             alignItems: 'center',
         justifyContent: 'space-between',
         marginBottom: theme.spacing.lg,
@@ -880,7 +971,7 @@ export default function HomeScreen() {
                 : 'More Listings From Sellers'
               }
             </Text>
-          </View>
+                    </View>
           <Text variant="bodySmall" color="muted" style={{ marginTop: theme.spacing.xs }}>
             {filters.categories?.length > 0 
               ? `${transformedProducts.length} ${transformedProducts.length === 1 ? 'item' : 'items'} found in ${filters.categories[0]}`
@@ -889,7 +980,7 @@ export default function HomeScreen() {
               : 'Browse all available items'
             }
           </Text>
-        </View>
+                  </View>
 
         {/* Clear Filter Button - Show when filters are active */}
         {(filters.categories?.length > 0 || searchQuery || filters.location || filters.condition?.length > 0) && (
@@ -917,9 +1008,9 @@ export default function HomeScreen() {
               Clear
                           </Text>
                       </TouchableOpacity>
-        )}
-              </View>
-    </View>
+          )}
+        </View>
+      </View>
   ), [
     // Only re-create when these specific values change
     searchQuery,
@@ -931,16 +1022,17 @@ export default function HomeScreen() {
     transformedProducts.length,
     user?.id,
     theme, // ✅ Add theme dependency for proper theme switching
+    currentLocation, // ✅ Add currentLocation dependency for instant location updates
   ]);
 
   return (
     <SafeAreaWrapper>
       {/* Enhanced Search Header - Floating */}
       <Animated.View style={{ 
-        position: 'absolute',
+            position: 'absolute',
         top: theme.spacing['3xl'],
-        left: 0,
-        right: 0,
+            left: 0,
+            right: 0,
         zIndex: 12,
         transform: [{ translateY: floatingSearchTranslateY }],
         opacity: floatingSearchOpacity,
@@ -964,17 +1056,30 @@ export default function HomeScreen() {
         {/* Main Content Area - Scrollable */}
         <View style={{ flex: 1 }}>
           {error ? (
-            <View style={{ paddingHorizontal: theme.spacing.lg }}>
+            <View style={{ 
+              flex: 1, 
+              justifyContent: 'center', 
+              alignItems: 'center', 
+              paddingHorizontal: theme.spacing.lg 
+            }}>
               <EmptyState
-                title="Unable to load listings"
-                description="Please check your internet connection and try again."
+                icon={<WifiOff size={48} color={theme.colors.text.muted} />}
+                title="Connection Error"
+                description="We're having trouble loading your marketplace. This could be due to a poor internet connection or server issues."
                 action={{
-                  text: 'Refresh',
-                  onPress: refresh,
+                  text: 'Try Again',
+                  onPress: async () => {
+                    setIsRetrying(true);
+                    try {
+                      await refresh();
+                    } finally {
+                      setIsRetrying(false);
+                    }
+                  },
                 }}
               />
             </View>
-          ) : loading ? (
+          ) : loading || refreshing || isRetrying ? (
             <HomeScreenSkeleton loadingText="Loading your marketplace..." />
           ) : transformedProducts.length === 0 ? (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: theme.spacing.lg }}>
@@ -991,16 +1096,16 @@ export default function HomeScreen() {
                   setSearchQuery('');
                         setFilters({
                           categories: [],
-                          priceRange: { min: undefined, max: undefined },
-                          condition: [],
-                          location: '',
+            priceRange: { min: undefined, max: undefined },
+            condition: [],
+            location: '',
                           sortBy: 'newest',
-                        });
+          });
                       }
                     : () => router.push('/(tabs)/create'),
-                }}
-              />
-            </View>
+        }}
+      />
+    </View>
           ) : (
             <AnimatedFlatList
               ref={mainScrollViewRef as any}
@@ -1013,60 +1118,20 @@ export default function HomeScreen() {
                 paddingTop: 100, // Add top padding to account for floating search input
                 paddingBottom: contentBottomPadding,
               }}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item: product }) => (
-                <View style={{ flex: 0.5, padding: 2 }}>
-                    <ProductCard
-                      image={product.image}
-                      title={product.title}
-                      price={product.price}
-                    previousPrice={product.previous_price}
-                    priceChangedAt={product.price_changed_at}
-                      seller={product.seller}
-                      badge={product.badge}
-                      location={product.location}
-                      layout="grid"
-                      fullWidth={true}
-                    borderRadius={theme.borderRadius.sm}
-                      listingId={product.id}
-                      isFavorited={favorites[product.id] || false}
-                      viewCount={viewCounts[product.id] || 0}
-                    favoritesCount={listingFavoriteCounts[product.id] ?? product.favorites ?? 0}
-                    isHighlighted={product.isHighlighted}
-                    onPress={() => handleListingPress(product.id)}
-                      onFavoritePress={user?.id !== product.seller.id ? () => {
-                        import('@/lib/favoritesAndViews').then(({ toggleFavorite }) => {
-                        const isFavorited = favorites[product.id] || false;
-                        toggleGlobalFavorite(product.id);
-                        if (isFavorited) {
-                          decrementListingFavoriteCount(product.id);
-                        } else {
-                          incrementListingFavoriteCount(product.id);
-                        }
-                          toggleFavorite(product.id).then((result) => {
-                          if (result.error) {
-                            toggleGlobalFavorite(product.id);
-                            if (isFavorited) {
-                              incrementListingFavoriteCount(product.id);
-                            } else {
-                              decrementListingFavoriteCount(product.id);
-                            }
-                          } else {
-                            refreshStats();
-                            }
-                          });
-                        });
-                      } : undefined}
-                    onViewPress={() => router.push(`/(tabs)/home/${product.id}`)}
-                  />
-                </View>
-              )}
+              keyExtractor={keyExtractor}
+              renderItem={renderItem}
+              // Performance optimizations for virtualized rendering
+              removeClippedSubviews={true}
+              initialNumToRender={8}
+              maxToRenderPerBatch={5}
+              windowSize={7}
+              updateCellsBatchingPeriod={100}
+              getItemLayout={getItemLayout}
               ListHeaderComponent={ListHeader}
               refreshControl={
                 <RefreshControl
                   refreshing={refreshing}
                   onRefresh={async () => {
-                    console.log('🔄 Pull to refresh triggered');
                     await refresh();
                   }}
                   tintColor={theme.colors.primary}
@@ -1076,12 +1141,6 @@ export default function HomeScreen() {
               }
               onScroll={handleScroll}
               scrollEventThrottle={16}
-              // ✅ Performance optimizations for smooth scrolling
-              removeClippedSubviews={true}
-              maxToRenderPerBatch={10}
-              windowSize={5}
-              initialNumToRender={10}
-              updateCellsBatchingPeriod={50}
               decelerationRate="fast"
             />
           )}
@@ -1095,7 +1154,7 @@ export default function HomeScreen() {
       <Animated.View
           style={{
             position: 'absolute',
-          bottom: theme.spacing.xl,
+          bottom: theme.spacing.xl + useSafeAreaInsets().bottom + contentBottomPadding,
           right: theme.spacing.lg,
           zIndex: 1000,
           opacity: scrollToTopOpacity,
@@ -1106,19 +1165,33 @@ export default function HomeScreen() {
           onPress={scrollToTop}
           style={{
             backgroundColor: theme.colors.primary,
-            width: 56,
-            height: 56,
-            borderRadius: 28,
+            width: 50,
+            height: 50,
+            borderRadius: 25,
             justifyContent: 'center',
             alignItems: 'center',
             ...theme.shadows.lg,
             elevation: 8,
+            shadowColor: theme.colors.primary,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            borderWidth: 2,
+            borderColor: theme.colors.primaryForeground,
           }}
-          activeOpacity={0.8}
+          activeOpacity={0.7}
+          accessibilityLabel="Scroll to top"
+          accessibilityHint="Double tap to scroll to the top of the page"
+          accessibilityRole="button"
         >
-          <ChevronUp size={24} color={theme.colors.primaryForeground} />
+          <ChevronUp 
+            size={24} 
+            color={theme.colors.primaryForeground} 
+            strokeWidth={2.5}
+          />
         </TouchableOpacity>
       </Animated.View>
     </SafeAreaWrapper>
   );
 }
+

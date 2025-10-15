@@ -33,7 +33,6 @@ export const dbHelpers = {
     
     // If profile doesn't exist, try to create it
     if (error && (error.code === 'PGRST116' || error.message.includes('0 rows'))) {
-      console.log('Profile not found, attempting to create missing profile...');
       
       // Get user data from auth
       const { data: authUser, error: authError } = await supabase.auth.getUser();
@@ -229,6 +228,7 @@ export const dbHelpers = {
     const limit = options.limit || 20;
     const offset = options.offset || 0;
     
+    
     let query = db.posts
       .select(`
         *,
@@ -246,7 +246,8 @@ export const dbHelpers = {
     }
 
     if (options.location) {
-      query = query.ilike('location', `%${options.location}%`);
+      // Try multiple location matching strategies
+      query = query.or(`location.ilike.%${options.location}%,location.ilike.%${options.location.toLowerCase()}%,location.ilike.%${options.location.toUpperCase()}%`);
     }
 
     if (options.following) {
@@ -254,6 +255,42 @@ export const dbHelpers = {
     }
 
     const { data, error } = await query.range(offset, offset + limit - 1);
+    
+    // Handle fallback for location filtering
+    if (data && data.length === 0 && options.location) {
+      // Debug: Get all posts to see what locations exist
+      const { data: allPosts } = await db.posts
+        .select('id, location')
+        .limit(10);
+      
+      // If no posts have location data, return all posts when location filter is applied
+      if (allPosts && allPosts.length > 0 && !allPosts.some((post: any) => post.location)) {
+        
+        // Re-run query without location filter
+        let fallbackQuery = db.posts
+          .select(`
+            *,
+            profiles!posts_user_id_fkey(*),
+            listings!posts_listing_id_fkey(*)
+          `)
+          .order('created_at', { ascending: false });
+          
+        if (options.userId) {
+          fallbackQuery = fallbackQuery.eq('user_id', options.userId);
+        }
+        
+        if (options.postType) {
+          fallbackQuery = fallbackQuery.eq('type', options.postType);
+        }
+        
+        const { data: fallbackData, error: fallbackError } = await fallbackQuery.range(offset, offset + limit - 1);
+        
+        if (fallbackData && fallbackData.length > 0) {
+          // Return the fallback data instead
+          return { data: fallbackData, error: null };
+        }
+      }
+    }
     
     // ✅ Enrich posts with Sellar Pro status
     if (data && data.length > 0) {
