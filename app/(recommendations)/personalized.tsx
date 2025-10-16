@@ -55,51 +55,50 @@ export default function PersonalizedRecommendationsScreen() {
     decrementListingFavoriteCount
   } = useFavoritesStore();
 
-  // ✅ Create section list data structure with pairs for 2-column grid
+  // ✅ Optimized section list data structure with memoized pairs
   const sections = useMemo<SectionData[]>(() => {
     const sectionArray: SectionData[] = [];
 
-    // Helper to create pairs
+    // Memoized helper to create pairs
     const createPairs = (items: RecommendationListing[]): RecommendationListing[][] => {
+      if (items.length === 0) return [];
       const pairs: RecommendationListing[][] = [];
       for (let i = 0; i < items.length; i += 2) {
         pairs.push([items[i], items[i + 1]].filter(Boolean));
       }
-      return pairs as any;
+      return pairs;
     };
 
-    // Personalized section
+    // Only create sections if data exists
     if (personalizedRecommendations.length > 0) {
       sectionArray.push({
         title: 'Recommended for You',
         subtitle: 'Based on your interests and activity',
         icon: <Star size={20} color={theme.colors.primary} />,
-        data: createPairs(personalizedRecommendations) as any
+        data: createPairs(personalizedRecommendations)
       });
     }
 
-    // Trending section
     if (trendingRecommendations.length > 0) {
       sectionArray.push({
         title: 'Trending Near You',
         subtitle: 'Popular items in your area',
         icon: <TrendingUp size={20} color={theme.colors.primary} />,
-        data: createPairs(trendingRecommendations) as any
+        data: createPairs(trendingRecommendations)
       });
     }
 
-    // Recently viewed section
     if (recentlyViewed.length > 0) {
       sectionArray.push({
         title: 'Recently Viewed',
         subtitle: 'Items you\'ve looked at',
         icon: <Eye size={20} color={theme.colors.primary} />,
-        data: createPairs(recentlyViewed) as any
+        data: createPairs(recentlyViewed)
       });
     }
 
     return sectionArray;
-  }, [personalizedRecommendations, trendingRecommendations, recentlyViewed, theme]);
+  }, [personalizedRecommendations, trendingRecommendations, recentlyViewed, theme.colors.primary]);
 
   const loadRecommendations = useCallback(async () => {
     if (!user) return;
@@ -107,10 +106,11 @@ export default function PersonalizedRecommendationsScreen() {
     try {
       setLoading(true);
       
+      // ✅ Reduced limits for faster loading and less memory usage
       const [personalized, trending, recent] = await Promise.all([
-        getPersonalizedRecommendations({ limit: 20 }),
-        getTrendingNearUser({ limit: 15 }),
-        getRecentlyViewed({ limit: 15 })
+        getPersonalizedRecommendations({ limit: 12 }),
+        getTrendingNearUser({ limit: 10 }),
+        getRecentlyViewed({ limit: 10 })
       ]);
 
       setPersonalizedRecommendations(personalized);
@@ -171,8 +171,8 @@ export default function PersonalizedRecommendationsScreen() {
     }
   }, [favorites, toggleGlobalFavorite, incrementListingFavoriteCount, decrementListingFavoriteCount, refreshStats]);
 
-  // ✅ Render section header
-  const renderSectionHeader = useCallback(({ section }: { section: SectionData }) => (
+  // ✅ Memoized section header component
+  const SectionHeader = React.memo(({ section }: { section: SectionData }) => (
     <View style={{ 
       paddingHorizontal: theme.spacing.lg,
       paddingTop: theme.spacing.xl,
@@ -189,72 +189,75 @@ export default function PersonalizedRecommendationsScreen() {
         </Text>
       )}
     </View>
-  ), [theme]);
+  ));
 
-  // ✅ Render row of 2 items for SectionList
-  const renderItem = useCallback(({ item: pair, index }: { item: RecommendationListing[]; index: number }) => {
-    const renderCard = (listing: RecommendationListing) => {
-      const isSellarPro = listing.is_sellar_pro === true;
-      
-      let badge;
-      if (listing.status === 'reserved') {
-        badge = { text: 'Reserved', variant: 'warning' as const };
-      } else if (listing.urgent_until && new Date(listing.urgent_until) > new Date()) {
-        badge = { text: 'Urgent Sale', variant: 'urgent' as const };
-      } else if (listing.spotlight_until && new Date(listing.spotlight_until) > new Date()) {
-        badge = { text: 'Spotlight', variant: 'spotlight' as const };
-      } else if (listing.boost_until && new Date(listing.boost_until) > new Date()) {
-        badge = { text: 'Boosted', variant: 'featured' as const };
-      } else if (isSellarPro) {
-        badge = { text: '⭐ PRO', variant: 'primary' as const };
-      }
+  const renderSectionHeader = useCallback(({ section }: { section: SectionData }) => (
+    <SectionHeader section={section} />
+  ), []);
 
-      return (
-        <View style={{ flex: 1, paddingHorizontal: 2}}>
-          <ProductCard
-            image={Array.isArray(listing.images) ? listing.images[0] : (listing.images || '')}
-            title={listing.title || 'Untitled'}
-            price={listing.price || 0}
-            previousPrice={listing.previous_price}
-            priceChangedAt={listing.price_changed_at}
-            currency={listing.currency || 'GHS'}
-            seller={{
-              id: listing.user_id || '',
-              name: listing.seller_name || 'Unknown',
-              avatar: listing.seller_avatar || undefined,
-              rating: 0
-            }}
-            badge={badge}
-            location={listing.location || 'Unknown'}
-            layout="grid"
-            fullWidth={false}
-            shadowSize="sm"
-            borderRadius={theme.borderRadius.sm}  
-            listingId={listing.listing_id}
-            isFavorited={favorites[listing.listing_id] || false}
-            viewCount={viewCounts[listing.listing_id] || 0}
-            favoritesCount={listingFavoriteCounts[listing.listing_id] ?? listing.favorites_count ?? 0}
-            onPress={() => handleListingPress(listing.listing_id)}
-            onFavoritePress={user?.id !== listing.user_id ? () => handleFavoritePress(listing.listing_id) : undefined}
-            showReportButton={false}
-            currentUserId={user?.id || ""}
-          />
-        </View>
-      );
-    };
+  // ✅ Memoized card component for better performance
+  const RecommendationCard = React.memo(({ listing }: { listing: RecommendationListing }) => {
+    const isSellarPro = listing.is_sellar_pro === true;
+    
+    let badge;
+    if (listing.status === 'reserved') {
+      badge = { text: 'Reserved', variant: 'warning' as const };
+    } else if (listing.urgent_until && new Date(listing.urgent_until) > new Date()) {
+      badge = { text: 'Urgent Sale', variant: 'urgent' as const };
+    } else if (listing.spotlight_until && new Date(listing.spotlight_until) > new Date()) {
+      badge = { text: 'Spotlight', variant: 'spotlight' as const };
+    } else if (listing.boost_until && new Date(listing.boost_until) > new Date()) {
+      badge = { text: 'Boosted', variant: 'featured' as const };
+    } else if (isSellarPro) {
+      badge = { text: '⭐ PRO', variant: 'primary' as const };
+    }
 
+    return (
+      <View style={{ flex: 1, paddingHorizontal: 2}}>
+        <ProductCard
+          image={Array.isArray(listing.images) ? listing.images[0] : (listing.images || '')}
+          title={listing.title || 'Untitled'}
+          price={listing.price || 0}
+          previousPrice={listing.previous_price}
+          priceChangedAt={listing.price_changed_at}
+          currency={listing.currency || 'GHS'}
+          seller={{
+            id: listing.user_id || '',
+            name: listing.seller_name || 'Unknown',
+            avatar: listing.seller_avatar || undefined,
+            rating: 0
+          }}
+          badge={badge}
+          location={listing.location || 'Unknown'}
+          layout="grid"
+          fullWidth={false}
+          shadowSize="sm"
+          borderRadius={theme.borderRadius.sm}  
+          listingId={listing.listing_id}
+          isFavorited={favorites[listing.listing_id] || false}
+          viewCount={viewCounts[listing.listing_id] || 0}
+          favoritesCount={listingFavoriteCounts[listing.listing_id] ?? listing.favorites_count ?? 0}
+          onPress={() => handleListingPress(listing.listing_id)}
+          onFavoritePress={user?.id !== listing.user_id ? () => handleFavoritePress(listing.listing_id) : undefined}
+          showReportButton={false}
+          currentUserId={user?.id || ""}
+        />
+      </View>
+    );
+  });
+
+  // ✅ Optimized render item with memoized components
+  const renderItem = useCallback(({ item: pair }: { item: RecommendationListing[] }) => {
     return (
       <View style={{ flexDirection: 'row', marginBottom: theme.spacing.sm, paddingHorizontal: theme.spacing.xs }}>
         {pair.map((listing) => (
-          <React.Fragment key={listing.listing_id}>
-            {renderCard(listing)}
-          </React.Fragment>
+          <RecommendationCard key={listing.listing_id} listing={listing} />
         ))}
         {/* Add spacer if only one item in pair */}
         {pair.length === 1 && <View style={{ flex: 1 }} />}
       </View>
     );
-  }, [theme, favorites, viewCounts, listingFavoriteCounts, user, handleListingPress, handleFavoritePress]);
+  }, [theme.spacing.sm, theme.spacing.xs]);
 
   const keyExtractor = useCallback((item: RecommendationListing[], index: number) => 
     `row-${index}-${item.map(i => i.listing_id).join('-')}`,
@@ -262,7 +265,12 @@ export default function PersonalizedRecommendationsScreen() {
   );
 
   useEffect(() => {
-    loadRecommendations();
+    // ✅ Delay loading to improve navigation performance
+    const timer = setTimeout(() => {
+      loadRecommendations();
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, [loadRecommendations]);
 
   if (!user) {
@@ -312,12 +320,20 @@ export default function PersonalizedRecommendationsScreen() {
         }
         showsVerticalScrollIndicator={false}
         stickySectionHeadersEnabled={false}
-        // ✅ Performance optimizations
+        // ✅ Enhanced performance optimizations for smooth navigation
         removeClippedSubviews={true}
-        maxToRenderPerBatch={10}
-        windowSize={5}
-        initialNumToRender={10}
-        updateCellsBatchingPeriod={50}
+        maxToRenderPerBatch={6}
+        windowSize={7}
+        initialNumToRender={8}
+        updateCellsBatchingPeriod={100}
+        decelerationRate="fast"
+        scrollEventThrottle={32}
+        // ✅ Optimize for navigation transitions
+        getItemLayout={(data, index) => ({
+          length: 200, // Approximate row height
+          offset: 200 * index,
+          index,
+        })}
       />
     </SafeAreaWrapper>
   );

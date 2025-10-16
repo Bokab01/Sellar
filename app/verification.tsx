@@ -10,6 +10,7 @@ import {
   Button,
   EmptyState,
   LoadingSkeleton,
+  HomeScreenSkeleton,
   Badge,
 } from '@/components';
 import { 
@@ -137,145 +138,18 @@ export default function VerificationScreen() {
           showBackButton
           onBackPress={() => router.back()}
         />
-        <Container>
-          {/* Trust Score Section Skeleton */}
-          <View
-            style={{
-              backgroundColor: theme.colors.surface,
-              borderRadius: theme.borderRadius.lg,
-              padding: theme.spacing.lg,
-              marginBottom: theme.spacing.lg,
-              ...theme.shadows.sm,
-            }}
-          >
-            {/* Header with icon and badge */}
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: theme.spacing.md,
-            }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <LoadingSkeleton width={24} height={24} style={{ marginRight: theme.spacing.sm }} />
-                <LoadingSkeleton width={100} height={24} />
-              </View>
-              <LoadingSkeleton width={60} height={24} borderRadius={12} />
-            </View>
-
-            {/* Score display */}
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginBottom: theme.spacing.sm,
-            }}>
-              <LoadingSkeleton width={40} height={32} style={{ marginRight: theme.spacing.sm }} />
-              <LoadingSkeleton width={30} height={16} />
-            </View>
-
-            {/* Description */}
-            <LoadingSkeleton width="80%" height={14} style={{ marginBottom: theme.spacing.md }} />
-
-            {/* Verification badges */}
-            <View style={{
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              gap: theme.spacing.sm,
-            }}>
-              <LoadingSkeleton width={60} height={20} borderRadius={10} />
-              <LoadingSkeleton width={80} height={20} borderRadius={10} />
-              <LoadingSkeleton width={70} height={20} borderRadius={10} />
-            </View>
-          </View>
-
-          {/* Your Verifications Section Skeleton */}
-          <View style={{ marginBottom: theme.spacing.xl }}>
-            <LoadingSkeleton width={150} height={24} style={{ marginBottom: theme.spacing.lg }} />
-            
-            {/* Verification Cards */}
-            <View style={{ gap: theme.spacing.md }}>
-              {Array.from({ length: 3 }).map((_, index) => (
-                <View
-                  key={index}
-                  style={{
-                    backgroundColor: theme.colors.surface,
-                    borderRadius: theme.borderRadius.lg,
-                    padding: theme.spacing.lg,
-                    borderWidth: 1,
-                    borderColor: theme.colors.border,
-                    ...theme.shadows.sm,
-                  }}
-                >
-                  {/* Header with icon and status */}
-                  <View style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: theme.spacing.md,
-                  }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <LoadingSkeleton width={24} height={24} style={{ marginRight: theme.spacing.sm }} />
-                      <LoadingSkeleton width={120} height={18} />
-                    </View>
-                    <LoadingSkeleton width={60} height={20} borderRadius={10} />
-                  </View>
-
-                  {/* Description */}
-                  <LoadingSkeleton width="90%" height={14} style={{ marginBottom: theme.spacing.sm }} />
-                  <LoadingSkeleton width="70%" height={14} style={{ marginBottom: theme.spacing.md }} />
-
-                  {/* Footer with date and action */}
-                  <View style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}>
-                    <LoadingSkeleton width={100} height={14} />
-                    <LoadingSkeleton width={80} height={32} borderRadius={16} />
-                  </View>
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* Available Verifications Section Skeleton */}
-          <View>
-            <LoadingSkeleton width={180} height={24} style={{ marginBottom: theme.spacing.lg }} />
-            
-            {/* Available verification cards */}
-            <View style={{ gap: theme.spacing.md }}>
-              {Array.from({ length: 2 }).map((_, index) => (
-                <View
-                  key={index}
-                  style={{
-                    backgroundColor: theme.colors.surface,
-                    borderRadius: theme.borderRadius.lg,
-                    padding: theme.spacing.lg,
-                    borderWidth: 1,
-                    borderColor: theme.colors.border,
-                    ...theme.shadows.sm,
-                  }}
-                >
-                  {/* Header with icon and type */}
-                  <View style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    marginBottom: theme.spacing.md,
-                  }}>
-                    <LoadingSkeleton width={24} height={24} style={{ marginRight: theme.spacing.sm }} />
-                    <LoadingSkeleton width={100} height={18} />
-                  </View>
-
-                  {/* Description */}
-                  <LoadingSkeleton width="85%" height={14} style={{ marginBottom: theme.spacing.sm }} />
-                  <LoadingSkeleton width="75%" height={14} style={{ marginBottom: theme.spacing.md }} />
-
-                  {/* Action button */}
-                  <LoadingSkeleton width={120} height={36} borderRadius={18} />
-                </View>
-              ))}
-            </View>
-          </View>
-        </Container>
+        <View style={{ 
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: theme.colors.background,
+        }}>
+          <HomeScreenSkeleton loadingText="Loading verification status..." />
+        </View>
       </SafeAreaWrapper>
     );
   }

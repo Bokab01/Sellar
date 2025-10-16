@@ -50,33 +50,35 @@ export default function TrendingScreen() {
     decrementListingFavoriteCount
   } = useFavoritesStore();
 
-  // ✅ Create section list data structure with pairs for 2-column grid
+  // ✅ Optimized section list data structure with memoized pairs
   const sections = useMemo<SectionData[]>(() => {
     if (trendingItems.length === 0) return [];
 
-    // Helper to create pairs
+    // Memoized helper to create pairs
     const createPairs = (items: RecommendationListing[]): RecommendationListing[][] => {
+      if (items.length === 0) return [];
       const pairs: RecommendationListing[][] = [];
       for (let i = 0; i < items.length; i += 2) {
         pairs.push([items[i], items[i + 1]].filter(Boolean));
       }
-      return pairs as any;
+      return pairs;
     };
 
     return [{
       title: 'Trending Near You',
       subtitle: 'Popular items in your area',
       icon: <TrendingUp size={20} color={theme.colors.primary} />,
-      data: createPairs(trendingItems) as any
+      data: createPairs(trendingItems)
     }];
-  }, [trendingItems, theme]);
+  }, [trendingItems, theme.colors.primary]);
 
   const loadTrendingItems = useCallback(async () => {
     if (!user) return;
 
     try {
       setLoading(true);
-      const trending = await getTrendingNearUser({ limit: 50 });
+      // ✅ Reduced limit for faster loading and less memory usage
+      const trending = await getTrendingNearUser({ limit: 30 });
       setTrendingItems(trending);
     } catch (error) {
       console.error('Error loading trending items:', error);
@@ -133,8 +135,8 @@ export default function TrendingScreen() {
     }
   }, [favorites, toggleGlobalFavorite, incrementListingFavoriteCount, decrementListingFavoriteCount, refreshStats]);
 
-  // ✅ Render section header
-  const renderSectionHeader = useCallback(({ section }: { section: SectionData }) => (
+  // ✅ Memoized section header component
+  const SectionHeader = React.memo(({ section }: { section: SectionData }) => (
     <View style={{ 
       paddingHorizontal: theme.spacing.lg,
       paddingTop: theme.spacing.lg,
@@ -151,71 +153,74 @@ export default function TrendingScreen() {
         </Text>
       )}
     </View>
-  ), [theme]);
+  ));
 
-  // ✅ Render row of 2 items for SectionList
+  const renderSectionHeader = useCallback(({ section }: { section: SectionData }) => (
+    <SectionHeader section={section} />
+  ), []);
+
+  // ✅ Memoized card component for better performance
+  const TrendingCard = React.memo(({ listing }: { listing: RecommendationListing }) => {
+    const isSellarPro = listing.is_sellar_pro === true;
+    
+    let badge;
+    if (listing.status === 'reserved') {
+      badge = { text: 'Reserved', variant: 'warning' as const };
+    } else if (listing.urgent_until && new Date(listing.urgent_until) > new Date()) {
+      badge = { text: 'Urgent Sale', variant: 'urgent' as const };
+    } else if (listing.spotlight_until && new Date(listing.spotlight_until) > new Date()) {
+      badge = { text: 'Spotlight', variant: 'spotlight' as const };
+    } else if (listing.boost_until && new Date(listing.boost_until) > new Date()) {
+      badge = { text: 'Boosted', variant: 'featured' as const };
+    } else if (isSellarPro) {
+      badge = { text: '⭐ PRO', variant: 'primary' as const };
+    }
+
+    return (
+      <View style={{ flex: 1, paddingHorizontal: theme.spacing.sm }}>
+        <ProductCard
+          image={Array.isArray(listing.images) ? listing.images[0] : (listing.images || '')}
+          title={listing.title || 'Untitled'}
+          price={listing.price || 0}
+          previousPrice={listing.previous_price}
+          priceChangedAt={listing.price_changed_at}
+          currency={listing.currency || 'GHS'}
+          seller={{
+            id: listing.user_id || '',
+            name: listing.seller_name || 'Unknown',
+            avatar: listing.seller_avatar || undefined,
+            rating: 0
+          }}
+          badge={badge}
+          location={listing.location || 'Unknown'}
+          layout="grid"
+          fullWidth={false}
+          shadowSize="sm"
+          listingId={listing.listing_id}
+          isFavorited={favorites[listing.listing_id] || false}
+          viewCount={viewCounts[listing.listing_id] || 0}
+          favoritesCount={listingFavoriteCounts[listing.listing_id] ?? listing.favorites_count ?? 0}
+          onPress={() => handleListingPress(listing.listing_id)}
+          onFavoritePress={user?.id !== listing.user_id ? () => handleFavoritePress(listing.listing_id) : undefined}
+          showReportButton={false}
+          currentUserId={user?.id || ""}
+        />
+      </View>
+    );
+  });
+
+  // ✅ Optimized render item with memoized components
   const renderItem = useCallback(({ item: pair }: { item: RecommendationListing[] }) => {
-    const renderCard = (listing: RecommendationListing) => {
-      const isSellarPro = listing.is_sellar_pro === true;
-      
-      let badge;
-      if (listing.status === 'reserved') {
-        badge = { text: 'Reserved', variant: 'warning' as const };
-      } else if (listing.urgent_until && new Date(listing.urgent_until) > new Date()) {
-        badge = { text: 'Urgent Sale', variant: 'urgent' as const };
-      } else if (listing.spotlight_until && new Date(listing.spotlight_until) > new Date()) {
-        badge = { text: 'Spotlight', variant: 'spotlight' as const };
-      } else if (listing.boost_until && new Date(listing.boost_until) > new Date()) {
-        badge = { text: 'Boosted', variant: 'featured' as const };
-      } else if (isSellarPro) {
-        badge = { text: '⭐ PRO', variant: 'primary' as const };
-      }
-
-      return (
-        <View style={{ flex: 1, paddingHorizontal: theme.spacing.sm }}>
-          <ProductCard
-            image={Array.isArray(listing.images) ? listing.images[0] : (listing.images || '')}
-            title={listing.title || 'Untitled'}
-            price={listing.price || 0}
-            previousPrice={listing.previous_price}
-            priceChangedAt={listing.price_changed_at}
-            currency={listing.currency || 'GHS'}
-            seller={{
-              id: listing.user_id || '',
-              name: listing.seller_name || 'Unknown',
-              avatar: listing.seller_avatar || undefined,
-              rating: 0
-            }}
-            badge={badge}
-            location={listing.location || 'Unknown'}
-            layout="grid"
-            fullWidth={false}
-            shadowSize="sm"
-            listingId={listing.listing_id}
-            isFavorited={favorites[listing.listing_id] || false}
-            viewCount={viewCounts[listing.listing_id] || 0}
-            favoritesCount={listingFavoriteCounts[listing.listing_id] ?? listing.favorites_count ?? 0}
-            onPress={() => handleListingPress(listing.listing_id)}
-            onFavoritePress={user?.id !== listing.user_id ? () => handleFavoritePress(listing.listing_id) : undefined}
-            showReportButton={false}
-            currentUserId={user?.id || ""}
-          />
-        </View>
-      );
-    };
-
     return (
       <View style={{ flexDirection: 'row', marginBottom: theme.spacing.sm, paddingHorizontal: theme.spacing.xs }}>
         {pair.map((listing) => (
-          <React.Fragment key={listing.listing_id}>
-            {renderCard(listing)}
-          </React.Fragment>
+          <TrendingCard key={listing.listing_id} listing={listing} />
         ))}
         {/* Add spacer if only one item in pair */}
         {pair.length === 1 && <View style={{ flex: 1 }} />}
       </View>
     );
-  }, [theme, favorites, viewCounts, listingFavoriteCounts, user, handleListingPress, handleFavoritePress]);
+  }, [theme.spacing.sm, theme.spacing.xs]);
 
   const keyExtractor = useCallback((item: RecommendationListing[], index: number) => 
     `row-${index}-${item.map(i => i.listing_id).join('-')}`,
@@ -223,7 +228,12 @@ export default function TrendingScreen() {
   );
 
   useEffect(() => {
-    loadTrendingItems();
+    // ✅ Delay loading to improve navigation performance
+    const timer = setTimeout(() => {
+      loadTrendingItems();
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, [loadTrendingItems]);
 
   if (!user) {
@@ -286,12 +296,20 @@ export default function TrendingScreen() {
         }
         showsVerticalScrollIndicator={false}
         stickySectionHeadersEnabled={false}
-        // ✅ Performance optimizations
+        // ✅ Enhanced performance optimizations for smooth navigation
         removeClippedSubviews={true}
-        maxToRenderPerBatch={10}
-        windowSize={5}
-        initialNumToRender={10}
-        updateCellsBatchingPeriod={50}
+        maxToRenderPerBatch={6}
+        windowSize={7}
+        initialNumToRender={8}
+        updateCellsBatchingPeriod={100}
+        decelerationRate="fast"
+        scrollEventThrottle={32}
+        // ✅ Optimize for navigation transitions
+        getItemLayout={(data, index) => ({
+          length: 200, // Approximate row height
+          offset: 200 * index,
+          index,
+        })}
       />
     </SafeAreaWrapper>
   );

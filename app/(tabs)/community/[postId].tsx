@@ -359,10 +359,10 @@ export default function PostDetailScreen() {
       return;
     }
 
-    setSubmittingComment(true);
-    try {
-      if (editingComment) {
-        // Edit existing comment
+    if (editingComment) {
+      // Edit existing comment - no optimistic update needed
+      setSubmittingComment(true);
+      try {
         console.log('Attempting to edit comment:', {
           commentId: editingComment.id,
           content: commentText.trim(),
@@ -387,94 +387,147 @@ export default function PostDetailScreen() {
         
         // Refresh comments to get updated content
         await fetchComments();
-      } else {
-        // Moderate content before creating comment
-        const moderationResult = await contentModerationService.moderateContent({
-          id: 'temp-comment-id', // Temporary ID
-          type: 'comment',
-          userId: user.id,
-          content: commentText.trim(),
-        });
-
-        // Check if content is approved
-        if (!moderationResult.isApproved) {
-          setSubmittingComment(false);
-          
-          // Extract specific violations with user-friendly messages
-          const flagReasons = moderationResult.flags
-            .map(flag => {
-              if (flag.type === 'profanity') {
-                return 'Inappropriate language detected';
-              } else if (flag.type === 'personal_info') {
-                return 'Too much personal information (multiple phone numbers/emails)';
-              } else if (flag.type === 'spam') {
-                return 'Spam-like content detected';
-              } else if (flag.type === 'inappropriate') {
-                return 'Inappropriate content detected';
-              } else if (flag.type === 'suspicious_links') {
-                return 'Suspicious or shortened links detected';
-              }
-              return flag.details;
-            })
-            .join('\n• ');
-          
-          setModerationError(`Your comment cannot be published:\n\n• ${flagReasons}\n\nPlease review and modify your content, then try again.`);
-          setShowModerationModal(true);
-          return;
-        }
-
-        // Add new comment or reply
-        console.log('Attempting to add comment:', {
-          postId,
-          userId: user.id,
-          content: commentText.trim(),
-          parentId: replyingTo?.id || null,
-          isReply: !!replyingTo
-        });
-
-        const { data, error } = await supabase
-          .from('comments')
-          .insert({
-            post_id: postId!,
-            user_id: user.id,
-            content: commentText.trim(),
-            parent_id: replyingTo?.id || null,
-            status: moderationResult.requiresManualReview ? 'hidden' : 'active',
-          })
-          .select();
-
-        if (error) {
-          console.error('Supabase error:', error);
-          throw error;
-        }
-
-        console.log('Comment added successfully:', data);
-        
-        // Log moderation result with actual comment ID
-        if (data && data[0]?.id) {
-          try {
-            await contentModerationService.moderateContent({
-              id: data[0].id,
-              type: 'comment',
-              userId: user.id,
-              content: commentText.trim(),
-            });
-          } catch (logError) {
-            console.error('Failed to log moderation result:', logError);
-          }
-        }
-
-        setCommentText('');
-        setReplyingTo(null);
-        
-        // Refresh comments and post data
-        await fetchComments();
-        await fetchPost();
+      } catch (error) {
+        console.error('Failed to edit comment:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        setToastMessage(`Failed to edit comment: ${errorMessage}`);
+        setToastVariant('error');
+        setShowToast(true);
+        setCommentText(commentText); // Restore comment text on error
+      } finally {
+        setSubmittingComment(false);
       }
+      return;
+    }
+
+    // ✅ OPTIMISTIC UPDATE: Add comment immediately to UI
+    const tempId = `temp-comment-${Date.now()}-${Math.random()}`;
+    const optimisticComment = {
+      id: tempId,
+      post_id: postId!,
+      user_id: user.id,
+      content: commentText.trim(),
+      parent_id: replyingTo?.id || null,
+      status: 'sending',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      profiles: {
+        id: user.id,
+        first_name: user.user_metadata?.first_name || '',
+        last_name: user.user_metadata?.last_name || '',
+        avatar_url: user.user_metadata?.avatar_url || null,
+      }
+    };
+
+    // Add optimistic comment immediately
+    setComments(prev => {
+      const updatedComments = [...prev, optimisticComment];
+      console.log('📝 Added optimistic comment:', tempId);
+      return updatedComments;
+    });
+
+    setSubmittingComment(true);
+    try {
+      // Moderate content before creating comment
+      const moderationResult = await contentModerationService.moderateContent({
+        id: 'temp-comment-id', // Temporary ID
+        type: 'comment',
+        userId: user.id,
+        content: commentText.trim(),
+      });
+
+      // Check if content is approved
+      if (!moderationResult.isApproved) {
+        // Remove optimistic comment on moderation failure
+        setComments(prev => prev.filter(comment => comment.id !== tempId));
+        setSubmittingComment(false);
+        
+        // Extract specific violations with user-friendly messages
+        const flagReasons = moderationResult.flags
+          .map(flag => {
+            if (flag.type === 'profanity') {
+              return 'Inappropriate language detected';
+            } else if (flag.type === 'personal_info') {
+              return 'Too much personal information (multiple phone numbers/emails)';
+            } else if (flag.type === 'spam') {
+              return 'Spam-like content detected';
+            } else if (flag.type === 'inappropriate') {
+              return 'Inappropriate content detected';
+            } else if (flag.type === 'suspicious_links') {
+              return 'Suspicious or shortened links detected';
+            }
+            return flag.details;
+          })
+          .join('\n• ');
+        
+        setModerationError(`Your comment cannot be published:\n\n• ${flagReasons}\n\nPlease review and modify your content, then try again.`);
+        setShowModerationModal(true);
+        return;
+      }
+
+      // Add new comment or reply
+      console.log('Attempting to add comment:', {
+        postId,
+        userId: user.id,
+        content: commentText.trim(),
+        parentId: replyingTo?.id || null,
+        isReply: !!replyingTo
+      });
+
+      const { data, error } = await supabase
+        .from('comments')
+        .insert({
+          post_id: postId!,
+          user_id: user.id,
+          content: commentText.trim(),
+          parent_id: replyingTo?.id || null,
+          status: moderationResult.requiresManualReview ? 'hidden' : 'active',
+        })
+        .select();
+
+      if (error) {
+        console.error('Supabase error:', error);
+        // Remove optimistic comment on error
+        setComments(prev => prev.filter(comment => comment.id !== tempId));
+        throw error;
+      }
+
+      console.log('Comment added successfully:', data);
+      
+      // Update optimistic comment with real data
+      setComments(prev => {
+        const updatedComments = prev.map(comment => 
+          comment.id === tempId 
+            ? { ...data[0], status: 'active' }
+            : comment
+        );
+        console.log('📝 Updated optimistic comment with real data');
+        return updatedComments;
+      });
+      
+      // Log moderation result with actual comment ID
+      if (data && data[0]?.id) {
+        try {
+          await contentModerationService.moderateContent({
+            id: data[0].id,
+            type: 'comment',
+            userId: user.id,
+            content: commentText.trim(),
+          });
+        } catch (logError) {
+          console.error('Failed to log moderation result:', logError);
+        }
+      }
+
+      setCommentText('');
+      setReplyingTo(null);
+      
+      // Refresh post data to update comment count
+      await fetchPost();
     } catch (error) {
-      console.error('Failed to add/edit comment:', error);
+      console.error('Failed to add comment:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      const actionText = editingComment ? 'edit comment' : (replyingTo ? 'add reply' : 'add comment');
+      const actionText = replyingTo ? 'add reply' : 'add comment';
       setToastMessage(`Failed to ${actionText}: ${errorMessage}`);
       setToastVariant('error');
       setShowToast(true);
@@ -886,7 +939,7 @@ export default function PostDetailScreen() {
       {editingComment && (
         <Animated.View style={{
           position: 'absolute',
-          bottom: 60,
+          bottom: 80, // Increased from 60 to account for input field height
           left: theme.spacing.lg,
           right: theme.spacing.lg,
           flexDirection: 'row',

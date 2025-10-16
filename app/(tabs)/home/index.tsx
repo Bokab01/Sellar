@@ -1,10 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, lazy, Suspense, useCallback } from 'react';
-import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl, Animated, Pressable, FlatList } from 'react-native';
-
-// Create animated FlatList for scroll animations
-const AnimatedFlatList = Animated.createAnimatedComponent(FlatList<any>);
+import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl, Pressable, FlatList, Animated } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // Removed Haptics import - not used
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -57,7 +53,6 @@ import {
   Search,
   Filter,
   ListFilterPlus,
-  ChevronUp,
   Grid2X2,
   House,
   Wifi,
@@ -85,14 +80,7 @@ export default function HomeScreen() {
     }
   }, [isNewUser, newUserLoading]);
 
-  // Cleanup scroll timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (scrollUpdateTimeout.current) {
-        clearTimeout(scrollUpdateTimeout.current);
-      }
-    };
-  }, []);
+  // No cleanup needed for simple scroll handler
   const { 
     currentLocation, 
     setCurrentLocation,
@@ -136,54 +124,26 @@ export default function HomeScreen() {
 
   // Category scroll reference (simplified - removed complex animations)
   const categoryScrollRef = useRef<ScrollView>(null);
-
-  // Scroll animation values
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const headerHeight = 160; // Approximate header height
-  const searchBarHeight = 70; // Search bar height with padding
-  const lastScrollY = useRef(0);
-  const scrollDirection = useRef<'up' | 'down'>('down');
-
-  // Animated values for header and floating search (simplified)
-  const headerTranslateY = useRef(new Animated.Value(0)).current;
-  const floatingSearchTranslateY = useRef(new Animated.Value(0)).current;
-  const floatingSearchOpacity = useRef(new Animated.Value(1)).current;
   
-  // Scroll-to-top FAB state
-  const [showScrollToTop, setShowScrollToTop] = useState(false);
-  const scrollToTopOpacity = useRef(new Animated.Value(0)).current;
-  const scrollToTopScale = useRef(new Animated.Value(0.8)).current;
+  // ✅ Category scroll indicator state
+  const [categoryScrollProgress, setCategoryScrollProgress] = useState(0);
+  const [categoryScrollMax, setCategoryScrollMax] = useState(0);
+
+  // Scroll state (no animations)
   const mainScrollViewRef = useRef<any>(null);
+
+  // ✅ Search header animation state
+  const searchHeaderTranslateY = useRef(new Animated.Value(0)).current;
+  const searchHeaderOpacity = useRef(new Animated.Value(1)).current;
+  const [isSearchHeaderVisible, setIsSearchHeaderVisible] = useState(true);
+  const lastScrollY = useRef(0);
+  const scrollDirection = useRef<'up' | 'down' | null>(null);
 
   // Category counts removed - no longer displayed in UI for better performance
 
   // Smart search modal removed - now using dedicated screen
 
-  // Enhanced scroll to top function with smooth UX
-  const scrollToTop = useCallback(() => {
-    if (mainScrollViewRef.current) {
-      // Smooth scroll to top with easing (FlatList uses scrollToOffset)
-      mainScrollViewRef.current.scrollToOffset({ 
-        offset: 0, 
-        animated: true 
-      });
-      
-      // Hide FAB immediately for better UX
-      setShowScrollToTop(false);
-      Animated.parallel([
-        Animated.timing(scrollToTopOpacity, {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scrollToTopScale, {
-          toValue: 0.8,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-  }, [scrollToTopOpacity, scrollToTopScale]);
+  // Scroll to top function removed - no FAB needed
 
   // Handle listing press with interaction tracking
   const handleListingPress = useCallback(async (listingId: string) => {
@@ -199,112 +159,69 @@ export default function HomeScreen() {
 
   // ✅ Optimized favorite toggle handler - Will be defined after variables are declared
 
-  // ✅ Optimized scroll handler with debouncing
-  const scrollUpdateTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
-  const handleScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    {
-      useNativeDriver: true,
-      listener: (event: any) => {
-        const currentScrollY = event.nativeEvent.contentOffset.y;
-        const diff = currentScrollY - lastScrollY.current;
-        
-        // Throttle scroll-to-top FAB updates
-        if (scrollUpdateTimeout.current) {
-          clearTimeout(scrollUpdateTimeout.current);
-        }
-        
-        scrollUpdateTimeout.current = setTimeout(() => {
-          // Show/hide scroll-to-top FAB
-          if (currentScrollY > 300 && !showScrollToTop) {
-            setShowScrollToTop(true);
-            Animated.parallel([
-              Animated.timing(scrollToTopOpacity, {
-                toValue: 1,
-                duration: 250,
-                useNativeDriver: true,
-              }),
-              Animated.spring(scrollToTopScale, {
-                toValue: 1,
-                useNativeDriver: true,
-                tension: 120,
-                friction: 7,
-                overshootClamping: true,
-              }),
-            ]).start();
-          } else if (currentScrollY <= 300 && showScrollToTop) {
-            setShowScrollToTop(false);
-            Animated.parallel([
-              Animated.timing(scrollToTopOpacity, {
-                toValue: 0,
-                duration: 200,
-                useNativeDriver: true,
-              }),
-              Animated.timing(scrollToTopScale, {
-                toValue: 0.8,
-                duration: 200,
-                useNativeDriver: true,
-              }),
-            ]).start();
-          }
-        }, 100); // Debounce FAB updates
-        
-        // Determine scroll direction with threshold to prevent jitter
-        if (Math.abs(diff) > 5) { // Only trigger on significant scroll
-          if (diff > 0 && currentScrollY > 50) {
-            // Scrolling down
-            if (scrollDirection.current !== 'down') {
-              scrollDirection.current = 'down';
-              // Simplified animations - hide header, show sticky search
-              Animated.parallel([
-                Animated.timing(headerTranslateY, {
-                  toValue: -headerHeight,
-                  duration: 250,
-                  useNativeDriver: true,
-                }),
-                Animated.timing(floatingSearchTranslateY, {
-                  toValue: -100,
-                  duration: 250,
-                  useNativeDriver: true,
-                }),
-                Animated.timing(floatingSearchOpacity, {
-                  toValue: 0,
-                  duration: 250,
-                  useNativeDriver: true,
-                }),
-              ]).start();
-            }
-          } else if (diff < -5 || currentScrollY <= 50) {
-            // Scrolling up or at top
-            if (scrollDirection.current !== 'up') {
-              scrollDirection.current = 'up';
-              // Show header and floating search
-              Animated.parallel([
-                Animated.timing(headerTranslateY, {
-                  toValue: 0,
-                  duration: 250,
-                  useNativeDriver: true,
-                }),
-                Animated.timing(floatingSearchTranslateY, {
-                  toValue: 0,
-                  duration: 250,
-                  useNativeDriver: true,
-                }),
-                Animated.timing(floatingSearchOpacity, {
-                  toValue: 1,
-                  duration: 250,
-                  useNativeDriver: true,
-                }),
-              ]).start();
-            }
-          }
-        }
-        
-        lastScrollY.current = currentScrollY;
-      },
+  // ✅ Enhanced scroll handler with scroll direction detection
+  const handleScroll = useCallback((event: any) => {
+    const currentOffset = event.nativeEvent.contentOffset.y;
+    const scrollThreshold = 50; // Hide after scrolling 50px down
+    const scrollDelta = currentOffset - lastScrollY.current;
+    
+    // Determine scroll direction
+    if (Math.abs(scrollDelta) > 5) { // Minimum scroll distance to avoid jitter
+      scrollDirection.current = scrollDelta > 0 ? 'down' : 'up';
     }
-  );
+    
+    // Update last scroll position
+    lastScrollY.current = currentOffset;
+    
+    // Show search header when scrolling up (regardless of position)
+    if (scrollDirection.current === 'up' && !isSearchHeaderVisible) {
+      setIsSearchHeaderVisible(true);
+      Animated.parallel([
+        Animated.timing(searchHeaderTranslateY, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(searchHeaderOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+    // Hide search header when scrolling down past threshold
+    else if (scrollDirection.current === 'down' && currentOffset > scrollThreshold && isSearchHeaderVisible) {
+      setIsSearchHeaderVisible(false);
+      Animated.parallel([
+        Animated.timing(searchHeaderTranslateY, {
+          toValue: -100,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(searchHeaderOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+    // Show search header when at the top
+    else if (currentOffset <= scrollThreshold && !isSearchHeaderVisible) {
+      setIsSearchHeaderVisible(true);
+      Animated.parallel([
+        Animated.timing(searchHeaderTranslateY, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(searchHeaderOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isSearchHeaderVisible, searchHeaderTranslateY, searchHeaderOpacity]);
 
   // Fetch user credit balance function
   const fetchUserCredit = async () => {
@@ -595,7 +512,7 @@ export default function HomeScreen() {
         decrementListingFavoriteCount(productId);
       }
     }
-  }, [globalFavorites, toggleGlobalFavorite, incrementListingFavoriteCount, decrementListingFavoriteCount, refreshStats]);
+  }, [toggleGlobalFavorite, incrementListingFavoriteCount, decrementListingFavoriteCount, refreshStats]);
   
   // Use global favorites from store (merged with hook favorites for backward compatibility)
   const favorites = useMemo(() => ({
@@ -672,16 +589,54 @@ export default function HomeScreen() {
   const lastName = profile?.last_name || user?.user_metadata?.last_name || '';
   const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
 
-  // ✅ Memoize category items to prevent re-creating on every render
+  // ✅ Optimized category items with lazy loading
+  const [showAllCategories, setShowAllCategories] = useState(false);
+  
   const categoryItems = useMemo(() => {
-    return categories.map((category) => {
+    const processedCategories = categories.map((category) => {
       const isSelected = filters.categories?.includes(category.label);
       return {
         ...category,
         isSelected,
       };
     });
-  }, [categories, filters.categories]);
+    
+    // Show only first 8 categories initially for better performance
+    return showAllCategories ? processedCategories : processedCategories.slice(0, 8);
+  }, [categories, filters.categories, showAllCategories]);
+
+  // ✅ Load more categories after initial render
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowAllCategories(true);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // ✅ Initialize scroll indicator when categories change
+  useEffect(() => {
+    if (categoryItems.length > 0 && categoryScrollRef.current) {
+      // Force a scroll event to initialize the indicator
+      setTimeout(() => {
+        categoryScrollRef.current?.scrollTo({ x: 0, animated: false });
+      }, 100);
+    }
+  }, [categoryItems.length]);
+
+  // ✅ Category scroll handler for indicator
+  const handleCategoryScroll = useCallback((event: any) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const scrollX = contentOffset.x;
+    const maxScrollX = contentSize.width - layoutMeasurement.width;
+    
+    // Always update progress, even if maxScrollX is 0
+    const progress = maxScrollX > 0 ? Math.min(scrollX / maxScrollX, 1) : 0;
+    setCategoryScrollProgress(progress);
+    setCategoryScrollMax(maxScrollX);
+    
+    // Debug logging
+    console.log('Category scroll:', { scrollX, maxScrollX, progress, contentSize: contentSize.width, layout: layoutMeasurement.width });
+  }, []);
 
   // ✅ Optimized category render item
   const renderCategoryItem = useCallback((category: any) => {
@@ -764,91 +719,88 @@ export default function HomeScreen() {
     </View>
   ), [theme, favorites, viewCounts, listingFavoriteCounts, user?.id, handleListingPress, handleFavoriteToggle]);
 
-  // ✅ Create a lighter, more stable header component
-  const ListHeader = useMemo(() => (
-    <View>
-      {/* Professional Location Display */}
+  // ✅ Memoized location display component
+  const LocationDisplay = useMemo(() => (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginHorizontal: theme.spacing.lg,
+        marginTop: theme.spacing['2xl'] + theme.spacing['3xl'],
+        marginBottom: theme.spacing.md,
+      }}
+    >
       <View
         style={{
-          flexDirection: 'row',
+          width: 24,
+          height: 24,
+          borderRadius: 12,
+          backgroundColor: theme.colors.primary + '15',
           alignItems: 'center',
-          marginHorizontal: theme.spacing.lg,
-          marginVertical: theme.spacing.md,
+          justifyContent: 'center',
+          marginRight: theme.spacing.sm,
         }}
       >
-        <View
+        <MapPin size={16} color={theme.colors.primary} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text
+          variant="button"
           style={{
-            width: 24,
-            height: 24,
-            borderRadius: 12,
-            backgroundColor: theme.colors.primary + '15',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginRight: theme.spacing.sm,
+            color: theme.colors.text.primary,
+            fontWeight: '600',
+            marginTop: 2,
           }}
         >
-          <MapPin size={16} color={theme.colors.primary} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text
-            variant="button"
-            style={{
-              color: theme.colors.text.primary,
-              fontWeight: '600',
-              marginTop: 2,
-            }}
-          >
-            {currentLocation}
-          </Text>
-        </View>
+          {currentLocation}
+        </Text>
       </View>
+    </View>
+  ), [theme, currentLocation]);
 
-      {/* Enhanced Categories - Simplified without complex animations */}
-      <View style={{ paddingVertical: theme.spacing.md }}>
-        <ScrollView
-          ref={categoryScrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          decelerationRate="fast"
-          scrollEventThrottle={16}
-          contentContainerStyle={{
-            paddingHorizontal: theme.spacing.md,
-            marginVertical: theme.spacing.sm,
-            gap: theme.spacing.sm,
-            alignItems: 'center',
-            paddingTop: theme.spacing.md,
-          }}
-        >
-          {categoryItems.map(renderCategoryItem)}
-        </ScrollView>
-      </View>
+  // ✅ Memoized categories section - now sticky
+  const CategoriesSection = useMemo(() => (
+    <View style={{ 
+      paddingTop: theme.spacing.sm,
+      paddingBottom: theme.spacing.sm,
+    }}>
+      <ScrollView
+        ref={categoryScrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        scrollEventThrottle={16}
+        onScroll={handleCategoryScroll}
+        contentContainerStyle={{
+          paddingHorizontal: theme.spacing.md,
+          marginVertical: theme.spacing.sm,
+          gap: theme.spacing.sm,
+          alignItems: 'center',
+          paddingTop: theme.spacing.md,
+        }}
+      >
+        {categoryItems.map(renderCategoryItem)}
+      </ScrollView>
+    </View>
+  ), [theme, categoryItems, renderCategoryItem, handleCategoryScroll]);
 
-      {/* Featured Business Listings - Removed Suspense for better performance */}
-      {!searchQuery && !filters.categories?.length && !filters.location && !filters.condition?.length && !filters.priceRange.min && !filters.priceRange.max && (
-        <View style={{ minHeight: 200 }}>
-          <CodeSplitting.FixedFeaturedListings
-            maxItems={10}
-            layout="horizontal"
-            onViewAll={() => {
-              navigation.home.goToBusinessListings();
-            }}
-          />
-        </View>
-      )}
+  // ✅ Memoized dynamic title section
+  const DynamicTitleSection = useMemo(() => {
+    const title = filters.categories?.length > 0 
+      ? `${filters.categories[0]} Listings`
+      : searchQuery 
+      ? 'Search Results'
+      : 'More Listings From Sellers';
 
-      {/* Recommendation Feed - Removed Suspense for better performance */}
-      {user && !searchQuery && !filters.categories?.length && !filters.location && !filters.condition?.length && !filters.priceRange.min && !filters.priceRange.max && (
-        <View style={{ minHeight: 250 }}>
-          <CodeSplitting.RecommendationFeed
-            onListingPress={handleListingPress}
-            onViewAllPersonalized={() => navigation.recommendations.goToPersonalized()}
-            onViewAllTrending={() => navigation.recommendations.goToTrending()}
-            onViewAllRecentlyViewed={() => navigation.recommendations.goToRecent()}
-          />
-        </View>
-      )}
+    const subtitle = filters.categories?.length > 0 
+      ? `${transformedProducts.length} ${transformedProducts.length === 1 ? 'item' : 'items'} found in ${filters.categories[0]}`
+      : searchQuery 
+      ? `${transformedProducts.length} ${transformedProducts.length === 1 ? 'result' : 'results'} for "${searchQuery}"`
+      : 'Browse all available items';
 
-      {/* All Listings Section - Dynamic Title */}
+    const hasActiveFilters = filters.categories?.length > 0 || searchQuery || filters.location || filters.condition?.length > 0;
+
+    return (
       <View style={{ 
         flexDirection: 'row', 
         alignItems: 'center',
@@ -858,27 +810,15 @@ export default function HomeScreen() {
       }}>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-            <Text variant="h3">
-              {filters.categories?.length > 0 
-                ? `${filters.categories[0]} Listings`
-                : searchQuery 
-                ? 'Search Results'
-                : 'More Listings From Sellers'
-              }
-            </Text>
+            <Text variant="h3">{title}</Text>
           </View>
           <Text variant="bodySmall" color="muted" style={{ marginTop: theme.spacing.xs }}>
-            {filters.categories?.length > 0 
-              ? `${transformedProducts.length} ${transformedProducts.length === 1 ? 'item' : 'items'} found in ${filters.categories[0]}`
-              : searchQuery 
-              ? `${transformedProducts.length} ${transformedProducts.length === 1 ? 'result' : 'results'} for "${searchQuery}"`
-              : 'Browse all available items'
-            }
+            {subtitle}
           </Text>
         </View>
 
         {/* Clear Filter Button - Show when filters are active */}
-        {(filters.categories?.length > 0 || searchQuery || filters.location || filters.condition?.length > 0) && (
+        {hasActiveFilters && (
           <TouchableOpacity
             onPress={() => {
               setSearchQuery('');
@@ -905,35 +845,96 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
       </View>
+    );
+  }, [theme, filters, searchQuery, transformedProducts.length, setSearchQuery, setFilters]);
+
+  // ✅ Lazy loading state for heavy sections
+  const [showHeavySections, setShowHeavySections] = useState(false);
+
+  // ✅ Progressive loading effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowHeavySections(true);
+    }, 100); // Small delay to improve initial render
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // ✅ Memoized heavy components with lazy loading
+  const FeaturedListingsSection = useMemo(() => {
+    if (!showHeavySections || searchQuery || filters.categories?.length || filters.location || filters.condition?.length || filters.priceRange.min || filters.priceRange.max) {
+      return null;
+    }
+    
+    return (
+      <View style={{ minHeight: 200 }}>
+        <Suspense fallback={<LoadingSkeleton width="100%" height={200} />}>
+          <CodeSplitting.FixedFeaturedListings
+            maxItems={8} // Reduced from 10 for better performance
+            layout="horizontal"
+            onViewAll={() => {
+              navigation.home.goToBusinessListings();
+            }}
+          />
+        </Suspense>
+      </View>
+    );
+  }, [showHeavySections, searchQuery, filters.categories, filters.location, filters.condition, filters.priceRange.min, filters.priceRange.max, theme.spacing.lg]);
+
+  // const RecommendationSection = useMemo(() => {
+  //   if (!showHeavySections || !user || searchQuery || filters.categories?.length || filters.location || filters.condition?.length || filters.priceRange.min || filters.priceRange.max) {
+  //     return null;
+  //   }
+    
+  //   return (
+  //     <View style={{ minHeight: 200 }}> {/* Reduced from 250 */}
+  //       <Suspense fallback={<LoadingSkeleton width="100%" height={200} />}>
+  //         <CodeSplitting.RecommendationFeed
+  //           onListingPress={handleListingPress}
+  //           onViewAllPersonalized={() => navigation.recommendations.goToPersonalized()}
+  //           onViewAllTrending={() => navigation.recommendations.goToTrending()}
+  //           onViewAllRecentlyViewed={() => navigation.recommendations.goToRecent()}
+  //         />
+  //       </Suspense>
+  //     </View>
+  //   );
+  // }, [showHeavySections, user, searchQuery, filters.categories, filters.location, filters.condition, filters.priceRange.min, filters.priceRange.max, handleListingPress]);
+
+  // ✅ Optimized header component with memoized sub-components
+  const ListHeader = useMemo(() => (
+    <View>
+      {/* Location Display - Memoized */}
+      {LocationDisplay}
+
+      {/* Featured Business Listings - Memoized for better performance */}
+      {FeaturedListingsSection}
+
+      {/* Recommendation Feed - Memoized for better performance */}
+      {/* {RecommendationSection} */}
+
+      {/* Dynamic Title Section - Memoized */}
+      {DynamicTitleSection}
     </View>
   ), [
-    // Reduced dependencies for better performance
-    categoryItems,
-    renderCategoryItem,
-    searchQuery,
-    filters.categories,
-    filters.location,
-    filters.condition,
-    filters.priceRange.min,
-    filters.priceRange.max,
-    transformedProducts.length,
-    user?.id,
-    theme,
-    currentLocation,
+    // ✅ Minimal dependencies for maximum performance
+    LocationDisplay,
+    FeaturedListingsSection,
+    // RecommendationSection,
+    DynamicTitleSection,
   ]);
 
   return (
     <SafeAreaWrapper>
-      {/* Enhanced Search Header - Floating */}
+      {/* ✅ Enhanced Search Header - Animated Hide/Show */}
       <Animated.View style={{ 
         position: 'absolute',
         top: theme.spacing['3xl'],
         left: 0,
         right: 0,
         zIndex: 12,
-        transform: [{ translateY: floatingSearchTranslateY }],
-        opacity: floatingSearchOpacity,
-        paddingVertical:theme.spacing.sm,
+        paddingVertical: theme.spacing.sm,
+        transform: [{ translateY: searchHeaderTranslateY }],
+        opacity: searchHeaderOpacity,
       }}>
         <EnhancedSearchHeader
           searchQuery={searchQuery}
@@ -941,13 +942,25 @@ export default function HomeScreen() {
           onFilterPress={() => router.push('/filter-products')}
           onAvatarPress={() => router.push('/(tabs)/more')}
           placeholder= 'Search here...'
-          
         />
       </Animated.View>
 
+      {/* ✅ Sticky Categories Section - Animated to follow search header */}
+      <Animated.View style={{
+        position: 'absolute',
+        top: 100, // Position below search header
+        left: 0,
+        right: 0,
+        zIndex: 11,
+        transform: [{ translateY: searchHeaderTranslateY }],
+      }}>
+        {CategoriesSection}
+      </Animated.View>
+
       {/* Main Content Container */}
-      <View style={{ 
+      <Animated.View style={{ 
         flex: 1,
+        paddingTop: 60, // Reduced padding since categories move up with search header
       }}>
 
         {/* Main Content Area - Scrollable */}
@@ -1004,7 +1017,7 @@ export default function HomeScreen() {
               />
             </View>
           ) : (
-            <AnimatedFlatList
+            <FlatList
               ref={mainScrollViewRef as any}
               data={transformedProductsWithOptimisticCounts}
               numColumns={2}
@@ -1012,7 +1025,7 @@ export default function HomeScreen() {
               showsVerticalScrollIndicator={false}
               style={{ zIndex: 10 }}
               contentContainerStyle={{
-                paddingTop: 100, // Add top padding to account for floating search input
+                paddingTop: 20, // Reduced padding since categories are now sticky
                 paddingBottom: contentBottomPadding,
               }}
               keyExtractor={(item) => item.id}
@@ -1047,51 +1060,11 @@ export default function HomeScreen() {
           )}
         </View>
 
-      </View>
-
-
-
-      {/* Scroll to Top FAB */}
-      <Animated.View
-          style={{
-            position: 'absolute',
-          bottom: theme.spacing.xl + useSafeAreaInsets().bottom + contentBottomPadding,
-          right: theme.spacing.lg,
-          zIndex: 1000,
-          opacity: scrollToTopOpacity,
-          transform: [{ scale: scrollToTopScale }],
-        }}
-      >
-        <TouchableOpacity
-          onPress={scrollToTop}
-          style={{
-            backgroundColor: theme.colors.primary,
-            width: 50,
-            height: 50,
-            borderRadius: 25,
-            justifyContent: 'center',
-            alignItems: 'center',
-            ...theme.shadows.lg,
-            elevation: 8,
-            shadowColor: theme.colors.primary,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3,
-            shadowRadius: 8,
-            borderWidth: 2,
-            borderColor: theme.colors.primaryForeground,
-          }}
-          activeOpacity={0.7}
-          accessibilityLabel="Scroll to top"
-          accessibilityHint="Double tap to scroll to the top of the page"
-          accessibilityRole="button"
-        >
-          <ChevronUp 
-            size={24} 
-            color={theme.colors.primaryForeground} 
-            strokeWidth={2.5}
-          />
-        </TouchableOpacity>
       </Animated.View>
+
+
+
+      {/* FAB removed for cleaner UI */}
     </SafeAreaWrapper>
   );
 }

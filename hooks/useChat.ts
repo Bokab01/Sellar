@@ -209,6 +209,36 @@ export function useMessages(conversationId: string) {
 
     console.log('📤 Sending message:', { content, messageType, conversationId, senderId: user.id, images });
 
+    // ✅ OPTIMISTIC UPDATE: Add message immediately to UI
+    const tempId = `temp-${Date.now()}-${Math.random()}`;
+    const optimisticMessage = {
+      id: tempId,
+      conversation_id: conversationId,
+      sender_id: user.id,
+      content,
+      message_type: messageType,
+      images: images ? JSON.stringify(images) : null,
+      offer_data: offerData,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      status: 'sending',
+      profiles: {
+        id: user.id,
+        first_name: user.user_metadata?.first_name || '',
+        last_name: user.user_metadata?.last_name || '',
+        avatar_url: user.user_metadata?.avatar_url || null,
+      }
+    };
+
+    // Add optimistic message immediately
+    setMessages(prev => {
+      const updatedMessages = [...prev, optimisticMessage].sort((a, b) => 
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      console.log('📤 Added optimistic message:', tempId);
+      return updatedMessages;
+    });
+
     try {
       // Only moderate text messages (not system messages, offers, etc.)
       if (messageType === 'text' && content.trim()) {
@@ -224,6 +254,9 @@ export function useMessages(conversationId: string) {
 
         // Check if content is approved
         if (!moderationResult.isApproved) {
+          // Remove optimistic message on moderation failure
+          setMessages(prev => prev.filter(msg => msg.id !== tempId));
+          
           // Extract specific violations with user-friendly messages
           const flagReasons = moderationResult.flags
             .map(flag => {
@@ -265,29 +298,29 @@ export function useMessages(conversationId: string) {
 
       if (error) {
         console.error('📤 Error sending message:', error);
+        // Remove optimistic message on error
+        setMessages(prev => prev.filter(msg => msg.id !== tempId));
         return { error: error.message };
       }
 
       console.log('📤 Message sent successfully:', data);
       
-      // Add a fallback: if real-time doesn't work, manually add the message to the list
-      setTimeout(() => {
-        setMessages(prev => {
-          const exists = prev.find(msg => msg.id === data.id);
-          if (!exists) {
-            console.log('📤 Adding sent message manually (real-time fallback)');
-            const updatedMessages = [...prev, data].sort((a, b) => 
-              new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-            );
-            return updatedMessages;
-          }
-          return prev;
-        });
-      }, 1000); // Wait 1 second to see if real-time picks it up
+      // Update optimistic message with real data
+      setMessages(prev => {
+        const updatedMessages = prev.map(msg => 
+          msg.id === tempId 
+            ? { ...data, status: 'sent' }
+            : msg
+        );
+        console.log('📤 Updated optimistic message with real data');
+        return updatedMessages;
+      });
       
       return { data };
     } catch (err) {
       console.error('📤 Exception sending message:', err);
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(msg => msg.id !== tempId));
       return { error: 'Failed to send message' };
     }
   };

@@ -10,7 +10,7 @@ import { Input } from '@/components/Input/Input';
 import { Badge } from '@/components/Badge/Badge';
 import { Avatar } from '@/components/Avatar/Avatar';
 import { LocationPicker } from '@/components/LocationPicker/LocationPicker';
-import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
+import { LoadingSkeleton, HomeScreenSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
 import { Toast } from '@/components/Toast/Toast';
 import { 
   User, 
@@ -324,82 +324,18 @@ export default function EditProfileScreen() {
           showBackButton
           onBackPress={() => router.back()}
         />
-        <Container style={{ paddingTop: theme.spacing.lg }}>
-          {/* Profile Completion Header Skeleton */}
-          <View
-            style={{
-              backgroundColor: theme.colors.surface,
-              borderRadius: theme.borderRadius.lg,
-              padding: theme.spacing.lg,
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-              marginBottom: theme.spacing.xl,
-            }}
-          >
-            <View style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: theme.spacing.md,
-            }}>
-              <LoadingSkeleton width="40%" height={20} />
-              <LoadingSkeleton width={50} height={24} borderRadius={12} />
-            </View>
-            <LoadingSkeleton width="100%" height={8} borderRadius={4} />
-          </View>
-
-          {/* Avatar Section Skeleton */}
-          <View style={{
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.borderRadius.lg,
-            padding: theme.spacing.lg,
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-            marginBottom: theme.spacing.md,
-            alignItems: 'center',
-          }}>
-            <LoadingSkeleton width={100} height={100} borderRadius={50} />
-            <View style={{ marginTop: theme.spacing.md, alignItems: 'center' }}>
-              <LoadingSkeleton width="60%" height={16} />
-              <LoadingSkeleton width="40%" height={14} style={{ marginTop: theme.spacing.sm }} />
-            </View>
-          </View>
-
-          {/* Collapsible Sections Skeleton */}
-          {Array.from({ length: 5 }).map((_, index) => (
-            <View key={index} style={{
-              backgroundColor: theme.colors.surface,
-              borderRadius: theme.borderRadius.lg,
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-              marginBottom: theme.spacing.md,
-            }}>
-              {/* Section Header */}
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: theme.spacing.lg,
-              }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
-                  <LoadingSkeleton width={24} height={24} borderRadius={12} />
-                  <LoadingSkeleton width="30%" height={16} />
-                </View>
-                <LoadingSkeleton width={20} height={20} borderRadius={10} />
-              </View>
-              
-              {/* Section Content */}
-              <View style={{ padding: theme.spacing.lg, paddingTop: 0 }}>
-                {Array.from({ length: 3 }).map((_, fieldIndex) => (
-                  <View key={fieldIndex} style={{ marginBottom: theme.spacing.lg }}>
-                    <LoadingSkeleton width="25%" height={14} style={{ marginBottom: theme.spacing.sm }} />
-                    <LoadingSkeleton width="100%" height={48} borderRadius={8} />
-                  </View>
-                ))}
-              </View>
-            </View>
-          ))}
-        </Container>
+        <View style={{ 
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: theme.colors.background,
+        }}>
+          <HomeScreenSkeleton loadingText="Loading profile..." />
+        </View>
       </SafeAreaWrapper>
     );
   }

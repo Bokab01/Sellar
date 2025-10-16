@@ -19,13 +19,13 @@ import {
   EmptyState,
   ErrorState,
   LoadingSkeleton,
-  PostCardSkeleton,
+  HomeScreenSkeleton,
   PostCard,
   CommunitySidebar,
   SidebarToggle,
   CommunityFilters,
 } from '@/components';
-import { Plus, Users, ChevronUp } from 'lucide-react-native';
+import { Plus, Users } from 'lucide-react-native';
 
 export default function CommunityScreen() {
   const { theme } = useTheme();
@@ -35,11 +35,7 @@ export default function CommunityScreen() {
   const { contentBottomPadding } = useBottomTabBarSpacing();
   const [sidebarVisible, setSidebarVisible] = useState(false);
   
-  // Scroll-to-top FAB state
-  const [showScrollToTop, setShowScrollToTop] = useState(false);
-  const scrollToTopOpacity = useRef(new Animated.Value(0)).current;
-  const scrollToTopScale = useRef(new Animated.Value(0.8)).current;
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<FlatList>(null);
   const [filters, setFilters] = useState<{ postType: string | null; location: string | null }>({
     postType: null,
     location: null,
@@ -49,73 +45,7 @@ export default function CommunityScreen() {
   // Debug logging for filters
   const { followingStates, followUser, unfollowUser, isFollowing, refreshAllFollowStates } = useFollowState();
 
-  // Enhanced scroll to top function with smooth UX
-  const scrollToTop = useCallback(() => {
-    if (scrollViewRef.current) {
-      // Smooth scroll to top with easing
-      scrollViewRef.current.scrollTo({ 
-        y: 0, 
-        animated: true 
-      });
-      
-      // Hide FAB immediately for better UX
-      setShowScrollToTop(false);
-      Animated.parallel([
-        Animated.timing(scrollToTopOpacity, {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scrollToTopScale, {
-          toValue: 0.8,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-  }, [scrollToTopOpacity, scrollToTopScale]);
 
-  // Handle scroll for FAB visibility
-  const handleScroll = (event: any) => {
-    const currentScrollY = event.nativeEvent.contentOffset.y;
-    
-    // Show/hide scroll-to-top FAB with professional animations
-    if (currentScrollY > 300) {
-      if (!showScrollToTop) {
-        setShowScrollToTop(true);
-        Animated.parallel([
-          Animated.timing(scrollToTopOpacity, {
-            toValue: 1,
-            duration: 250,
-            useNativeDriver: true,
-          }),
-          Animated.spring(scrollToTopScale, {
-            toValue: 1,
-            useNativeDriver: true,
-            tension: 120,
-            friction: 7,
-            overshootClamping: true,
-          }),
-        ]).start();
-      }
-    } else {
-      if (showScrollToTop) {
-        setShowScrollToTop(false);
-        Animated.parallel([
-          Animated.timing(scrollToTopOpacity, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-          Animated.timing(scrollToTopScale, {
-            toValue: 0.8,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-        ]).start();
-      }
-    }
-  };
 
   // Get unique locations from posts for filter options
   const availableLocations = React.useMemo(() => {
@@ -372,21 +302,7 @@ export default function CommunityScreen() {
         />
 
         {loading ? (
-          <FlatList
-            data={Array.from({ length: 3 })}
-            keyExtractor={(_, index) => `skeleton-${index}`}
-            renderItem={({ index }) => (
-              <PostCardSkeleton key={index} showImage={index % 2 === 0} />
-            )}
-            contentContainerStyle={{
-              padding: theme.spacing.sm,
-            }}
-            // ✅ Performance optimizations for skeleton loading
-            removeClippedSubviews={true}
-            maxToRenderPerBatch={3}
-            windowSize={2}
-            initialNumToRender={3}
-          />
+          <HomeScreenSkeleton loadingText="Loading community posts..." />
         ) : error ? (
           <ErrorState
             message={error}
@@ -394,7 +310,7 @@ export default function CommunityScreen() {
           />
         ) : transformedPosts.length > 0 ? (
           <FlatList
-            ref={scrollViewRef as any}
+            ref={scrollViewRef}
             data={transformedPosts}
             keyExtractor={keyExtractor}
             renderItem={renderPost}
@@ -404,7 +320,6 @@ export default function CommunityScreen() {
               paddingBottom: contentBottomPadding,
             }}
             showsVerticalScrollIndicator={false}
-            onScroll={handleScroll}
             scrollEventThrottle={16}
             refreshControl={
               <RefreshControl
@@ -470,47 +385,6 @@ export default function CommunityScreen() {
         onClose={() => setSidebarVisible(false)}
       />
 
-      {/* Scroll to Top FAB */}
-      <Animated.View
-        style={{
-          position: 'absolute',
-          bottom: insets.bottom + theme.spacing.xl + contentBottomPadding,
-          right: theme.spacing.lg,
-          zIndex: 1000,
-          opacity: scrollToTopOpacity,
-          transform: [{ scale: scrollToTopScale }],
-        }}
-      >
-        <TouchableOpacity
-          onPress={scrollToTop}
-          style={{
-            backgroundColor: theme.colors.primary,
-            width: 50,
-            height: 50,
-            borderRadius: 25,
-            justifyContent: 'center',
-            alignItems: 'center',
-            ...theme.shadows.lg,
-            elevation: 8,
-            shadowColor: theme.colors.primary,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3,
-            shadowRadius: 8,
-            borderWidth: 2,
-            borderColor: theme.colors.primaryForeground,
-          }}
-          activeOpacity={0.7}
-          accessibilityLabel="Scroll to top"
-          accessibilityHint="Double tap to scroll to the top of the page"
-          accessibilityRole="button"
-        >
-          <ChevronUp 
-            size={24} 
-            color={theme.colors.primaryForeground} 
-            strokeWidth={2.5}
-          />
-        </TouchableOpacity>
-      </Animated.View>
     </SafeAreaWrapper>
   );
 }

@@ -425,6 +425,9 @@ export function FixedFeaturedListings({
     const views = viewCounts[listing.id] || 0;
     const isOwnListing = user?.id === listing.seller.id;
 
+    // ✅ Add PRO badge for featured listings (all are from Sellar Pro users)
+    const badge = { text: '⭐ PRO', variant: 'primary' as const };
+
     return (
       <View style={{ width: 190, marginBottom: theme.spacing.md, marginRight: theme.spacing.sm - 5 }}>
         <ProductCard
@@ -441,6 +444,7 @@ export function FixedFeaturedListings({
           currency={listing.currency}
           seller={listing.seller}
           location={listing.location}
+          badge={badge}
           viewCount={views}
           favoritesCount={favCount}
           isFavorited={isFavorited}

@@ -296,11 +296,10 @@ export function PostCard({
       style={[
         {
           backgroundColor: theme.colors.surface,
-          marginBottom: theme.spacing.md,
+          marginBottom: theme.spacing.sm,
           borderRadius: theme.borderRadius.lg,
           borderWidth: 1,
           borderColor: theme.colors.border,
-          ...theme.shadows.sm,
           overflow: 'hidden',
         },
         style,

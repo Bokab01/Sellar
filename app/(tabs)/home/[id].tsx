@@ -23,6 +23,7 @@ import {
   EmptyState,
   ErrorState,
   LoadingSkeleton,
+  HomeScreenSkeleton,
   AppModal,
   Input,
   Toast,
@@ -230,6 +231,75 @@ export default function ListingDetailScreen() {
     openViewer: openMediaViewer,
     closeViewer: closeMediaViewer,
   } = useMediaViewer({ media, initialIndex: currentImageIndex });
+
+  // ✅ Memoized render functions for better performance (moved to top to fix hooks order)
+  const renderSellerListing = useCallback(({ item }: { item: any }) => (
+    <View style={{ flex: 1, margin: 2 }}>
+      <ProductCard
+        image={item.image}
+        title={item.title}
+        price={item.price}
+        seller={item.seller}
+        badge={item.badge}
+        location={item.location}
+        layout="grid"
+        fullWidth={true}
+        onPress={() => router.push(`/(tabs)/home/${item.id}`)}
+      />
+    </View>
+  ), []);
+
+  const renderSimilarListing = useCallback(({ item }: { item: any }) => (
+    <View style={{ flex: 1, margin: 2 }}>
+      <ProductCard
+        image={item.image}
+        title={item.title}
+        price={item.price}
+        seller={item.seller}
+        badge={item.badge}
+        location={item.location}
+        layout="grid"
+        fullWidth={true}
+        onPress={() => router.push(`/(tabs)/home/${item.id}`)}
+      />
+    </View>
+  ), []);
+
+  const renderImageItem = useCallback(({ item: mediaUrl, index }: { item: string; index: number }) => {
+    const isVideo = isVideoUrl(mediaUrl);
+    const screenWidth = Dimensions.get('window').width;
+    const screenHeight = Dimensions.get('window').height;
+    const imageHeight = screenHeight * 0.7;
+    
+    return (
+      <TouchableOpacity
+        onPress={() => openMediaViewer(index)}
+        activeOpacity={0.9}
+        style={{ width: screenWidth }}
+      >
+        {isVideo ? (
+          <MediaItemVideo 
+            videoUrl={mediaUrl} 
+            isActive={index === currentImageIndex}
+            width={screenWidth}
+            height={imageHeight}
+            theme={theme}
+          />
+        ) : (
+          <Image
+            source={{ uri: mediaUrl }}
+            style={{
+              width: screenWidth,
+              height: imageHeight,
+              backgroundColor: theme.colors.surfaceVariant,
+            }}
+            resizeMode="cover"
+            loadingIndicatorSource={{ uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' }}
+          />
+        )}
+      </TouchableOpacity>
+    );
+  }, [currentImageIndex, theme, openMediaViewer]);
 
   useEffect(() => {
     if (listingId) {
@@ -1176,114 +1246,21 @@ export default function ListingDetailScreen() {
   };
 
   if (loading) {
-    const screenHeight = Dimensions.get('window').height;
-    const imageHeight = screenHeight * 0.7;
-    
     return (
       <SafeAreaWrapper>
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-        
-        {/* Fixed Header Overlay Skeleton */}
-        <View
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            paddingTop: (StatusBar.currentHeight || 44) + theme.spacing.md,
-            paddingHorizontal: theme.spacing.lg,
-            paddingBottom: theme.spacing.md,
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            zIndex: 1000,
-          }}
-        >
-          <LoadingSkeleton width={40} height={40} borderRadius={20} />
-          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
-            <LoadingSkeleton width={40} height={40} borderRadius={20} />
-            <LoadingSkeleton width={40} height={40} borderRadius={20} />
-          </View>
+        <AppHeader title="Listing Details" showBack />
+        <View style={{ 
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: theme.colors.background,
+        }}>
+          <HomeScreenSkeleton loadingText="Loading your item..." />
         </View>
-
-        <ScrollView style={{ flex: 1 }}>
-          {/* Hero Image Skeleton */}
-          <LoadingSkeleton width="100%" height={imageHeight} borderRadius={0} />
-          
-          {/* Content Section */}
-          <View style={{ 
-            backgroundColor: theme.colors.background,
-            borderTopLeftRadius: theme.borderRadius.xl,
-            borderTopRightRadius: theme.borderRadius.xl,
-            marginTop: -20,
-            padding: theme.spacing.lg,
-          }}>
-            {/* Badges Row Skeleton */}
-            <View style={{ flexDirection: 'row', gap: theme.spacing.xs, marginBottom: theme.spacing.md }}>
-              <LoadingSkeleton width={80} height={24} borderRadius={theme.borderRadius.full} />
-              <LoadingSkeleton width={100} height={24} borderRadius={theme.borderRadius.full} />
-            </View>
-
-            {/* Title Skeleton */}
-            <LoadingSkeleton width="90%" height={28} style={{ marginBottom: theme.spacing.sm }} />
-            <LoadingSkeleton width="70%" height={28} style={{ marginBottom: theme.spacing.lg }} />
-
-            {/* Price Skeleton */}
-            <LoadingSkeleton width="40%" height={36} style={{ marginBottom: theme.spacing.lg }} />
-
-            {/* Stats Row Skeleton */}
-            <View style={{ flexDirection: 'row', gap: theme.spacing.lg, marginBottom: theme.spacing.xl }}>
-              <LoadingSkeleton width={60} height={20} />
-              <LoadingSkeleton width={60} height={20} />
-            </View>
-
-            {/* Description Section Skeleton */}
-            <LoadingSkeleton width={120} height={20} style={{ marginBottom: theme.spacing.md }} />
-            <LoadingSkeleton width="100%" height={16} style={{ marginBottom: theme.spacing.xs }} />
-            <LoadingSkeleton width="100%" height={16} style={{ marginBottom: theme.spacing.xs }} />
-            <LoadingSkeleton width="80%" height={16} style={{ marginBottom: theme.spacing.xl }} />
-
-            {/* Item Details Table Skeleton */}
-            <LoadingSkeleton width={120} height={20} style={{ marginBottom: theme.spacing.md }} />
-            <View style={{ 
-              backgroundColor: theme.colors.surface,
-              borderRadius: theme.borderRadius.lg,
-              padding: theme.spacing.md,
-              gap: theme.spacing.sm,
-              marginBottom: theme.spacing.xl,
-            }}>
-              {[1, 2, 3, 4].map((i) => (
-                <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <LoadingSkeleton width="40%" height={16} />
-                  <LoadingSkeleton width="50%" height={16} />
-                </View>
-              ))}
-            </View>
-
-            {/* Seller Section Skeleton */}
-            <LoadingSkeleton width={100} height={20} style={{ marginBottom: theme.spacing.md }} />
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: theme.colors.surface,
-              borderRadius: theme.borderRadius.lg,
-              padding: theme.spacing.md,
-              marginBottom: theme.spacing.xl,
-            }}>
-              <LoadingSkeleton width={48} height={48} borderRadius={24} style={{ marginRight: theme.spacing.md }} />
-              <View style={{ flex: 1 }}>
-                <LoadingSkeleton width="60%" height={18} style={{ marginBottom: theme.spacing.xs }} />
-                <LoadingSkeleton width="40%" height={14} />
-              </View>
-            </View>
-
-            {/* Action Buttons Skeleton */}
-            <View style={{ flexDirection: 'row', gap: theme.spacing.md, marginBottom: theme.spacing.xl }}>
-              <LoadingSkeleton width="48%" height={48} borderRadius={theme.borderRadius.lg} style={{ flex: 1 }} />
-              <LoadingSkeleton width="48%" height={48} borderRadius={theme.borderRadius.lg} style={{ flex: 1 }} />
-            </View>
-          </View>
-        </ScrollView>
       </SafeAreaWrapper>
     );
   }
@@ -1551,47 +1528,15 @@ export default function ListingDetailScreen() {
                   setCurrentImageIndex(index);
                 }}
                 keyExtractor={(item, index) => `${index}`}
-                renderItem={({ item: mediaUrl, index }) => {
-                  const isVideo = isVideoUrl(mediaUrl);
-                  
-                  return (
-                  <TouchableOpacity
-                      onPress={() => openMediaViewer(index)}
-                    activeOpacity={0.9}
-                      style={{ width: screenWidth }}
-                    >
-                      {isVideo ? (
-                        <MediaItemVideo 
-                          videoUrl={mediaUrl} 
-                          isActive={index === currentImageIndex}
-                          width={screenWidth}
-                          height={imageHeight}
-                          theme={theme}
-                        />
-                      ) : (
-                    <Image
-                          source={{ uri: mediaUrl }}
-                      style={{
-                        width: screenWidth,
-                        height: imageHeight,
-                        backgroundColor: theme.colors.surfaceVariant,
-                      }}
-                      resizeMode="cover"
-                          // Performance optimizations
-                          loadingIndicatorSource={{ uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' }}
-                          onLoadStart={() => console.log(`Loading media ${index}`)}
-                          onLoadEnd={() => console.log(`Loaded media ${index}`)}
-                    />
-                      )}
-                  </TouchableOpacity>
-                  );
-                }}
-                // Performance optimizations
+                renderItem={renderImageItem}
+                // ✅ Enhanced performance optimizations for smooth scrolling
                 removeClippedSubviews={true}
-                maxToRenderPerBatch={2}
-                updateCellsBatchingPeriod={100}
+                maxToRenderPerBatch={1}
+                updateCellsBatchingPeriod={50}
                 initialNumToRender={1}
-                windowSize={3}
+                windowSize={2}
+                decelerationRate="fast"
+                scrollEventThrottle={16}
                 getItemLayout={(data, index) => ({
                   length: screenWidth,
                   offset: screenWidth * index,
@@ -2407,27 +2352,15 @@ export default function ListingDetailScreen() {
                       data={sellerListings.slice(0, 6)}
                       numColumns={2}
                       keyExtractor={(item) => item.id}
-                      renderItem={({ item }) => (
-                        <View style={{ flex: 1, margin: 2 }}>
-                        <ProductCard
-                          image={item.image}
-                          title={item.title}
-                          price={item.price}
-                          seller={item.seller}
-                          badge={item.badge}
-                          location={item.location}
-                          layout="grid"
-                          fullWidth={true}
-                          onPress={() => router.push(`/(tabs)/home/${item.id}`)}
-                        />
-                        </View>
-                      )}
-                      // Performance optimizations
+                      renderItem={renderSellerListing}
+                      // ✅ Enhanced performance optimizations for smooth navigation
                       removeClippedSubviews={true}
-                      maxToRenderPerBatch={4}
-                      updateCellsBatchingPeriod={100}
-                      initialNumToRender={4}
-                      windowSize={10}
+                      maxToRenderPerBatch={3}
+                      updateCellsBatchingPeriod={50}
+                      initialNumToRender={3}
+                      windowSize={5}
+                      decelerationRate="fast"
+                      scrollEventThrottle={32}
                       getItemLayout={(data, index) => ({
                         length: 200,
                         offset: 200 * Math.floor(index / 2),
@@ -2478,27 +2411,15 @@ export default function ListingDetailScreen() {
                       data={similarListings.slice(0, 6)}
                       numColumns={2}
                       keyExtractor={(item) => item.id}
-                      renderItem={({ item }) => (
-                        <View style={{ flex: 1, margin: 2 }}>
-                        <ProductCard
-                          image={item.image}
-                          title={item.title}
-                          price={item.price}
-                          seller={item.seller}
-                          badge={item.badge}
-                          location={item.location}
-                          layout="grid"
-                          fullWidth={true}
-                          onPress={() => router.push(`/(tabs)/home/${item.id}`)}
-                        />
-                        </View>
-                      )}
-                      // Performance optimizations
+                      renderItem={renderSimilarListing}
+                      // ✅ Enhanced performance optimizations for smooth navigation
                       removeClippedSubviews={true}
-                      maxToRenderPerBatch={4}
-                      updateCellsBatchingPeriod={100}
-                      initialNumToRender={4}
-                      windowSize={10}
+                      maxToRenderPerBatch={3}
+                      updateCellsBatchingPeriod={50}
+                      initialNumToRender={3}
+                      windowSize={5}
+                      decelerationRate="fast"
+                      scrollEventThrottle={32}
                       getItemLayout={(data, index) => ({
                         length: 200,
                         offset: 200 * Math.floor(index / 2),
