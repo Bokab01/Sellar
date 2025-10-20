@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Animated, Image, useColorScheme } from 'react-native';
+import { View, Animated, Image } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Grid } from '@/components/Grid/Grid';
 
@@ -172,8 +172,7 @@ interface HomeScreenSkeletonProps {
 }
 
 export function HomeScreenSkeleton({ loadingText = "Loading your marketplace..." }: HomeScreenSkeletonProps) {
-  const { theme } = useTheme();
-  const colorScheme = useColorScheme();
+  const { theme, isDarkMode } = useTheme();
   const animatedValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -207,8 +206,8 @@ export function HomeScreenSkeleton({ loadingText = "Loading your marketplace..."
     outputRange: [0.95, 1.05],
   });
 
-  // Use the appropriate icon based on color scheme
-  const iconSource = colorScheme === 'dark' 
+  // Use the appropriate icon based on theme mode
+  const iconSource = isDarkMode 
     ? require('@/assets/icon/icon-dark.png')
     : require('@/assets/icon/icon-light.png');
 

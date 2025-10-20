@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { dbHelpers } from '@/lib/supabase';
-import { useListingsRealtime } from './useRealtime';
+import { useOptimizedListingsRealtime } from './useOptimizedRealtime';
 import { useRealtimeConnection } from './useRealtimeConnection';
 
 interface UseListingsOptions {
@@ -30,10 +30,8 @@ export function useListings(options: UseListingsOptions = {}) {
   // Monitor real-time connection
   const { isConnected, isReconnecting, forceReconnect } = useRealtimeConnection({
     onConnectionLost: () => {
-      console.log('🔗 Real-time connection lost, will retry...');
     },
     onConnectionRestored: () => {
-      console.log('🔗 Real-time connection restored');
       // If we don't have initial data yet, try to fetch
       if (!hasInitialDataRef.current && listings.length === 0) {
         fetchListings();
@@ -94,7 +92,6 @@ export function useListings(options: UseListingsOptions = {}) {
       
       // If it's a timeout or connection error, try to reconnect real-time
       if (errorMessage.includes('timeout') || errorMessage.includes('connection')) {
-        console.log('🔗 Fetch failed due to connection issue, attempting to reconnect...');
         forceReconnectRef.current?.();
       }
     } finally {
@@ -104,23 +101,20 @@ export function useListings(options: UseListingsOptions = {}) {
   }, [options]);
 
   // Real-time updates
-  useListingsRealtime((newListing) => {
+  useOptimizedListingsRealtime((newListing) => {
     React.startTransition(() => {
       setListings(prev => {
         // Handle removal (delete or status change to inactive)
         if (newListing._shouldRemove) {
-          console.log('🔗 Removing listing from UI:', newListing.id);
           return prev.filter(item => item.id !== newListing.id);
         }
         
         const exists = prev.find(item => item.id === newListing.id);
         if (exists) {
           // Update existing listing
-          console.log('🔗 Updating existing listing in UI:', newListing.id);
           return prev.map(item => item.id === newListing.id ? newListing : item);
         } else {
           // Add new listing
-          console.log('🔗 Adding new listing to UI:', newListing.id);
           return [newListing, ...prev];
         }
       });

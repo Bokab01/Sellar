@@ -16,6 +16,7 @@
     "test:e2e": "detox test"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.913.0",
     "@expo-google-fonts/inter": "^0.4.1",
     "@expo-google-fonts/poppins": "^0.4.0",
     "@expo/metro-runtime": "~6.1.2",
@@ -23,6 +24,7 @@
     "@lucide/lab": "^0.1.2",
     "@paystack/inline-js": "^2.22.7",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/datetimepicker": "8.4.4",
     "@react-native-community/netinfo": "^11.4.1",
     "@react-native-firebase/app": "^23.3.0",
     "@react-native-picker/picker": "^2.11.1",

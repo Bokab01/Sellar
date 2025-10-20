@@ -41,6 +41,7 @@ interface BusinessUser {
   location?: string;
   phone?: string;
   isBusinessUser: boolean;
+  isVerified?: boolean;
   listings: BusinessListing[];
 }
 
@@ -83,7 +84,6 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
       
       // Return cached data if it's still fresh and not a refresh
       if (!isRefresh && cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-        console.log('Using cached business listings data');
         setBusinessUsers(cached.data);
         setLoading(false);
         return;
@@ -115,7 +115,8 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
             display_business_name,
             business_name_priority,
             phone,
-            location
+            location,
+            is_verified
           )
         `)
         .in('status', ['active', 'cancelled'])
@@ -139,7 +140,8 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
             display_business_name,
             business_name_priority,
             phone,
-            location
+            location,
+            is_verified
           `)
           .eq('is_business', true)
           .not('id', 'in', `(${businessUserIds.join(',')})`);
@@ -165,7 +167,8 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
             display_business_name,
             business_name_priority,
             phone,
-            location
+            location,
+            is_verified
           `)
           .eq('is_business', true);
 
@@ -178,8 +181,6 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
 
       if (businessError) throw businessError;
 
-      console.log('Subscription-based business users:', businessUsers?.length || 0);
-      console.log('Profile-based business users:', businessProfileUsers?.length || 0);
 
       // Combine subscription-based and profile-based business users
       const allBusinessUsers = [
@@ -197,13 +198,9 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
         }))
       ];
 
-      console.log('Total business users combined:', allBusinessUsers.length);
 
       if (allBusinessUsers.length === 0) {
-        console.log('No business users found (subscription or profile-based)');
-        
         // Final fallback: fetch all users with business profiles
-        console.log('Trying final fallback: fetch all business profiles');
         const { data: allBusinessProfiles, error: allBusinessProfilesError } = await supabase
           .from('profiles')
           .select(`
@@ -218,7 +215,8 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
             display_business_name,
             business_name_priority,
             phone,
-            location
+            location,
+            is_verified
           `)
           .eq('is_business', true);
 
@@ -229,12 +227,10 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
         }
 
         if (!allBusinessProfiles || allBusinessProfiles.length === 0) {
-          console.log('No business profiles found at all');
           setBusinessUsers([]);
           return;
         }
 
-        console.log('Found business profiles in fallback:', allBusinessProfiles.length);
         
         // Use the fallback business profiles
         const fallbackBusinessUsers = allBusinessProfiles.map(profile => ({
@@ -304,11 +300,11 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
             location: (profile as any)?.location,
             phone: (profile as any)?.phone,
             isBusinessUser: true,
+            isVerified: (profile as any)?.is_verified,
             listings: transformedListings,
           };
         });
 
-        console.log('Fallback business users with listings:', fallbackBusinessUsersWithListings.length);
         setBusinessUsers(fallbackBusinessUsersWithListings);
         return;
       }
@@ -337,15 +333,12 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
 
       if (listingsError) throw listingsError;
 
-      console.log('Business users found:', allBusinessUsers.length);
-      console.log('Listings found:', listingsData?.length || 0);
 
       // Group listings by business user
       const businessUsersWithListings: BusinessUser[] = allBusinessUsers.map(businessUser => {
         const profile = businessUser.profiles;
         const userListings = listingsData?.filter(listing => listing.user_id === businessUser.user_id) || [];
 
-        console.log(`User ${businessUser.user_id} has ${userListings.length} listings`);
 
         const transformedListings: BusinessListing[] = userListings.map(listing => ({
           id: listing.id,
@@ -375,12 +368,11 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
           location: (profile as any)?.location,
           phone: (profile as any)?.phone,
           isBusinessUser: true,
+          isVerified: (profile as any)?.is_verified,
           listings: transformedListings,
         };
       });
 
-      console.log('Business users with listings:', businessUsersWithListings.length);
-      console.log('Business users with listings > 0:', businessUsersWithListings.filter(u => u.listings.length > 0).length);
 
       const endTime = performance.now();
       const loadTime = endTime - startTime;
@@ -397,7 +389,6 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
         }
       });
 
-      console.log(`Business listings loaded in ${loadTime.toFixed(2)}ms, data size: ${(dataSize / 1024).toFixed(2)}KB`);
       setBusinessUsers(businessUsersWithListings);
     } catch (err) {
       console.error('Error fetching business listings:', err);
@@ -520,7 +511,6 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
                   onMessagePress={user?.id !== businessUser.id ? () => router.push(`/profile/${businessUser.id}`) : undefined}
                   onCallPress={user?.id !== businessUser.id && businessUser.phone ? () => {
                     // Handle call functionality
-                    console.log('Calling:', businessUser.phone);
                   } : undefined}
                 />
                 

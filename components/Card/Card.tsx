@@ -8,6 +8,7 @@ import { Badge } from '@/components/Badge/Badge';
 import { PriceDisplay } from '@/components/PriceDisplay/PriceDisplay';
 import { CompactUserBadges } from '@/components/UserBadges/UserBadges';
 import { ListingImage } from '@/components/OptimizedImage/OptimizedImage';
+import { CDNOptimizedVideo } from '@/components/OptimizedVideo/CDNOptimizedVideo';
 // Removed useMemoryManager for better performance
 import { ImageViewer } from '@/components/ImageViewer/ImageViewer';
 import { useImageViewer } from '@/hooks/useImageViewer';
@@ -31,7 +32,7 @@ interface ProductCardProps {
   previousPrice?: number; // NEW: For showing price drops with strikethrough
   priceChangedAt?: string; // NEW: When price was last changed
   currency?: string;
-  seller: {
+  seller?: {
     id?: string;
     name: string;
     avatar?: string;
@@ -168,10 +169,11 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
   } = useImageViewer({ images });
   
   const isGridLayout = layout === 'grid';
+  const isListLayout = layout === 'list';
   // Optimized card height for better mobile experience
-  const totalCardHeight = isGridLayout ? 280 : 360; // Reduced from 320 to 280
-  const imageHeight = isGridLayout ? totalCardHeight * 0.65 : 200; // Reduced from 70% to 65% for more content space
-  const cardPadding = isGridLayout ? theme.spacing.md : theme.spacing.lg; // Increased padding for grid
+  const totalCardHeight = isGridLayout ? 320 : 400; // Increased from 280 to 320 for grid layout
+  const imageHeight = isGridLayout ? totalCardHeight * 0.75 : (isListLayout ? 300 : 200); // Increased list layout image height
+  const cardPadding = isGridLayout ? theme.spacing.sm : theme.spacing.md; // Reduced padding for more compact content
 
   const handleLongPress = () => {
     if (enableImageViewer && images.length > 0) {
@@ -181,8 +183,8 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
 
   // Calculate dimensions based on variant
   const cardWidth = variant === 'compact' && width ? width : '100%';
-  const cardHeight = variant === 'compact' ? 280 : (isGridLayout ? totalCardHeight : undefined);
-  const compactImageHeight = variant === 'compact' ? 182 : imageHeight;
+  const cardHeight = variant === 'compact' ? 320 : (isGridLayout ? totalCardHeight : undefined);
+  const compactImageHeight = variant === 'compact' ? 240 : imageHeight;
 
   // LIST VARIANT RENDERING (Horizontal layout)
   if (variant === 'list') {
@@ -201,17 +203,33 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
           }}
           activeOpacity={0.95}
         >
-          {/* Image - Left Side */}
+          {/* Image/Video - Left Side */}
           <View style={{ position: 'relative', width: 100, height: 100, borderRadius: theme.borderRadius.md, overflow: 'hidden' }}>
-            <Image
-              source={imageSource}
-              style={{
-                width: '100%',
-                height: '100%',
-                backgroundColor: theme.colors.surfaceVariant,
-              }}
-              resizeMode="cover"
-            />
+            {typeof imageSource === 'object' && 'uri' in imageSource && imageSource.uri && isVideoUrl(imageSource.uri) ? (
+              <CDNOptimizedVideo
+                bucket="sellar-pro-videos"
+                path={imageSource.uri.split('/').pop() || ''}
+                width={100}
+                height={100}
+                quality="medium"
+                showThumbnail={true}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  backgroundColor: theme.colors.surfaceVariant,
+                }}
+              />
+            ) : (
+              <Image
+                source={imageSource}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  backgroundColor: theme.colors.surfaceVariant,
+                }}
+                resizeMode="cover"
+              />
+            )}
           </View>
 
           {/* Content - Middle */}
@@ -302,7 +320,7 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
                   activeOpacity={0.7}
                 >
                   <Heart 
-                    size={14}
+                    size={18}
                     color={isFavorited ? '#ff4757' : '#ffffff'} 
                     fill={isFavorited ? '#ff4757' : 'transparent'}
                   />
@@ -522,7 +540,7 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
             activeOpacity={0.7}
           >
             <Heart 
-              size={isGridLayout ? 14 : 16} // Smaller icons for grid
+              size={isGridLayout ? 18 : 20} // Increased size for better visibility
               color={isFavorited ? '#ff4757' : '#ffffff'} 
               fill={isFavorited ? '#ff4757' : 'transparent'}
             />
@@ -530,7 +548,7 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
         )}
 
         {/* Report Button */}
-        {showReportButton && listingId && currentUserId && seller.id && currentUserId !== seller.id && (
+        {showReportButton && listingId && currentUserId && seller?.id && currentUserId !== seller.id && (
           <View style={{
             position: 'absolute',
             top: theme.spacing.xs,
@@ -649,7 +667,7 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
             variant={isGridLayout ? 'bodySmall' : 'h4'} 
             numberOfLines={isGridLayout ? 2 : 2}
             style={{ 
-              marginBottom: isGridLayout ? theme.spacing.xs : theme.spacing.sm,
+              marginBottom: isGridLayout ? 2 : theme.spacing.xs,
               fontSize: isGridLayout ? 12 : undefined, // Reduced from 13 to 12
               fontWeight: isGridLayout ? '600' : undefined,
               lineHeight: isGridLayout ? 15 : undefined, // Reduced from 16 to 15
@@ -664,12 +682,12 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
             priceChangedAt={priceChangedAt}
             currency={currency}
             size={isGridLayout ? 'sm' : 'lg'}
-            style={{ marginBottom: isGridLayout ? theme.spacing.xs : theme.spacing.md }}
+            style={{ marginBottom: isGridLayout ? 2 : theme.spacing.sm }}
           />
         </View>
 
         {location && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.md, gap: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: isGridLayout ? theme.spacing.xs : theme.spacing.sm, gap: 4 }}>
             <MapPin size={10} color={theme.colors.text.muted} />
             <Text 
               variant="location"
@@ -681,11 +699,8 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
           </View>
         )}
 
-        {/* Seller Info - Simplified for grid layout */}
-        {isGridLayout ? (
-          // Seller name removed from grid layout
-          null
-        ) : (
+        {/* Seller Info - Only show if seller exists and not in grid layout */}
+        {seller && !isGridLayout && (
           <TouchableOpacity
             onPress={onSellerPress}
             style={{

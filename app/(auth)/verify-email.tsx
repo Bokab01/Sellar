@@ -40,7 +40,6 @@ export default function VerifyEmailScreen() {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (appState.match(/inactive|background/) && nextAppState === 'active') {
         // App came to foreground, check if email was verified
-        console.log('App became active, checking email verification status...');
         checkEmailVerificationStatus();
       }
       setAppState(nextAppState);
@@ -53,7 +52,6 @@ export default function VerifyEmailScreen() {
   // Function to check email verification status without showing alerts
   const checkEmailVerificationStatus = async () => {
     try {
-      console.log('Auto-checking email verification status...');
       
       // First check current session
       const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
@@ -65,7 +63,6 @@ export default function VerifyEmailScreen() {
 
       // If current session shows verified, proceed immediately
       if (currentSession?.user?.email_confirmed_at) {
-        console.log('✅ Email verified in current session (auto-check)');
         router.replace('/(tabs)/home');
         return;
       }
@@ -79,10 +76,8 @@ export default function VerifyEmailScreen() {
       }
       
       if (refreshedSession?.user?.email_confirmed_at) {
-        console.log('✅ Email verified in refreshed session (auto-check)');
         router.replace('/(tabs)/home');
       } else {
-        console.log('Email still not verified (auto-check)');
       }
     } catch (error) {
       console.warn('Auto-check email verification failed:', error);
@@ -112,7 +107,6 @@ export default function VerifyEmailScreen() {
     setLoading(true);
     
     try {
-      console.log('Checking email verification status...');
       
       // Get the current session first
       const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
@@ -124,22 +118,14 @@ export default function VerifyEmailScreen() {
         return;
       }
 
-      console.log('Current session:', {
-        hasSession: !!currentSession,
-        hasUser: !!currentSession?.user,
-        emailConfirmed: currentSession?.user?.email_confirmed_at,
-        userEmail: currentSession?.user?.email
-      });
 
       // If we have a session and the email is confirmed, proceed
       if (currentSession?.user?.email_confirmed_at) {
-        console.log('✅ Email already verified in current session');
         router.replace('/(tabs)/home');
         return;
       }
 
       // Try to refresh the session to get the latest verification status
-      console.log('Refreshing session to get latest verification status...');
       const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
       
       if (refreshError) {
@@ -148,11 +134,9 @@ export default function VerifyEmailScreen() {
         // If refresh fails but we have a current session, check if it's verified
         if (currentSession?.user) {
           if (currentSession.user.email_confirmed_at) {
-            console.log('✅ Email verified in current session (refresh failed)');
             router.replace('/(tabs)/home');
             return;
           } else {
-            console.log('❌ Email not verified in current session');
             Alert.alert(
               'Email Not Verified',
               'Your email has not been verified yet. Please click the verification link in your email first.',
@@ -169,7 +153,6 @@ export default function VerifyEmailScreen() {
           }
         } else {
           // No session at all
-          console.log('❌ No session found');
           Alert.alert(
             'Session Expired',
             'Your session has expired. Please sign in again.',
@@ -185,16 +168,9 @@ export default function VerifyEmailScreen() {
         }
       }
 
-      console.log('Refreshed session:', {
-        hasSession: !!refreshedSession,
-        hasUser: !!refreshedSession?.user,
-        emailConfirmed: refreshedSession?.user?.email_confirmed_at,
-        userEmail: refreshedSession?.user?.email
-      });
       
       // Check the refreshed session
       if (!refreshedSession?.user) {
-        console.log('❌ No user in refreshed session');
         Alert.alert(
           'Session Error',
           'Unable to verify your session. Please sign in again.',
@@ -211,10 +187,8 @@ export default function VerifyEmailScreen() {
       
       // Check if email is confirmed in the refreshed session
       if (refreshedSession.user.email_confirmed_at) {
-        console.log('✅ Email verified successfully (refreshed session)');
         router.replace('/(tabs)/home');
       } else {
-        console.log('❌ Email not verified in refreshed session');
         Alert.alert(
           'Email Not Verified',
           'Your email has not been verified yet. Please click the verification link in your email first.',

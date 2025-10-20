@@ -7,6 +7,9 @@ export { Container, SafeAreaWrapper, SafeAreaContainer } from './Layout';
 // Form Components
 export { Button } from './Button/Button';
 export { Input } from './Input/Input';
+export { DatePicker } from './DatePicker/DatePicker';
+export { SimpleDatePicker } from './DatePicker/SimpleDatePicker';
+export { CalendarDatePicker } from './DatePicker/CalendarDatePicker';
 export { MultiStepForm, useMultiStepForm } from './MultiStepForm/MultiStepForm';
 
 // Marketplace Components
@@ -17,6 +20,27 @@ export { ProductCard } from './Card/Card';
 export { Badge } from './Badge/Badge';
 export { BusinessBadge, BusinessBadges } from './BusinessBadge/BusinessBadge';
 export { UserBadgeSystem, CompactUserBadges, FullUserBadges, DarkThemeUserBadges } from './UserBadgeSystem';
+export { ExtraSmallUserBadges } from './UserBadgeSystem/UserBadgeSystem';
+export { 
+  NewVerificationBadge, 
+  BasicVerificationBadge, 
+  IdentityVerificationBadge, 
+  BusinessVerificationBadge, 
+  PremiumVerificationBadge,
+  CompactNewVerificationBadge,
+  ExtraSmallIdentityVerificationBadge,
+  MinimalNewVerificationBadge,
+  TrustScoreBadge,
+  ExtraSmallTrustScoreBadge
+} from './VerifiedBadge/VerifiedBadge';
+
+// Migration wrappers for backward compatibility
+export {
+  LegacyVerificationBadge,
+  LegacyCompactVerificationBadge,
+  LegacyTrustScoreDisplay,
+  LegacyVerificationStatusIndicator
+} from './VerifiedBadge/MigrationWrappers';
 export { SponsoredPost, SponsoredPostManager } from './SponsoredPost/SponsoredPost';
 export { FeaturedListings, CompactFeaturedListings } from './FeaturedListings/FeaturedListings';
 export { Avatar } from './Avatar/Avatar';
@@ -67,12 +91,6 @@ export { CreateTicketModal } from './CreateTicketModal/CreateTicketModal';
 export { KnowledgeBaseCard } from './KnowledgeBaseCard/KnowledgeBaseCard';
 
 // Verification System Components
-export { 
-  VerificationBadge, 
-  CompactVerificationBadge, 
-  TrustScoreDisplay, 
-  VerificationStatusIndicator 
-} from './VerificationBadge/VerificationBadge';
 export { DocumentUpload, MultiDocumentUpload } from './DocumentUpload/DocumentUpload';
 export { 
   VerificationStatusTracker, 

@@ -614,7 +614,7 @@ export default function FeatureMarketplaceScreen() {
               </View>
 
             {/* Features Grid */}
-            <View style={{ gap: theme.spacing.lg }}>
+            <View style={{ gap: theme.spacing.sm }}>
             {hasBusinessPlan() ? (
               // Sellar Pro users see auto-refresh status instead of boost features
               <View
@@ -727,26 +727,26 @@ export default function FeatureMarketplaceScreen() {
                       onPress={() => handleFeaturePurchase(feature.key)}
                       disabled={!canAfford || hasAccess}
                       style={{
-                        padding: theme.spacing.lg,
+                        padding: theme.spacing.md,
                     }}
                     activeOpacity={0.7}
                   >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.lg, marginBottom: theme.spacing.lg }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, marginBottom: theme.spacing.md }}>
                       <View
                         style={{
                           backgroundColor: theme.colors.primary + '15',
                           borderRadius: theme.borderRadius.lg,
-                            width: 70,
-                            height: 70,
+                            width: 60,
+                            height: 60,
                           justifyContent: 'center',
                           alignItems: 'center',
                             overflow: 'hidden',
                         }}
                       >
-                          <Text style={{ fontSize: 30, lineHeight: 36 }}>{getFeatureIcon(feature)}</Text>
+                          <Text style={{ fontSize: 24, lineHeight: 28 }}>{getFeatureIcon(feature)}</Text>
                       </View>
                       
-                        <View style={{ flex: 1, paddingRight: theme.spacing.xl }}>
+                        <View style={{ flex: 1, paddingRight: theme.spacing.lg }}>
                         <Text variant="h4" style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}>
                           {feature.name}
                         </Text>

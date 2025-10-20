@@ -52,7 +52,6 @@ export default function FollowingScreen() {
     const timeSinceLastFetch = now - lastFetchTime.current;
     
     if (!forceRefresh && hasLoadedData.current && timeSinceLastFetch < FETCH_COOLDOWN) {
-      console.log('⏭️ Following: Using cached data');
       setLoading(false);
       setRefreshing(false);
       return;
@@ -60,7 +59,6 @@ export default function FollowingScreen() {
 
     try {
       setError(null);
-      console.log('🔄 Following: Fetching data', { forceRefresh, timeSinceLastFetch });
       
       // Try to use RPC function first
       try {
@@ -82,7 +80,6 @@ export default function FollowingScreen() {
         if (!rpcError.message.includes('Could not find the function')) {
           throw rpcError;
         }
-        console.log('RPC function not available, using direct query');
       }
 
       // Fallback to direct query if RPC doesn't exist
@@ -154,10 +151,8 @@ export default function FollowingScreen() {
       const timeSinceLastFetch = now - lastFetchTime.current;
       
       if (!hasLoadedData.current || timeSinceLastFetch > FETCH_COOLDOWN) {
-        console.log('🔄 Following: Focus refresh', { hasLoadedData: hasLoadedData.current, timeSinceLastFetch });
         fetchFollowing();
       } else {
-        console.log('⏭️ Following: Using cached data on focus');
       }
     }, [fetchFollowing])
   );

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, ScrollView, RefreshControl } from 'react-native';
+import { View, ScrollView, RefreshControl, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { router } from 'expo-router';
 import {
@@ -18,6 +18,7 @@ import {
   CheckCircle, 
   Clock, 
   AlertCircle, 
+  AlertTriangle,
   Phone, 
   Mail, 
   User, 
@@ -36,7 +37,7 @@ import { formatVerificationType, formatVerificationStatus, formatDocumentType, g
 
 export default function VerificationScreen() {
   const { theme } = useTheme();
-  const { requests, loading: requestsLoading, error, refetch } = useVerificationRequests();
+  const { requests, loading: requestsLoading, error, refetch, deleteRequest } = useVerificationRequests();
   const { status, loading: statusLoading, refetch: refetchStatus } = useUserVerificationStatus();
   const { templates } = useVerificationTemplates();
   const [refreshing, setRefreshing] = useState(false);
@@ -46,6 +47,9 @@ export default function VerificationScreen() {
     await Promise.all([refetch(), refetchStatus()]);
     setRefreshing(false);
   };
+
+  // Note: Removed useFocusEffect to prevent infinite loops
+  // Manual refresh is available via pull-to-refresh
 
   const getVerificationIcon = (type: string, size: number = 24) => {
     const iconProps = { size, color: theme.colors.primary };
@@ -75,6 +79,8 @@ export default function VerificationScreen() {
       case 'pending':
       case 'in_review':
         return <Clock size={size} color={color} />;
+      case 'incomplete':
+        return <AlertTriangle size={size} color={color} />;
       case 'rejected':
       case 'expired':
         return <AlertCircle size={size} color={color} />;
@@ -110,13 +116,133 @@ export default function VerificationScreen() {
     router.push(`/verification/${request.id}` as any);
   };
 
+  const handleContinueRequest = (request: VerificationRequest) => {
+    // Route to the appropriate verification screen to continue
+    switch (request.verification_type) {
+      case 'identity':
+        router.push(`/verification/identity?id=${request.id}` as any);
+        break;
+      case 'phone':
+        router.push(`/verification/phone?id=${request.id}` as any);
+        break;
+      case 'email':
+        router.push(`/verification/email?id=${request.id}` as any);
+        break;
+      case 'business':
+        router.push(`/verification/business?id=${request.id}` as any);
+        break;
+      case 'address':
+        router.push(`/verification/address?id=${request.id}` as any);
+        break;
+      default:
+        router.push(`/verification/${request.id}` as any);
+    }
+  };
+
+  const handleDeleteRequest = async (request: VerificationRequest) => {
+    Alert.alert(
+      'Delete Verification Request',
+      'Are you sure you want to delete this incomplete verification request? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteRequest(request.id);
+              Alert.alert('Success', 'Verification request deleted successfully');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete verification request');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Helper function to determine if a request is actually submitted
+  const isRequestSubmitted = (request: VerificationRequest): boolean => {
+    if (request.status === 'approved' || request.status === 'rejected' || request.status === 'in_review') {
+      return true;
+    }
+    
+    if (request.status === 'pending') {
+      // For identity verification, check if the user has actually submitted
+      // We need to check if the request has been moved to 'in_review' status
+      // But since we're in the 'pending' block, we need to check other indicators
+      if (request.verification_type === 'identity') {
+        // For identity verification, we need to check if the user has actually submitted
+        // The key indicator is whether the status has been changed from 'pending' to 'in_review'
+        // But since we're checking 'pending' requests, we need to look at other indicators
+        
+        // Check if both documents are uploaded AND the request has been explicitly submitted
+        const documents = request.documents || [];
+        const hasIdDocument = documents.some(doc => 
+          doc.document_type === 'national_id' || 
+          doc.document_type === 'passport' || 
+          doc.document_type === 'drivers_license' || 
+          doc.document_type === 'voters_id'
+        );
+        const hasSelfie = documents.some(doc => doc.document_type === 'selfie_with_id');
+        
+        // For now, let's be more conservative - only consider it submitted if it's actually 'in_review'
+        // This means we should never consider 'pending' identity verifications as submitted
+        const isActuallySubmitted = false; // Pending identity verifications are never "submitted"
+        
+        // Debug logging
+        
+        return isActuallySubmitted;
+      }
+      
+      // For other verification types, consider them submitted if they have submitted_data
+      const hasSubmittedData = request.submitted_data && Object.keys(request.submitted_data).length > 0;
+      
+      // Debug logging for other types
+      
+      return hasSubmittedData;
+    }
+    
+    return false;
+  };
+
+  // Helper function to get the display status for a request
+  const getRequestDisplayStatus = (request: VerificationRequest): string => {
+    if (request.status === 'approved') return 'approved';
+    if (request.status === 'rejected') return 'rejected';
+    if (request.status === 'in_review') return 'in_review';
+    if (request.status === 'expired') return 'expired';
+    if (request.status === 'cancelled') return 'cancelled';
+    
+    // For pending status, check if it's actually submitted
+    if (request.status === 'pending') {
+      const isSubmitted = isRequestSubmitted(request);
+      const displayStatus = isSubmitted ? 'pending' : 'incomplete';
+      
+      // Debug logging
+      
+      return displayStatus;
+    }
+    
+    return request.status;
+  };
+
   const getAvailableVerifications = () => {
     const completedTypes = requests
       .filter(r => r.status === 'approved')
       .map(r => r.verification_type);
     
+    // Only consider requests as "pending" if they have been properly submitted
     const pendingTypes = requests
-      .filter(r => r.status === 'pending' || r.status === 'in_review')
+      .filter(r => {
+        const displayStatus = getRequestDisplayStatus(r);
+        return displayStatus === 'pending' || displayStatus === 'in_review';
+      })
+      .map(r => r.verification_type);
+    
+    // Also exclude incomplete requests to prevent multiple incomplete requests
+    const incompleteTypes = requests
+      .filter(r => getRequestDisplayStatus(r) === 'incomplete')
       .map(r => r.verification_type);
     
     // Also check if email is verified through auth (signup process)
@@ -124,8 +250,8 @@ export default function VerificationScreen() {
       completedTypes.push('email');
     }
     
-    // Filter out both completed and pending verifications
-    const unavailableTypes = [...completedTypes, ...pendingTypes];
+    // Filter out completed, pending, and incomplete verifications
+    const unavailableTypes = [...completedTypes, ...pendingTypes, ...incompleteTypes];
     
     return templates.filter(t => !unavailableTypes.includes(t.verification_type as any));
   };
@@ -138,18 +264,18 @@ export default function VerificationScreen() {
           showBackButton
           onBackPress={() => router.back()}
         />
-        <View style={{ 
+            <View style={{
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
           justifyContent: 'center',
-          alignItems: 'center',
+              alignItems: 'center',
           backgroundColor: theme.colors.background,
         }}>
           <HomeScreenSkeleton loadingText="Loading verification status..." />
-        </View>
+          </View>
       </SafeAreaWrapper>
     );
   }
@@ -332,22 +458,25 @@ export default function VerificationScreen() {
                       </View>
 
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        {getStatusIcon(request.status)}
+                        {getStatusIcon(getRequestDisplayStatus(request))}
                         <Text 
                           variant="bodySmall" 
                           style={{ 
                             marginLeft: theme.spacing.xs,
-                            color: getVerificationStatusColor(request.status),
+                            color: getVerificationStatusColor(getRequestDisplayStatus(request)),
                             fontWeight: '600',
                           }}
                         >
-                          {formatVerificationStatus(request.status)}
+                          {formatVerificationStatus(getRequestDisplayStatus(request))}
                         </Text>
                       </View>
                     </View>
 
                     <Text variant="bodySmall" color="secondary" style={{ marginBottom: theme.spacing.md }}>
-                      Submitted {new Date(request.submitted_at).toLocaleDateString()}
+                      {getRequestDisplayStatus(request) === 'incomplete' 
+                        ? `Started ${new Date(request.created_at).toLocaleDateString()}`
+                        : `Submitted ${new Date(request.submitted_at).toLocaleDateString()}`
+                      }
                     </Text>
 
                     {request.status === 'rejected' && request.rejection_reason && (
@@ -362,6 +491,32 @@ export default function VerificationScreen() {
                         <Text variant="bodySmall" style={{ color: theme.colors.error }}>
                           Rejection Reason: {request.rejection_reason}
                         </Text>
+                      </View>
+                    )}
+
+                    {/* Action buttons for incomplete requests */}
+                    {getRequestDisplayStatus(request) === 'incomplete' && (
+                      <View style={{ 
+                        flexDirection: 'row', 
+                        gap: theme.spacing.sm, 
+                        marginBottom: theme.spacing.md 
+                      }}>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onPress={() => handleContinueRequest(request)}
+                          style={{ flex: 1 }}
+                        >
+                          Continue
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onPress={() => handleDeleteRequest(request)}
+                          style={{ flex: 1 }}
+                        >
+                          Delete
+                        </Button>
                       </View>
                     )}
 

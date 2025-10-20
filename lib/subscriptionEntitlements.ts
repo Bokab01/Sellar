@@ -241,7 +241,7 @@ class SubscriptionEntitlementsService {
     // Get user verification status
     const { data: profile } = await supabase
       .from('profiles')
-      .select('is_verified, verification_level')
+      .select('is_verified')
       .eq('id', userId)
       .single();
 
@@ -250,7 +250,7 @@ class SubscriptionEntitlementsService {
       prioritySeller: entitlements.prioritySellerBadge,
       premium: entitlements.premiumBadge,
       verified: profile?.is_verified || false,
-      businessVerified: profile?.verification_level === 'business',
+      businessVerified: false, // This field doesn't exist in the database
     };
   }
 

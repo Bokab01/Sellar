@@ -51,7 +51,6 @@ export default function FollowersScreen() {
     const timeSinceLastFetch = now - lastFetchTime.current;
     
     if (!forceRefresh && hasLoadedData.current && timeSinceLastFetch < FETCH_COOLDOWN) {
-      console.log('⏭️ Followers: Using cached data');
       setLoading(false);
       setRefreshing(false);
       return;
@@ -59,7 +58,6 @@ export default function FollowersScreen() {
 
     try {
       setError(null);
-      console.log('🔄 Followers: Fetching data', { forceRefresh, timeSinceLastFetch });
       
       // Try to use RPC function first
       try {
@@ -89,7 +87,6 @@ export default function FollowersScreen() {
         if (!rpcError.message.includes('Could not find the function')) {
           throw rpcError;
         }
-        console.log('RPC function not available, using direct query');
       }
 
       // Fallback to direct query if RPC doesn't exist
@@ -169,10 +166,8 @@ export default function FollowersScreen() {
       const timeSinceLastFetch = now - lastFetchTime.current;
       
       if (!hasLoadedData.current || timeSinceLastFetch > FETCH_COOLDOWN) {
-        console.log('🔄 Followers: Focus refresh', { hasLoadedData: hasLoadedData.current, timeSinceLastFetch });
         fetchFollowers();
       } else {
-        console.log('⏭️ Followers: Using cached data on focus');
       }
     }, [fetchFollowers])
   );
@@ -199,7 +194,6 @@ export default function FollowersScreen() {
         if (!rpcError.message.includes('Could not find the function')) {
           throw rpcError;
         }
-        console.log('RPC function not available, using direct insert/delete');
       }
 
       // Fallback to direct database operations
@@ -224,7 +218,6 @@ export default function FollowersScreen() {
         if (error) {
           if (error.code === '23505') {
             // Already following, just update state - this is not an error
-            console.log('User already being followed, updating state');
           } else {
             throw error;
           }

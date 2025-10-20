@@ -26,11 +26,9 @@ export default function ReceivedReviewsTab() {
       const timeSinceLastFetch = now - lastFetchTime.current;
       
       if (!hasLoadedData.current || timeSinceLastFetch > FETCH_COOLDOWN) {
-        console.log('🔄 Received Reviews: Focus refresh', { hasLoadedData: hasLoadedData.current, timeSinceLastFetch });
         hasLoadedData.current = true;
         lastFetchTime.current = now;
       } else {
-        console.log('⏭️ Received Reviews: Using cached data on focus');
       }
     }, [])
   );

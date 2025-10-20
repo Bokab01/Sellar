@@ -60,7 +60,6 @@ export default function SignUpScreen() {
         }
       } catch (error) {
         // Ignore URL processing errors in mobile environment
-        console.log('URL processing not available in mobile environment');
       }
     };
 
@@ -227,7 +226,6 @@ export default function SignUpScreen() {
   const handleResendConfirmation = async (email: string) => {
     try {
       setLoading(true);
-      console.log('Resending confirmation email for:', email);
       
       const { error } = await supabase.auth.resend({
         type: 'signup',
@@ -238,7 +236,6 @@ export default function SignUpScreen() {
         console.error('Resend confirmation error:', error);
         showAlertModal('Error', `Failed to resend confirmation email: ${error.message}`);
       } else {
-        console.log('Confirmation email resent successfully');
         showAlertModal(
           'Email Sent!',
           'A new confirmation email has been sent to your inbox. Please check your email and click the verification link.',
@@ -341,11 +338,9 @@ export default function SignUpScreen() {
       }
 
       // Step 3: Enhanced pre-signup validation with smart user status detection
-      console.log('Checking user status before signup...');
       
       try {
         const userStatus = await checkUserStatus(sanitizedData.email);
-        console.log('User status result:', userStatus);
         
         if (userStatus.exists && userStatus.recommendedAction !== 'signup') {
           setErrors({ email: userStatus.message });
@@ -384,7 +379,6 @@ export default function SignUpScreen() {
           return;
         }
         
-        console.log('Email is available - proceeding with signup');
       } catch (statusCheckError) {
         console.error('User status check failed:', statusCheckError);
         // Continue with signup if check fails (fail-safe)
@@ -394,7 +388,6 @@ export default function SignUpScreen() {
       await AuthRateLimiters.registration.recordAttempt(identifier, 'registration');
 
       // Step 5: Proceed with signup using sanitized data
-      console.log('Starting signup process for:', sanitizedData.email);
       const result = await secureSignUp({
         email: sanitizedData.email,
         password: sanitizedData.password,
@@ -406,7 +399,6 @@ export default function SignUpScreen() {
         referralCode: referralCode.trim() || undefined,
       });
       
-      console.log('Signup result:', result);
       
       if (!result.success) {
         // Handle specific signup errors

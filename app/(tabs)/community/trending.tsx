@@ -172,7 +172,6 @@ export default function TrendingTopicsScreen() {
           text: 'View Posts', 
           onPress: () => {
             // TODO: Navigate to hashtag posts screen
-            console.log(`Navigate to hashtag: ${topic.tag}`);
           }
         }
       ]
@@ -479,7 +478,7 @@ export default function TrendingTopicsScreen() {
                               paddingHorizontal: theme.spacing.sm,
                               paddingVertical: theme.spacing.xs,
                             }}
-                            onPress={() => console.log(`Navigate to hashtag: ${hashtag}`)}
+                            onPress={() => {}}
                           >
                             <Text variant="caption" color="primary">
                               #{hashtag}

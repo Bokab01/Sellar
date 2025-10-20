@@ -69,12 +69,12 @@ export default function DashboardLayout() {
   return (
     <SafeAreaWrapper style={{ backgroundColor: theme.colors.background }}>
       {/* Header */}
-      {/* <AppHeader
+      <AppHeader
         title={isBusinessUser ? "Business Dashboard" : "Dashboard"}
         subtitle={isBusinessUser ? "Manage your business performance" : "Upgrade to unlock all features"}
         showBackButton
         onBackPress={() => router.back()}
-      /> */}
+      />
 
       {/* Tab Navigator */}
       <Tab.Navigator 

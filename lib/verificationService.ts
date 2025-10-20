@@ -38,7 +38,6 @@ export class VerificationService {
           return await this.sendAWSSMS(phoneNumber, code);
         default:
           // Local/development - just log the code
-          console.log(`SMS Verification Code for ${phoneNumber}: ${code}`);
           return true;
       }
     } catch (error) {
@@ -50,13 +49,11 @@ export class VerificationService {
   private async sendTwilioSMS(phoneNumber: string, code: string): Promise<boolean> {
     // TODO: Implement Twilio SMS sending
     // This would require Twilio SDK and credentials
-    console.log(`Twilio SMS to ${phoneNumber}: Your Sellar verification code is ${code}`);
     return true;
   }
 
   private async sendAWSSMS(phoneNumber: string, code: string): Promise<boolean> {
     // TODO: Implement AWS SNS SMS sending
-    console.log(`AWS SNS SMS to ${phoneNumber}: Your Sellar verification code is ${code}`);
     return true;
   }
 
@@ -72,7 +69,6 @@ export class VerificationService {
           return await this.sendAWSEmail(email, token, userName);
         default:
           // Local/development - just log the link
-          console.log(`Email Verification Link for ${email}: /verify-email?token=${token}`);
           return true;
       }
     } catch (error) {
@@ -84,21 +80,18 @@ export class VerificationService {
   private async sendResendEmail(email: string, token: string, userName?: string): Promise<boolean> {
     // TODO: Implement Resend email sending
     const verificationLink = `${process.env.EXPO_PUBLIC_APP_URL}/verify-email?token=${token}`;
-    console.log(`Resend Email to ${email}: Verification link: ${verificationLink}`);
     return true;
   }
 
   private async sendSendGridEmail(email: string, token: string, userName?: string): Promise<boolean> {
     // TODO: Implement SendGrid email sending
     const verificationLink = `${process.env.EXPO_PUBLIC_APP_URL}/verify-email?token=${token}`;
-    console.log(`SendGrid Email to ${email}: Verification link: ${verificationLink}`);
     return true;
   }
 
   private async sendAWSEmail(email: string, token: string, userName?: string): Promise<boolean> {
     // TODO: Implement AWS SES email sending
     const verificationLink = `${process.env.EXPO_PUBLIC_APP_URL}/verify-email?token=${token}`;
-    console.log(`AWS SES Email to ${email}: Verification link: ${verificationLink}`);
     return true;
   }
 
@@ -390,7 +383,6 @@ export class VerificationService {
   ): Promise<void> {
     try {
       // TODO: Integrate with push notification service
-      console.log(`Notification to user ${userId}: ${verificationType} verification ${status}`);
       
       // You could integrate with your existing notification system here
       // await notificationService.send({
@@ -454,6 +446,7 @@ export const formatVerificationStatus = (status: string): string => {
     rejected: 'Rejected',
     expired: 'Expired',
     cancelled: 'Cancelled',
+    incomplete: 'Incomplete',
   };
   return statusMap[status] || status;
 };
@@ -466,6 +459,7 @@ export const getVerificationStatusColor = (status: string): string => {
     rejected: '#F44336', // Red
     expired: '#9E9E9E', // Gray
     cancelled: '#9E9E9E', // Gray
+    incomplete: '#FF9800', // Dark Orange
   };
   return colorMap[status] || '#9E9E9E';
 };

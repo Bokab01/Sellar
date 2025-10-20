@@ -70,7 +70,6 @@ class OfflineStorageService {
       // Initialize storage structure
       await this.ensureStorageStructure();
       this.isInitialized = true;
-      console.log('Offline storage initialized successfully');
     } catch (error) {
       console.error('Failed to initialize offline storage:', error);
       throw error;
@@ -103,7 +102,6 @@ class OfflineStorageService {
       }));
 
       await AsyncStorage.setItem(STORAGE_KEYS.LISTINGS, JSON.stringify(offlineListings));
-      console.log(`Cached ${listings.length} listings offline`);
     } catch (error) {
       console.error('Failed to cache listings:', error);
     }
@@ -190,7 +188,6 @@ class OfflineStorageService {
       const updated = [...filtered, ...offlineMessages];
       
       await AsyncStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(updated));
-      console.log(`Cached ${messages.length} messages for conversation ${conversationId}`);
     } catch (error) {
       console.error('Failed to cache messages:', error);
     }
@@ -232,7 +229,6 @@ class OfflineStorageService {
       queue.push(newItem);
       await AsyncStorage.setItem(STORAGE_KEYS.SYNC_QUEUE, JSON.stringify(queue));
       
-      console.log(`Added item to sync queue: ${newItem.type}`);
     } catch (error) {
       console.error('Failed to add to sync queue:', error);
     }
@@ -404,7 +400,6 @@ class OfflineStorageService {
     errors: string[];
   }> {
     if (this.syncInProgress && !forceSync) {
-      console.log('Sync already in progress, skipping...');
       return { success: false, synced: 0, failed: 0, errors: ['Sync already in progress'] };
     }
 
@@ -415,7 +410,6 @@ class OfflineStorageService {
 
     try {
       const queue = await this.getSyncQueue();
-      console.log(`Starting sync of ${queue.length} items`);
 
       for (const item of queue) {
         try {
@@ -447,7 +441,6 @@ class OfflineStorageService {
       // Update last sync timestamp
       await AsyncStorage.setItem(STORAGE_KEYS.LAST_SYNC, new Date().toISOString());
 
-      console.log(`Sync completed: ${synced} synced, ${failed} failed`);
       return { success: true, synced, failed, errors };
 
     } catch (error) {
@@ -637,7 +630,6 @@ class OfflineStorageService {
         await AsyncStorage.setItem(STORAGE_KEYS.NETWORK_QUALITY, '[]');
       }
 
-      console.log(`Cleared cache: ${type || 'all'}`);
     } catch (error) {
       console.error('Failed to clear cache:', error);
     }
@@ -741,7 +733,6 @@ class OfflineStorageService {
   // Cleanup method
   async destroy(): Promise<void> {
     // Clean up any resources if needed
-    console.log('OfflineStorage destroyed');
   }
 }
 

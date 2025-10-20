@@ -216,7 +216,7 @@ const RecommendationSection = memo(function RecommendationSection({
     }
     
     return (
-      <View style={{ width: 180, marginRight: theme.spacing.sm }}>
+      <View style={{ width: 190, marginRight: theme.spacing.sm }}>
         <ProductCard
           image={Array.isArray(item.images) ? item.images[0] : (item.images || '')}
           title={item.title || 'Untitled'}
@@ -257,8 +257,8 @@ const RecommendationSection = memo(function RecommendationSection({
   // ✅ OPTIMIZED: getItemLayout for better scroll performance
   const getItemLayout = useCallback(
     (_: any, index: number) => ({
-      length: 180 + theme.spacing.sm, // width + marginRight
-      offset: (180 + theme.spacing.sm) * index,
+      length: 190 + theme.spacing.sm, // width + marginRight
+      offset: (190 + theme.spacing.sm) * index,
       index,
     }),
     [theme]
@@ -295,7 +295,7 @@ const RecommendationSection = memo(function RecommendationSection({
     }
     
     return (
-      <View style={{ flex: 0.5, paddingHorizontal: theme.spacing.xs, marginBottom: theme.spacing.sm }}>
+      <View style={{ flex: 0.5, padding: 2 }}>
         <ProductCard
           image={Array.isArray(item.images) ? item.images[0] : (item.images || '')}
           title={item.title || 'Untitled'}
@@ -312,7 +312,7 @@ const RecommendationSection = memo(function RecommendationSection({
           badge={badge}
           location={item.location || 'Unknown'}
           layout="grid"
-          fullWidth={false}
+          fullWidth={true}
           shadowSize="sm"
           listingId={item.listing_id}
           isFavorited={favorites[item.listing_id] || false}
@@ -399,8 +399,8 @@ const RecommendationSection = memo(function RecommendationSection({
           {Array.from({ length: 3 }).map((_, index) => (
             <LoadingSkeleton
               key={index}
-              width={180}
-              height={200}
+              width={190}
+              height={240}
               style={{ borderRadius: theme.borderRadius.lg }}
             />
           ))}
@@ -474,9 +474,7 @@ const RecommendationSection = memo(function RecommendationSection({
           renderItem={renderGridItem}
           keyExtractor={keyExtractor}
           numColumns={2}
-          columnWrapperStyle={{
-            paddingHorizontal: theme.spacing.sm,
-          }}
+          columnWrapperStyle={{}}
           showsVerticalScrollIndicator={false}
           scrollEnabled={false}
           // ✅ Performance optimizations
@@ -485,6 +483,11 @@ const RecommendationSection = memo(function RecommendationSection({
           windowSize={5}
           initialNumToRender={10}
           updateCellsBatchingPeriod={50}
+          getItemLayout={(data, index) => ({
+            length: 330, // Approximate card height + padding
+            offset: 330 * Math.floor(index / 2), // Account for 2 columns
+            index,
+          })}
         />
       ) : (
         <FlatList
@@ -508,7 +511,7 @@ const RecommendationSection = memo(function RecommendationSection({
           decelerationRate="fast"
           scrollEventThrottle={16}
           pagingEnabled={false}
-          snapToInterval={180 + theme.spacing.sm}
+          snapToInterval={190 + theme.spacing.sm}
           snapToAlignment="start"
         />
       )}

@@ -177,7 +177,7 @@ export default function TrendingScreen() {
     }
 
     return (
-      <View style={{ flex: 1, paddingHorizontal: theme.spacing.sm }}>
+      <View style={{ flex: 1, padding: 2 }}>
         <ProductCard
           image={Array.isArray(listing.images) ? listing.images[0] : (listing.images || '')}
           title={listing.title || 'Untitled'}
@@ -194,7 +194,7 @@ export default function TrendingScreen() {
           badge={badge}
           location={listing.location || 'Unknown'}
           layout="grid"
-          fullWidth={false}
+          fullWidth={true}
           shadowSize="sm"
           listingId={listing.listing_id}
           isFavorited={favorites[listing.listing_id] || false}

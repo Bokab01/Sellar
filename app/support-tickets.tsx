@@ -30,7 +30,6 @@ export default function SupportTicketsScreen() {
 
   const handleTicketPress = useCallback((ticketId: string) => {
     // Navigate to ticket details - route will be created later
-    console.log('Navigate to ticket:', ticketId);
   }, []);
 
   // Memoize styles to prevent re-renders

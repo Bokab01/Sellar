@@ -180,7 +180,6 @@ export default function InboxScreen() {
           onPress: async () => {
             setBulkActionLoading(prev => ({ ...prev, delete: true }));
             try {
-              console.log('🎯 Bulk delete - selected conversations:', Array.from(selectedConversations));
               
               // Check if these conversations exist
               const { data: existingConversations, error: checkError } = await supabase
@@ -188,7 +187,6 @@ export default function InboxScreen() {
                 .select('id, participant_1, participant_2')
                 .in('id', Array.from(selectedConversations));
 
-              console.log('🎯 Existing conversations found:', existingConversations?.length || 0);
 
               const { data, error } = await supabase
                 .from('conversations')
@@ -196,13 +194,11 @@ export default function InboxScreen() {
                 .in('id', Array.from(selectedConversations))
                 .select();
 
-              console.log('🎯 Bulk delete result:', { data, error });
 
               if (error) {
                 Alert.alert('Error', 'Failed to delete conversations');
                 console.error('Bulk delete error:', error);
               } else {
-                console.log('🎯 Successfully deleted conversations, count:', data?.length || 0);
                 
                 // Clear local unread counts for deleted conversations
                 const { setUnreadCount } = useChatStore.getState();
@@ -229,7 +225,6 @@ export default function InboxScreen() {
   const handleBulkMarkAsRead = async () => {
     if (selectedConversations.size === 0) return;
 
-    console.log('🎯 Bulk mark as read - selected conversations:', Array.from(selectedConversations));
     setBulkActionLoading(prev => ({ ...prev, markAsRead: true }));
     
     try {
@@ -240,7 +235,6 @@ export default function InboxScreen() {
         .in('conversation_id', Array.from(selectedConversations))
         .is('read_at', null);
 
-      console.log('🎯 Unread messages found:', unreadMessages?.length || 0);
 
       // Mark messages as read for selected conversations
       const { data, error } = await supabase
@@ -250,17 +244,14 @@ export default function InboxScreen() {
         .is('read_at', null)
         .select();
 
-      console.log('🎯 Bulk mark as read result:', { data, error });
 
       if (error) {
         Alert.alert('Error', 'Failed to mark messages as read');
         console.error('Bulk mark as read error:', error);
       } else {
-        console.log('🎯 Successfully marked messages as read, count:', data?.length || 0);
         
         // Clear manually marked as unread flag since we're marking as read
         Array.from(selectedConversations).forEach(convId => {
-          console.log('🧹 Clearing manual tracking for conversation:', convId);
           clearManuallyMarkedAsUnread(convId);
         });
         
@@ -274,7 +265,6 @@ export default function InboxScreen() {
         setIsSelectionMode(false);
         
         // Refresh conversations without showing skeleton
-        console.log('🔄 Refreshing conversations after bulk mark as read');
         await refresh(true); // Skip loading state
       }
     } catch (err) {
@@ -288,7 +278,6 @@ export default function InboxScreen() {
   const handleBulkMarkAsUnread = async () => {
     if (selectedConversations.size === 0) return;
 
-    console.log('🎯 Bulk mark as unread - selected conversations:', Array.from(selectedConversations));
     setBulkActionLoading(prev => ({ ...prev, markAsUnread: true }));
     
     try {
@@ -306,7 +295,6 @@ export default function InboxScreen() {
         .not('read_at', 'is', null)
         .neq('sender_id', user.id); // Exclude user's own messages
 
-      console.log('🎯 Read messages found (excluding own):', readMessages?.length || 0);
 
       // Mark messages as unread for selected conversations (excluding user's own messages)
       const { data, error } = await supabase
@@ -317,13 +305,11 @@ export default function InboxScreen() {
         .neq('sender_id', user.id) // Exclude user's own messages
         .select();
 
-      console.log('🎯 Bulk mark as unread result:', { data, error });
 
       if (error) {
         Alert.alert('Error', 'Failed to mark messages as unread');
         console.error('Bulk mark as unread error:', error);
       } else {
-        console.log('🎯 Successfully marked messages as unread, count:', data?.length || 0);
         
         // Mark conversations as manually unread to prevent auto-marking as read
         Array.from(selectedConversations).forEach(convId => {

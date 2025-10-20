@@ -297,7 +297,6 @@ export default function EditListingScreen() {
     setLoading(true);
     try {
       // Check network connectivity first
-      console.log('Checking network connectivity...');
       const networkStatus = await networkUtils.checkNetworkStatus();
       
       if (!networkStatus.isConnected) {
@@ -320,7 +319,6 @@ export default function EditListingScreen() {
       
       // Upload new images if any
       if (newImages.length > 0) {
-        console.log(`Uploading ${newImages.length} new images...`);
         
         for (let i = 0; i < newImages.length; i++) {
           const image = newImages[i];

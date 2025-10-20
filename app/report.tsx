@@ -165,13 +165,6 @@ export default function ReportScreen() {
         throw new Error('User not authenticated');
       }
 
-      console.log('Submitting report with params:', {
-        p_reporter_id: user.id,
-        p_target_type: targetType,
-        p_target_id: targetId,
-        p_category: selectedCategory,
-        p_reason: reason.trim(),
-      });
 
       const { data, error } = await supabase.rpc('submit_report', {
         p_reporter_id: user.id,
@@ -183,7 +176,6 @@ export default function ReportScreen() {
         p_evidence_urls: JSON.stringify([])
       });
 
-      console.log('Report submission response:', { data, error });
 
       if (error) throw error;
 

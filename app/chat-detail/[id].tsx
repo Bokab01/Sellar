@@ -52,7 +52,6 @@ export default function ChatScreen() {
   // App resume handling - refresh messages when app comes back from background
   const { isRefreshing, isReconnecting, error: resumeError } = useAppResume({
     onResume: async () => {
-      console.log('📱 Chat screen: App resumed, refreshing messages...');
       await refreshMessages();
       // Also refresh conversation details to get latest user status
       await fetchConversationDetails();
@@ -123,7 +122,6 @@ export default function ChatScreen() {
       fetchConversationDetails();
       markAsRead(conversationId); // Update local state (may be blocked if manually marked as unread)
       markMessagesAsRead(); // Update database (should always work)
-      console.log('📱 Chat detail screen loaded for conversation:', conversationId);
     }
   }, [conversationId, conversationDeleted]);
 
@@ -131,7 +129,6 @@ export default function ChatScreen() {
   useEffect(() => {
     if (!conversationId || !user?.id || !conversation?.listing_id) return;
 
-    console.log('🔔 Setting up realtime subscription for transactions');
     
     const channel = supabase
       .channel(`transaction-${conversationId}`)
@@ -144,7 +141,6 @@ export default function ChatScreen() {
           filter: `conversation_id=eq.${conversationId}`,
         },
         (payload) => {
-          console.log('🔔 Transaction update received:', payload);
           
           // Refresh transaction data
           if (conversation?.listing_id) {
@@ -155,7 +151,6 @@ export default function ChatScreen() {
       .subscribe();
 
     return () => {
-      console.log('🔔 Cleaning up transaction subscription');
       supabase.removeChannel(channel);
     };
   }, [conversationId, user?.id, conversation?.listing_id]);
@@ -314,7 +309,6 @@ export default function ChatScreen() {
       if (error) {
         // Check if it's a "no rows" error (conversation deleted)
         if ((error as any).message?.includes('0 rows') || (error as any).code === 'PGRST116') {
-          console.log('Conversation no longer exists, redirecting...');
           setConversationDeleted(true); // Prevent further queries
           Alert.alert(
             'Conversation Unavailable',
@@ -387,13 +381,11 @@ export default function ChatScreen() {
   }, [conversationId, user?.id, checkExistingTransaction]);
 
   const handleTransactionCreated = (transactionId: string) => {
-    console.log('Transaction created:', transactionId);
     // Refresh to get the new transaction
     checkExistingTransaction(conversation?.listing?.id);
   };
 
   const handleTransactionUpdated = () => {
-    console.log('Transaction updated, refreshing data...');
     // Refresh to get the updated transaction
     checkExistingTransaction(conversation?.listing?.id);
   };
@@ -494,9 +486,7 @@ export default function ChatScreen() {
         status: 'pending',
       };
       
-      console.log('🎯 Creating offer with data:', offerData);
       const { data: createdOffer, error: offerError } = await dbHelpers.createOffer(offerData);
-      console.log('🎯 Offer creation result:', { createdOffer, offerError });
 
       if (offerError) throw offerError;
 
@@ -519,46 +509,33 @@ export default function ChatScreen() {
 
   const handleOfferAction = async (offerId: string, action: 'accept' | 'reject') => {
     try {
-      console.log('🎯 Handling offer action:', { offerId, action, userId: user?.id, userType: typeof user?.id });
       
       if (!user?.id) {
         throw new Error('User not authenticated');
       }
 
       // Use direct Supabase query instead of the helper function
-      console.log('🎯 Using direct Supabase query to update offer:', { offerId, action });
       
       const newStatus = action === 'accept' ? 'accepted' : 'rejected';
       
       // First, check if the offer exists
-      console.log('🎯 Checking if offer exists...');
       const { data: existingOffer, error: checkError } = await supabase
         .from('offers')
         .select('id, status, buyer_id, seller_id')
         .eq('id', offerId)
         .single();
       
-      console.log('🎯 Offer check result:', { existingOffer, checkError });
       
       if (checkError || !existingOffer) {
         throw new Error(`Offer not found: ${checkError?.message || 'Offer does not exist'}`);
       }
       
       // Check user permissions
-      console.log('🎯 Checking user permissions:', {
-        currentUserId: user.id,
-        offerBuyerId: existingOffer.buyer_id,
-        offerSellerId: existingOffer.seller_id,
-        isBuyer: user.id === existingOffer.buyer_id,
-        isSeller: user.id === existingOffer.seller_id,
-        canUpdate: user.id === existingOffer.buyer_id || user.id === existingOffer.seller_id
-      });
       
       if (user.id !== existingOffer.buyer_id && user.id !== existingOffer.seller_id) {
         throw new Error('You do not have permission to update this offer. Only the buyer or seller can update it.');
       }
       
-      console.log('🎯 Found offer, proceeding with update...');
       
       // Direct update using Supabase client
       const { data, error } = await supabase
@@ -570,7 +547,6 @@ export default function ChatScreen() {
         .eq('id', offerId)
         .select();
       
-      console.log('🎯 Direct update result:', { data, error });
       
       if (error) {
         console.error('🎯 Direct update error:', error);
@@ -582,7 +558,6 @@ export default function ChatScreen() {
         throw new Error('No offer was updated. The offer may not exist or you may not have permission to update it.');
       }
       
-      console.log('🎯 Successfully updated offer:', data[0]);
 
       // If offer was accepted, handle the acceptance flow
       if (action === 'accept') {
@@ -614,7 +589,6 @@ export default function ChatScreen() {
 
   const handleOfferAcceptance = async (offerId: string, acceptedOffer: any) => {
     try {
-      console.log('🎯 Handling offer acceptance:', { offerId, acceptedOffer });
 
       if (!conversation?.listing_id) {
         console.error('🎯 No listing_id found in conversation');
@@ -633,18 +607,11 @@ export default function ChatScreen() {
         return;
       }
 
-      console.log('🎯 Listing details:', listing);
 
       // Determine quantity being purchased (default to 1 if not specified in offer)
       const quantityToPurchase = acceptedOffer.quantity || 1;
       const availableQuantity = listing.quantity - (listing.quantity_reserved || 0);
 
-      console.log('🎯 Quantity check:', { 
-        total: listing.quantity, 
-        reserved: listing.quantity_reserved, 
-        available: availableQuantity,
-        requested: quantityToPurchase 
-      });
 
       // Check if enough quantity is available
       if (availableQuantity < quantityToPurchase) {
@@ -657,7 +624,6 @@ export default function ChatScreen() {
         // =============================================
         // FULL LISTING RESERVATION (quantity = 1 or buying all)
         // =============================================
-        console.log('🎯 Using full listing reservation (old method)');
         
         const reservedUntil = new Date();
         reservedUntil.setHours(reservedUntil.getHours() + 48);
@@ -683,13 +649,11 @@ export default function ChatScreen() {
         if (listingError) {
           console.error('🎯 Error reserving listing:', listingError);
         } else {
-          console.log('🎯 Successfully reserved full listing until:', reservedUntil);
         }
       } else {
         // =============================================
         // PARTIAL QUANTITY RESERVATION (multi-quantity listing)
         // =============================================
-        console.log('🎯 Using partial quantity reservation (new method)');
         
         const { data: pendingTx, error: pendingTxError } = await supabase
           .rpc('create_pending_transaction', {
@@ -707,11 +671,9 @@ export default function ChatScreen() {
           return;
         }
 
-        console.log('🎯 Successfully created pending transaction:', pendingTx);
       }
 
       // 2. Reject all other pending offers for this listing
-      console.log('🎯 Rejecting other pending offers for this listing');
       const { error: rejectError } = await supabase
         .from('offers')
         .update({ 
@@ -725,10 +687,8 @@ export default function ChatScreen() {
       if (rejectError) {
         console.error('🎯 Error rejecting other offers:', rejectError);
       } else {
-        console.log('🎯 Successfully rejected other pending offers');
       }
 
-      console.log('🎯 Offer acceptance flow completed successfully');
 
     } catch (err) {
       console.error('🎯 Error in handleOfferAcceptance:', err);
@@ -767,7 +727,6 @@ export default function ChatScreen() {
       // Create counter offer message
       const counterContent = `💰 Counter Offer: GHS ${(amount || 0).toLocaleString()}${offerMessage ? `\n\n"${offerMessage}"` : ''}`;
       
-      console.log('🎯 Creating counter offer message...');
       const { data: message, error: messageError } = await supabase
         .from('messages')
         .insert({
@@ -784,7 +743,6 @@ export default function ChatScreen() {
         })
         .select('id');
 
-      console.log('🎯 Message creation result:', { message, messageError });
 
       if (messageError) {
         console.error('🎯 Message creation error:', messageError);
@@ -800,18 +758,6 @@ export default function ChatScreen() {
       // Create counter offer record using direct Supabase query
       // For counter offers, the current user becomes the buyer (making the offer)
       // and the other user becomes the seller (receiving the offer)
-      console.log('🎯 Creating counter offer with data:', {
-        listing_id: conversation?.listing_id!,
-        conversation_id: conversationId!,
-        message_id: messageId,
-        buyer_id: user!.id, // Current user is the buyer (making the counter offer)
-        seller_id: otherUser?.id!, // Other user is the seller (receiving the counter offer)
-        parent_offer_id: counteringOfferId, // Link to the original offer
-        amount,
-        currency: 'GHS',
-        message: offerMessage.trim() || null,
-        status: 'pending',
-      });
 
       const { data: counterOffer, error: offerError } = await supabase
         .from('offers')
@@ -829,7 +775,6 @@ export default function ChatScreen() {
         })
         .select();
 
-      console.log('🎯 Counter offer creation result:', { counterOffer, offerError });
 
       if (offerError) {
         console.error('🎯 Counter offer creation error:', offerError);
@@ -842,7 +787,6 @@ export default function ChatScreen() {
 
       // Update the original offer's status to "countered"
       if (counteringOfferId) {
-        console.log('🎯 Updating original offer status to countered:', counteringOfferId);
         const { error: updateOriginalError } = await supabase
           .from('offers')
           .update({ 
@@ -855,7 +799,6 @@ export default function ChatScreen() {
           console.error('🎯 Error updating original offer:', updateOriginalError);
           // Don't throw error here, just log it - the counter offer was still created
         } else {
-          console.log('🎯 Successfully updated original offer status to countered');
         }
       }
 
@@ -1258,11 +1201,11 @@ export default function ChatScreen() {
             conversationId={conversationId!}
             otherUser={otherUser}
             conversation={conversation}
-            onBlock={() => console.log('Block user')}
-            onDelete={() => console.log('Delete conversation')}
-            onArchive={() => console.log('Archive conversation')}
-            onMute={() => console.log('Mute conversation')}
-            onUnmute={() => console.log('Unmute conversation')}
+            onBlock={() => {}}
+            onDelete={() => {}}
+            onArchive={() => {}}
+            onMute={() => {}}
+            onUnmute={() => {}}
           />,
         ].filter(Boolean)}
       />

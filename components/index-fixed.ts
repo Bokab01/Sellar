@@ -57,12 +57,6 @@ export { CreateTicketModal } from './CreateTicketModal/CreateTicketModal';
 export { KnowledgeBaseCard } from './KnowledgeBaseCard/KnowledgeBaseCard';
 
 // Verification System Components
-export { 
-  VerificationBadge, 
-  CompactVerificationBadge, 
-  TrustScoreDisplay, 
-  VerificationStatusIndicator 
-} from './VerificationBadge/VerificationBadge';
 export { DocumentUpload, MultiDocumentUpload } from './DocumentUpload/DocumentUpload';
 export { 
   VerificationStatusTracker, 

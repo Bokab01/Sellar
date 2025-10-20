@@ -25,6 +25,7 @@ import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { initializeWebOptimizations } from '@/lib/webOptimizations';
 import { useRefreshTokenError } from '@/hooks/useRefreshTokenError';
 import { setupAuthErrorInterceptor } from '@/lib/authErrorInterceptor';
+import { setupNetworkInterceptor } from '@/scripts/monitorBandwidth';
 import * as Sentry from '@sentry/react-native';
 
 Sentry.init({
@@ -68,7 +69,6 @@ function AppContent() {
   // Initialize all services (gradually re-enabled with performance optimizations)
   useEffect(() => {
     const initializeServices = async () => {
-      console.log('Initializing services with performance optimizations...');
       
       // Quick initialization with timeout fallback
       const initPromise = initializeAllServices();
@@ -76,7 +76,6 @@ function AppContent() {
       
       try {
         await Promise.race([initPromise, timeoutPromise]);
-        console.log('Services initialized successfully');
       } catch (error) {
         console.warn('Service initialization had issues, but continuing:', error);
       }
@@ -91,7 +90,6 @@ function AppContent() {
       try {
         // Setup global auth error interceptor first
         setupAuthErrorInterceptor();
-        console.log('✅ Auth error interceptor initialized');
 
         // Recover from any corrupted sessions first (with timeout)
         try {
@@ -100,7 +98,6 @@ function AppContent() {
           const recovery = await Promise.race([recoveryPromise, timeoutPromise]) as any;
           
           if (recovery && recovery.recovered) {
-            console.log('Session recovery completed:', recovery.cleanState ? 'clean state' : 'authenticated state');
           } else {
             console.warn('Session recovery skipped or failed');
           }
@@ -114,7 +111,6 @@ function AppContent() {
           const securityPromise = securityService.initialize();
           const timeoutPromise = new Promise(resolve => setTimeout(resolve, 2000));
           await Promise.race([securityPromise, timeoutPromise]);
-          console.log('Security services initialized successfully');
         } catch (error) {
           console.error('Failed to initialize security services:', error);
           // Continue app initialization even if security services fail
@@ -122,14 +118,12 @@ function AppContent() {
 
         // Initialize offline storage
         try {
-          console.log('Offline storage initialized');
         } catch (error) {
           console.error('Failed to initialize offline storage:', error);
         }
 
         // Initialize memory manager
         try {
-          console.log('Memory manager initialized');
         } catch (error) {
           console.error('Failed to initialize memory manager:', error);
         }
@@ -137,9 +131,15 @@ function AppContent() {
         // Initialize web optimizations
         try {
           initializeWebOptimizations();
-          console.log('Web optimizations initialized successfully');
         } catch (error) {
           console.error('Failed to initialize web optimizations:', error);
+        }
+
+        // Initialize bandwidth monitoring
+        try {
+          setupNetworkInterceptor();
+        } catch (error) {
+          console.error('Failed to initialize bandwidth monitoring:', error);
         }
 
         // Initialize monetization data (credits and subscription)
@@ -149,12 +149,10 @@ function AppContent() {
             refreshCredits(),
             refreshSubscription(),
           ]);
-          console.log('Monetization data initialized successfully');
         } catch (error) {
           console.error('Failed to initialize monetization data:', error);
         }
 
-        console.log('All services initialized successfully');
       } catch (error) {
         console.error('Failed to initialize services:', error);
       } finally {

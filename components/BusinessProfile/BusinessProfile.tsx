@@ -2,9 +2,10 @@ import React from 'react';
 import { View, TouchableOpacity, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
-import { Avatar, FullUserBadges } from '@/components';
+import { Avatar, CompactReviewSummary } from '@/components';
+import { IdentityVerificationBadge } from '@/components/VerifiedBadge/VerifiedBadge';
 import { Button } from '@/components/Button/Button';
-import { Star, MessageCircle, Phone, MapPin } from 'lucide-react-native';
+import { MessageCircle, Phone, MapPin } from 'lucide-react-native';
 import { router } from 'expo-router';
 
 interface BusinessProfileProps {
@@ -17,7 +18,6 @@ interface BusinessProfileProps {
     phone?: string;
     isBusinessUser: boolean;
     isVerified?: boolean; // ID verification status
-    isBusinessVerified?: boolean; // Business verification status
   };
   onMessagePress?: () => void;
   onCallPress?: () => void;
@@ -53,7 +53,6 @@ export function BusinessProfile({
             text: 'Call', 
             onPress: () => {
               // Implement actual calling functionality
-              console.log('Calling:', business.phone);
             }
           }
         ]
@@ -61,47 +60,6 @@ export function BusinessProfile({
     }
   };
 
-  const renderStars = (rating: number) => {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
-
-    for (let i = 0; i < fullStars; i++) {
-      stars.push(
-        <Star
-          key={i}
-          size={14}
-          color={theme.colors.warning}
-          fill={theme.colors.warning}
-        />
-      );
-    }
-
-    if (hasHalfStar) {
-      stars.push(
-        <Star
-          key="half"
-          size={14}
-          color={theme.colors.warning}
-          fill={theme.colors.warning}
-        />
-      );
-    }
-
-    const emptyStars = 5 - Math.ceil(rating);
-    for (let i = 0; i < emptyStars; i++) {
-      stars.push(
-        <Star
-          key={`empty-${i}`}
-          size={14}
-          color={theme.colors.border}
-          fill="transparent"
-        />
-      );
-    }
-
-    return stars;
-  };
 
   return (
     <View style={{
@@ -127,7 +85,7 @@ export function BusinessProfile({
         <Avatar
           source={business.avatar ? { uri: business.avatar } : undefined}
           name={business.name}
-          size="lg"
+          size="md"
         />
         {/* Business Badge */}
        {/*  {business.isBusinessUser && (
@@ -173,39 +131,31 @@ export function BusinessProfile({
           {business.name}
         </Text>
 
-        {/* Rating */}
-        {business.rating && (
-          <View style={{
+        {/* Verification Badge - Below name */}
+        {business.isVerified && (
+          <View style={{ 
+            marginTop: theme.spacing.xs,
             flexDirection: 'row',
-            alignItems: 'center',
-            marginBottom: theme.spacing.xs,
-            backgroundColor: theme.colors.primary + '10',
-            paddingHorizontal: theme.spacing.sm,
-            paddingVertical: 2,
-            borderRadius: theme.borderRadius.sm,
-            alignSelf: 'flex-start',
+            alignItems: 'center'
           }}>
-            <View style={{ flexDirection: 'row', marginRight: theme.spacing.xs }}>
-              {renderStars(business.rating)}
-            </View>
-            <Text 
-              variant="caption" 
-              style={{ 
-                color: theme.colors.primary,
-                fontWeight: '600',
-              }}
-            >
-              {business.rating.toFixed(1)}
-            </Text>
+            <IdentityVerificationBadge
+              size="xs"
+              variant="compact"
+            />
           </View>
         )}
+
+        {/* Rating - Below verification badge */}
+        <View style={{ marginVertical: theme.spacing.xs }}>
+          <CompactReviewSummary userId={business.id} />
+        </View>
 
         {/* Location */}
         {business.location && (
           <View style={{
             flexDirection: 'row',
             alignItems: 'center',
-            marginBottom: theme.spacing.xs,
+            
           }}>
             <Text 
               variant="caption" 
@@ -221,14 +171,6 @@ export function BusinessProfile({
           </View>
         )}
 
-        {/* Badges - Pro, Verified, and Business Verified */}
-        <View style={{ marginTop: theme.spacing.xs }}>
-          <FullUserBadges
-            isBusinessUser={business.isBusinessUser}
-            isVerified={business.isVerified}
-            isBusinessVerified={business.isBusinessVerified}
-          />
-        </View>
       </View>
 
       {/* Action Buttons - Only show if callbacks are provided */}

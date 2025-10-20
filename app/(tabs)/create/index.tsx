@@ -225,10 +225,8 @@ function CreateListingScreen() {
           .single();
           
         if (existingDraft) {
-          console.log('📄 Found existing draft:', existingDraft.id);
           setCurrentDraftId(existingDraft.id);
         } else {
-          console.log('📄 No existing draft found');
         }
       }
     } catch (error) {
@@ -389,7 +387,6 @@ function CreateListingScreen() {
       
       // If any credits are needed, deduct them
       if (totalCredits > 0) {
-        console.log(`💳 Deducting ${totalCredits} credits (${listingFee} listing fee + ${featureCredits} features)...`);
         
         // Check if user has enough credits
         if (balance < totalCredits) {
@@ -421,7 +418,6 @@ function CreateListingScreen() {
             return;
           }
           
-          console.log(`✅ Successfully deducted ${listingFee} credits for additional listing slot`);
         }
         
         // Deduct credits for features if any were selected
@@ -434,29 +430,23 @@ function CreateListingScreen() {
           if (!featureResult.success) {
             // Refund listing fee if feature payment fails
             if (listingFee > 0) {
-              console.log('💰 Refunding listing fee due to feature payment failure...');
               // TODO: Implement refund logic
             }
             Alert.alert('Error', featureResult.error || 'Failed to process feature payment');
             return;
           }
           
-          console.log(`✅ Successfully deducted ${featureCredits} credits for features`);
         }
       }
       
       // ✅ REFACTORED: Create the listing using hook
       await createListing();
     } catch (listingError) {
-      console.log('🔄 Listing creation failed, checking for refunds...');
-      console.log(`Selected features: ${selectedFeatures.length}`);
       
       // If features were selected, refund them
       if (selectedFeatures.length > 0) {
-        console.log('💰 Refunding features...');
         await refundAllCredits(0, 'listing_creation_failed', listingError);
       } else {
-        console.log('ℹ️ No features to refund');
       }
       // Error already logged and shown to user in createListing
     }
@@ -527,7 +517,6 @@ function CreateListingScreen() {
         router.replace('/(tabs)/home');
       }
     } catch (navError) {
-      console.log('Navigation error (safe to ignore):', navError);
     }
   }, []);
 
@@ -548,7 +537,6 @@ function CreateListingScreen() {
             try {
               router.push('/buy-credits');
             } catch (e) {
-              console.log('Navigation error:', e);
             }
           }},
         ]
@@ -572,10 +560,6 @@ function CreateListingScreen() {
           // Success! Credits were spent and listing was created with features applied
         } catch (listingError) {
           // Listing creation failed - refund ALL the credits
-          console.log('🔄 Listing creation failed after payment, refunding credits...');
-          console.log(`Listing fee: ${requiredCredits} credits`);
-          console.log(`Feature credits: ${featureCredits} credits`);
-          console.log(`Total refunding: ${totalCreditsNeeded} credits`);
           
           await refundAllCredits(requiredCredits, 'listing_creation_failed', listingError);
           
@@ -602,7 +586,6 @@ function CreateListingScreen() {
       const featureCredits = selectedFeatures.reduce((sum, feature) => sum + (feature.credits || 0), 0);
       const totalCreditsToRefund = listingFeeCredits + featureCredits;
       
-      console.log(`Refunding ${totalCreditsToRefund} credits (${listingFeeCredits} listing fee + ${featureCredits} features)`);
       
       // Get current balance for transaction record
       const { data: userCredits } = await supabase
@@ -1629,7 +1612,6 @@ function CreateListingScreen() {
           try {
               router.push('/subscription-plans');
           } catch (e) {
-            console.log('Navigation error:', e);
           }
         },
         }}

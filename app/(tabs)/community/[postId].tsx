@@ -66,7 +66,6 @@ export default function PostDetailScreen() {
 
   const fetchPost = useCallback(async () => {
     try {
-      console.log('Fetching post with ID:', postId);
       const { data, error: fetchError } = await supabase
         .from('posts')
         .select(`
@@ -171,7 +170,6 @@ export default function PostDetailScreen() {
 
   const fetchComments = async () => {
     try {
-      console.log('Fetching comments for post ID:', postId);
       const { data, error: fetchError } = await supabase
         .from('comments')
         .select(`
@@ -193,7 +191,6 @@ export default function PostDetailScreen() {
         .is('parent_id', null) // Only top-level comments
         .order('created_at', { ascending: true });
 
-      console.log('Comments fetch result:', { data, error: fetchError });
 
       if (fetchError) {
         console.error('Failed to fetch comments:', fetchError);
@@ -243,7 +240,6 @@ export default function PostDetailScreen() {
 
   // Real-time subscription for post updates (likes, comments count, etc.)
   const handlePostUpdate = useCallback((updatedPost: any) => {
-    console.log('🔗 Post updated via real-time:', updatedPost);
     if (updatedPost.id === postId) {
       setPost((prev: any) => prev ? { ...prev, ...updatedPost } : updatedPost);
     }
@@ -251,7 +247,6 @@ export default function PostDetailScreen() {
 
   // Real-time subscription for new comments
   const handleCommentUpdate = useCallback((newComment: any) => {
-    console.log('🔗 Comment updated via real-time:', newComment);
     if (newComment.post_id === postId) {
       // Fetch the complete comment data with profile info
       const fetchCompleteComment = async () => {
@@ -351,11 +346,6 @@ export default function PostDetailScreen() {
 
   const handleAddComment = async () => {
     if (!commentText.trim() || !user) {
-      console.log('Cannot add comment: missing text or user', { 
-        hasText: !!commentText.trim(), 
-        hasUser: !!user,
-        userId: user?.id 
-      });
       return;
     }
 
@@ -363,11 +353,6 @@ export default function PostDetailScreen() {
       // Edit existing comment - no optimistic update needed
       setSubmittingComment(true);
       try {
-        console.log('Attempting to edit comment:', {
-          commentId: editingComment.id,
-          content: commentText.trim(),
-        });
-
         const { error } = await supabase
           .from('comments')
           .update({
@@ -381,7 +366,6 @@ export default function PostDetailScreen() {
           throw error;
         }
 
-        console.log('Comment edited successfully');
         setEditingComment(null);
         setCommentText('');
         
@@ -422,7 +406,6 @@ export default function PostDetailScreen() {
     // Add optimistic comment immediately
     setComments(prev => {
       const updatedComments = [...prev, optimisticComment];
-      console.log('📝 Added optimistic comment:', tempId);
       return updatedComments;
     });
 
@@ -466,13 +449,6 @@ export default function PostDetailScreen() {
       }
 
       // Add new comment or reply
-      console.log('Attempting to add comment:', {
-        postId,
-        userId: user.id,
-        content: commentText.trim(),
-        parentId: replyingTo?.id || null,
-        isReply: !!replyingTo
-      });
 
       const { data, error } = await supabase
         .from('comments')
@@ -492,7 +468,6 @@ export default function PostDetailScreen() {
         throw error;
       }
 
-      console.log('Comment added successfully:', data);
       
       // Update optimistic comment with real data
       setComments(prev => {
@@ -501,7 +476,6 @@ export default function PostDetailScreen() {
             ? { ...data[0], status: 'active' }
             : comment
         );
-        console.log('📝 Updated optimistic comment with real data');
         return updatedComments;
       });
       

@@ -121,7 +121,7 @@ export function PriceDisplay({
   }
 
   return (
-    <View style={[{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: theme.spacing.sm }, style]}>
+    <View style={[{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: theme.spacing.xs }, style]}>
       {/* Current Price */}
       <Text
         variant={getTextVariant()}
@@ -141,7 +141,7 @@ export function PriceDisplay({
           variant="bodySmall"
           style={{
             color: theme.colors.text.muted,
-            fontSize: getFontSize() * 0.75,
+            fontSize: getFontSize() * 0.7,
             textDecorationLine: 'line-through',
             fontWeight: '500',
           }}
@@ -154,9 +154,9 @@ export function PriceDisplay({
       {hasPriceDrop && isRecentPriceDrop && showPriceDropBadge && discountPercent > 0 && (
         <View style={{
           backgroundColor: theme.colors.error + '15',
-          borderRadius: theme.borderRadius.sm,
-          paddingHorizontal: theme.spacing.xs,
-          paddingVertical: 2,
+          borderRadius: theme.borderRadius.xs,
+          paddingHorizontal: 4,
+          paddingVertical: 1,
           borderWidth: 1,
           borderColor: theme.colors.error + '30',
         }}>
@@ -164,7 +164,7 @@ export function PriceDisplay({
             variant="caption"
             style={{
               color: theme.colors.error,
-              fontSize: getFontSize() * 0.6,
+              fontSize: 8,
               fontWeight: '700',
             }}
           >

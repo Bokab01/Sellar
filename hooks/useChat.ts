@@ -51,32 +51,25 @@ export function useConversations() {
             const isRecentRead = timeSinceLastRead !== null && timeSinceLastRead < 300000; // 5 minutes
             
             if (isManuallyMarked) {
-              console.log('🚫 Preserving manually marked unread conversation:', conversationId);
               // Don't update manually marked conversations
             } else if (!(conversationId in unreadCounts)) {
               // New conversation not in local state - use database count
-              console.log('📊 New conversation, using database count:', conversationId, 'count:', count);
               setUnreadCount(conversationId, count as number);
             } else if (count > 0 && currentLocalCount === 0) {
               // Database shows unread but local shows 0 - check if this is a recent read
               if (isRecentRead) {
-                console.log('⚠️ Recent read detected - database shows unread but local shows 0 for:', conversationId);
-                console.log('⏰ Last read:', timeSinceLastRead, 'ms ago - preserving local state (0)');
                 // Don't update - preserve the local state of 0
               } else {
-                console.log('📊 App reload detected - using database count for:', conversationId, 'count:', count);
                 setUnreadCount(conversationId, count as number);
               }
             } else if (count > 0 && currentLocalCount > 0) {
               // If both database and local have unread messages, use the higher count
               const maxCount = Math.max(count as number, currentLocalCount);
               if (maxCount !== currentLocalCount) {
-                console.log('📊 Using higher unread count:', conversationId, 'count:', maxCount);
                 setUnreadCount(conversationId, maxCount);
               }
             } else if (count === 0 && currentLocalCount > 0) {
               // Database shows 0 but local shows unread - use database (messages were read)
-              console.log('📊 Database shows 0, updating local count to 0 for:', conversationId);
               setUnreadCount(conversationId, 0);
             }
           });
@@ -87,7 +80,6 @@ export function useConversations() {
         const currentUnreadCounts = unreadCountsResult.data || {};
         Object.keys(unreadCounts).forEach(conversationId => {
           if (!(conversationId in currentUnreadCounts) && !manuallyMarkedAsUnread.has(conversationId)) {
-            console.log('🧹 Clearing unread count for conversation:', conversationId);
             setUnreadCount(conversationId, 0);
           }
         });
@@ -107,7 +99,6 @@ export function useConversations() {
 
   // Real-time updates for conversations
   const handleConversationUpdate = useCallback(() => {
-    console.log('📨 Conversation update detected, refreshing list...');
     // Use skipLoading to avoid showing loading state for real-time updates
     fetchConversations(true);
   }, []);
@@ -153,7 +144,6 @@ export function useMessages(conversationId: string) {
 
   // Real-time message updates
   const handleNewMessage = useCallback((newMessage: any) => {
-    console.log('📨 New message received via real-time:', newMessage);
     
     // useChatRealtime now fetches complete message data with joins,
     // so we don't need to fetch again here
@@ -164,20 +154,17 @@ export function useMessages(conversationId: string) {
       
       if (existingIndex !== -1) {
         // Update existing message (for read receipts, status changes, etc.)
-        console.log('📨 Updating existing message:', newMessage.id);
         const updatedMessages = [...prev];
         updatedMessages[existingIndex] = { ...updatedMessages[existingIndex], ...newMessage };
         return updatedMessages;
       }
       
-      console.log('📨 Adding new message to list. Previous count:', prev.length);
       
       // Add new message and sort by created_at to maintain chronological order
       const updatedMessages = [...prev, newMessage].sort((a, b) => 
         new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       );
       
-      console.log('📨 Updated messages count:', updatedMessages.length);
       return updatedMessages;
     });
   }, []);
@@ -186,7 +173,6 @@ export function useMessages(conversationId: string) {
 
   // Real-time offer updates
   const handleOfferUpdate = useCallback(async (updatedOffer: any) => {
-    console.log('🔗 Offer update received via real-time:', updatedOffer);
     
     // Refresh messages to get updated offer data
     // This ensures the UI shows the latest offer statuses
@@ -207,7 +193,6 @@ export function useMessages(conversationId: string) {
     const { user } = useAuthStore.getState();
     if (!user) return { error: 'Not authenticated' };
 
-    console.log('📤 Sending message:', { content, messageType, conversationId, senderId: user.id, images });
 
     // ✅ OPTIMISTIC UPDATE: Add message immediately to UI
     const tempId = `temp-${Date.now()}-${Math.random()}`;
@@ -235,7 +220,6 @@ export function useMessages(conversationId: string) {
       const updatedMessages = [...prev, optimisticMessage].sort((a, b) => 
         new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       );
-      console.log('📤 Added optimistic message:', tempId);
       return updatedMessages;
     });
 
@@ -303,7 +287,6 @@ export function useMessages(conversationId: string) {
         return { error: error.message };
       }
 
-      console.log('📤 Message sent successfully:', data);
       
       // Update optimistic message with real data
       setMessages(prev => {
@@ -312,7 +295,6 @@ export function useMessages(conversationId: string) {
             ? { ...data, status: 'sent' }
             : msg
         );
-        console.log('📤 Updated optimistic message with real data');
         return updatedMessages;
       });
       
@@ -328,11 +310,9 @@ export function useMessages(conversationId: string) {
   const markMessagesAsRead = async () => {
     const { user } = useAuthStore.getState();
     if (!user) {
-      console.log('❌ No user found for markMessagesAsRead');
       return;
     }
 
-    console.log('📖 markMessagesAsRead called for conversation:', conversationId);
 
     try {
       // Mark unread messages as read using read_at timestamp
@@ -350,18 +330,14 @@ export function useMessages(conversationId: string) {
         const { setUnreadCount, clearManuallyMarkedAsUnread } = useChatStore.getState();
         setUnreadCount(conversationId, 0);
         clearManuallyMarkedAsUnread(conversationId);
-        console.log('📊 Updated local unread count to 0 despite database error');
       } else {
-        console.log('✅ Marked messages as read:', data?.length || 0, 'messages in conversation:', conversationId);
         if (data && data.length > 0) {
-          console.log('📝 Messages marked as read:', data.map(msg => ({ id: msg.id, read_at: msg.read_at })));
         }
         
         // Always update local unread count to 0 since we're marking messages as read
         const { setUnreadCount, clearManuallyMarkedAsUnread } = useChatStore.getState();
         setUnreadCount(conversationId, 0);
         clearManuallyMarkedAsUnread(conversationId); // Clear manual marking since we're reading
-        console.log('📊 Updated local unread count to 0 for conversation:', conversationId);
         
         // Wait a bit to ensure database update is committed
         await new Promise(resolve => setTimeout(resolve, 200));
@@ -372,7 +348,6 @@ export function useMessages(conversationId: string) {
       const { setUnreadCount, clearManuallyMarkedAsUnread } = useChatStore.getState();
       setUnreadCount(conversationId, 0);
       clearManuallyMarkedAsUnread(conversationId);
-      console.log('📊 Updated local unread count to 0 despite exception');
     }
   };
 

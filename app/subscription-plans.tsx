@@ -161,24 +161,17 @@ export default function SubscriptionPlansScreen() {
           text: 'Cancel',
           style: 'destructive',
           onPress: async () => {
-            console.log('🔄 User confirmed cancellation');
-            console.log('📋 Current subscription before cancellation:', currentPlan);
             
             const result = await cancelSubscription();
-            console.log('📋 Cancellation result:', result);
             
             if (result.success) {
-              console.log('✅ Cancellation successful, showing success toast');
               setToastMessage('Subscription cancelled successfully');
               setToastVariant('success');
               setShowToast(true);
               
               // Force refresh the subscription data
-              console.log('🔄 Forcing subscription refresh...');
               await refreshSubscription();
-              console.log('📋 Subscription after refresh:', currentPlan);
             } else {
-              console.log('❌ Cancellation failed:', result.error);
               setToastMessage('Failed to cancel subscription');
               setToastVariant('error');
               setShowToast(true);
@@ -359,7 +352,6 @@ export default function SubscriptionPlansScreen() {
         <Container>
           {/* Current Plan Status */}
           {currentPlan && !isOnTrial && (
-            console.log('📋 Rendering current plan:', currentPlan),
             <View
               style={{
                 backgroundColor: theme.colors.success + '10',

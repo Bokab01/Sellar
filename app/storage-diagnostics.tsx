@@ -21,7 +21,6 @@ export default function StorageDiagnosticsScreen() {
     setResults(null);
 
     try {
-      console.log('🔍 Running storage diagnostics...');
       
       // Test 1: Storage Connection
       const connectionTest = await testStorageConnection();

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, ScrollView, Alert } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import {
   Text,
   SafeAreaWrapper,
@@ -11,27 +11,76 @@ import {
   Input,
   DocumentUpload,
   StepIndicator,
+  CalendarDatePicker,
 } from '@/components';
 import { User, Camera, FileText, CheckCircle, AlertTriangle } from 'lucide-react-native';
 import { 
   useCreateVerificationRequest,
   useVerificationDocuments,
+  useVerificationRequests,
 } from '@/hooks/useVerification';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function IdentityVerificationScreen() {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const { createRequest, loading: createLoading } = useCreateVerificationRequest();
   const { uploadDocument, loading: uploadLoading } = useVerificationDocuments();
+  const { requests, loading: requestsLoading, refetch: refetchRequests } = useVerificationRequests();
+  const { id: existingRequestId } = useLocalSearchParams<{ id?: string }>();
 
   const [currentStep, setCurrentStep] = useState(0);
   const [verificationId, setVerificationId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     full_name: '',
-    date_of_birth: '',
+    date_of_birth: null as Date | null,
     id_number: '',
     id_type: 'national_id',
   });
   const [uploadedDocuments, setUploadedDocuments] = useState<string[]>([]);
+
+  // Get current verification request and its documents
+  const currentRequest = verificationId ? requests.find(r => r.id === verificationId) : null;
+  const existingDocuments = currentRequest?.documents || [];
+
+  // Handle continuing an existing request
+  useEffect(() => {
+    if (existingRequestId && requests.length > 0) {
+      const existingRequest = requests.find(r => r.id === existingRequestId);
+      if (existingRequest) {
+        setVerificationId(existingRequestId);
+        
+        // Populate form data from existing request
+        if (existingRequest.submitted_data) {
+          setFormData({
+            full_name: existingRequest.submitted_data.full_name || '',
+            date_of_birth: existingRequest.submitted_data.date_of_birth ? new Date(existingRequest.submitted_data.date_of_birth) : null,
+            id_number: existingRequest.submitted_data.id_number || '',
+            id_type: existingRequest.submitted_data.id_type || 'national_id',
+          });
+        }
+        
+        // Determine current step based on uploaded documents
+        const documents = existingRequest.documents || [];
+        const hasIdDocument = documents.some(doc => 
+          doc.document_type === 'national_id' || 
+          doc.document_type === 'passport' || 
+          doc.document_type === 'drivers_license' || 
+          doc.document_type === 'voters_id'
+        );
+        const hasSelfie = documents.some(doc => doc.document_type === 'selfie_with_id');
+        
+        if (hasIdDocument && hasSelfie) {
+          setCurrentStep(3); // Review step
+        } else if (hasIdDocument) {
+          setCurrentStep(2); // Selfie step
+        } else {
+          setCurrentStep(1); // ID document step
+        }
+      }
+    }
+  }, [existingRequestId, requests]);
 
   const steps = [
     { title: 'Personal Information', description: 'Enter your details' },
@@ -53,8 +102,8 @@ export default function IdentityVerificationScreen() {
       Alert.alert('Error', 'Please enter your full name');
       return;
     }
-    if (!formData.date_of_birth.trim()) {
-      Alert.alert('Error', 'Please enter your date of birth');
+    if (!formData.date_of_birth) {
+      Alert.alert('Error', 'Please select your date of birth');
       return;
     }
     if (!formData.id_number.trim()) {
@@ -65,7 +114,10 @@ export default function IdentityVerificationScreen() {
     try {
       const request = await createRequest({
         verification_type: 'identity',
-        submitted_data: formData,
+        submitted_data: {
+          ...formData,
+          date_of_birth: formData.date_of_birth?.toISOString().split('T')[0], // Format as YYYY-MM-DD
+        },
       });
 
       setVerificationId(request.id);
@@ -75,8 +127,11 @@ export default function IdentityVerificationScreen() {
     }
   };
 
-  const handleDocumentUpload = (documentType: string) => {
+  const handleDocumentUpload = async (documentType: string) => {
     setUploadedDocuments(prev => [...prev, documentType]);
+    
+    // Refresh verification requests to get updated documents
+    await refetchRequests();
     
     // Auto-advance when both documents are uploaded
     if (documentType === 'national_id' && uploadedDocuments.includes('selfie_with_id')) {
@@ -88,17 +143,42 @@ export default function IdentityVerificationScreen() {
     }
   };
 
-  const handleFinalSubmit = () => {
-    Alert.alert(
-      'Verification Submitted',
-      'Your identity verification has been submitted for review. We\'ll notify you within 24-48 hours.',
-      [
-        {
-          text: 'OK',
-          onPress: () => router.push('/verification'),
-        },
-      ]
-    );
+  const handleFinalSubmit = async () => {
+    if (!verificationId) {
+      Alert.alert('Error', 'No verification request found');
+      return;
+    }
+
+    try {
+      // Update the verification request status to indicate it's been submitted
+      const { error } = await supabase
+        .from('user_verification')
+        .update({ 
+          status: 'in_review',
+          submitted_at: new Date().toISOString()
+        })
+        .eq('id', verificationId)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      // Refresh the requests to get the updated status
+      await refetchRequests();
+
+      Alert.alert(
+        'Verification Submitted',
+        'Your identity verification has been submitted for review. We\'ll notify you within 24-48 hours.',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.push('/verification'),
+          },
+        ]
+      );
+    } catch (error) {
+      Alert.alert('Error', 'Failed to submit verification request');
+      console.error('Error submitting verification:', error);
+    }
   };
 
   const renderPersonalInfoStep = () => (
@@ -138,11 +218,13 @@ export default function IdentityVerificationScreen() {
           onChangeText={(value) => setFormData(prev => ({ ...prev, full_name: value }))}
         />
 
-        <Input
+        <CalendarDatePicker
           label="Date of Birth"
-          placeholder="DD/MM/YYYY"
+          placeholder="Select your date of birth"
           value={formData.date_of_birth}
-          onChangeText={(value) => setFormData(prev => ({ ...prev, date_of_birth: value }))}
+          onChange={(date) => setFormData(prev => ({ ...prev, date_of_birth: date }))}
+          maximumDate={new Date()}
+          helper="You must be at least 18 years old to verify your identity"
         />
 
         <View>
@@ -258,6 +340,7 @@ export default function IdentityVerificationScreen() {
           description="Upload a clear photo of your ID document"
           required
           acceptedTypes={['image']}
+          existingDocuments={existingDocuments}
           onUploadComplete={() => handleDocumentUpload('national_id')}
         />
       )}
@@ -333,6 +416,7 @@ export default function IdentityVerificationScreen() {
           description="Take a selfie while holding your ID document"
           required
           acceptedTypes={['image']}
+          existingDocuments={existingDocuments}
           onUploadComplete={() => handleDocumentUpload('selfie_with_id')}
         />
       )}
@@ -391,7 +475,13 @@ export default function IdentityVerificationScreen() {
 
           <View>
             <Text variant="bodySmall" color="muted">Date of Birth</Text>
-            <Text variant="body">{formData.date_of_birth}</Text>
+            <Text variant="body">
+              {formData.date_of_birth ? formData.date_of_birth.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+              }) : 'Not selected'}
+            </Text>
           </View>
 
           <View>

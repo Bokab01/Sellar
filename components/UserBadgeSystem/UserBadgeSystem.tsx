@@ -2,12 +2,13 @@ import React from 'react';
 import { View } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
+import { IdentityVerificationBadge, BusinessVerificationBadge } from '@/components/VerifiedBadge/VerifiedBadge';
 
 interface UserBadgeSystemProps {
   isBusinessUser?: boolean;
   isVerified?: boolean;
   isBusinessVerified?: boolean;
-  size?: 'small' | 'medium' | 'large';
+  size?: 'xs' | 'small' | 'medium' | 'large';
   variant?: 'default' | 'compact' | 'full';
   theme?: 'light' | 'dark';
   style?: any;
@@ -31,6 +32,11 @@ export function UserBadgeSystem({
 
   // Size configurations
   const sizeConfig = {
+    xs: {
+      fontSize: 7,
+      paddingHorizontal: 2,
+      paddingVertical: -1,
+    },
     small: {
       fontSize: 8,
       paddingHorizontal: theme.spacing.xs,
@@ -156,18 +162,18 @@ export function UserBadgeSystem({
       )}
       
       {/* ID Verified Badge */}
-      {isVerified && (
-        <BadgeComponent 
-          text={currentVariant.verified} 
-          config={currentTheme.verified} 
+      {isVerified && !isBusinessVerified && (
+        <IdentityVerificationBadge
+          size={size}
+          variant={variant === 'compact' ? 'compact' : 'default'}
         />
       )}
       
       {/* Business Verified Badge */}
       {isBusinessVerified && (
-        <BadgeComponent 
-          text={currentVariant.business} 
-          config={currentTheme.business} 
+        <BusinessVerificationBadge
+          size={size}
+          variant={variant === 'compact' ? 'compact' : 'default'}
         />
       )}
     </View>
@@ -177,6 +183,10 @@ export function UserBadgeSystem({
 // Convenience components for common use cases
 export function CompactUserBadges(props: Omit<UserBadgeSystemProps, 'size' | 'variant'>) {
   return <UserBadgeSystem {...props} size="small" variant="compact" />;
+}
+
+export function ExtraSmallUserBadges(props: Omit<UserBadgeSystemProps, 'size' | 'variant'>) {
+  return <UserBadgeSystem {...props} size="xs" variant="compact" />;
 }
 
 export function FullUserBadges(props: Omit<UserBadgeSystemProps, 'size' | 'variant'>) {

@@ -31,6 +31,7 @@ import {
   ProductCard,
   SimpleCallbackRequestButton,
   QuickEditModal,
+  IdentityVerificationBadge,
 } from '@/components';
 
 // Lazy load heavy MediaViewer component (supports images and videos)
@@ -38,11 +39,13 @@ const MediaViewer = lazy(() => import('@/components/MediaViewer/MediaViewer').th
 import { useMediaViewer } from '@/hooks/useMediaViewer';
 import { useListingStats } from '@/hooks/useListingStats';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
+import { SvgXml } from 'react-native-svg';
 import { useProfile } from '@/hooks/useProfile';
-import { Heart, Share as ShareIcon, MessageCircle, Phone, PhoneCall, DollarSign, ArrowLeft, Package, MoreVertical, Edit, Trash2, Flag, BadgeCent, RefreshCw, Play } from 'lucide-react-native';
+import { Heart, Share as ShareIcon, MessageCircle, Phone, PhoneCall, DollarSign, ArrowLeft, Package, MoreVertical, Edit, Trash2, Flag, BadgeCent, RefreshCw, Play, X } from 'lucide-react-native';
 import { getDisplayName } from '@/hooks/useDisplayName';
 import { ReportButton } from '@/components/ReportButton/ReportButton';
 import { VideoView, useVideoPlayer } from 'expo-video';
+import { CDNOptimizedVideo } from '@/components/OptimizedVideo/CDNOptimizedVideo';
 
 // Helper function to detect if URL is a video
 const isVideoUrl = (url: string): boolean => {
@@ -62,6 +65,18 @@ interface MediaItemVideoProps {
 
 function MediaItemVideo({ videoUrl, isActive, width, height, theme }: MediaItemVideoProps) {
   const [isPlaying, setIsPlaying] = useState(false);
+  
+  // Extract bucket and path from video URL for CDN optimization
+  const getVideoPath = (url: string) => {
+    if (url.includes('/storage/v1/object/public/')) {
+      const parts = url.split('/storage/v1/object/public/')[1];
+      const [bucket, ...pathParts] = parts.split('/');
+      return { bucket, path: pathParts.join('/') };
+    }
+    return { bucket: 'sellar-pro-videos', path: url.split('/').pop() || '' };
+  };
+
+  const { bucket, path } = getVideoPath(videoUrl);
   
   const player = useVideoPlayer(videoUrl, (player) => {
     player.loop = false;
@@ -105,25 +120,19 @@ function MediaItemVideo({ videoUrl, isActive, width, height, theme }: MediaItemV
       }}
       pointerEvents="box-none"
     >
-      {/* Video layer - positioned absolutely to not block touches */}
-      <View
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width,
-          height,
-        }}
-        pointerEvents="none"
-      >
-        <VideoView
-          player={player}
-          style={{ width, height }}
-          contentFit="cover"
-          nativeControls={false}
-          pointerEvents="none"
-        />
-      </View>
+      {/* Use CDN optimized video for better performance */}
+      <CDNOptimizedVideo
+        bucket={bucket}
+        path={path}
+        width={width}
+        height={height}
+        quality="high"
+        showThumbnail={false}
+        autoPlay={isActive}
+        loop={false}
+        muted={true}
+        style={{ width, height }}
+      />
       
       {/* Play indicator overlay - only show when not playing */}
       {!isPlaying && (
@@ -176,6 +185,7 @@ export default function ListingDetailScreen() {
   const [showContactModal, setShowContactModal] = useState(false);
   const [showCallbackModal, setShowCallbackModal] = useState(false);
   const [showOfferModal, setShowOfferModal] = useState(false);
+  const [showCallModal, setShowCallModal] = useState(false);
   const [callbackRequested, setCallbackRequested] = useState(false);
   
   // Quick edit modal
@@ -222,6 +232,7 @@ export default function ListingDetailScreen() {
   const [similarListings, setSimilarListings] = useState<any[]>([]);
   const [sellerListingsLoading, setSellerListingsLoading] = useState(false);
   const [similarListingsLoading, setSimilarListingsLoading] = useState(false);
+  const [totalSellerListingsCount, setTotalSellerListingsCount] = useState(0);
 
   // Media viewer (supports images and videos)
   const media = listing?.images || [];
@@ -255,6 +266,8 @@ export default function ListingDetailScreen() {
         image={item.image}
         title={item.title}
         price={item.price}
+        previousPrice={item.previous_price}
+        priceChangedAt={item.price_changed_at}
         seller={item.seller}
         badge={item.badge}
         location={item.location}
@@ -350,8 +363,102 @@ export default function ListingDetailScreen() {
   });
 
   // Get real-time favorites count from global store
-  const { listingFavoriteCounts } = useFavoritesStore();
+  const { 
+    favorites, 
+    listingFavoriteCounts,
+    toggleFavorite: toggleGlobalFavorite,
+    incrementListingFavoriteCount,
+    decrementListingFavoriteCount
+  } = useFavoritesStore();
   const favoritesCount = listingFavoriteCounts[listingId || ''] ?? listing?.favorites_count ?? 0;
+
+  // Favorite toggle handler for similar items
+  const handleSimilarItemFavorite = useCallback(async (itemId: string) => {
+    if (!user) {
+      Alert.alert('Sign In Required', 'Please sign in to save favorites');
+      return;
+    }
+
+    const isFavorited = favorites[itemId] || false;
+    
+    // Optimistic update
+    toggleGlobalFavorite(itemId);
+    if (isFavorited) {
+      decrementListingFavoriteCount(itemId);
+    } else {
+      incrementListingFavoriteCount(itemId);
+    }
+
+    try {
+      const { toggleFavorite } = await import('@/lib/favoritesAndViews');
+      const result = await toggleFavorite(itemId);
+      
+      if (result.error) {
+        // Revert on error
+        toggleGlobalFavorite(itemId);
+        if (isFavorited) {
+          incrementListingFavoriteCount(itemId);
+        } else {
+          decrementListingFavoriteCount(itemId);
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      // Revert on error
+      toggleGlobalFavorite(itemId);
+      if (isFavorited) {
+        incrementListingFavoriteCount(itemId);
+      } else {
+        decrementListingFavoriteCount(itemId);
+      }
+    }
+  }, [user, favorites, toggleGlobalFavorite, incrementListingFavoriteCount, decrementListingFavoriteCount]);
+
+  // Updated renderSimilarListing with favorite functionality
+  const renderSimilarListingWithFavorites = useCallback(({ item }: { item: any }) => (
+    <View style={{ flex: 1, margin: 2 }}>
+      <ProductCard
+        image={item.image}
+        title={item.title}
+        price={item.price}
+        previousPrice={item.previous_price}
+        priceChangedAt={item.price_changed_at}
+        seller={item.seller}
+        badge={item.badge}
+        location={item.location}
+        layout="grid"
+        fullWidth={true}
+        listingId={item.id}
+        isFavorited={favorites[item.id] || false}
+        favoritesCount={listingFavoriteCounts[item.id] ?? 0}
+        onPress={() => router.push(`/(tabs)/home/${item.id}`)}
+        onFavoritePress={user?.id !== item.seller?.id ? () => handleSimilarItemFavorite(item.id) : undefined}
+        currentUserId={user?.id || ""}
+      />
+    </View>
+  ), [favorites, listingFavoriteCounts, user, handleSimilarItemFavorite]);
+
+  // Updated renderSellerListing with favorite functionality
+  const renderSellerListingWithFavorites = useCallback(({ item }: { item: any }) => (
+    <View style={{ flex: 1, margin: 2 }}>
+      <ProductCard
+        image={item.image}
+        title={item.title}
+        price={item.price}
+        seller={item.seller}
+        badge={item.badge}
+        location={item.location}
+        layout="grid"
+        fullWidth={true}
+        listingId={item.id}
+        isFavorited={favorites[item.id] || false}
+        favoritesCount={listingFavoriteCounts[item.id] ?? 0}
+        onPress={() => router.push(`/(tabs)/home/${item.id}`)}
+        onFavoritePress={user?.id !== item.seller?.id ? () => handleSimilarItemFavorite(item.id) : undefined}
+        currentUserId={user?.id || ""}
+      />
+    </View>
+  ), [favorites, listingFavoriteCounts, user, handleSimilarItemFavorite]);
 
   // Cache for smart refresh - only refresh if needed
   const lastFetchTime = useRef(0);
@@ -365,7 +472,6 @@ export default function ListingDetailScreen() {
       
       // Only refresh if it's been more than 30 seconds since last fetch
       if (listingId && (timeSinceLastFetch > FETCH_COOLDOWN || lastFetchTime.current === 0)) {
-        console.log('🔄 Listing detail: Refreshing data on focus');
         lastFetchTime.current = now;
         
         Promise.all([
@@ -376,7 +482,6 @@ export default function ListingDetailScreen() {
         ]);
         // Don't increment view count on focus refresh
       } else {
-        console.log('⏭️ Listing detail: Using cached data on focus');
       }
     }, [listingId])
   );
@@ -423,7 +528,6 @@ export default function ListingDetailScreen() {
 
       // If the joined query fails due to schema cache issues, fall back to separate queries
       if (fetchError && fetchError.message.includes('schema cache')) {
-        console.log('🔄 Falling back to separate queries for listing detail');
         
         // Get listing without joins - ✅ Use view for PRO status
         const { data: listingData, error: listingError } = await supabase
@@ -476,7 +580,6 @@ export default function ListingDetailScreen() {
       setError('Failed to load listing');
     } finally {
       const endTime = performance.now();
-      console.log(`Listing detail loaded in ${(endTime - startTime).toFixed(2)}ms`);
       setLoading(false);
     }
   }, [listingId]);
@@ -661,6 +764,20 @@ export default function ListingDetailScreen() {
       setSellerListingsLoading(false);
     }
 
+    // Fetch total seller listings count (including current listing)
+    try {
+      const { count, error: countError } = await supabase
+        .from('listings')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', listing.user_id)
+        .eq('status', 'active');
+
+      if (countError) throw countError;
+      setTotalSellerListingsCount(count || 0);
+    } catch (error) {
+      console.error('Failed to fetch total seller listings count:', error);
+    }
+
     // Process similar listings
     try {
       let similarData = null;
@@ -694,6 +811,8 @@ export default function ListingDetailScreen() {
           image: item.images?.[0] || 'https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg',
           title: item.title,
           price: item.price,
+          previous_price: item.previous_price,
+          price_changed_at: item.price_changed_at,
           seller: {
             name: getDisplayName(item.profiles, false).displayName,
             avatar: item.profiles?.avatar_url,
@@ -917,8 +1036,9 @@ export default function ListingDetailScreen() {
       return;
     }
 
-    if (!messageText.trim()) {
-      Alert.alert('Error', 'Please enter a message');
+    // Prevent users from messaging themselves
+    if (listing.user_id === user.id) {
+      Alert.alert('Cannot Message', 'You cannot message yourself');
       return;
     }
 
@@ -932,42 +1052,6 @@ export default function ListingDetailScreen() {
 
     setSendingMessage(true);
     try {
-      // Moderate message content before sending
-      const { contentModerationService } = await import('@/lib/contentModerationService');
-      
-      const moderationResult = await contentModerationService.moderateContent({
-        id: 'temp-contact-message-id',
-        type: 'comment',
-        userId: user.id,
-        content: messageText.trim(),
-      });
-
-      // Check if content is approved
-      if (!moderationResult.isApproved) {
-        setSendingMessage(false);
-        
-        // Extract specific violations with user-friendly messages
-        const flagReasons = moderationResult.flags
-          .map(flag => {
-            if (flag.type === 'profanity') {
-              return 'Inappropriate language detected';
-            } else if (flag.type === 'personal_info') {
-              return 'Too much personal information (multiple phone numbers/emails)';
-            } else if (flag.type === 'spam') {
-              return 'Spam-like content detected';
-            } else if (flag.type === 'inappropriate') {
-              return 'Inappropriate content detected';
-            } else if (flag.type === 'suspicious_links') {
-              return 'Suspicious or shortened links detected';
-            }
-            return flag.details;
-          })
-          .join('\n• ');
-        
-        setModerationError(`Your message cannot be sent:\n\n• ${flagReasons}\n\nPlease review and modify your content, then try again.`);
-        setShowModerationModal(true);
-        return;
-      }
 
       // Check if conversation already exists
       const { data: existingConv } = await supabase
@@ -995,25 +1079,24 @@ export default function ListingDetailScreen() {
         conversationId = (newConv as any).id;
       }
 
-      // Send message
-      const { error: messageError } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: conversationId,
-          sender_id: user.id,
-          content: messageText.trim(),
-        } as any);
+      // Only send message if user provided one
+      if (messageText.trim()) {
+        const { error: messageError } = await supabase
+          .from('messages')
+          .insert({
+            conversation_id: conversationId,
+            sender_id: user.id,
+            content: messageText.trim(),
+          } as any);
 
-      if (messageError) throw messageError;
+        if (messageError) throw messageError;
+      }
 
       setShowContactModal(false);
       setMessageText('');
-      showSuccessToast('Message sent successfully!');
-
-      // Navigate to chat after a brief delay
-      setTimeout(() => {
-        router.push(`/chat-detail/${conversationId}` as any);
-      }, 1000);
+      
+      // Navigate to chat
+      router.push(`/chat-detail/${conversationId}` as any);
     } catch (err: any) {
       showErrorToast('Failed to send message');
     } finally {
@@ -1023,25 +1106,12 @@ export default function ListingDetailScreen() {
 
   const handleRequestCallback = async () => {
     if (!user) {
-      Alert.alert('Sign In Required', 'Please sign in to request callbacks');
+      setShowCallModal(true);
       return;
     }
 
     if (!callbackPhone.trim()) {
-      Alert.alert(
-        'Phone Number Required', 
-        'Please add your phone number in your profile settings to request callbacks.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Go to Profile', 
-            onPress: () => {
-              setShowCallbackModal(false);
-              router.push('/edit-profile');
-            }
-          }
-        ]
-      );
+      setShowCallModal(true);
       return;
     }
 
@@ -1126,12 +1196,6 @@ export default function ListingDetailScreen() {
 
       if (!conversationId) {
         // Create new conversation
-        console.log('Creating new conversation with:', {
-          listing_id: listingId,
-          participant_1: user.id,
-          participant_2: listing.user_id,
-          current_user: user.id
-        });
 
         const { data: newConv, error: convError } = await supabase
           .from('conversations')
@@ -1150,7 +1214,6 @@ export default function ListingDetailScreen() {
           throw new Error(`Failed to create conversation: ${convError.message}`);
         }
         conversationId = (newConv as any).id;
-        console.log('Conversation created successfully:', conversationId);
       }
 
       // Create offer message first
@@ -1213,24 +1276,7 @@ export default function ListingDetailScreen() {
   };
 
   const handleCall = () => {
-    if (!listing?.profiles?.phone) {
-      Alert.alert('No Phone Number', 'This seller has not provided a phone number');
-      return;
-    }
-
-    Alert.alert(
-      'Call Seller',
-      `Call ${listing.profiles.first_name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Call',
-          onPress: () => {
-            Linking.openURL(`tel:${listing.profiles.phone}`);
-          },
-        },
-      ]
-    );
+    setShowCallModal(true);
   };
 
   const showSuccessToast = (message: string) => {
@@ -1658,10 +1704,24 @@ export default function ListingDetailScreen() {
                   )}
                   <CompactUserBadges
                     isBusinessUser={listing.profiles.is_business_user}
-                    isVerified={listing.profiles.is_verified}
+                    isVerified={false}
                     isBusinessVerified={listing.profiles.is_business_verified}
                   />
                 </View>
+                
+                {/* Verification Badge - Below name */}
+                {listing.profiles?.is_verified && (
+                  <View style={{ 
+                    marginTop: theme.spacing.xs,
+                    flexDirection: 'row',
+                    alignItems: 'center'
+                  }}>
+                    <IdentityVerificationBadge
+                      size="xs"
+                      variant="compact"
+                    />
+                  </View>
+                )}
                 <View style={{ marginTop: theme.spacing.xs }}>
                   <CompactReviewSummary userId={listing.profiles.id} />
                 </View>
@@ -1852,31 +1912,6 @@ export default function ListingDetailScreen() {
                 />
               )}
 
-              {/* Verification Badge */}
-              {listing.profiles?.is_verified && (
-                <View style={{
-                  backgroundColor: theme.colors.success + '15',
-                  borderWidth: 1,
-                  borderColor: theme.colors.success + '30',
-                  borderRadius: theme.borderRadius.full,
-                  paddingHorizontal: theme.spacing.md,
-                  paddingVertical: theme.spacing.sm,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: theme.spacing.xs,
-                }}>
-                  <Text style={{ fontSize: 14, color: theme.colors.success }}>✅</Text>
-                  <Text 
-                    variant="bodySmall" 
-                    style={{ 
-                      color: theme.colors.success,
-                      fontWeight: '600'
-                    }}
-                  >
-                    Verified Seller
-                  </Text>
-                </View>
-              )}
             </View>
           </View>
 
@@ -2352,7 +2387,7 @@ export default function ListingDetailScreen() {
                       data={sellerListings.slice(0, 6)}
                       numColumns={2}
                       keyExtractor={(item) => item.id}
-                      renderItem={renderSellerListing}
+                      renderItem={renderSellerListingWithFavorites}
                       // ✅ Enhanced performance optimizations for smooth navigation
                       removeClippedSubviews={true}
                       maxToRenderPerBatch={3}
@@ -2369,14 +2404,14 @@ export default function ListingDetailScreen() {
                       scrollEnabled={false}
                     />
                     
-                    {sellerListings.length > 6 && (
+                    {totalSellerListingsCount > 6 && (
                       <Button
                         variant="tertiary"
-                        onPress={() => router.push(`/profile/${listing.user_id}`)}
+                        onPress={() => router.push(`/seller-listings/${listing.user_id}` as any)}
                         fullWidth
                         style={{ marginTop: theme.spacing.md, marginHorizontal: theme.spacing.lg }}
                       >
-                        View All {sellerListings.length} Items
+                        View All {totalSellerListingsCount} Items
                       </Button>
                     )}
                   </View>
@@ -2411,7 +2446,7 @@ export default function ListingDetailScreen() {
                       data={similarListings.slice(0, 6)}
                       numColumns={2}
                       keyExtractor={(item) => item.id}
-                      renderItem={renderSimilarListing}
+                      renderItem={renderSimilarListingWithFavorites}
                       // ✅ Enhanced performance optimizations for smooth navigation
                       removeClippedSubviews={true}
                       maxToRenderPerBatch={3}
@@ -2467,33 +2502,108 @@ export default function ListingDetailScreen() {
         )}
       </ScrollView>
 
-      {/* Contact Modal */}
-      <AppModal
-        position="bottom"
-        visible={showContactModal}
-        onClose={() => setShowContactModal(false)}
-        title="Contact Seller"
-        primaryAction={{
-          text: 'Send Message',
-          onPress: handleContactSeller,
-          loading: sendingMessage,
-        }}
-        secondaryAction={{
-          text: 'Cancel',
-          onPress: () => setShowContactModal(false),
-        }}
-      >
-        <View style={{ gap: theme.spacing.md }}>
-          <Text variant="body" color="secondary">
-            Send a message to {listing.profiles?.first_name} about this listing
-          </Text>
+       {/* Contact Modal */}
+       <AppModal
+         position="center"
+         visible={showContactModal}
+         onClose={() => setShowContactModal(false)}
+         title="Contact Seller"
+         showCloseButton={true}
+       >
+         <View style={{ gap: theme.spacing.lg, padding: theme.spacing.lg }}>
+           <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
+             Choose how you'd like to contact {listing.profiles?.first_name}
+           </Text>
 
-          <Input
-            variant="multiline"
-            placeholder="Hi! I'm interested in your listing..."
-            value={messageText}
-            onChangeText={setMessageText}
-          />
+           {/* WhatsApp Option */}
+           {listing.profiles?.phone && (
+             <Button
+               variant="primary"
+               size="md"
+               fullWidth
+               onPress={() => {
+                 const phoneNumber = listing.profiles.phone.replace(/\D/g, ''); // Remove non-digits
+                 const whatsappUrl = `whatsapp://send?phone=${phoneNumber}&text=Hi! I'm interested in your listing: ${listing.title}`;
+                 Linking.openURL(whatsappUrl).catch(() => {
+                   // Fallback to web WhatsApp if app not installed
+                   const webWhatsappUrl = `https://wa.me/${phoneNumber}?text=Hi! I'm interested in your listing: ${listing.title}`;
+                   Linking.openURL(webWhatsappUrl);
+                 });
+                 setShowContactModal(false);
+               }}
+               style={{
+                 backgroundColor: '#25D366',
+                 borderColor: '#25D366',
+               }}
+               icon={
+                 <SvgXml 
+                   xml={`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="24px" height="24px" fill-rule="evenodd" clip-rule="evenodd"><path fill="#fff" d="M4.868,43.303l2.694-9.835C5.9,30.59,5.026,27.324,5.027,23.979C5.032,13.514,13.548,5,24.014,5c5.079,0.002,9.845,1.979,13.43,5.566c3.584,3.588,5.558,8.356,5.556,13.428c-0.004,10.465-8.522,18.98-18.986,18.98c-0.001,0,0,0,0,0h-0.008c-3.177-0.001-6.3-0.798-9.073-2.311L4.868,43.303z"/><path fill="#fff" d="M4.868,43.803c-0.132,0-0.26-0.052-0.355-0.148c-0.125-0.127-0.174-0.312-0.127-0.483l2.639-9.636c-1.636-2.906-2.499-6.206-2.497-9.556C4.532,13.238,13.273,4.5,24.014,4.5c5.21,0.002,10.105,2.031,13.784,5.713c3.679,3.683,5.704,8.577,5.702,13.781c-0.004,10.741-8.746,19.48-19.486,19.48c-3.189-0.001-6.344-0.788-9.144-2.277l-9.875,2.589C4.953,43.798,4.911,43.803,4.868,43.803z"/><path fill="#cfd8dc" d="M24.014,5c5.079,0.002,9.845,1.979,13.43,5.566c3.584,3.588,5.558,8.356,5.556,13.428c-0.004,10.465-8.522,18.98-18.986,18.98h-0.008c-3.177-0.001-6.3-0.798-9.073-2.311L4.868,43.303l2.694-9.835C5.9,30.59,5.026,27.324,5.027,23.979C5.032,13.514,13.548,5,24.014,5 M24.014,42.974C24.014,42.974,24.014,42.974,24.014,42.974C24.014,42.974,24.014,42.974,24.014,42.974C24.014,42.974,24.014,42.974,24.014,42.974C24.014,42.974,24.014,42.974,24.014,42.974 M24.014,4C24.014,4,24.014,4,24.014,4C12.998,4,4.032,12.962,4.027,23.979c-0.001,3.367,0.849,6.685,2.461,9.622l-2.585,9.439c-0.094,0.345,0.002,0.713,0.254,0.967c0.19,0.192,0.447,0.297,0.711,0.297c0.085,0,0.17-0.011,0.254-0.033l9.687-2.54c2.828,1.468,5.998,2.243,9.197,2.244c11.024,0,19.99-8.963,19.995-19.98c0.002-5.339-2.075-10.359-5.848-14.135C34.378,6.083,29.357,4.002,24.014,4L24.014,4z"/><path fill="#40c351" d="M35.176,12.832c-2.98-2.982-6.941-4.625-11.157-4.626c-8.704,0-15.783,7.076-15.787,15.774c-0.001,2.981,0.833,5.883,2.413,8.396l0.376,0.597l-1.595,5.821l5.973-1.566l0.577,0.342c2.422,1.438,5.2,2.198,8.032,2.199h0.006c8.698,0,15.777-7.077,15.78-15.776C39.795,19.778,38.156,15.814,35.176,12.832z"/><path fill="#fff" fill-rule="evenodd" d="M19.268,16.045c-0.355-0.79-0.729-0.806-1.068-0.82c-0.277-0.012-0.593-0.011-0.909-0.011c-0.316,0-0.83,0.119-1.265,0.594c-0.435,0.475-1.661,1.622-1.661,3.956c0,2.334,1.7,4.59,1.937,4.906c0.237,0.316,3.282,5.259,8.104,7.161c4.007,1.58,4.823,1.266,5.693,1.187c0.87-0.079,2.807-1.147,3.202-2.255c0.395-1.108,0.395-2.057,0.277-2.255c-0.119-0.198-0.435-0.316-0.909-0.554s-2.807-1.385-3.242-1.543c-0.435-0.158-0.751-0.237-1.068,0.238c-0.316,0.474-1.225,1.543-1.502,1.859c-0.277,0.317-0.554,0.357-1.028,0.119c-0.474-0.238-2.002-0.738-3.815-2.354c-1.41-1.257-2.362-2.81-2.639-3.285c-0.277-0.474-0.03-0.731,0.208-0.968c0.213-0.213,0.474-0.554,0.712-0.831c0.237-0.277,0.316-0.475,0.474-0.791c0.158-0.317,0.079-0.594-0.04-0.831C20.612,19.329,19.69,16.983,19.268,16.045z" clip-rule="evenodd"/></svg>`}
+                   width={24}
+                   height={24}
+                 />
+               }
+             >
+               WhatsApp
+             </Button>
+           )}
+
+           {/* Platform Messaging Option */}
+           <Button
+             variant="secondary"
+             size="md"
+             fullWidth
+             onPress={() => {
+               setShowContactModal(false);
+               handleContactSeller();
+             }}
+             icon={<MessageCircle size={24} color={theme.colors.primaryForeground} />}
+           >
+             Sellar Message
+           </Button>
+         </View>
+       </AppModal>
+
+      {/* Call User Modal */}
+      <AppModal
+        position="center"
+        visible={showCallModal}
+        onClose={() => setShowCallModal(false)}
+        title={!listing?.profiles?.phone ? "No Phone Number" : ``}
+        showCloseButton={true}
+      >
+        <View style={{ gap: theme.spacing.md, padding: theme.spacing.lg }}>
+          <Text variant="h4" color="secondary" style={{ textAlign: 'center', marginBottom: theme.spacing.md }}>
+            {!listing?.profiles?.phone 
+              ? 'This seller has not provided a phone number'
+              : `You are about to call ${listing.profiles?.first_name}`
+            }
+          </Text>
+          
+          <View style={{ gap: theme.spacing.sm }}>
+            {listing?.profiles?.phone && (
+              <Button
+                variant="primary"
+                fullWidth
+                icon={<Phone size={18} color={theme.colors.primaryForeground} />}
+                onPress={() => {
+                  setShowCallModal(false);
+                  Linking.openURL(`tel:${listing.profiles.phone}`);
+                }}
+              >
+                Call
+              </Button>
+            )}
+            
+            <Button
+              variant="icon"
+              fullWidth
+              onPress={() => setShowCallModal(false)}
+              icon={<X size={18} color={theme.colors.error} />}
+              style={{ borderColor: theme.colors.error, borderWidth: 1 }}
+            >
+              Cancel
+            </Button>
+          </View>
         </View>
       </AppModal>
 
@@ -2645,7 +2755,6 @@ export default function ListingDetailScreen() {
           }}
           onSuccess={async (updatedListing) => {
             // Debug: Log what we received from quick edit
-            console.log('📥 Received from quick edit:', updatedListing);
             
             // Refetch the listing to get the trigger-updated fields (previous_price, price_changed_at)
             try {
@@ -2656,17 +2765,11 @@ export default function ListingDetailScreen() {
                 .single();
 
               if (!refreshError && refreshedListing) {
-                console.log('📥 Refetched listing:', {
-                  price: refreshedListing.price,
-                  previous_price: refreshedListing.previous_price,
-                  price_changed_at: refreshedListing.price_changed_at
-                });
                 setListing((prev: any) => ({
                   ...prev,
                   ...refreshedListing,
                 }));
               } else {
-                console.log('⚠️ Refetch failed, using manual update');
                 // Fallback to manual update if refetch fails
                 setListing((prev: any) => ({
                   ...prev,

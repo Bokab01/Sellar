@@ -41,7 +41,6 @@ export default function PaymentScreen() {
 
   const verifyPayment = async () => {
     if (isProcessing) {
-      console.log('⏭️ Payment already being verified');
       return;
     }
 
@@ -49,7 +48,6 @@ export default function PaymentScreen() {
       setIsProcessing(true);
       setVerifying(true);
 
-      console.log('🔄 Verifying payment:', params.reference);
       
       const { data, error } = await supabase.functions.invoke('paystack-verify', {
         body: { reference: params.reference },
@@ -58,7 +56,6 @@ export default function PaymentScreen() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      console.log('✅ Payment verified:', data);
       
       setPaymentStatus('success');
       const creditsMsg = params.credits 
@@ -83,17 +80,14 @@ export default function PaymentScreen() {
 
   const handleNavigationChange = (navState: any) => {
     if (isProcessing) {
-      console.log('⏭️ Ignoring navigation - payment already being processed');
       return;
     }
 
-    console.log('🔍 Navigation:', navState.url);
 
     const url = navState.url.toLowerCase();
     
     // Check for success callback
     if (url.includes('sellar.app/payment/callback') && url.includes('status=success')) {
-      console.log('✅ Payment success detected via callback!');
       verifyPayment();
     }
   };

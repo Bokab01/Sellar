@@ -57,7 +57,6 @@ export default function MyPostsScreen() {
     const timeSinceLastFetch = now - lastFetchTime.current;
     
     if (!forceRefresh && hasLoadedData.current && timeSinceLastFetch < FETCH_COOLDOWN) {
-      console.log('⏭️ My Posts: Using cached data');
       setLoading(false);
       setRefreshing(false);
       return;
@@ -65,7 +64,6 @@ export default function MyPostsScreen() {
 
     try {
       setError(null);
-      console.log('🔄 My Posts: Fetching data', { forceRefresh, timeSinceLastFetch });
       
       const { data, error: fetchError } = await supabase
         .from('posts')
@@ -121,10 +119,8 @@ export default function MyPostsScreen() {
       const timeSinceLastFetch = now - lastFetchTime.current;
       
       if (!hasLoadedData.current || timeSinceLastFetch > FETCH_COOLDOWN) {
-        console.log('🔄 My Posts: Focus refresh', { hasLoadedData: hasLoadedData.current, timeSinceLastFetch });
         fetchMyPosts();
       } else {
-        console.log('⏭️ My Posts: Using cached data on focus');
       }
     }, [fetchMyPosts])
   );

@@ -435,7 +435,7 @@ export default function PaystackDiagnosticsScreen() {
                   'Webhook Status',
                   result.message,
                   [
-                    { text: 'Details', onPress: () => console.log('Webhook details:', result.details) },
+                    { text: 'Details', onPress: () => {} },
                     { text: 'OK' }
                   ]
                 );

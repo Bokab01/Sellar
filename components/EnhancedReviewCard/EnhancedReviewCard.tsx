@@ -6,6 +6,10 @@ import { Text } from '@/components/Typography/Text';
 import { Avatar } from '@/components/Avatar/Avatar';
 import { Rating } from '@/components/Rating/Rating';
 import { Badge } from '@/components/Badge/Badge';
+import { 
+  IdentityVerificationBadge, 
+  TrustScoreBadge 
+} from '@/components/VerifiedBadge/VerifiedBadge';
 import { Button } from '@/components/Button/Button';
 import { UserDisplayName } from '@/components/UserDisplayName/UserDisplayName';
 import { 
@@ -75,23 +79,31 @@ export function EnhancedReviewCard({
     switch (review.verification_level) {
       case 'mutual_confirmed':
         return {
-          text: 'Verified Transaction',
-          variant: 'success' as const,
-          icon: <CheckCircle size={12} color={theme.colors.success} />,
+          component: <IdentityVerificationBadge size="small" variant="compact" />,
           description: 'Both parties confirmed this meetup',
         };
       case 'single_confirmed':
         return {
-          text: 'Partially Verified',
-          variant: 'warning' as const,
-          icon: <Clock size={12} color={theme.colors.warning} />,
+          component: (
+            <Badge
+              text="Partially Verified"
+              variant="warning"
+              leftIcon={<Clock size={12} color={theme.colors.warning} />}
+              size="small"
+            />
+          ),
           description: 'One party confirmed this transaction',
         };
       default:
         return {
-          text: 'Unverified',
-          variant: 'neutral' as const,
-          icon: <Users size={12} color={theme.colors.text.muted} />,
+          component: (
+            <Badge
+              text="Unverified"
+              variant="neutral"
+              leftIcon={<Users size={12} color={theme.colors.text.muted} />}
+              size="small"
+            />
+          ),
           description: 'Transaction not confirmed by both parties',
         };
     }
@@ -99,12 +111,8 @@ export function EnhancedReviewCard({
 
   const getTrustScoreBadge = () => {
     const score = review.reviewer_verification_score;
-    if (score >= 80) {
-      return { text: 'Trusted Reviewer', variant: 'success' as const };
-    } else if (score >= 60) {
-      return { text: 'Verified Reviewer', variant: 'info' as const };
-    } else if (score >= 40) {
-      return { text: 'New Reviewer', variant: 'warning' as const };
+    if (score && score > 0) {
+      return <TrustScoreBadge trustScore={score} size="small" />;
     }
     return null;
   };
@@ -195,22 +203,13 @@ export function EnhancedReviewCard({
             />
 
             {/* Verification Status */}
-            <Badge
-              text={verificationBadge.text}
-              variant={verificationBadge.variant}
-              leftIcon={verificationBadge.icon}
-              size="small"
-            />
+            {verificationBadge.component}
           </View>
 
           {/* Trust Score Badge */}
           {trustBadge && (
             <View style={{ marginBottom: theme.spacing.xs }}>
-              <Badge
-                text={trustBadge.text}
-                variant={trustBadge.variant}
-                size="small"
-              />
+              {trustBadge}
             </View>
           )}
 

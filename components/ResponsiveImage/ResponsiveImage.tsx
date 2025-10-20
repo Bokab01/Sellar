@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Image, ImageStyle, ViewStyle, Dimensions, Text } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
+import { CDNOptimizedImage } from '@/components/OptimizedImage/CDNOptimizedImage';
 
 interface ResponsiveImageProps {
   source: { uri: string };
@@ -14,6 +15,10 @@ interface ResponsiveImageProps {
   backgroundColor?: string;
   onLoad?: () => void;
   onError?: (error: any) => void;
+  // CDN optimization props
+  bucket?: string;
+  path?: string;
+  quality?: 'low' | 'medium' | 'high';
 }
 
 export function ResponsiveImage({
@@ -28,6 +33,9 @@ export function ResponsiveImage({
   backgroundColor,
   onLoad,
   onError,
+  bucket,
+  path,
+  quality = 'medium',
 }: ResponsiveImageProps) {
   const { theme } = useTheme();
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -112,6 +120,25 @@ export function ResponsiveImage({
     );
   }
 
+  // Use CDN optimized image if bucket and path are provided
+  if (bucket && path) {
+    return (
+      <View style={containerStyles}>
+        <CDNOptimizedImage
+          bucket={bucket}
+          path={path}
+          style={imageStyles}
+          width={optimalDimensions.width}
+          height={optimalDimensions.height}
+          quality={quality}
+          onLoad={handleImageLoad}
+          onError={handleImageError}
+        />
+      </View>
+    );
+  }
+
+  // Fallback to regular Image component
   return (
     <View style={containerStyles}>
       <Image
@@ -137,6 +164,8 @@ export function PostImage({
       aspectRatio={16/9}
       maxHeight={400}
       resizeMode="cover"
+      bucket="community-images"
+      quality="medium"
       {...props}
     />
   );
@@ -152,6 +181,8 @@ export function ListingImage({
       aspectRatio={4/3}
       maxHeight={300}
       resizeMode="contain"
+      bucket="listing-images"
+      quality="medium"
       {...props}
     />
   );
@@ -167,6 +198,8 @@ export function ProfileImage({
       aspectRatio={1}
       maxHeight={200}
       resizeMode="cover"
+      bucket="profile-images"
+      quality="medium"
       {...props}
     />
   );
@@ -185,6 +218,8 @@ export function ThumbnailImage({
       maxWidth={size}
       resizeMode="cover"
       style={{ width: size, height: size }}
+      bucket="profile-images"
+      quality="low"
       {...props}
     />
   );

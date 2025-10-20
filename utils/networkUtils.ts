@@ -204,7 +204,6 @@ class NetworkUtilsService {
       if (cacheKey && this.networkQuality === 'poor') {
         const cached = await this.getCachedResponse(cacheKey);
         if (cached) {
-          console.log(`Using cached data for ${cacheKey} due to poor network`);
           return cached;
         }
       }
@@ -236,14 +235,12 @@ class NetworkUtilsService {
       if (cacheKey) {
         const cached = await this.getCachedResponse(cacheKey);
         if (cached) {
-          console.log(`Using cached fallback for ${cacheKey}`);
           return cached;
         }
       }
 
       // Use provided fallback data
       if (fallbackData !== undefined) {
-        console.log('Using provided fallback data');
         return fallbackData;
       }
 
@@ -315,7 +312,6 @@ class NetworkUtilsService {
           maxDelay
         );
 
-        console.log(`Request failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delay}ms:`, error);
         await this.sleep(delay);
       }
     }
@@ -464,7 +460,6 @@ class NetworkUtilsService {
         { priority: 'low', timeout: 5000, retries: 2 }
       );
 
-      console.log('Storage connection test:', result ? 'passed' : 'failed');
       return result;
     } catch (error) {
       console.error('Storage connection test error:', error);
@@ -485,7 +480,6 @@ class NetworkUtilsService {
         { priority: 'low', timeout: 5000, retries: 2 }
       );
 
-      console.log(`Bucket '${bucketName}' access test:`, result ? 'passed' : 'failed');
       return result;
     } catch (error) {
       console.error(`Bucket '${bucketName}' access test error:`, error);

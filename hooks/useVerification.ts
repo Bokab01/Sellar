@@ -156,6 +156,35 @@ export function useVerificationRequests() {
     }
   };
 
+  const deleteRequest = async (requestId: string) => {
+    if (!user) {
+      throw new Error('User must be authenticated to delete verification requests');
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { error: deleteError } = await supabase
+        .from('user_verification')
+        .delete()
+        .eq('id', requestId)
+        .eq('user_id', user.id); // Ensure user can only delete their own requests
+
+      if (deleteError) throw deleteError;
+
+      // Remove the deleted request from local state
+      setRequests(prev => prev.filter(r => r.id !== requestId));
+    } catch (err) {
+      console.error('Error deleting verification request:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete verification request';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchRequests();
   }, [user]);
@@ -165,6 +194,7 @@ export function useVerificationRequests() {
     loading,
     error,
     refetch: fetchRequests,
+    deleteRequest,
   };
 }
 
@@ -246,7 +276,7 @@ export function useVerificationDocuments() {
 
   const uploadDocument = async (
     verificationId: string,
-    file: File,
+    file: File | any,
     documentType: VerificationDocument['document_type']
   ) => {
     if (!user) {
@@ -257,33 +287,42 @@ export function useVerificationDocuments() {
     setError(null);
 
     try {
-      // Generate unique file name
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${verificationId}/${documentType}_${Date.now()}.${fileExt}`;
+      // Check authentication status
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No authenticated session found');
+      }
+      
 
-      // Upload file to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('verification-documents')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('verification-documents')
-        .getPublicUrl(fileName);
+      // Import storageHelpers dynamically to avoid circular imports
+      const { storageHelpers } = await import('@/lib/storage');
+      
+      // Use the same upload method as listings and posts
+      let uploadResult;
+      if (file.uri) {
+        // Mobile: use URI-based upload
+        uploadResult = await storageHelpers.uploadVerificationDocument(
+          file.uri,
+          user.id
+        );
+      } else {
+        // Web: convert File to URI and upload
+        const fileUrl = URL.createObjectURL(file);
+        uploadResult = await storageHelpers.uploadVerificationDocument(
+          fileUrl,
+          user.id
+        );
+        URL.revokeObjectURL(fileUrl);
+      }
 
       // Create document record to add to JSONB array
       const documentRecord = {
-        id: crypto.randomUUID(),
+        id: `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
         document_type: documentType,
-        file_url: publicUrl,
-        file_name: file.name,
-        file_size: file.size,
-        mime_type: file.type,
+        file_url: uploadResult.url,
+        file_name: file.name || `document_${Date.now()}`,
+        file_size: file.size || 0,
+        mime_type: file.type || 'image/jpeg',
         status: 'pending',
         uploaded_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
@@ -293,26 +332,39 @@ export function useVerificationDocuments() {
       // Get current verification record to update documents array
       const { data: currentVerification, error: fetchError } = await supabase
         .from('user_verification')
-        .select('documents')
+        .select('documents, user_id')
         .eq('id', verificationId)
+        .eq('user_id', user.id) // Ensure the verification belongs to the current user
         .single();
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        console.error('Failed to fetch verification record:', fetchError);
+        throw new Error(`Verification record not found or access denied: ${fetchError.message}`);
+      }
+
+      if (!currentVerification) {
+        throw new Error('Verification record not found or you do not have permission to update it');
+      }
 
       // Update documents array
       const currentDocuments = Array.isArray(currentVerification.documents) ? currentVerification.documents : [];
       const updatedDocuments = [...currentDocuments, documentRecord];
 
       // Save updated documents array
+
       const { error: saveError } = await supabase
         .from('user_verification')
         .update({ 
           documents: updatedDocuments,
           updated_at: new Date().toISOString()
         })
-        .eq('id', verificationId);
+        .eq('id', verificationId)
+        .eq('user_id', user.id); // Add user_id check for extra security
 
-      if (saveError) throw saveError;
+      if (saveError) {
+        console.error('RLS Policy Error:', saveError);
+        throw new Error(`Failed to update verification record: ${saveError.message}`);
+      }
 
       return documentRecord as VerificationDocument;
     } catch (err) {
@@ -723,7 +775,6 @@ export function usePhoneVerification() {
 
       // TODO: Integrate with SMS service (Twilio, AWS SNS, etc.)
       // For now, we'll just log the code (in production, send via SMS)
-      console.log(`Verification code for ${phoneNumber}: ${code}`);
 
       return request;
     } catch (err) {
@@ -817,7 +868,7 @@ export function useEmailVerification() {
       }
 
       // Generate verification token
-      const token = crypto.randomUUID();
+      const token = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
       
       // Create or update verification request
       const { data: request, error: createError } = await supabase
@@ -837,7 +888,6 @@ export function useEmailVerification() {
 
       // TODO: Send verification email
       // For now, we'll just log the token (in production, send via email service)
-      console.log(`Verification link for ${email}: /verify-email?token=${token}`);
 
       return request;
     } catch (err) {

@@ -22,11 +22,9 @@ export default function GivenReviewsTab() {
       const timeSinceLastFetch = now - lastFetchTime.current;
       
       if (!hasLoadedData.current || timeSinceLastFetch > FETCH_COOLDOWN) {
-        console.log('🔄 Given Reviews: Focus refresh', { hasLoadedData: hasLoadedData.current, timeSinceLastFetch });
         hasLoadedData.current = true;
         lastFetchTime.current = now;
       } else {
-        console.log('⏭️ Given Reviews: Using cached data on focus');
       }
     }, [])
   );

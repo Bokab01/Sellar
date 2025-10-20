@@ -219,7 +219,6 @@ export default function NotificationDetailScreen() {
           break;
 
         default:
-          console.log('Unknown notification type:', notification.type, 'Data:', data);
           break;
       }
     } catch (error) {

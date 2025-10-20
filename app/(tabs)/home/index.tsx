@@ -56,7 +56,47 @@ import {
   Grid2X2,
   House,
   Wifi,
-  WifiOff
+  WifiOff,
+  // Additional icons for unique category mapping
+  Armchair,
+  Baby,
+  Utensils,
+  Heart as HeartIcon,
+  Ticket,
+  Laptop,
+  Palette,
+  Grid,
+  Wrench,
+  Scissors,
+  Trophy,
+  Gamepad2,
+  Music,
+  Film,
+  GraduationCap,
+  Pencil,
+  Calendar,
+  HeartPulse,
+  Sparkles,
+  Clock,
+  ShoppingBasket,
+  Coffee,
+  Leaf,
+  Tractor,
+  Bone,
+  Printer,
+  Cog,
+  HardHat,
+  Boxes,
+  ShoppingCart,
+  Plane,
+  Map,
+  Star,
+  Building,
+  Package,
+  File,
+  Gift,
+  Puzzle,
+  Repeat
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 
@@ -261,32 +301,82 @@ export default function HomeScreen() {
         setLoadingCategories(true);
         const mainCategories = await fetchMainCategories();
         
-        // Map categories with icons
+        // Map categories with icons - using unique icons for each category
         const categoriesWithIcons = mainCategories.map((cat) => {
-          // Map icon names to actual icon components
+          // Map icon names to actual icon components with unique icons
           let icon;
           switch (cat.icon?.toLowerCase()) {
+            // Electronics & Gadgets
             case 'smartphone':
               icon = <Smartphone size={24} color={theme.colors.primary} />;
               break;
+            // Vehicles
             case 'car':
               icon = <Car size={24} color={theme.colors.primary} />;
               break;
+            // Real Estate & Property
             case 'home':
-            case 'house':
               icon = <House size={24} color={theme.colors.primary} />;
               break;
+            // Fashion & Clothing
             case 'shirt':
               icon = <Shirt size={24} color={theme.colors.primary} />;
               break;
-            case 'book':
-              icon = <Book size={24} color={theme.colors.primary} />;
+            // Home & Furniture
+            case 'armchair':
+              icon = <Armchair size={24} color={theme.colors.primary} />;
               break;
+            // Health & Beauty
+            case 'heart':
+              icon = <HeartIcon size={24} color={theme.colors.primary} />;
+              break;
+            // Sports & Outdoors
             case 'dumbbell':
               icon = <Dumbbell size={24} color={theme.colors.primary} />;
               break;
+            // Baby, Kids & Toys
+            case 'baby':
+              icon = <Baby size={24} color={theme.colors.primary} />;
+              break;
+            // Books, Media & Education
+            case 'book':
+              icon = <Book size={24} color={theme.colors.primary} />;
+              break;
+            // Services
             case 'briefcase':
               icon = <Briefcase size={24} color={theme.colors.primary} />;
+              break;
+            // Jobs & Freelance
+            case 'clock':
+              icon = <Clock size={24} color={theme.colors.primary} />;
+              break;
+            // Food & Agriculture
+            case 'utensils':
+              icon = <Utensils size={24} color={theme.colors.primary} />;
+              break;
+            // Pets & Animals
+            case 'bone':
+              icon = <Bone size={24} color={theme.colors.primary} />;
+              break;
+            // Industrial & Business
+            case 'cog':
+              icon = <Cog size={24} color={theme.colors.primary} />;
+              break;
+            // Tickets & Events
+            case 'ticket':
+              icon = <Ticket size={24} color={theme.colors.primary} />;
+              break;
+            // Digital Products & Software
+            case 'laptop':
+              icon = <Laptop size={24} color={theme.colors.primary} />;
+              break;
+            // Collectibles & Hobbies
+            case 'palette':
+              icon = <Palette size={24} color={theme.colors.primary} />;
+              break;
+            // Miscellaneous
+            case 'grid':
+              icon = <Grid size={24} color={theme.colors.primary} />;
               break;
             default:
               icon = <Grid2X2 size={24} color={theme.colors.primary} />;
@@ -634,12 +724,50 @@ export default function HomeScreen() {
     setCategoryScrollProgress(progress);
     setCategoryScrollMax(maxScrollX);
     
-    // Debug logging
-    console.log('Category scroll:', { scrollX, maxScrollX, progress, contentSize: contentSize.width, layout: layoutMeasurement.width });
   }, []);
+
+  // Get unique background color for each category using theme colors
+  const getCategoryBackgroundColor = useCallback((categoryName: string) => {
+    // Use theme color palette for consistent design
+    const themeColors = [
+      theme.colors.primary,
+      theme.colors.secondary,
+      theme.colors.success,
+      theme.colors.warning,
+      theme.colors.error,
+      // Use color palette variations for more variety
+      '#8000ff', // Primary 500
+      '#0000ff', // Secondary 500
+      '#00ff00', // Success 500
+      '#ff6600', // Warning 500
+      '#ff0000', // Error 500
+      '#7c3aed', // Primary 600
+      '#2563eb', // Secondary 600
+      '#16a34a', // Success 600
+      '#ea580c', // Warning 600
+      '#dc2626', // Error 600
+      '#a855f7', // Primary 400
+      '#60a5fa', // Secondary 400
+      '#4ade80', // Success 400
+      '#fb923c', // Warning 400
+      '#f87171', // Error 400
+      '#c084fc', // Primary 300
+      '#93c5fd', // Secondary 300
+    ];
+    
+    // Use category name to get consistent color
+    const hash = categoryName.split('').reduce((a, b) => {
+      a = ((a << 5) - a) + b.charCodeAt(0);
+      return a & a;
+    }, 0);
+    
+    return themeColors[Math.abs(hash) % themeColors.length];
+  }, [theme.colors]);
 
   // ✅ Optimized category render item
   const renderCategoryItem = useCallback((category: any) => {
+    const iconBackgroundColor = getCategoryBackgroundColor(category.label);
+    
     return (
       <Pressable
         key={category.id}
@@ -648,30 +776,41 @@ export default function HomeScreen() {
           flexDirection: 'row',
           alignItems: 'center',
           paddingHorizontal: theme.spacing.lg,
-          paddingVertical: theme.spacing.md,
+          paddingVertical: theme.spacing.sm,
           borderRadius: theme.borderRadius.full,
           backgroundColor: category.isSelected ? theme.colors.primary : theme.colors.surface,
           borderWidth: 1,
           borderColor: category.isSelected ? theme.colors.primary : theme.colors.border,
           gap: theme.spacing.sm,
-          minHeight: 48,
-          shadowColor: theme.colors.text.primary,
+          minHeight: 40,
+          /* shadowColor: theme.colors.text.primary,
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: category.isSelected ? 0.2 : 0.1,
           shadowRadius: pressed ? 8 : 4,
-          elevation: pressed ? 4 : 2,
+          elevation: pressed ? 4 : 2, */
           transform: [{ scale: pressed ? 0.98 : 1 }],
         })}
       >
         <View style={{ 
-          width: 24, 
-          height: 24, 
+          width: 41, 
+          height: 41,
+          position: 'absolute',
+          left: 0, // Extend beyond the pill's left padding
+          
+         // Half of icon container height (32/2)
           justifyContent: 'center', 
-          alignItems: 'center' 
+          alignItems: 'center',
+          backgroundColor: category.isSelected ? `${theme.colors.primaryForeground}20` : iconBackgroundColor,
+          borderRadius: 20,
+          shadowColor: iconBackgroundColor,
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.3,
+          shadowRadius: 2,
+          elevation: 2,
         }}>
           {React.cloneElement(category.icon as React.ReactElement, {
-            size: 20,
-            color: category.isSelected ? theme.colors.primaryForeground : theme.colors.primary,
+            size: 18,
+            color: category.isSelected ? theme.colors.primaryForeground : theme.colors.text.inverse,
           } as any)}
         </View>
         
@@ -681,6 +820,7 @@ export default function HomeScreen() {
             color: category.isSelected ? theme.colors.primaryForeground : theme.colors.text.primary,
             fontWeight: '700',
             fontSize: 13,
+            marginLeft: 35, // Space for overlapping icon
           }}
         >
           {category.label}
@@ -1052,8 +1192,8 @@ export default function HomeScreen() {
               updateCellsBatchingPeriod={100}
               decelerationRate="fast"
               getItemLayout={(data, index) => ({
-                length: 290, // Approximate card height + padding
-                offset: 290 * Math.floor(index / 2), // Account for 2 columns
+                length: 330, // Approximate card height + padding (increased from 290)
+                offset: 330 * Math.floor(index / 2), // Account for 2 columns
                 index,
               })}
             />

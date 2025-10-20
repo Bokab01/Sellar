@@ -3,6 +3,11 @@ import { View } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { Badge } from '@/components/Badge/Badge';
+import { 
+  IdentityVerificationBadge, 
+  BusinessVerificationBadge, 
+  TrustScoreBadge 
+} from '@/components/VerifiedBadge/VerifiedBadge';
 import { Rating } from '@/components/Rating/Rating';
 import { 
   Shield, 
@@ -58,35 +63,6 @@ export function TrustMetricsDisplay({
     return 'New User';
   };
 
-  const getVerificationBadges = () => {
-    const badges = [];
-    
-    if (metrics.phone_verified) {
-      badges.push({
-        icon: <Phone size={12} color={theme.colors.success} />,
-        text: 'Phone',
-        variant: 'success' as const,
-      });
-    }
-    
-    if (metrics.email_verified) {
-      badges.push({
-        icon: <Mail size={12} color={theme.colors.success} />,
-        text: 'Email',
-        variant: 'success' as const,
-      });
-    }
-    
-    if (metrics.id_verified) {
-      badges.push({
-        icon: <FileText size={12} color={theme.colors.success} />,
-        text: 'ID',
-        variant: 'success' as const,
-      });
-    }
-
-    return badges;
-  };
 
   if (variant === 'minimal') {
     return (
@@ -227,16 +203,43 @@ export function TrustMetricsDisplay({
           Verifications
         </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
-          {getVerificationBadges().map((badge, index) => (
-            <Badge
-              key={index}
-              text={badge.text}
-              variant={badge.variant}
-              leftIcon={badge.icon}
+          {/* Trust Score Badge */}
+          {metrics.trust_score && metrics.trust_score > 0 && (
+            <TrustScoreBadge
+              trustScore={metrics.trust_score}
               size="small"
             />
-          ))}
-          {getVerificationBadges().length === 0 && (
+          )}
+          
+          {/* Identity Verification */}
+          {metrics.id_verified && (
+            <IdentityVerificationBadge
+              size="small"
+              variant="compact"
+            />
+          )}
+          
+          
+          {/* Basic Verifications */}
+          {metrics.phone_verified && (
+            <Badge
+              text="Phone"
+              variant="success"
+              leftIcon={<Phone size={12} color={theme.colors.success} />}
+              size="small"
+            />
+          )}
+          
+          {metrics.email_verified && (
+            <Badge
+              text="Email"
+              variant="success"
+              leftIcon={<Mail size={12} color={theme.colors.success} />}
+              size="small"
+            />
+          )}
+          
+          {!metrics.id_verified && !metrics.phone_verified && !metrics.email_verified && (
             <Text variant="caption" color="muted">
               No verifications yet
             </Text>

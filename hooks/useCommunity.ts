@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Alert } from 'react-native';
 import { dbHelpers, supabase } from '@/lib/supabase';
-import { useCommunityRealtime } from './useRealtime';
+import { useOptimizedCommunityRealtime } from './useOptimizedRealtime';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useAppStore } from '@/store/useAppStore';
 import { addProfileRefreshListener } from './useProfile';
@@ -29,10 +29,8 @@ export function useCommunityPosts(options: {
   // Monitor real-time connection
   const { isConnected, isReconnecting, forceReconnect } = useRealtimeConnection({
     onConnectionLost: () => {
-      console.log('🔗 Real-time connection lost for community, will retry...');
     },
     onConnectionRestored: () => {
-      console.log('🔗 Real-time connection restored for community');
       // If we don't have initial data yet, try to fetch
       if (!hasInitialDataRef.current && posts.length === 0) {
         fetchPosts();
@@ -61,7 +59,6 @@ export function useCommunityPosts(options: {
       
       setError(null);
 
-      console.log('📊 Fetching posts with options:', options);
 
       // Set a timeout for the fetch operation
       const fetchPromise = dbHelpers.getPosts({
@@ -86,7 +83,6 @@ export function useCommunityPosts(options: {
       if (fetchError) {
         setError(fetchError.message);
       } else {
-        console.log(`✅ Fetched ${data?.length || 0} posts with filters`);
         setPosts(data || []);
         hasInitialDataRef.current = true;
       }
@@ -96,7 +92,6 @@ export function useCommunityPosts(options: {
       
       // If it's a timeout or connection error, try to reconnect real-time
       if (errorMessage.includes('timeout') || errorMessage.includes('connection')) {
-        console.log('🔗 Fetch failed due to connection issue, attempting to reconnect...');
         forceReconnectRef.current?.();
       }
     } finally {
@@ -124,7 +119,7 @@ export function useCommunityPosts(options: {
     });
   }, []);
 
-  const { postsSubscription, commentsSubscription, likesSubscription } = useCommunityRealtime(handleRealtimeUpdate);
+  const { postsSubscription, commentsSubscription, likesSubscription } = useOptimizedCommunityRealtime(handleRealtimeUpdate);
 
   useEffect(() => {
     // Reset the initial data flag when options change
@@ -167,13 +162,6 @@ export function useCommunityPosts(options: {
       // Check if content is approved
       if (!moderationResult.isApproved) {
         // Log moderation details for debugging
-        console.log('🚨 Post moderation failed:', {
-          requiresManualReview: moderationResult.requiresManualReview,
-          suggestedAction: moderationResult.suggestedAction,
-          confidence: moderationResult.confidence,
-          flags: moderationResult.flags,
-          content: content.substring(0, 100) + '...' // Log first 100 chars
-        });
 
         // Extract specific violations with user-friendly messages
         const flagReasons = moderationResult.flags
@@ -199,11 +187,6 @@ export function useCommunityPosts(options: {
       }
 
       const finalLocation = location || currentLocation || null;
-      console.log('📍 Creating post with location:', { 
-        providedLocation: location, 
-        currentLocation, 
-        finalLocation 
-      });
       
       const postData = {
         user_id: user.id,
@@ -255,7 +238,6 @@ export function useCommunityPosts(options: {
   }, []);
 
   const incrementCommentCount = useCallback((postId: string) => {
-    console.log('🔗 Manually incrementing comment count for post:', postId);
     setPosts(prev => prev.map(post => 
       post.id === postId 
         ? { ...post, comments_count: (post.comments_count || 0) + 1 }
@@ -264,18 +246,15 @@ export function useCommunityPosts(options: {
   }, []);
 
   const updatePost = async (postId: string, updates: { content?: string; images?: string[]; type?: string; location?: string }) => {
-    console.log('updatePost hook called with:', postId, typeof postId, updates);
     
     if (!user) return { error: 'Not authenticated' };
     if (!postId) return { error: 'Post ID is required' };
 
     try {
-      console.log('Calling dbHelpers.updatePost with:', postId, updates);
       const { data, error } = await dbHelpers.updatePost(postId, {
         ...updates,
         updated_at: new Date().toISOString(),
       });
-      console.log('dbHelpers.updatePost result:', { data, error });
 
       if (error) {
         console.error('Database error in updatePost:', error);
@@ -297,15 +276,12 @@ export function useCommunityPosts(options: {
   };
 
   const deletePost = async (postId: string) => {
-    console.log('deletePost hook called with:', postId, typeof postId);
     
     if (!user) return { error: 'Not authenticated' };
     if (!postId) return { error: 'Post ID is required' };
 
     try {
-      console.log('Calling dbHelpers.deletePost with:', postId);
       const { data, error } = await dbHelpers.deletePost(postId);
-      console.log('dbHelpers.deletePost result:', { data, error });
 
       if (error) {
         console.error('Database error in deletePost:', error);

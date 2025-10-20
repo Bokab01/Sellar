@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { Avatar } from '@/components/Avatar/Avatar';
-import { CompactUserBadges } from '@/components/UserBadgeSystem/UserBadgeSystem';
+import { ExtraSmallUserBadges } from '@/components/UserBadgeSystem/UserBadgeSystem';
 import { useDisplayName } from '@/hooks/useDisplayName';
 import { UserProfile } from '@/hooks/useProfile';
 
@@ -91,7 +91,7 @@ export function UserDisplayName({
       </Text>
       
       {showBadge && (
-        <CompactUserBadges
+        <ExtraSmallUserBadges
           isBusinessUser={displayInfo.showBusinessBadge}
           isVerified={profile.is_verified}
           isBusinessVerified={profile.verification_level === 'business'}

@@ -29,8 +29,8 @@ import {
   Chip,
   UserDisplayName,
   EnhancedReviewCard,
+  AppModal,
 } from '@/components';
-import { FullUserBadges } from '@/components/UserBadges/UserBadges';
 import { ReputationDisplay } from '@/components/ReputationDisplay/ReputationDisplay';
 import { 
   MessageCircle, 
@@ -44,7 +44,8 @@ import {
   Users,
   MessageSquare,
   Info,
-  MoreVertical
+  MoreVertical,
+  X
 } from 'lucide-react-native';
 import { ReportButton } from '@/components/ReportButton/ReportButton';
 
@@ -75,6 +76,8 @@ export default function UserProfileScreen() {
   const [activeTab, setActiveTab] = useState<TabType>((tab as TabType) || 'listings');
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [showCallModal, setShowCallModal] = useState(false);
+  const [totalListingsCount, setTotalListingsCount] = useState(0);
 
   // Get user's listings
   const { 
@@ -101,6 +104,7 @@ export default function UserProfileScreen() {
     if (profileId) {
       fetchProfile();
       checkFollowStatus();
+      fetchTotalListingsCount();
     }
   }, [profileId]);
 
@@ -158,6 +162,23 @@ export default function UserProfileScreen() {
     }
   };
 
+  const fetchTotalListingsCount = async () => {
+    if (!profileId) return;
+    
+    try {
+      const { count, error } = await supabase
+        .from('listings')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', profileId)
+        .eq('status', 'active');
+
+      if (error) throw error;
+      setTotalListingsCount(count || 0);
+    } catch (err: any) {
+      console.error('Error fetching total listings count:', err);
+    }
+  };
+
   // Reviews fetching is now handled by useReviews hook in ReviewsList component
 
   const handleRefresh = async () => {
@@ -165,6 +186,7 @@ export default function UserProfileScreen() {
     await Promise.all([
       fetchProfile(),
       checkFollowStatus(),
+      fetchTotalListingsCount(), // Already parallel
       refreshListings(),
       refreshPosts(),
     ]);
@@ -200,7 +222,6 @@ export default function UserProfileScreen() {
         if (error) {
           if (error.code === '23505') {
             // Already following, just update state - this is not an error
-            console.log('User already being followed, updating state');
             setIsFollowing(true);
             setToastMessage('Following successfully');
           } else {
@@ -262,23 +283,11 @@ export default function UserProfileScreen() {
 
   const handleCall = () => {
     if (!profile?.phone) {
-      Alert.alert('No Phone Number', 'This user has not provided a phone number');
+      setShowCallModal(true);
       return;
     }
 
-    Alert.alert(
-      'Call User',
-      `Call ${profile.first_name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Call',
-          onPress: () => {
-            Linking.openURL(`tel:${profile.phone}`);
-          },
-        },
-      ]
-    );
+    setShowCallModal(true);
   };
 
   if (loading) {
@@ -342,7 +351,7 @@ export default function UserProfileScreen() {
   // Reviews transformation is now handled by ReviewsList component
 
   const tabs = [
-    { id: 'listings', label: 'Listings', count: filteredListings.length },
+    { id: 'listings', label: 'Listings', count: totalListingsCount },
     { id: 'reviews', label: 'Reviews', count: null }, // Count will be handled by ReviewsList
     { id: 'about', label: 'About', count: null },
     { id: 'posts', label: 'Posts', count: filteredPosts.length },
@@ -352,23 +361,38 @@ export default function UserProfileScreen() {
     switch (activeTab) {
       case 'listings':
         return filteredListings.length > 0 ? (
-          <Grid columns={2} spacing={4}>
-            {transformedListings.map((listing) => (
-              <ProductCard
-                key={listing.id}
-                image={listing.image}
-                title={listing.title}
-                price={listing.price}
-                previousPrice={listing.previous_price}
-                priceChangedAt={listing.price_changed_at}
-                seller={listing.seller}
-                location={listing.location}
-                layout="grid"
-                fullWidth={true}
-                onPress={() => router.push(`/(tabs)/home/${listing.id}`)}
-              />
-            ))}
-          </Grid>
+          <View>
+            <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>Items</Text>
+            
+            <Grid columns={2} spacing={4}>
+              {transformedListings.slice(0, 8).map((listing) => (
+                <ProductCard
+                  key={listing.id}
+                  image={listing.image}
+                  title={listing.title}
+                  price={listing.price}
+                  previousPrice={listing.previous_price}
+                  priceChangedAt={listing.price_changed_at}
+                  seller={listing.seller}
+                  location={listing.location}
+                  layout="grid"
+                  fullWidth={true}
+                  onPress={() => router.push(`/(tabs)/home/${listing.id}`)}
+                />
+              ))}
+            </Grid>
+            
+            {totalListingsCount > 8 && (
+              <Button
+                variant="tertiary"
+                onPress={() => router.push(`/seller-listings/${profileId}` as any)}
+                fullWidth
+                style={{ marginTop: theme.spacing.md }}
+              >
+                View All {totalListingsCount} Items
+              </Button>
+            )}
+          </View>
         ) : (
           <EmptyState
             icon={<Package size={48} color={theme.colors.text.muted} />}
@@ -695,10 +719,6 @@ export default function UserProfileScreen() {
                 <CompactReviewSummary userId={profileId!} />
               </View>
 
-              {/* User Badges */}
-              <View style={{ marginBottom: theme.spacing.xs }}>
-                <FullUserBadges userId={profileId} />
-              </View>
 
               {/* Location */}
               {profile.location && (
@@ -879,6 +899,52 @@ export default function UserProfileScreen() {
           {renderTabContent()}
         </View>
       </ScrollView>
+
+      {/* Call User Modal */}
+      <AppModal
+        position="center"
+        visible={showCallModal}
+        onClose={() => setShowCallModal(false)}
+        title={!profile?.phone ? "No Phone Number" : ``}
+        showCloseButton={true}
+      >
+        <View style={{ gap: theme.spacing.md, padding: theme.spacing.lg }}>
+          <Text variant="h4" color="secondary" style={{ textAlign: 'center', marginBottom: theme.spacing.md }}>
+            {!profile?.phone 
+              ? 'This user has not provided a phone number'
+              : `You are about to call ${profile.first_name}`
+            }
+          </Text>
+          
+          <View style={{ gap: theme.spacing.sm }}>
+            {profile?.phone && (
+              <Button
+                variant="primary"
+                fullWidth
+                icon={<Phone size={18} color={theme.colors.primaryForeground} />}
+                onPress={() => {
+                  setShowCallModal(false);
+                  Linking.openURL(`tel:${profile.phone}`);
+                }}
+              >
+                Call
+              </Button>
+            )}
+            
+            <Button
+              variant="icon"
+              fullWidth
+              onPress={() => setShowCallModal(false)}
+              icon={<X size={18} color={theme.colors.error} />}
+              style={{ borderColor: theme.colors.error, borderWidth: 1 }}
+              
+             
+            >
+              Cancel
+            </Button>
+          </View>
+        </View>
+      </AppModal>
 
       {/* Toast */}
       <Toast

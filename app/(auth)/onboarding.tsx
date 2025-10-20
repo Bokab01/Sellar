@@ -292,12 +292,10 @@ export default function OnboardingScreen() {
 
   const handleGoogleAuth = () => {
     // TODO: Implement Google authentication
-    console.log('Google auth');
   };
 
   const handleFacebookAuth = () => {
     // TODO: Implement Facebook authentication
-    console.log('Facebook auth');
   };
 
   return (
