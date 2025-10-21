@@ -59,7 +59,7 @@ export default function InboxScreen() {
         refresh(true); // Pass true to skip loading state
         lastRefreshTime.current = now;
       }
-    }, [conversations.length])
+    }, [conversations.length, refresh])
   );
   
   // Bulk operations state

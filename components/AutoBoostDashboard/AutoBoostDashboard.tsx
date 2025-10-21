@@ -219,21 +219,18 @@ export default function AutoBoostDashboard() {
   const [hasMoreData, setHasMoreData] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   
-  const ITEMS_PER_PAGE = 10;
+  // ✅ SCALABILITY: Use pagination for users with many listings
+  const ITEMS_PER_PAGE = 20;
+  const FETCH_ALL_THRESHOLD = 30; // Fetch all if user has ≤30 listings, paginate if more
   
   // ✅ PERFORMANCE FIX: Add caching to prevent unnecessary refetches
   const lastFetchTime = React.useRef(0);
-  const FETCH_COOLDOWN = 30000; // 30 seconds cache
+  const FETCH_COOLDOWN = 5000; // 5 seconds cache (reduced from 30s for better responsiveness)
 
   useEffect(() => {
-    const now = Date.now();
-    const timeSinceLastFetch = now - lastFetchTime.current;
-    
-    // Only fetch if cache is stale or first load
-    if (timeSinceLastFetch > FETCH_COOLDOWN || lastFetchTime.current === 0) {
-      lastFetchTime.current = now;
-      fetchAutoRefreshSettings();
-    }
+    // Always fetch on mount to ensure fresh data
+    lastFetchTime.current = Date.now();
+    fetchAutoRefreshSettings();
   }, []);
 
   const fetchAutoRefreshSettings = async (page = 1, isRefresh = false) => {
@@ -248,10 +245,84 @@ export default function AutoBoostDashboard() {
     }
     
     try {
+      // ✅ SCALABILITY: First, check total count to decide strategy
+      if (page === 1) {
+        const { count: totalListings } = await supabase
+          .from('listings')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('status', 'active');
+
+        console.log(`📊 User has ${totalListings} active listings`);
+
+        // ✅ SMART LOADING: Fetch all if ≤ threshold, paginate if more
+        if (totalListings && totalListings <= FETCH_ALL_THRESHOLD) {
+          console.log('✅ Fetching all listings at once (optimal for small dataset)');
+          
+          const [listingsResult, autoRefreshResult] = await Promise.all([
+            supabase
+              .from('listings')
+              .select('id, title, status, boost_until, updated_at')
+              .eq('user_id', user.id)
+              .eq('status', 'active')
+              .order('updated_at', { ascending: false }),
+            supabase
+              .from('business_auto_refresh')
+              .select('listing_id, is_active, last_refresh_at, next_refresh_at, created_at')
+              .eq('user_id', user.id)
+          ]);
+
+          const { data: listings, error: listingsError } = listingsResult;
+          const { data: autoRefreshData, error: autoRefreshError } = autoRefreshResult;
+
+          if (listingsError) {
+            console.error('Error fetching listings:', listingsError);
+          } else {
+            const allListingsData = listings || [];
+            
+            setUserListings(allListingsData);
+            setAllListings(allListingsData);
+            setHasMoreData(false); // No more pages
+            setCurrentPage(1);
+          }
+
+          if (autoRefreshError) {
+            console.error('Error fetching auto-refresh settings:', autoRefreshError);
+          }
+
+          // Map all listings with their auto-refresh status
+          const activeListings = (listings || []).map(listing => {
+            const isBoosted = !!listing.boost_until && new Date(listing.boost_until) > new Date();
+            const autoRefreshItem = autoRefreshData?.find(item => item.listing_id === listing.id);
+            const hasAutoRefresh = !!autoRefreshItem && autoRefreshItem.is_active;
+            
+            return {
+              listingId: listing.id,
+              listingTitle: listing.title,
+              lastRefresh: autoRefreshItem?.last_refresh_at || autoRefreshItem?.created_at || listing.updated_at,
+              nextRefresh: autoRefreshItem?.next_refresh_at || (hasAutoRefresh ? new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() : ''),
+              boostUntil: listing.boost_until,
+              isBoosted,
+              hasAutoRefresh,
+            };
+          });
+
+          setSettings({
+            enabled: true,
+            autoRefreshEnabled: true,
+            activeListings,
+          });
+          
+          return; // Exit early
+        }
+        
+        console.log('⚡ Using pagination (large dataset optimization)');
+      }
+
+      // ✅ PAGINATION: For users with many listings
       const from = (page - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
       
-      // ✅ PERFORMANCE FIX: Fetch listings and auto-refresh settings in parallel
       const [listingsResult, autoRefreshResult] = await Promise.all([
         supabase
           .from('listings')
@@ -290,7 +361,8 @@ export default function AutoBoostDashboard() {
         console.error('Error fetching auto-refresh settings:', autoRefreshError);
       }
 
-      const activeListings = (listings || []).map(listing => {
+      // ✅ PAGINATION: Map current page listings with their auto-refresh status
+      const newActiveListings = (listings || []).map(listing => {
         const isBoosted = !!listing.boost_until && new Date(listing.boost_until) > new Date();
         const autoRefreshItem = autoRefreshData?.find(item => item.listing_id === listing.id);
         const hasAutoRefresh = !!autoRefreshItem && autoRefreshItem.is_active;
@@ -306,13 +378,26 @@ export default function AutoBoostDashboard() {
         };
       });
 
-      const settings: AutoRefreshSettings = {
-        enabled: true,
-        autoRefreshEnabled: true,
-        activeListings,
-      };
-
-      setSettings(settings);
+      // ✅ PAGINATION: Merge with existing activeListings when loading more pages
+      setSettings(prev => {
+        let updatedActiveListings;
+        
+        if (page === 1 || isRefresh) {
+          // First page or refresh: replace all
+          updatedActiveListings = newActiveListings;
+        } else {
+          // Loading more: merge with existing, avoiding duplicates
+          const existingIds = new Set(prev.activeListings.map(l => l.listingId));
+          const uniqueNewListings = newActiveListings.filter(l => !existingIds.has(l.listingId));
+          updatedActiveListings = [...prev.activeListings, ...uniqueNewListings];
+        }
+        
+        return {
+          enabled: true,
+          autoRefreshEnabled: true,
+          activeListings: updatedActiveListings,
+        };
+      });
     } catch (error) {
       console.error('Error fetching auto-refresh settings:', error);
     } finally {
@@ -323,14 +408,15 @@ export default function AutoBoostDashboard() {
   };
 
   const loadMoreListings = useCallback(() => {
+    // ✅ SCALABILITY: Load more pages if user has many listings
     if (!loadingMore && hasMoreData) {
       fetchAutoRefreshSettings(currentPage + 1);
     }
   }, [currentPage, loadingMore, hasMoreData]);
 
   const onRefresh = useCallback(() => {
-    // ✅ Reset cache on manual refresh
-    lastFetchTime.current = Date.now();
+    // ✅ Reset cache on manual refresh and force immediate fetch
+    lastFetchTime.current = 0; // Reset to force fresh fetch
     setCurrentPage(1);
     setHasMoreData(true);
     fetchAutoRefreshSettings(1, true);
@@ -341,14 +427,15 @@ export default function AutoBoostDashboard() {
     
     // ✅ FIX: Set updating state for specific listing only
     setUpdatingListingId(listingId);
+    
     try {
       const existingAutoRefresh = settings.activeListings.find(
         listing => listing.listingId === listingId && listing.hasAutoRefresh
       );
       
       if (existingAutoRefresh) {
-        // Use direct database operation - actually delete the record
-        console.log('Disabling auto-refresh for listing:', listingId);
+        // Disable auto-refresh - DELETE the record
+        console.log('🔴 Disabling auto-refresh for listing:', listingId);
         
         const { error: deleteError } = await supabase
           .from('business_auto_refresh')
@@ -359,20 +446,24 @@ export default function AutoBoostDashboard() {
         if (deleteError) {
           console.error('Error disabling auto-refresh:', deleteError);
           Alert.alert('Error', `Failed to disable auto-refresh: ${deleteError.message}`);
+          setUpdatingListingId(null);
           return;
         }
 
+        console.log('✅ Successfully disabled auto-refresh in database');
+        
+        // Update state to reflect the change
         setSettings(prev => ({
           ...prev,
           activeListings: prev.activeListings.map(listing => 
             listing.listingId === listingId 
-              ? { ...listing, hasAutoRefresh: false }
+              ? { ...listing, hasAutoRefresh: false, nextRefresh: '' }
               : listing
           )
         }));
       } else {
-        // Use direct database operation with upsert to handle conflicts
-        console.log('Enabling auto-refresh for listing:', listingId);
+        // Enable auto-refresh - INSERT/UPDATE the record
+        console.log('🟢 Enabling auto-refresh for listing:', listingId);
         
         const { error: upsertError } = await supabase
           .from('business_auto_refresh')
@@ -389,23 +480,34 @@ export default function AutoBoostDashboard() {
         if (upsertError) {
           console.error('Error enabling auto-refresh:', upsertError);
           Alert.alert('Error', `Failed to enable auto-refresh: ${upsertError.message}`);
+          setUpdatingListingId(null);
           return;
         }
 
+        console.log('✅ Successfully enabled auto-refresh in database');
+        
+        // Update state to reflect the change
         setSettings(prev => ({
           ...prev,
           activeListings: prev.activeListings.map(listing => 
             listing.listingId === listingId 
-              ? { ...listing, hasAutoRefresh: true }
+              ? { 
+                  ...listing, 
+                  hasAutoRefresh: true, 
+                  nextRefresh: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+                  lastRefresh: new Date().toISOString()
+                }
               : listing
           )
         }));
       }
+      
+      console.log('📊 Toggle complete for listing:', listingId);
     } catch (error) {
-      console.error('Error toggling auto-refresh:', error);
+      console.error('❌ Error toggling auto-refresh:', error);
       Alert.alert('Error', 'Failed to update auto-refresh for this listing.');
     } finally {
-      // ✅ FIX: Clear specific listing updating state
+      // Clear updating state
       setUpdatingListingId(null);
     }
   }, [user, settings.activeListings]);

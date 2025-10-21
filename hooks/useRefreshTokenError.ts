@@ -35,26 +35,8 @@ export function useRefreshTokenError() {
     };
   }, [setUser, setSession, setLoading]);
 
-  // Global error handler for Supabase operations
-  useEffect(() => {
-    const originalConsoleError = console.error;
-    
-    console.error = (...args) => {
-      // Check if this is a refresh token error
-      const errorMessage = args.join(' ');
-      if (errorMessage.includes('Invalid Refresh Token') || 
-          errorMessage.includes('Refresh Token Not Found')) {
-        
-        // Handle the refresh token error
-        RefreshTokenHandler.handleRefreshTokenError(new Error(errorMessage));
-      }
-      
-      // Call the original console.error
-      originalConsoleError.apply(console, args);
-    };
-
-    return () => {
-      console.error = originalConsoleError;
-    };
-  }, []);
+  // Note: Removed global console.error interceptor as it was causing
+  // "Text strings must be rendered within a <Text> component" errors
+  // due to conflicts with Sentry and React Native's error handling.
+  // Refresh token errors are now handled by the auth state listener above.
 }

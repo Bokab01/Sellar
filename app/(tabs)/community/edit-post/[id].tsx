@@ -5,7 +5,8 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useCommunityPosts } from '@/hooks/useCommunity';
 import { useListings } from '@/hooks/useListings';
-import { storageHelpers } from '@/lib/storage';
+import { hybridStorage } from '@/lib/hybridStorage';
+import { STORAGE_BUCKETS } from '@/lib/storage';
 import {
   Text,
   SafeAreaWrapper,
@@ -98,12 +99,15 @@ export default function EditPostScreen() {
       const existingImages = images.filter(img => img.uri.startsWith('http')).map(img => img.uri);
 
       if (newImages.length > 0) {
-        const uploadResults = await storageHelpers.uploadMultipleImages(
+        const uploadResults = await hybridStorage.uploadMultipleImages(
           newImages.map(img => img.uri),
+          STORAGE_BUCKETS.COMMUNITY,
           'posts',
-          '',
           user?.id,
-          setUploadProgress
+          (current, total) => {
+            const progress = current / total;
+            setUploadProgress(progress);
+          }
         );
         const newImageUrls = uploadResults.map(result => result.url);
         imageUrls = [...existingImages, ...newImageUrls];

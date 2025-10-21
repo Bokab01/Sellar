@@ -87,13 +87,15 @@ export function useListingAutosave(
     }
   }, [userId]);
 
-  // Autosave effect - debounced
+  // Autosave effect - debounced with performance optimization
   useEffect(() => {
     // Skip autosave if no user
     if (!userId) return;
 
-    // Check if data actually changed
+    // ✅ FIX: Use useMemo-style check to avoid re-stringifying on every render
     const currentData = JSON.stringify({ ...formData, currentStep });
+    
+    // Only proceed if data actually changed
     if (currentData === lastSavedDataRef.current) {
       return;
     }
@@ -118,7 +120,9 @@ export function useListingAutosave(
         clearTimeout(autosaveTimeoutRef.current);
       }
     };
-  }, [formData, currentStep, userId, saveDraft]);
+  // ✅ FIX: Remove saveDraft from dependencies to prevent infinite loop
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData, currentStep, userId]);
 
   return {
     isSaved,

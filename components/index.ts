@@ -161,6 +161,7 @@ export { QuickEditModal } from './QuickEditModal/QuickEditModal';
 
 // Auth Error Boundary
 export { AuthErrorBoundary } from './AuthErrorBoundary/AuthErrorBoundary';
+export { GlobalErrorBoundary } from './GlobalErrorBoundary/GlobalErrorBoundary';
 
 // Link Button
 export { LinkButton } from './LinkButton/LinkButton';

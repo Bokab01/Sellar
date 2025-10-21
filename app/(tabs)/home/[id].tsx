@@ -61,22 +61,32 @@ interface MediaItemVideoProps {
   width: number;
   height: number;
   theme: any;
+  onPress?: () => void;
 }
 
-function MediaItemVideo({ videoUrl, isActive, width, height, theme }: MediaItemVideoProps) {
+function MediaItemVideo({ videoUrl, isActive, width, height, theme, onPress }: MediaItemVideoProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   
-  // Extract bucket and path from video URL for CDN optimization
+  // Extract bucket and path from video URL - handle both Supabase and R2
   const getVideoPath = (url: string) => {
+    // Supabase URL format
     if (url.includes('/storage/v1/object/public/')) {
       const parts = url.split('/storage/v1/object/public/')[1];
       const [bucket, ...pathParts] = parts.split('/');
-      return { bucket, path: pathParts.join('/') };
+      return { bucket, path: pathParts.join('/'), isSupabase: true };
     }
-    return { bucket: 'sellar-pro-videos', path: url.split('/').pop() || '' };
+    // R2 URL format (pub-xxx.r2.dev)
+    if (url.includes('.r2.dev/')) {
+      const pathAfterDomain = url.split('.r2.dev/')[1];
+      return { bucket: 'media-videos', path: pathAfterDomain, isSupabase: false };
+    }
+    // Fallback
+    return { bucket: 'listing-images', path: url.split('/').pop() || '', isSupabase: true };
   };
 
-  const { bucket, path } = getVideoPath(videoUrl);
+  const { bucket, path, isSupabase } = getVideoPath(videoUrl);
+  
+  console.log('🎬 Video details:', { videoUrl, bucket, path, isSupabase });
   
   const player = useVideoPlayer(videoUrl, (player) => {
     player.loop = false;
@@ -111,57 +121,60 @@ function MediaItemVideo({ videoUrl, isActive, width, height, theme }: MediaItemV
   }, [isActive, player]);
 
   return (
-    <View 
+    <View
       style={{ 
         width, 
-        height, 
+        height,
         backgroundColor: theme.colors.surfaceVariant,
         position: 'relative',
       }}
-      pointerEvents="box-none"
     >
-      {/* Use CDN optimized video for better performance */}
-      <CDNOptimizedVideo
-        bucket={bucket}
-        path={path}
-        width={width}
-        height={height}
-        quality="high"
-        showThumbnail={false}
-        autoPlay={isActive}
-        loop={false}
-        muted={true}
+      {/* Use VideoView directly with the video URL */}
+      <VideoView
+        player={player}
         style={{ width, height }}
+        nativeControls={false}
+        contentFit="cover"
       />
       
-      {/* Play indicator overlay - only show when not playing */}
-      {!isPlaying && (
-        <View
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            justifyContent: 'center',
-            alignItems: 'center',
-            pointerEvents: 'none',
-          }}
-        >
+      {/* Transparent overlay to capture touches */}
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={onPress}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'transparent',
+        }}
+      >
+        {/* Play indicator overlay - only show when not playing */}
+        {!isPlaying && (
           <View
             style={{
-              width: 60,
-              height: 60,
-              borderRadius: 30,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              flex: 1,
               justifyContent: 'center',
               alignItems: 'center',
+              pointerEvents: 'none',
             }}
           >
-            <Play size={30} color="#FFFFFF" fill="#FFFFFF" />
+            <View
+              style={{
+                width: 60,
+                height: 60,
+                borderRadius: 30,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <Play size={30} color="#FFFFFF" fill="#FFFFFF" />
+            </View>
           </View>
-        </View>
-      )}
+        )}
+      </TouchableOpacity>
     </View>
   );
 }
@@ -284,32 +297,35 @@ export default function ListingDetailScreen() {
     const screenHeight = Dimensions.get('window').height;
     const imageHeight = screenHeight * 0.7;
     
+    if (isVideo) {
+      return (
+        <MediaItemVideo 
+          videoUrl={mediaUrl} 
+          isActive={index === currentImageIndex}
+          width={screenWidth}
+          height={imageHeight}
+          theme={theme}
+          onPress={() => openMediaViewer(index)}
+        />
+      );
+    }
+    
     return (
       <TouchableOpacity
         onPress={() => openMediaViewer(index)}
         activeOpacity={0.9}
         style={{ width: screenWidth }}
       >
-        {isVideo ? (
-          <MediaItemVideo 
-            videoUrl={mediaUrl} 
-            isActive={index === currentImageIndex}
-            width={screenWidth}
-            height={imageHeight}
-            theme={theme}
-          />
-        ) : (
-          <Image
-            source={{ uri: mediaUrl }}
-            style={{
-              width: screenWidth,
-              height: imageHeight,
-              backgroundColor: theme.colors.surfaceVariant,
-            }}
-            resizeMode="cover"
-            loadingIndicatorSource={{ uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' }}
-          />
-        )}
+        <Image
+          source={{ uri: mediaUrl }}
+          style={{
+            width: screenWidth,
+            height: imageHeight,
+            backgroundColor: theme.colors.surfaceVariant,
+          }}
+          resizeMode="cover"
+          loadingIndicatorSource={{ uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' }}
+        />
       </TouchableOpacity>
     );
   }, [currentImageIndex, theme, openMediaViewer]);
@@ -1560,7 +1576,7 @@ export default function ListingDetailScreen() {
       >
         {/* Hero Image Section */}
         <View style={{ position: 'relative', height: imageHeight }}>
-          {listing.images && listing.images.length > 0 ? (
+          {listing.images && Array.isArray(listing.images) && listing.images.length > 0 ? (
             <>
               <FlatList
                 ref={imageScrollViewRef}

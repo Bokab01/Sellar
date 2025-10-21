@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { storageHelpers } from '@/lib/storage';
+import { hybridStorage } from '@/lib/hybridStorage';
 import { SelectedImage } from '@/components/ImagePicker';
 
 interface UseImageUploadOptions {
@@ -48,7 +48,7 @@ export function useImageUpload(options: UseImageUploadOptions = {}) {
       setError(null);
       setProgress(0);
 
-      const result = await storageHelpers.uploadImage(
+      const result = await hybridStorage.uploadImage(
         image.uri,
         bucket,
         folder,
@@ -85,12 +85,13 @@ export function useImageUpload(options: UseImageUploadOptions = {}) {
       setError(null);
       setProgress(0);
 
-      const results = await storageHelpers.uploadMultipleImages(
+      const results = await hybridStorage.uploadMultipleImages(
         images.map(img => img.uri),
         bucket,
         folder,
         userId,
-        (progress) => {
+        (current, total) => {
+          const progress = current / total;
           setProgress(progress);
           onProgressUpdate?.(progress);
         }
@@ -109,7 +110,7 @@ export function useImageUpload(options: UseImageUploadOptions = {}) {
   const deleteImage = async (path: string): Promise<boolean> => {
     try {
       setError(null);
-      await storageHelpers.deleteImage(path, bucket);
+      await hybridStorage.deleteFile(path, bucket);
       return true;
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to delete image';

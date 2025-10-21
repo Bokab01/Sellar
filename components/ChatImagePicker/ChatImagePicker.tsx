@@ -17,8 +17,8 @@ interface ChatImagePickerProps {
 export function ChatImagePicker({ onImageSelected, disabled = false }: ChatImagePickerProps) {
   const { theme } = useTheme();
   const { uploading, uploadSingle } = useImageUpload({
-    folder: 'chat-images',
-    bucket: 'listing-images', // Use listing-images as fallback since it's public and more likely to work
+    folder: 'chat',
+    bucket: 'chat-attachments', // Use chat-attachments bucket (routed to R2)
   });
   const [showPicker, setShowPicker] = useState(false);
   const [showToast, setShowToast] = useState(false);

@@ -5,7 +5,8 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useAppStore } from '@/store/useAppStore';
 import { useCommunityPosts } from '@/hooks/useCommunity';
 import { useListings } from '@/hooks/useListings';
-import { storageHelpers } from '@/lib/storage';
+import { hybridStorage } from '@/lib/hybridStorage';
+import { STORAGE_BUCKETS } from '@/lib/storage';
 import {
   Text,
   SafeAreaWrapper,
@@ -81,12 +82,15 @@ export default function CreatePostScreen() {
       // Upload images if any
       let imageUrls: string[] = [];
       if (images.length > 0) {
-        const uploadResults = await storageHelpers.uploadMultipleImages(
+        const uploadResults = await hybridStorage.uploadMultipleImages(
           images.map(img => img.uri),
-          'community-images',
+          STORAGE_BUCKETS.COMMUNITY,
           'posts',
           user.id,
-          setUploadProgress
+          (current, total) => {
+            const progress = current / total;
+            setUploadProgress(progress);
+          }
         );
         imageUrls = uploadResults.map(result => result.url);
       }

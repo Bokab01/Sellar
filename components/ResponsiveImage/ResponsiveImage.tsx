@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Image, ImageStyle, ViewStyle, Dimensions, Text } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { CDNOptimizedImage } from '@/components/OptimizedImage/CDNOptimizedImage';
@@ -40,14 +40,11 @@ export function ResponsiveImage({
   const { theme } = useTheme();
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
 
   const screenWidth = Dimensions.get('window').width;
   const availableWidth = maxWidth || screenWidth - (theme.spacing.lg * 2); // Account for padding
 
   const handleImageLoad = (event: any) => {
-    const { width, height } = event.nativeEvent.source;
-    setImageDimensions({ width, height });
     setImageLoaded(true);
     onLoad?.();
   };
@@ -57,35 +54,13 @@ export function ResponsiveImage({
     onError?.(error);
   };
 
-  // Calculate optimal dimensions
-  const getOptimalDimensions = () => {
-    if (imageDimensions) {
-      const imageAspectRatio = imageDimensions.width / imageDimensions.height;
-      
-      // If image is wider than our target aspect ratio, limit by width
-      if (imageAspectRatio > aspectRatio) {
-        return {
-          width: availableWidth,
-          height: availableWidth / imageAspectRatio,
-        };
-      } else {
-        // If image is taller than our target aspect ratio, limit by height
-        const calculatedHeight = availableWidth / imageAspectRatio;
-        return {
-          width: availableWidth,
-          height: Math.min(calculatedHeight, maxHeight),
-        };
-      }
-    }
-    
-    // Fallback to aspect ratio based sizing
+  // Calculate dimensions once - no state changes on image load to prevent blinking
+  const optimalDimensions = useMemo(() => {
     return {
       width: availableWidth,
       height: Math.min(availableWidth / aspectRatio, maxHeight),
     };
-  };
-
-  const optimalDimensions = getOptimalDimensions();
+  }, [availableWidth, aspectRatio, maxHeight]);
 
   const containerStyles: ViewStyle = {
     backgroundColor: backgroundColor || theme.colors.surfaceVariant,
@@ -93,6 +68,8 @@ export function ResponsiveImage({
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
+    width: optimalDimensions.width,
+    height: optimalDimensions.height,
     ...containerStyle,
   };
 

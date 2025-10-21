@@ -1,4 +1,5 @@
-import { storageHelpers, STORAGE_BUCKETS } from '@/lib/storage';
+import { hybridStorage } from '@/lib/hybridStorage';
+import { STORAGE_BUCKETS } from '@/lib/storage';
 import { SelectedImage } from '@/components/ImagePicker';
 
 export interface ImageUploadProgress {
@@ -39,8 +40,8 @@ export async function uploadListingImages(
       const extension = image.uri.split('.').pop() || 'jpg';
       const filename = `${userId}/${timestamp}_${random}.${extension}`;
 
-      // Upload to Supabase Storage
-      const uploadResult = await storageHelpers.uploadImage(
+      // Upload using hybrid storage (auto-routes to R2 for listings)
+      const uploadResult = await hybridStorage.uploadImage(
         image.uri,
         STORAGE_BUCKETS.LISTINGS,
         'listing',
@@ -66,11 +67,8 @@ export async function uploadListingImages(
 export async function deleteListingImages(imageUrls: string[]): Promise<void> {
   try {
     for (const url of imageUrls) {
-      // Extract path from URL
-      const path = url.split('/listings/').pop();
-      if (path) {
-        await storageHelpers.deleteImage(path, STORAGE_BUCKETS.LISTINGS);
-      }
+      // Use hybrid storage which auto-detects provider from URL
+      await hybridStorage.deleteFile(url, STORAGE_BUCKETS.LISTINGS);
     }
   } catch (error) {
     console.error('Failed to delete images:', error);

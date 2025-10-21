@@ -715,7 +715,7 @@ function CreateListingScreen() {
       console.error('Error fetching category attributes:', error);
       setCategoryAttributes([]);
     }
-  }, [updateFormData]);
+  }, [updateMultipleFields]);
 
   const handleCategoryAttributeChange = useCallback((slug: string, value: any) => {
     updateMultipleFields({ 
@@ -903,12 +903,14 @@ function CreateListingScreen() {
 
         {/* Dynamic Category Attributes Form */}
         {formData.categoryId && (
-          <CategoryAttributesForm
-            categoryId={formData.categoryId}
-              values={formData.categoryAttributes}
-              onChange={handleCategoryAttributeChange}
-            errors={validationResults[1]?.errors || {}}
-            />
+          <CreateListingErrorBoundary>
+            <CategoryAttributesForm
+              categoryId={formData.categoryId}
+                values={formData.categoryAttributes}
+                onChange={handleCategoryAttributeChange}
+              errors={validationResults[1]?.errors || {}}
+              />
+          </CreateListingErrorBoundary>
         )}
 
         {/* Dynamic Location Section */}
@@ -1090,12 +1092,12 @@ function CreateListingScreen() {
         borderColor: theme.colors.border,
         ...theme.shadows.md,
       }}>
-        {/* Images Preview */}
+        {/* Images Preview - Memory Optimized */}
         {formData.images.length > 0 && (
           <View style={{ marginBottom: theme.spacing.md }}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
-                {formData.images.map((image, index) => (
+                {formData.images.slice(0, 8).map((image, index) => (
                   <View
                     key={image.id || index}
                     style={{
@@ -2547,9 +2549,22 @@ class CreateListingErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoun
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('CreateListing Error Boundary caught an error:', error);
-    console.error('Error info:', errorInfo);
-    console.error('Component stack:', errorInfo.componentStack);
+    console.error('🚨 CreateListing Error Boundary caught an error:', error);
+    console.error('📍 Error info:', errorInfo);
+    console.error('📚 Component stack:', errorInfo.componentStack);
+    
+    // ✅ Log to help identify crash patterns
+    try {
+      const errorLog = {
+        error: error.message,
+        stack: error.stack,
+        componentStack: errorInfo.componentStack,
+        timestamp: new Date().toISOString(),
+      };
+      console.error('🔍 Full error log:', JSON.stringify(errorLog, null, 2));
+    } catch (e) {
+      console.error('Failed to log error details:', e);
+    }
   }
 
   render() {

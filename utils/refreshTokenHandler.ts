@@ -42,7 +42,7 @@ export class RefreshTokenHandler {
       return true;
       
     } catch (recoveryError) {
-      console.error('Failed to recover from refresh token error:', recoveryError);
+      console.error('Failed to recover from refresh token error:', String(recoveryError));
       return false;
     } finally {
       this.isRecovering = false;
@@ -57,7 +57,7 @@ export class RefreshTokenHandler {
       // Use unified cleanup function
       await clearAllAuthData();
     } catch (error) {
-      console.error('Error clearing corrupted session:', error);
+      console.error('Error clearing corrupted session:', String(error));
       throw error;
     }
   }

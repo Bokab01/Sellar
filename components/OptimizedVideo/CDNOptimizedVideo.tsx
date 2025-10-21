@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { View, ActivityIndicator, Dimensions, TouchableOpacity, Text } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { VideoOptimization } from '@/lib/videoOptimization';
@@ -122,14 +122,18 @@ export function CDNOptimizedVideo({
     setShowVideo(true);
   };
 
-  // Create video player
-  const player = videoUrl ? useVideoPlayer(videoUrl, (player) => {
-    player.loop = loop;
-    player.muted = muted;
-    if (autoPlay) {
-      player.play();
+  // Create video player - must be called unconditionally (Rules of Hooks)
+  // Use a placeholder URL if videoUrl is not yet loaded
+  const playerUrl = videoUrl || 'placeholder';
+  const player = useVideoPlayer(playerUrl, (player) => {
+    if (videoUrl) {
+      player.loop = loop;
+      player.muted = muted;
+      if (autoPlay) {
+        player.play();
+      }
     }
-  }) : null;
+  });
 
   if (!videoUrl) {
     return (
@@ -211,7 +215,7 @@ export function CDNOptimizedVideo({
   // Show video player
   return (
     <View style={style}>
-      {player && (
+      {videoUrl && (
         <VideoView
           player={player}
           style={style}

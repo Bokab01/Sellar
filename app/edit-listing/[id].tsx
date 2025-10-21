@@ -5,7 +5,8 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { dbHelpers, supabase } from '@/lib/supabase';
-import { storageHelpers, STORAGE_BUCKETS } from '@/lib/storage';
+import { hybridStorage } from '@/lib/hybridStorage';
+import { STORAGE_BUCKETS } from '@/lib/storage';
 import { 
   validateListingStep, 
   createDebouncedValidator, 
@@ -326,7 +327,7 @@ export default function EditListingScreen() {
           setUploadProgress(progress);
           
           try {
-            const uploadResult = await storageHelpers.uploadImage(
+            const uploadResult = await hybridStorage.uploadImage(
               image.uri,
               STORAGE_BUCKETS.LISTINGS,
               `listings/${user?.id}`,

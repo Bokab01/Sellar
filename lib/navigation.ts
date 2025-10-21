@@ -11,10 +11,10 @@ export const navigation = {
 
   // Business navigation
   business: {
-    goToDashboard: () => router.push('/(business)/dashboard'),
-    goToAnalytics: () => router.push('/(business)/analytics'),
-    goToSupport: () => router.push('/(business)/support'),
-    goToAutoRefresh: () => router.push('/(business)/auto-refresh'),
+    goToDashboard: () => router.push('/(business)/dashboard' as any),
+    goToAnalytics: () => router.push('/(business)/analytics' as any),
+    goToSupport: () => router.push('/(business)/support' as any),
+    goToAutoRefresh: () => router.push('/(business)/auto-refresh' as any),
   },
 
   // Recommendations navigation

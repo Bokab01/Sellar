@@ -53,30 +53,51 @@ export const CategoryAttributesForm: React.FC<CategoryAttributesFormProps> = ({
   const [attributes, setAttributes] = useState<CategoryAttribute[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // ✅ FIX: Move fetchAttributes inside useEffect to avoid memory leak
   useEffect(() => {
-    if (categoryId) {
-      fetchAttributes();
-    }
-  }, [categoryId]);
-
-  const fetchAttributes = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .rpc('get_category_attributes', { p_category_id: categoryId });
-
-      if (error) {
-        console.error('Error fetching attributes:', error);
-        return;
-      }
-
-      setAttributes(data || []);
-    } catch (error) {
-      console.error('Error:', error);
-    } finally {
+    if (!categoryId) {
+      setAttributes([]);
       setLoading(false);
+      return;
     }
-  };
+
+    let isMounted = true;
+
+    const fetchAttributes = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .rpc('get_category_attributes', { p_category_id: categoryId });
+
+        if (error) {
+          console.error('Error fetching attributes:', error);
+          if (isMounted) {
+            setAttributes([]);
+            setLoading(false);
+          }
+          return;
+        }
+
+        if (isMounted) {
+          setAttributes(data || []);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        if (isMounted) {
+          setAttributes([]);
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchAttributes();
+
+    // ✅ Cleanup function to prevent state updates on unmounted component
+    return () => {
+      isMounted = false;
+    };
+  }, [categoryId]);
 
   const renderField = (attribute: CategoryAttribute) => {
     const value = values[attribute.slug];

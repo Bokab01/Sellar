@@ -300,17 +300,17 @@ export function EnhancedSearchHeader({
           </Animated.View>
 
           {/* Separator */}
-          <View
+          {/* <View
             style={{
               width: 1,
               height: 20,
               backgroundColor: theme.colors.border,
               marginHorizontal: theme.spacing.xs,
             }}
-          />
+          /> */}
 
           {/* Filter */}
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={{
               padding: theme.spacing.sm,
             }}
@@ -318,7 +318,7 @@ export function EnhancedSearchHeader({
             activeOpacity={0.7}
           >
             <ListFilterPlus size={24} color={theme.colors.text.primary} />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
     </Animated.View>
   );

@@ -192,10 +192,11 @@ export default function FavoritesScreen() {
   const renderGridRow = useCallback(({ item: pair }: { item: any[] }) => (
     <View style={{ 
       flexDirection: 'row', 
-      paddingHorizontal: theme.spacing.lg,
-      marginBottom: theme.spacing.sm 
+      paddingHorizontal: 0,
+      marginBottom: theme.spacing.sm,
+      gap: theme.spacing.xs,
     }}>
-      <View style={{ flex: 1, marginRight: theme.spacing.xs }}>
+      <View style={{ flex: 1 }}>
         <View style={{ position: 'relative' }}>
           <ProductCard
             key={pair[0]?.id}
@@ -263,7 +264,7 @@ export default function FavoritesScreen() {
           </View>
         </View>
       </View>
-      <View style={{ flex: 1, marginLeft: theme.spacing.xs }}>
+      <View style={{ flex: 1 }}>
         {pair[1] && (
           <View style={{ position: 'relative' }}>
             <ProductCard
