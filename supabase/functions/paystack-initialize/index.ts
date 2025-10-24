@@ -8,6 +8,7 @@ interface PaystackInitializeRequest {
   purpose: 'credit_purchase' | 'subscription' | 'feature_purchase';
   purpose_id: string;
   channels?: string[];
+  callback_url?: string; // ← Added optional callback_url
 }
 
 Deno.serve(async (req: Request) => {
@@ -20,7 +21,9 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { amount, email, reference, purpose, purpose_id, channels }: PaystackInitializeRequest = await req.json();
+    
+    // ← Parse with callback_url
+    const { amount, email, reference, purpose, purpose_id, channels, callback_url }: PaystackInitializeRequest = await req.json();
 
     // Validate required fields
     if (!amount || !email || !reference || !purpose || !purpose_id) {
@@ -127,6 +130,15 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // ← Use provided callback_url or default to mobile app callback
+    const finalCallbackUrl = callback_url || `https://sellar.app/payment/callback?reference=${reference}&status=success`;
+    
+    console.log('Payment initialization:', {
+      reference,
+      callback_url: finalCallbackUrl,
+      source: callback_url ? 'web_dashboard' : 'mobile_app',
+    });
+
     // Initialize Paystack transaction
     const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
@@ -139,7 +151,7 @@ Deno.serve(async (req: Request) => {
         email,
         reference,
         channels: channels || ['card', 'mobile_money'],
-        callback_url: `https://sellar.app/payment/callback?reference=${reference}&status=success`,
+        callback_url: finalCallbackUrl, // ← Use dynamic callback URL
         metadata: {
           purpose,
           purpose_id,

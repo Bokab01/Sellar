@@ -1,5 +1,4 @@
 const { getDefaultConfig } = require('expo/metro-config');
-const { withSentryConfig } = require('@sentry/react-native/metro');
 
 const config = getDefaultConfig(__dirname);
 
@@ -12,10 +11,6 @@ config.transformer = {
   },
 };
 
-// Re-enable Sentry with proper configuration for EAS builds
-module.exports = withSentryConfig(config, {
-  org: 'sellar-n6',
-  project: 'sellar-ghana',
-  // EAS will automatically use the SENTRY_AUTH_TOKEN secret
-  authToken: process.env.SENTRY_AUTH_TOKEN,
-});
+// Export the config without Sentry wrapper
+// Sentry is handled by the Expo plugin in app.json
+module.exports = config;

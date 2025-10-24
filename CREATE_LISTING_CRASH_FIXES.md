@@ -161,9 +161,9 @@ Then check:
 
 ---
 
-## 🆕 Bonus Fix: Listing Detail Screen Crash
+## 🆕 Bonus Fixes: Additional Crash Prevention
 
-### 6. **Undefined Images Array** (CRITICAL)
+### 6. **Undefined Images Array in Listing Detail** (CRITICAL)
 **Problem:** `listing.images.map()` was called without checking if `listing.images` is actually an array, causing "listing.images.map is not a function" crash.
 
 **Fix:**
@@ -172,6 +172,22 @@ Then check:
 - Ensures `images` is actually an array before attempting to call `.map()` or `.length`
 
 **File:** `app/(tabs)/home/[id].tsx` (line 1579)
+
+---
+
+### 7. **Undefined Media Array in MediaViewer** (CRITICAL)
+**Problem:** `media.map()` was called without checking if `media` prop is defined and is an array, causing "media.map is not a function" crash when opening image viewer.
+
+**Fix:**
+- Added early return with comprehensive safety check:
+  ```typescript
+  if (!visible || !media || !Array.isArray(media) || media.length === 0) {
+    return null;
+  }
+  ```
+- Prevents MediaViewer from rendering with invalid data
+
+**File:** `components/MediaViewer/MediaViewer.tsx` (line 431)
 
 ---
 

@@ -427,6 +427,11 @@ export function MediaViewer({
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [controlsVisible, setControlsVisible] = useState(true);
 
+  // ✅ FIX: Safety check for media array
+  if (!visible || !media || !Array.isArray(media) || media.length === 0) {
+    return null;
+  }
+
   // Parse media items
   const mediaItems: MediaItem[] = media.map(url => ({
     url,
