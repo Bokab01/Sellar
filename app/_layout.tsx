@@ -28,6 +28,9 @@ import { useRefreshTokenError } from '@/hooks/useRefreshTokenError';
 import { setupAuthErrorInterceptor } from '@/lib/authErrorInterceptor';
 import { setupNetworkInterceptor } from '@/scripts/monitorBandwidth';
 import * as Sentry from '@sentry/react-native';
+import { usePresence } from '@/hooks/usePresence';
+import { useNotificationStore } from '@/store/useNotificationStore';
+import { useAuthStore } from '@/store/useAuthStore';
 
 // Suppress non-critical errors in development
 // This prevents metro bundler errors from causing rendering issues
@@ -82,6 +85,28 @@ function AppContent() {
   
   // Handle refresh token errors globally
   useRefreshTokenError();
+  
+  // Track user presence (online/offline status) globally
+  usePresence();
+  
+  // Set up global real-time notification subscription
+  const { subscribeToNotifications, unsubscribeFromNotifications } = useNotificationStore();
+  
+  useEffect(() => {
+    const { user, session } = useAuthStore.getState();
+    const userId = user?.id || session?.user?.id;
+
+    if (userId) {
+      console.log('🔔 [AppLayout] Setting up global real-time notification subscription for user:', userId);
+      subscribeToNotifications(userId);
+    }
+
+    // Cleanup on unmount (app closes)
+    return () => {
+      console.log('🔔 [AppLayout] Cleaning up global notification subscription');
+      unsubscribeFromNotifications();
+    };
+  }, [subscribeToNotifications, unsubscribeFromNotifications]);
   
   // Splash screen management
   const { isAppReady, showCustomSplash, handleAppReady, handleAnimationComplete } = useSplashScreen();

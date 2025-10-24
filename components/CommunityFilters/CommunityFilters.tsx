@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { View, ScrollView, TouchableOpacity, Modal, TouchableWithoutFeedback, FlatList } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Modal, TouchableWithoutFeedback } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { Button } from '@/components/Button/Button';
-import { Badge } from '@/components/Badge/Badge';
-import { Filter, X, MapPin, Tag, ListFilterPlus, ChevronDown } from 'lucide-react-native';
+import { X, MapPin, Tag, ChevronDown } from 'lucide-react-native';
 import { GHANA_REGIONS } from '@/constants/ghana';
 
 export interface CommunityFilters {
@@ -17,6 +16,8 @@ interface CommunityFiltersProps {
   filters: CommunityFilters;
   onFiltersChange: (filters: CommunityFilters) => void;
   availableLocations?: string[];
+  isVisible?: boolean;
+  onClose?: () => void;
 }
 
 const POST_TYPES = [
@@ -36,117 +37,42 @@ const POST_TYPES = [
 export function CommunityFilters({ 
   filters, 
   onFiltersChange, 
-  availableLocations = [] 
+  availableLocations = [],
+  isVisible = false,
+  onClose = () => {},
 }: CommunityFiltersProps) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const [showModal, setShowModal] = useState(false);
   const [tempFilters, setTempFilters] = useState<CommunityFilters>(filters);
   const [showRegionModal, setShowRegionModal] = useState(false);
 
+  // Update temp filters when modal opens
+  React.useEffect(() => {
+    if (isVisible) {
+      setTempFilters(filters);
+    }
+  }, [isVisible, filters]);
+
   const handleApplyFilters = () => {
     onFiltersChange(tempFilters);
-    setShowModal(false);
+    onClose();
   };
 
   const handleClearFilters = () => {
     const clearedFilters = { postType: null, location: null };
     setTempFilters(clearedFilters);
     onFiltersChange(clearedFilters);
-    setShowModal(false);
-  };
-
-  const hasActiveFilters = filters.postType || filters.location;
-
-  const getActiveFilterCount = () => {
-    let count = 0;
-    if (filters.postType) count++;
-    if (filters.location) count++;
-    return count;
-  };
-
-  const getFilterSummary = () => {
-    const parts = [];
-    if (filters.postType) {
-      const type = POST_TYPES.find(t => t.value === filters.postType);
-      parts.push(type?.label || filters.postType);
-    }
-    if (filters.location) {
-      parts.push(filters.location);
-    }
-    return parts.join(' • ');
+    onClose();
   };
 
   return (
     <>
-      {/* Filter Bar */}
-      <View
-        style={{
-          backgroundColor: theme.colors.surface,
-          borderBottomWidth: 1,
-          borderBottomColor: theme.colors.border,
-          paddingHorizontal: theme.spacing.lg,
-          paddingVertical: theme.spacing.md,
-        }}
-      >
-        <TouchableOpacity
-          onPress={() => setShowModal(true)}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            backgroundColor: theme.colors.background,
-            borderRadius: theme.borderRadius.lg,
-            paddingHorizontal: theme.spacing.md,
-            paddingVertical: theme.spacing.sm,
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-          }}
-          activeOpacity={0.7}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-            <ListFilterPlus size={18} color={theme.colors.text.muted} />
-            <Text 
-              variant="body" 
-              style={{ 
-                marginLeft: theme.spacing.sm,
-                flex: 1,
-                color: hasActiveFilters ? theme.colors.text.primary : theme.colors.text.muted
-              }}
-            >
-              {hasActiveFilters ? getFilterSummary() : 'Filter posts'}
-            </Text>
-          </View>
-          
-          {hasActiveFilters && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
-              <Badge 
-                text={getActiveFilterCount().toString()} 
-                variant="primary" 
-                size="sm" 
-              />
-              <TouchableOpacity
-                onPress={handleClearFilters}
-                style={{
-                  padding: theme.spacing.xs,
-                  borderRadius: theme.borderRadius.sm,
-                  backgroundColor: theme.colors.error + '10',
-                }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <X size={14} color={theme.colors.error} />
-              </TouchableOpacity>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-
       {/* Filter Modal */}
       <Modal
-        visible={showModal}
+        visible={isVisible}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => setShowModal(false)}
+        onRequestClose={onClose}
       >
         <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
           {/* Header */}
@@ -165,7 +91,7 @@ export function CommunityFilters({
           >
             <Text variant="h3">Filter Posts</Text>
             <TouchableOpacity
-              onPress={() => setShowModal(false)}
+              onPress={onClose}
               style={{
                 padding: theme.spacing.sm,
                 borderRadius: theme.borderRadius.sm,

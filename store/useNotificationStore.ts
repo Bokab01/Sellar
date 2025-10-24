@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { dbHelpers } from '@/lib/supabase';
+import { dbHelpers, supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/useAuthStore';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 interface Notification {
   id: string;
@@ -18,6 +19,7 @@ interface NotificationState {
   unreadCount: number;
   loading: boolean;
   error: string | null;
+  realtimeChannel: RealtimeChannel | null;
   
   // Actions
   fetchNotifications: () => Promise<void>;
@@ -27,6 +29,8 @@ interface NotificationState {
   deleteAllNotifications: () => Promise<void>;
   refresh: () => Promise<void>;
   reset: () => void;
+  subscribeToNotifications: (userId: string) => void;
+  unsubscribeFromNotifications: () => void;
 }
 
 export const useNotificationStore = create<NotificationState>((set, get) => ({
@@ -34,6 +38,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   unreadCount: 0,
   loading: false,
   error: null,
+  realtimeChannel: null,
 
   fetchNotifications: async () => {
     const { user, session } = useAuthStore.getState();
@@ -197,6 +202,112 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       unreadCount: 0,
       loading: false,
       error: null,
+      realtimeChannel: null,
     });
+  },
+
+  subscribeToNotifications: (userId: string) => {
+    console.log('🔔 [Store] Setting up real-time subscription for notifications, user:', userId);
+    
+    // Cleanup existing subscription
+    const { realtimeChannel } = get();
+    if (realtimeChannel) {
+      console.log('🔔 [Store] Removing existing notification subscription');
+      supabase.removeChannel(realtimeChannel);
+    }
+
+    // Create new subscription
+    const channel = supabase
+      .channel(`notifications-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          console.log('🔔 [Store] Real-time notification received:', payload.new);
+          
+          const newNotification = payload.new as Notification;
+          const { notifications, unreadCount } = get();
+          
+          // Add new notification to the top of the list
+          const updatedNotifications = [newNotification, ...notifications];
+          const newUnreadCount = !newNotification.is_read ? unreadCount + 1 : unreadCount;
+          
+          console.log('🔔 [Store] Updated notifications count:', updatedNotifications.length, 'Unread:', newUnreadCount);
+          
+          set({
+            notifications: updatedNotifications,
+            unreadCount: newUnreadCount,
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          console.log('🔔 [Store] Real-time notification updated:', payload.new);
+          
+          const updatedNotification = payload.new as Notification;
+          const { notifications } = get();
+          
+          // Update the notification in the list
+          const updatedNotifications = notifications.map(n =>
+            n.id === updatedNotification.id ? updatedNotification : n
+          );
+          const newUnreadCount = updatedNotifications.filter(n => !n.is_read).length;
+          
+          set({
+            notifications: updatedNotifications,
+            unreadCount: newUnreadCount,
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          console.log('🔔 [Store] Real-time notification deleted:', payload.old);
+          
+          const deletedId = payload.old.id as string;
+          const { notifications } = get();
+          
+          // Remove the notification from the list
+          const updatedNotifications = notifications.filter(n => n.id !== deletedId);
+          const newUnreadCount = updatedNotifications.filter(n => !n.is_read).length;
+          
+          set({
+            notifications: updatedNotifications,
+            unreadCount: newUnreadCount,
+          });
+        }
+      )
+      .subscribe((status) => {
+        console.log('🔔 [Store] Notification subscription status:', status);
+      });
+
+    set({ realtimeChannel: channel });
+  },
+
+  unsubscribeFromNotifications: () => {
+    console.log('🔔 [Store] Unsubscribing from notifications');
+    const { realtimeChannel } = get();
+    if (realtimeChannel) {
+      supabase.removeChannel(realtimeChannel);
+      set({ realtimeChannel: null });
+    }
   },
 }));

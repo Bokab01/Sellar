@@ -36,16 +36,23 @@ export function EnhancedSearchHeader({
   const bellShake = useRef(new Animated.Value(0)).current;
   const heartBeat = useRef(new Animated.Value(1)).current;
   
-  // Track previous favorites count to detect additions (initialize with 0 to avoid undefined)
+  // Track previous counts to detect additions (initialize with 0 to avoid undefined)
   const prevFavoritesCount = useRef(favoritesCount || 0);
+  const prevUnreadCount = useRef(unreadCount || 0);
 
   const firstName = profile?.first_name || user?.user_metadata?.first_name || 'User';
   const lastName = profile?.last_name || user?.user_metadata?.last_name || '';
   const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
 
-  // Bell shake animation when there are unread notifications
+  // Bell shake animation - ONLY when a new notification arrives
   useEffect(() => {
-    if (unreadCount > 0) {
+    const currentCount = unreadCount || 0;
+    const previousCount = prevUnreadCount.current || 0;
+    
+    // Only animate if count increased (new notification received)
+    if (currentCount > previousCount && currentCount > 0) {
+      console.log('🔔 [SearchHeader] New notification detected, animating bell. Previous:', previousCount, 'Current:', currentCount);
+      
       Animated.sequence([
         Animated.timing(bellShake, {
           toValue: 10,
@@ -69,6 +76,9 @@ export function EnhancedSearchHeader({
         }),
       ]).start();
     }
+    
+    // Update previous count for next comparison
+    prevUnreadCount.current = currentCount;
   }, [unreadCount]);
 
   // Heart beat animation - ONLY when a new item is added to favorites

@@ -59,16 +59,26 @@ export function useRealtime({
             ...(currentFilter && { filter: currentFilter }),
           },
           (payload) => {
-            console.log(`🔗 ${currentTable} event received:`, payload.eventType, payload);
+            console.log(`🔗🔗🔗 [BASE REALTIME] ${currentTable} event received:`, {
+              eventType: payload.eventType,
+              table: payload.table,
+              schema: payload.schema,
+              new: payload.new ? { id: payload.new.id } : null,
+              filter: currentFilter,
+            });
+            
             try {
               switch (payload.eventType) {
                 case 'INSERT':
+                  console.log(`🔗 [BASE] Calling onInsert for ${currentTable}`);
                   callbacksRef.current.onInsert?.(payload.new);
                   break;
                 case 'UPDATE':
+                  console.log(`🔗 [BASE] Calling onUpdate for ${currentTable}`);
                   callbacksRef.current.onUpdate?.(payload.new);
                   break;
                 case 'DELETE':
+                  console.log(`🔗 [BASE] Calling onDelete for ${currentTable}`);
                   callbacksRef.current.onDelete?.(payload.old);
                   break;
               }
@@ -179,19 +189,23 @@ export function useRealtime({
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
         console.log(`🔗 App became active, checking channel state for ${tableRef.current}`);
-        // Check if channel is still active
-        if (channelRef.current) {
-          const status = channelRef.current.state;
-          console.log(`🔗 Current channel state: ${status}`);
-          
-          if (status === 'closed' || status === 'errored') {
-            console.log(`🔗 Channel is ${status}, reconnecting...`);
-            reconnectChannel();
+        
+        // Add a small delay to allow useAppResume to finish channel cleanup
+        setTimeout(() => {
+          // Check if channel is still active
+          if (channelRef.current) {
+            const status = channelRef.current.state;
+            console.log(`🔗 Current channel state: ${status}`);
+            
+            if (status === 'closed' || status === 'errored') {
+              console.log(`🔗 Channel is ${status}, reconnecting...`);
+              reconnectChannel();
+            }
+          } else {
+            console.log('🔗 No active channel after resume, setting up new one...');
+            setupChannel();
           }
-        } else {
-          console.log('🔗 No active channel, setting up new one...');
-          setupChannel();
-        }
+        }, 1500); // Wait 1.5 seconds for useAppResume to finish
       }
       
       appStateRef.current = nextAppState;
@@ -204,17 +218,48 @@ export function useRealtime({
     };
   }, [reconnectChannel, setupChannel]); // Only depend on stable functions
 
+  // Periodic health check to detect externally removed channels
+  useEffect(() => {
+    const healthCheckInterval = setInterval(() => {
+      // Only check if we expect to have a channel
+      if (tableRef.current && !channelRef.current) {
+        console.log(`🏥 Health check: Channel missing for ${tableRef.current}, recreating...`);
+        setupChannel();
+      } else if (channelRef.current) {
+        const status = channelRef.current.state;
+        if (status === 'closed' || status === 'errored') {
+          console.log(`🏥 Health check: Channel in bad state (${status}) for ${tableRef.current}, reconnecting...`);
+          reconnectChannel();
+        }
+      }
+    }, 5000); // Check every 5 seconds
+
+    return () => {
+      clearInterval(healthCheckInterval);
+    };
+  }, [setupChannel, reconnectChannel]);
+
   return channelRef.current;
 }
 
 // Specific hooks for different features
 export function useChatRealtime(conversationId: string, onNewMessage: (message: any) => void) {
-  console.log('🔗 Setting up chat real-time for conversation:', conversationId);
+  console.log('🔗 [useChatRealtime] Setting up chat real-time for conversation:', conversationId);
+  
+  if (!conversationId) {
+    console.warn('🔗 [useChatRealtime] No conversation ID provided, skipping subscription');
+  }
+  
   return useRealtime({
-    table: 'messages',
-    filter: `conversation_id=eq.${conversationId}`,
+    table: conversationId ? 'messages' : '', // Only subscribe if we have a conversation ID
+    filter: conversationId ? `conversation_id=eq.${conversationId}` : undefined,
     onInsert: async (payload) => {
-      console.log('🔗 Real-time message insert received:', payload);
+      console.log('🔗🔗🔗 [useChatRealtime] Real-time message INSERT received:', {
+        messageId: payload.id,
+        conversationId: payload.conversation_id,
+        senderId: payload.sender_id,
+        content: payload.content?.substring(0, 50),
+      });
       
       // Fetch the complete message data with joins to ensure we have all related data
       try {
@@ -229,21 +274,28 @@ export function useChatRealtime(conversationId: string, onNewMessage: (message: 
           .single();
         
         if (!error && data) {
-          console.log('🔗 Fetched complete message data:', data);
+          console.log('🔗 [useChatRealtime] Fetched complete message data:', {
+            id: data.id,
+            hasSender: !!data.sender,
+            hasOffers: !!data.offers,
+          });
           onNewMessage(data);
         } else {
-          console.warn('🔗 Failed to fetch complete message data:', error);
+          console.warn('🔗 [useChatRealtime] Failed to fetch complete message data:', error);
           // Fallback to the raw payload if fetch fails
           onNewMessage(payload);
         }
       } catch (err) {
-        console.error('🔗 Error fetching message data:', err);
+        console.error('🔗 [useChatRealtime] Error fetching message data:', err);
         // Fallback to the raw payload if fetch fails
         onNewMessage(payload);
       }
     },
     onUpdate: async (payload) => {
-      console.log('🔗 Real-time message update received:', payload);
+      console.log('🔗🔗🔗 [useChatRealtime] Real-time message UPDATE received:', {
+        messageId: payload.id,
+        conversationId: payload.conversation_id,
+      });
       
       // Fetch the complete message data for updates as well (for read receipts, status changes, etc.)
       try {
@@ -258,15 +310,15 @@ export function useChatRealtime(conversationId: string, onNewMessage: (message: 
           .single();
         
         if (!error && data) {
-          console.log('🔗 Fetched updated message data:', data);
+          console.log('🔗 [useChatRealtime] Fetched updated message data');
           onNewMessage(data);
         } else {
-          console.warn('🔗 Failed to fetch updated message data:', error);
+          console.warn('🔗 [useChatRealtime] Failed to fetch updated message data:', error);
           // Fallback to the raw payload if fetch fails
           onNewMessage(payload);
         }
       } catch (err) {
-        console.error('🔗 Error fetching updated message data:', err);
+        console.error('🔗 [useChatRealtime] Error fetching updated message data:', err);
         // Fallback to the raw payload if fetch fails
         onNewMessage(payload);
       }
@@ -275,11 +327,12 @@ export function useChatRealtime(conversationId: string, onNewMessage: (message: 
 }
 
 export function useConversationsRealtime(userId: string, onConversationUpdate: () => void) {
-  console.log('🔗 Setting up conversations real-time for user:', userId);
+  console.log('🔗 Setting up conversations real-time for user:', userId || '(no user)');
   
   // Set up messages subscription to detect new messages in any conversation
+  // Only subscribe if we have a valid userId
   const messagesSubscription = useRealtime({
-    table: 'messages',
+    table: userId ? 'messages' : '', // Empty table prevents subscription
     // Listen for messages where user is participant
     onInsert: async (payload) => {
       console.log('🔗 Real-time new message in conversations:', payload);
@@ -294,9 +347,10 @@ export function useConversationsRealtime(userId: string, onConversationUpdate: (
   });
 
   // Set up conversations subscription to detect conversation changes
+  // Only subscribe if we have a valid userId
   const conversationsSubscription = useRealtime({
-    table: 'conversations',
-    filter: `participant1_id=eq.${userId},participant2_id=eq.${userId}`,
+    table: userId ? 'conversations' : '', // Empty table prevents subscription
+    filter: userId ? `participant1_id=eq.${userId},participant2_id=eq.${userId}` : undefined,
     onInsert: async (payload) => {
       console.log('🔗 Real-time new conversation:', payload);
       onConversationUpdate();

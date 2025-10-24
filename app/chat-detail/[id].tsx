@@ -74,6 +74,7 @@ export default function ChatScreen() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [moderationError, setModerationError] = useState('');
   const [showModerationModal, setShowModerationModal] = useState(false);
+  const [renderKey, setRenderKey] = useState(0);
   
   const scrollViewRef = useRef<KeyboardAwareScrollView>(null);
   const flatListRef = useRef<FlatList>(null);
@@ -88,7 +89,12 @@ export default function ChatScreen() {
 
   // Transform messages for FlatList with date separators
   const transformedMessages = useMemo(() => {
-    if (!messages || messages.length === 0) return [];
+    console.log(`🎨 Transforming ${messages?.length || 0} messages for rendering`);
+    
+    if (!messages || messages.length === 0) {
+      console.log(`🎨 No messages to transform`);
+      return [];
+    }
     
     const items: any[] = [];
     
@@ -114,7 +120,29 @@ export default function ChatScreen() {
       });
     });
     
+    console.log(`🎨 Transformed into ${items.length} items (messages + separators)`);
+    
     return items;
+  }, [messages]);
+
+  // Debug: Track messages array changes and force re-render
+  useEffect(() => {
+    console.log(`🔍 Messages array changed. New count: ${messages?.length || 0}`);
+    if (messages && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      console.log(`🔍 Last message:`, {
+        id: lastMessage.id,
+        content: lastMessage.content?.substring(0, 50),
+        sender: lastMessage.sender_id,
+        created: lastMessage.created_at,
+      });
+    }
+    // Force re-render when messages change
+    setRenderKey(prev => {
+      const newKey = prev + 1;
+      console.log(`🔄 Force re-render triggered, new key: ${newKey}`);
+      return newKey;
+    });
   }, [messages]);
 
   useEffect(() => {
@@ -122,8 +150,92 @@ export default function ChatScreen() {
       fetchConversationDetails();
       markAsRead(conversationId); // Update local state (may be blocked if manually marked as unread)
       markMessagesAsRead(); // Update database (should always work)
+      
+      // Set active conversation to prevent notifications while user is viewing this chat
+      setActiveConversation(conversationId);
     }
+    
+    // Cleanup: Clear active conversation when leaving this screen
+    return () => {
+      if (conversationId) {
+        clearActiveConversation();
+      }
+    };
   }, [conversationId, conversationDeleted]);
+  
+  // Function to set active conversation on device token
+  const setActiveConversation = async (convId: string) => {
+    if (!user) return;
+    
+    try {
+      await supabase
+        .from('device_tokens')
+        .update({ active_conversation_id: convId })
+        .eq('user_id', user.id)
+        .eq('is_active', true);
+      
+      console.log('🔕 Set active conversation to prevent notifications:', convId);
+    } catch (error) {
+      console.warn('Failed to set active conversation:', error);
+    }
+  };
+  
+  // Function to clear active conversation
+  const clearActiveConversation = async () => {
+    if (!user) return;
+    
+    try {
+      await supabase
+        .from('device_tokens')
+        .update({ active_conversation_id: null })
+        .eq('user_id', user.id)
+        .eq('is_active', true);
+      
+      console.log('🔔 Cleared active conversation, notifications enabled');
+    } catch (error) {
+      console.warn('Failed to clear active conversation:', error);
+    }
+  };
+
+  // Realtime subscription for other user's profile updates (last_seen, is_online)
+  useEffect(() => {
+    if (!otherUser?.id) return;
+
+    console.log('🟢 Setting up real-time subscription for other user profile:', otherUser.id);
+    
+    const profileChannel = supabase
+      .channel(`profile-${otherUser.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${otherUser.id}`,
+        },
+        (payload) => {
+          console.log('🟢 Other user profile updated:', {
+            is_online: payload.new.is_online,
+            last_seen: payload.new.last_seen,
+          });
+          
+          // Update otherUser state with new profile data
+          setOtherUser((prev: any) => ({
+            ...prev,
+            is_online: payload.new.is_online,
+            last_seen: payload.new.last_seen,
+          }));
+        }
+      )
+      .subscribe((status) => {
+        console.log('🟢 Profile subscription status:', status);
+      });
+
+    return () => {
+      console.log('🟢 Cleaning up profile subscription');
+      supabase.removeChannel(profileChannel);
+    };
+  }, [otherUser?.id]);
 
   // Realtime subscription for transaction updates
   useEffect(() => {
@@ -333,6 +445,15 @@ export default function ChatScreen() {
         const otherParticipant = conv.participant_1_profile?.id === user!.id 
           ? conv.participant_2_profile 
           : conv.participant_1_profile;
+        
+        console.log('👤 Other user profile data:', {
+          id: otherParticipant?.id,
+          name: `${otherParticipant?.first_name} ${otherParticipant?.last_name}`,
+          is_online: otherParticipant?.is_online,
+          last_seen: otherParticipant?.last_seen,
+          hasIsOnlineField: 'is_online' in (otherParticipant || {}),
+          hasLastSeenField: 'last_seen' in (otherParticipant || {}),
+        });
         
         // ✅ Check if other user has active Sellar Pro subscription
         if (otherParticipant?.id) {
@@ -1391,8 +1512,12 @@ export default function ChatScreen() {
               />
             </View>
           ) : (
-            <View>
-              {transformedMessages.map((item) => renderMessage({ item }))}
+            <View key={`messages-${renderKey}-${messages.length}`}>
+              {transformedMessages.map((item) => (
+                <React.Fragment key={item.id}>
+                  {renderMessage({ item })}
+                </React.Fragment>
+              ))}
               {ListFooter}
             </View>
           )}

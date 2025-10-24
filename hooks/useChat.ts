@@ -130,12 +130,11 @@ export function useConversations() {
   const handleConversationUpdate = useCallback(() => {
     // Use skipLoading to avoid showing loading state for real-time updates
     fetchConversations(true);
-  }, []);
+  }, [fetchConversations]);
 
-  // Set up real-time subscriptions
-  if (user?.id) {
-    useConversationsRealtime(user.id, handleConversationUpdate);
-  }
+  // Set up real-time subscriptions - MUST be called unconditionally (Rules of Hooks)
+  // The hook will handle the user check internally
+  useConversationsRealtime(user?.id || '', handleConversationUpdate);
 
   return {
     conversations,
@@ -203,32 +202,54 @@ export function useMessages(conversationId: string) {
 
   // Real-time message updates
   const handleNewMessage = useCallback((newMessage: any) => {
+    console.log(`📨 Real-time message received in useMessages:`, {
+      messageId: newMessage.id,
+      conversationId: newMessage.conversation_id,
+      content: newMessage.content?.substring(0, 50),
+      sender: newMessage.sender_id,
+      hasJoins: !!newMessage.sender,
+    });
     
     // useChatRealtime now fetches complete message data with joins,
     // so we don't need to fetch again here
     
     setMessages(prev => {
+      console.log(`📨 Updating messages state. Previous count: ${prev.length}`);
+      
       // Check if message already exists
       const existingIndex = prev.findIndex(msg => msg.id === newMessage.id);
       
       if (existingIndex !== -1) {
+        console.log(`📨 Message ${newMessage.id} already exists at index ${existingIndex}, updating...`);
         // Update existing message (for read receipts, status changes, etc.)
         const updatedMessages = [...prev];
         updatedMessages[existingIndex] = { ...updatedMessages[existingIndex], ...newMessage };
         return updatedMessages;
       }
       
+      console.log(`📨 Adding new message ${newMessage.id} to messages array`);
       
       // Add new message and sort by created_at to maintain chronological order
       const updatedMessages = [...prev, newMessage].sort((a, b) => 
         new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       );
       
+      console.log(`📨 New messages count: ${updatedMessages.length}`);
+      
       return updatedMessages;
     });
   }, []);
 
+  // Real-time subscription
   useChatRealtime(conversationId, handleNewMessage);
+  
+  // Debug: Log whenever messages state changes
+  useEffect(() => {
+    console.log(`🔥 [useMessages] Messages state updated for conversation ${conversationId}:`, {
+      count: messages.length,
+      messageIds: messages.map(m => m.id),
+    });
+  }, [messages, conversationId]);
 
   // Real-time offer updates
   const handleOfferUpdate = useCallback(async (updatedOffer: any) => {
@@ -252,6 +273,16 @@ export function useMessages(conversationId: string) {
     const { user } = useAuthStore.getState();
     if (!user) return { error: 'Not authenticated' };
 
+    // Update last_seen timestamp whenever user sends a message
+    supabase
+      .from('profiles')
+      .update({ last_seen: new Date().toISOString() })
+      .eq('id', user.id)
+      .then(({ error }) => {
+        if (error) {
+          console.warn('Failed to update last_seen:', error);
+        }
+      });
 
     // ✅ OPTIMISTIC UPDATE: Add message immediately to UI
     const tempId = `temp-${Date.now()}-${Math.random()}`;

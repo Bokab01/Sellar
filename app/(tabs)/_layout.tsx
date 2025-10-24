@@ -17,8 +17,12 @@ export default function TabLayout() {
   const { tabBarHeight, tabBarBottomPadding, contentBottomPadding } = useBottomTabBarSpacing();
   const pathname = usePathname();
   
-  // Calculate total unread count for inbox badge
-  const totalUnreadCount = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
+  // Calculate total unread count for inbox badge (memoized to prevent unnecessary recalculations)
+  const totalUnreadCount = useMemo(() => {
+    const count = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
+    console.log('📊 [TabLayout] Total unread count recalculated:', count, 'from', Object.keys(unreadCounts).length, 'conversations');
+    return count;
+  }, [unreadCounts]);
   
   // Check if we're on the post detail screen
   const isPostDetailScreen = pathname.includes('/community/') && pathname.includes('/');

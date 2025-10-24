@@ -55,20 +55,30 @@ export function usePresence() {
         console.log('User went offline:', key);
       })
       .subscribe(async (status) => {
+        console.log('🟢 [usePresence] Channel status:', status);
+        
         if (status === 'SUBSCRIBED') {
           await channel.track({
             user_id: user.id,
             online_at: new Date().toISOString(),
           });
 
+          console.log('🟢 [usePresence] Updating profile to online for user:', user.id);
+          
           // Update database online status
-          await supabase
+          const { error } = await supabase
             .from('profiles')
             .update({ 
               is_online: true, 
               last_seen: new Date().toISOString() 
             })
             .eq('id', user.id);
+          
+          if (error) {
+            console.error('🟢 [usePresence] Error updating online status:', error);
+          } else {
+            console.log('🟢 [usePresence] Successfully updated to online');
+          }
         }
       });
 
@@ -77,6 +87,8 @@ export function usePresence() {
     // Cleanup on unmount
     return () => {
       if (channelRef.current) {
+        console.log('🟢 [usePresence] Cleaning up, setting user offline:', user.id);
+        
         // Update offline status
         supabase
           .from('profiles')
@@ -84,7 +96,14 @@ export function usePresence() {
             is_online: false, 
             last_seen: new Date().toISOString() 
           })
-          .eq('id', user.id);
+          .eq('id', user.id)
+          .then(({ error }) => {
+            if (error) {
+              console.error('🟢 [usePresence] Error updating offline status:', error);
+            } else {
+              console.log('🟢 [usePresence] Successfully updated to offline');
+            }
+          });
 
         supabase.removeChannel(channelRef.current);
       }

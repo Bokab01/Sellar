@@ -195,55 +195,53 @@ export function useAppResume(options: UseAppResumeOptions = {}) {
     setState(prev => ({ ...prev, isReconnecting: true }));
 
     try {
-      log('🔗 Checking and reconnecting realtime channels...');
+      log('🔗 Checking realtime channel states...');
       
       // Get all active channels
       const channels = supabase.getChannels();
       log(`🔗 Found ${channels.length} active channels`);
 
       if (channels.length === 0) {
-        log('🔗 No channels to reconnect');
+        log('🔗 No channels to check');
         return true;
       }
 
-      // Check and fix each channel's state
-      let reconnectedCount = 0;
-      let needsReconnection = 0;
+      // Just log channel states - let individual hooks handle their own reconnection
+      let healthyCount = 0;
+      let unhealthyCount = 0;
       
       for (const channel of channels) {
         try {
           const channelState = channel.state;
-          log(`🔗 Channel "${channel.topic}" state: ${channelState}`);
           
-          // If channel is not in a healthy state, it needs reconnection
-          if (channelState !== 'joined') {
-            needsReconnection++;
-            log(`⚠️ Channel "${channel.topic}" needs reconnection (state: ${channelState})`);
-            
-            // For channels in bad states, remove and let them be recreated naturally
-            // by their hooks when data is next accessed
-            await supabase.removeChannel(channel);
-            log(`🗑️ Removed channel "${channel.topic}" - will be recreated on next data access`);
-          } else {
-            // Channel is healthy
-            reconnectedCount++;
+          if (channelState === 'joined') {
+            healthyCount++;
             log(`✅ Channel "${channel.topic}" is healthy`);
+          } else {
+            unhealthyCount++;
+            log(`⚠️ Channel "${channel.topic}" state: ${channelState} - will be handled by its hook`);
+            
+            // For channels in bad states, remove them so individual hooks can recreate
+            await supabase.removeChannel(channel);
+            log(`🗑️ Removed unhealthy channel "${channel.topic}" - hook will recreate it`);
           }
         } catch (error) {
           log(`❌ Error checking channel "${channel.topic}":`, error);
         }
       }
       
-      log(`🔗 Reconnection summary: ${reconnectedCount} healthy, ${needsReconnection} removed for recreation`);
+      log(`🔗 Channel health summary: ${healthyCount} healthy, ${unhealthyCount} unhealthy (removed for recreation)`);
       
-      // Return success if we have any healthy channels or successfully cleaned up bad ones
+      // Wait a moment to allow individual hooks to detect and recreate their channels
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       return true;
 
     } catch (error) {
-      log('❌ Realtime reconnection error:', error);
+      log('❌ Realtime channel check error:', error);
       setState(prev => ({ 
         ...prev, 
-        error: error instanceof Error ? error.message : 'Realtime reconnection failed' 
+        error: error instanceof Error ? error.message : 'Realtime check failed' 
       }));
       return false;
     } finally {

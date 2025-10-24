@@ -24,8 +24,10 @@ import {
   CommunitySidebar,
   SidebarToggle,
   CommunityFilters,
+  Badge,
+  Button,
 } from '@/components';
-import { Plus, Users } from 'lucide-react-native';
+import { Plus, Users, SlidersHorizontal } from 'lucide-react-native';
 
 export default function CommunityScreen() {
   const { theme } = useTheme();
@@ -40,6 +42,7 @@ export default function CommunityScreen() {
     postType: null,
     location: null,
   });
+  const [showFilterModal, setShowFilterModal] = useState(false);
   const { posts, loading, error, refreshing, refresh, updatePost, deletePost } = useCommunityPosts(filters);
   
   // Debug logging for filters
@@ -280,6 +283,16 @@ export default function CommunityScreen() {
     </View>
   ), [CreatePostPrompt]);
 
+  // Get active filter count
+  const getActiveFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.postType) count++;
+    if (filters.location) count++;
+    return count;
+  }, [filters.postType, filters.location]);
+
+  const hasActiveFilters = filters.postType || filters.location;
+
   return (
     <SafeAreaWrapper>
       <AppHeader
@@ -290,13 +303,71 @@ export default function CommunityScreen() {
             onToggle={() => setSidebarVisible(!sidebarVisible)}
           />
         }
+        rightActions={[
+          <TouchableOpacity
+            key="filter"
+            onPress={() => setShowFilterModal(true)}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: theme.spacing.md,
+              paddingVertical: theme.spacing.sm,
+              borderRadius: theme.borderRadius.full,
+              backgroundColor: hasActiveFilters ? theme.colors.primary : theme.colors.surface,
+              borderWidth: 1,
+              borderColor: theme.colors.primary,
+              gap: theme.spacing.xs,
+            }}
+            activeOpacity={0.7}
+          >
+            <SlidersHorizontal 
+              size={16} 
+              color={hasActiveFilters ? '#fff' : theme.colors.text.primary} 
+            />
+            <Text 
+              variant="bodySmall" 
+              style={{ 
+                fontWeight: '500',
+                color: hasActiveFilters ? '#fff' : theme.colors.text.primary
+              }}
+            >
+              Filter
+            </Text>
+            {hasActiveFilters && (
+              <View
+                style={{
+                  backgroundColor: '#fff',
+                  borderRadius: theme.borderRadius.full,
+                  minWidth: 20,
+                  height: 20,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingHorizontal: 6,
+                }}
+              >
+                <Text 
+                  variant="caption" 
+                  style={{ 
+                    color: theme.colors.primary,
+                    fontWeight: '600',
+                    fontSize: 11,
+                  }}
+                >
+                  {getActiveFilterCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        ]}
       />
 
-      {/* Community Filters - Moved to header area */}
+      {/* Community Filters Modal */}
       <CommunityFilters
         filters={filters}
         onFiltersChange={setFilters}
         availableLocations={availableLocations}
+        isVisible={showFilterModal}
+        onClose={() => setShowFilterModal(false)}
       />
 
       <View style={{ flex: 1 }}>

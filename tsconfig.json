@@ -5,7 +5,9 @@
     "esModuleInterop": true,
     "isolatedModules": true,
     "jsx": "react-native",
-    "lib": ["esnext"],
+    "lib": [
+      "esnext"
+    ],
     "module": "esnext",
     "moduleResolution": "node",
     "noEmit": true,
@@ -15,7 +17,9 @@
     "target": "esnext",
     "forceConsistentCasingInFileNames": true,
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ]
     }
   },
   "include": [
@@ -28,5 +32,6 @@
   "exclude": [
     "node_modules",
     "supabase/functions/**/*"
-  ]
+  ],
+  "extends": "expo/tsconfig.base"
 }
