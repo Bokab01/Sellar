@@ -7,6 +7,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useMultipleListingStats } from '@/hooks/useListingStats';
 import { useOptimizedListingsRealtime } from '@/hooks/useOptimizedRealtime';
+import { useAuthStore } from '@/store/useAuthStore';
 import { supabase } from '@/lib/supabase';
 import { 
   Text,
@@ -21,6 +22,7 @@ import { getDisplayName } from '@/hooks/useDisplayName';
 export default function SellerListingsScreen() {
   const { theme } = useTheme();
   const { userId } = useLocalSearchParams<{ userId: string }>();
+  const { user } = useAuthStore();
   const [sellerProfile, setSellerProfile] = useState<any>(null);
   const [sellerListings, setSellerListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,6 +31,9 @@ export default function SellerListingsScreen() {
   const [error, setError] = useState<string | null>(null);
   
   const { favorites, toggleFavorite } = useFavoritesStore();
+  
+  // Check if current user is viewing their own listings
+  const isOwnListings = user?.id === userId;
   
   // Optimized realtime updates for listings
   const handleListingUpdate = useCallback((updatedListing: any) => {
@@ -175,12 +180,12 @@ export default function SellerListingsScreen() {
         fullWidth={true}
         isFavorited={favorites[item.id] || false}
         onPress={() => handleListingPress(item.id)}
-        onFavoritePress={() => handleFavoriteToggle(item.id)}
+        onFavoritePress={isOwnListings ? undefined : () => handleFavoriteToggle(item.id)}
         showReportButton={false}
         currentUserId={userId || ""}
       />
     </View>
-  ), [viewMode, theme.spacing.sm, favorites, handleListingPress, handleFavoriteToggle, userId]);
+  ), [viewMode, theme.spacing.sm, favorites, handleListingPress, handleFavoriteToggle, userId, isOwnListings]);
 
   // Memoized key extractor
   const keyExtractor = useCallback((item: any) => item.id, []);

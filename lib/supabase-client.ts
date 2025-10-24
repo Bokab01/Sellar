@@ -1,10 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState } from 'react-native';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 
-// Create a Supabase client without complex typing
+// Create a Supabase client with proper configuration for mobile
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: AsyncStorage,
@@ -12,6 +13,53 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: false,
   },
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+    },
+  },
+  global: {
+    headers: {
+      'x-client-info': 'sellar-mobile-app',
+    },
+    fetch: (url, options = {}) => {
+      // Add timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      return fetch(url, {
+        ...options,
+        signal: controller.signal,
+      }).finally(() => {
+        clearTimeout(timeoutId);
+      });
+    },
+  },
+});
+
+// Track app state for connection management
+let appState = AppState.currentState;
+
+AppState.addEventListener('change', (nextAppState) => {
+  if (appState.match(/inactive|background/) && nextAppState === 'active') {
+    console.log('📱 App became active - Supabase client will handle reconnection');
+    
+    // Give the app a moment to stabilize before checking connections
+    setTimeout(() => {
+      // Check if we have an active session
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          console.log('✅ Active session found, connection restored');
+        } else {
+          console.warn('⚠️ No active session found');
+        }
+      }).catch((error) => {
+        console.error('❌ Error checking session:', error);
+      });
+    }, 500);
+  }
+  
+  appState = nextAppState;
 });
 
 // Type-safe database operations

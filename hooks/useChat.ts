@@ -10,8 +10,11 @@ export function useConversations() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchConversations = async (skipLoading = false) => {
+  const fetchConversations = async (skipLoading = false, retryCount = 0) => {
     if (!user) return;
+
+    const MAX_RETRIES = 2;
+    const RETRY_DELAY = 1000; // 1 second
 
     try {
       if (!skipLoading) {
@@ -19,18 +22,28 @@ export function useConversations() {
       }
       setError(null);
 
-      // Delay to ensure database updates have propagated
-      await new Promise(resolve => setTimeout(resolve, 500));
+      console.log(`📥 Fetching conversations (attempt ${retryCount + 1}/${MAX_RETRIES + 1})...`);
 
-      // Fetch conversations and unread counts in parallel
-      const [conversationsResult, unreadCountsResult] = await Promise.all([
+      // Fetch conversations and unread counts in parallel with timeout
+      const fetchPromise = Promise.all([
         dbHelpers.getConversations(user.id),
         dbHelpers.getUnreadMessageCounts(user.id)
       ]);
 
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), 15000)
+      );
+
+      const [conversationsResult, unreadCountsResult] = await Promise.race([
+        fetchPromise,
+        timeoutPromise
+      ]) as any;
+
       if (conversationsResult.error) {
-        setError(typeof conversationsResult.error === 'string' ? conversationsResult.error : (conversationsResult.error as any)?.message || 'Failed to load conversations');
+        throw new Error(typeof conversationsResult.error === 'string' ? conversationsResult.error : (conversationsResult.error as any)?.message || 'Failed to load conversations');
       } else {
+        console.log(`✅ Loaded ${conversationsResult.data?.length || 0} conversations`);
         setConversations(conversationsResult.data || []);
         
         // Update unread counts in the chat store
@@ -42,6 +55,7 @@ export function useConversations() {
           // 2. Are not in the local state (new conversations)
           // 3. Are not manually marked as unread (preserve user's manual marking)
           Object.entries(unreadCountsResult.data).forEach(([conversationId, count]) => {
+            const countNum = Number(count);
             const currentLocalCount = unreadCounts[conversationId] || 0;
             const isManuallyMarked = manuallyMarkedAsUnread.has(conversationId);
             
@@ -54,21 +68,21 @@ export function useConversations() {
               // Don't update manually marked conversations
             } else if (!(conversationId in unreadCounts)) {
               // New conversation not in local state - use database count
-              setUnreadCount(conversationId, count as number);
-            } else if (count > 0 && currentLocalCount === 0) {
+              setUnreadCount(conversationId, countNum);
+            } else if (countNum > 0 && currentLocalCount === 0) {
               // Database shows unread but local shows 0 - check if this is a recent read
               if (isRecentRead) {
                 // Don't update - preserve the local state of 0
               } else {
-                setUnreadCount(conversationId, count as number);
+                setUnreadCount(conversationId, countNum);
               }
-            } else if (count > 0 && currentLocalCount > 0) {
+            } else if (countNum > 0 && currentLocalCount > 0) {
               // If both database and local have unread messages, use the higher count
-              const maxCount = Math.max(count as number, currentLocalCount);
+              const maxCount = Math.max(countNum, currentLocalCount);
               if (maxCount !== currentLocalCount) {
                 setUnreadCount(conversationId, maxCount);
               }
-            } else if (count === 0 && currentLocalCount > 0) {
+            } else if (countNum === 0 && currentLocalCount > 0) {
               // Database shows 0 but local shows unread - use database (messages were read)
               setUnreadCount(conversationId, 0);
             }
@@ -84,8 +98,23 @@ export function useConversations() {
           }
         });
       }
-    } catch (err) {
-      setError('Failed to load conversations');
+    } catch (err: any) {
+      console.error(`❌ Error loading conversations:`, err);
+      
+      // Retry logic
+      if (retryCount < MAX_RETRIES) {
+        console.log(`🔄 Retrying in ${RETRY_DELAY}ms...`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        return fetchConversations(skipLoading, retryCount + 1);
+      }
+      
+      // Max retries reached
+      const errorMessage = err.message === 'Request timeout' 
+        ? 'Connection timeout. Please check your internet connection.'
+        : 'Failed to load conversations. Pull to refresh.';
+      
+      setError(errorMessage);
+      console.error('❌ Max retries reached, giving up');
     } finally {
       if (!skipLoading) {
         setLoading(false);
@@ -121,22 +150,52 @@ export function useMessages(conversationId: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchMessages = useCallback(async () => {
+  const fetchMessages = useCallback(async (retryCount = 0) => {
+    const MAX_RETRIES = 2;
+    const RETRY_DELAY = 1000;
+
     try {
       setLoading(true);
       setError(null);
 
-      const { data, error: fetchError } = await dbHelpers.getMessages(conversationId);
+      console.log(`📥 Fetching messages for conversation ${conversationId} (attempt ${retryCount + 1}/${MAX_RETRIES + 1})...`);
+
+      // Add timeout to prevent infinite loading
+      const fetchPromise = dbHelpers.getMessages(conversationId);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), 15000)
+      );
+
+      const { data, error: fetchError } = await Promise.race([
+        fetchPromise,
+        timeoutPromise
+      ]) as any;
 
       if (fetchError) {
-        setError(typeof fetchError === 'string' ? fetchError : (fetchError as any)?.message || 'Failed to load messages');
+        throw new Error(typeof fetchError === 'string' ? fetchError : (fetchError as any)?.message || 'Failed to load messages');
       } else {
         // Reverse the order since getMessages returns newest first, but we want oldest first for display
         const sortedMessages = (data || []).reverse();
+        console.log(`✅ Loaded ${sortedMessages.length} messages`);
         setMessages(sortedMessages);
       }
-    } catch (err) {
-      setError('Failed to load messages');
+    } catch (err: any) {
+      console.error(`❌ Error loading messages:`, err);
+      
+      // Retry logic
+      if (retryCount < MAX_RETRIES) {
+        console.log(`🔄 Retrying in ${RETRY_DELAY}ms...`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        return fetchMessages(retryCount + 1);
+      }
+      
+      // Max retries reached
+      const errorMessage = err.message === 'Request timeout' 
+        ? 'Connection timeout. Please check your internet connection.'
+        : 'Failed to load messages. Pull to refresh.';
+      
+      setError(errorMessage);
+      console.error('❌ Max retries reached for messages, giving up');
     } finally {
       setLoading(false);
     }

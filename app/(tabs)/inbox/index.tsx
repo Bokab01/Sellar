@@ -581,14 +581,6 @@ export default function InboxScreen() {
       />
 
       <View style={{ flex: 1 }}>
-        {/* Search */}
-        <SearchBar
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="Search conversations..."
-          showFilter={false}
-        />
-
         {/* Bulk Action Buttons */}
         {isSelectionMode && selectedConversations.size > 0 && (
           <Animated.View style={{
@@ -673,6 +665,18 @@ export default function InboxScreen() {
             keyExtractor={keyExtractor}
             renderItem={renderConversation}
             style={{ flex: 1 }}
+            ListHeaderComponent={
+              <View>
+                {/* Search */}
+                <SearchBar
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Search conversations..."
+                  showFilter={false}
+                />
+              </View>
+            }
+            stickyHeaderIndices={[]}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -691,15 +695,24 @@ export default function InboxScreen() {
             showsVerticalScrollIndicator={false}
           />
         ) : (
-          <EmptyState
-            icon={<MessageCircle size={64} color={theme.colors.text.muted} />}
-            title="No conversations yet"
-            description="Start chatting with sellers to see your conversations here."
-            action={{
-              text: 'Browse Products',
-              onPress: () => router.push('/(tabs)/home'),
-            }}
-          />
+          <View style={{ flex: 1 }}>
+            {/* Search for empty state */}
+            <SearchBar
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search conversations..."
+              showFilter={false}
+            />
+            <EmptyState
+              icon={<MessageCircle size={64} color={theme.colors.text.muted} />}
+              title="No conversations yet"
+              description="Start chatting with sellers to see your conversations here."
+              action={{
+                text: 'Browse Products',
+                onPress: () => router.push('/(tabs)/home'),
+              }}
+            />
+          </View>
         )}
       </View>
     </SafeAreaWrapper>

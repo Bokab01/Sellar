@@ -195,51 +195,52 @@ export function useAppResume(options: UseAppResumeOptions = {}) {
     setState(prev => ({ ...prev, isReconnecting: true }));
 
     try {
-      log('Reconnecting realtime channels...');
+      log('🔗 Checking and reconnecting realtime channels...');
       
       // Get all active channels
       const channels = supabase.getChannels();
-      log('Found', channels.length, 'active channels');
+      log(`🔗 Found ${channels.length} active channels`);
 
       if (channels.length === 0) {
-        log('No channels to reconnect');
+        log('🔗 No channels to reconnect');
         return true;
       }
 
-      // Reconnect each channel
-      const reconnectPromises = channels.map(async (channel) => {
-        try {
-          log('Reconnecting channel:', channel.topic);
-          
-          // Unsubscribe and resubscribe to refresh connection
-          await channel.unsubscribe();
-          
-          // Small delay to ensure clean disconnection
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
-          // Resubscribe
-          const status = await new Promise<string>((resolve) => {
-            channel.subscribe((status) => {
-              resolve(status);
-            });
-          });
-          
-          log('Channel reconnection status:', channel.topic, status);
-          return status === 'SUBSCRIBED';
-        } catch (error) {
-          log('Failed to reconnect channel:', channel.topic, error);
-          return false;
-        }
-      });
-
-      const results = await Promise.allSettled(reconnectPromises);
-      const successCount = results.filter(r => r.status === 'fulfilled' && r.value).length;
+      // Check and fix each channel's state
+      let reconnectedCount = 0;
+      let needsReconnection = 0;
       
-      log('Reconnected', successCount, 'of', channels.length, 'channels');
-      return successCount > 0 || channels.length === 0;
+      for (const channel of channels) {
+        try {
+          const channelState = channel.state;
+          log(`🔗 Channel "${channel.topic}" state: ${channelState}`);
+          
+          // If channel is not in a healthy state, it needs reconnection
+          if (channelState !== 'joined') {
+            needsReconnection++;
+            log(`⚠️ Channel "${channel.topic}" needs reconnection (state: ${channelState})`);
+            
+            // For channels in bad states, remove and let them be recreated naturally
+            // by their hooks when data is next accessed
+            await supabase.removeChannel(channel);
+            log(`🗑️ Removed channel "${channel.topic}" - will be recreated on next data access`);
+          } else {
+            // Channel is healthy
+            reconnectedCount++;
+            log(`✅ Channel "${channel.topic}" is healthy`);
+          }
+        } catch (error) {
+          log(`❌ Error checking channel "${channel.topic}":`, error);
+        }
+      }
+      
+      log(`🔗 Reconnection summary: ${reconnectedCount} healthy, ${needsReconnection} removed for recreation`);
+      
+      // Return success if we have any healthy channels or successfully cleaned up bad ones
+      return true;
 
     } catch (error) {
-      log('Realtime reconnection error:', error);
+      log('❌ Realtime reconnection error:', error);
       setState(prev => ({ 
         ...prev, 
         error: error instanceof Error ? error.message : 'Realtime reconnection failed' 

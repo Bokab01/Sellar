@@ -23,16 +23,99 @@ export function useRealtime({
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isReconnectingRef = useRef(false);
+  const tableRef = useRef(table);
+  const filterRef = useRef(filter);
 
-  // Update callbacks ref when they change
+  // Update refs when they change
   useEffect(() => {
     callbacksRef.current = { onInsert, onUpdate, onDelete };
-  }, [onInsert, onUpdate, onDelete]);
+    tableRef.current = table;
+    filterRef.current = filter;
+  }, [onInsert, onUpdate, onDelete, table, filter]);
 
-  // Reconnection function
+  // Setup channel function - stable, doesn't depend on changing values
+  const setupChannel = useCallback(async () => {
+    if (channelRef.current) {
+      console.log(`🔗 Channel already exists for ${tableRef.current}, skipping setup`);
+      return;
+    }
+
+    const currentTable = tableRef.current;
+    const currentFilter = filterRef.current;
+
+    try {
+      // Create channel with unique name to avoid conflicts
+      const channelName = `realtime-${currentTable}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      console.log(`🔗 Creating new channel: ${channelName}`, currentFilter ? `with filter: ${currentFilter}` : 'no filter');
+      
+      const channel = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: currentTable,
+            ...(currentFilter && { filter: currentFilter }),
+          },
+          (payload) => {
+            console.log(`🔗 ${currentTable} event received:`, payload.eventType, payload);
+            try {
+              switch (payload.eventType) {
+                case 'INSERT':
+                  callbacksRef.current.onInsert?.(payload.new);
+                  break;
+                case 'UPDATE':
+                  callbacksRef.current.onUpdate?.(payload.new);
+                  break;
+                case 'DELETE':
+                  callbacksRef.current.onDelete?.(payload.old);
+                  break;
+              }
+            } catch (err) {
+              console.error(`🔗 Error processing ${currentTable} event:`, err);
+            }
+          }
+        )
+        .subscribe((status) => {
+          console.log(`🔗 Channel ${channelName} status:`, status);
+          
+          if (status === 'SUBSCRIBED') {
+            console.log(`✅ Successfully subscribed to ${currentTable} changes`);
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error(`❌ Channel error for ${currentTable}, scheduling reconnection`);
+            // Schedule reconnection
+            if (reconnectTimeoutRef.current) {
+              clearTimeout(reconnectTimeoutRef.current);
+            }
+            reconnectTimeoutRef.current = setTimeout(() => {
+              reconnectChannel();
+            }, 5000);
+          } else if (status === 'TIMED_OUT') {
+            console.error(`⏱️ Channel timeout for ${currentTable}, scheduling reconnection`);
+            // Schedule reconnection
+            if (reconnectTimeoutRef.current) {
+              clearTimeout(reconnectTimeoutRef.current);
+            }
+            reconnectTimeoutRef.current = setTimeout(() => {
+              reconnectChannel();
+            }, 5000);
+          } else if (status === 'CLOSED') {
+            console.warn(`🔒 Channel closed for ${currentTable}`);
+          }
+        });
+
+      channelRef.current = channel;
+    } catch (err) {
+      console.error(`🔗 Error setting up ${currentTable} channel:`, err);
+    }
+  }, []); // Empty dependencies - stable function
+
+  // Reconnection function - also stable
   const reconnectChannel = useCallback(async () => {
     if (isReconnectingRef.current) return;
     
+    console.log(`🔗 Reconnecting channel for ${tableRef.current}`);
     isReconnectingRef.current = true;
     
     try {
@@ -48,7 +131,7 @@ export function useRealtime({
       // Recreate the subscription
       await setupChannel();
     } catch (error) {
-      // Silent reconnection failure
+      console.error(`🔗 Reconnection failed for ${tableRef.current}:`, error);
       
       // Schedule another reconnection attempt
       if (reconnectTimeoutRef.current) {
@@ -61,109 +144,52 @@ export function useRealtime({
     } finally {
       isReconnectingRef.current = false;
     }
-  }, [table, filter]);
-
-  // Setup channel function
-  const setupChannel = useCallback(async () => {
-    if (channelRef.current) {
-      return;
-    }
-
-    try {
-      // Create channel with unique name to avoid conflicts
-      const channelName = `realtime-${table}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const channel = supabase
-        .channel(channelName)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table,
-            ...(filter && { filter }),
-          },
-          (payload) => {
-            try {
-              switch (payload.eventType) {
-                case 'INSERT':
-                  callbacksRef.current.onInsert?.(payload.new);
-                  break;
-                case 'UPDATE':
-                  callbacksRef.current.onUpdate?.(payload.new);
-                  break;
-                case 'DELETE':
-                  callbacksRef.current.onDelete?.(payload.old);
-                  break;
-              }
-            } catch (err) {
-              // Silent error handling
-            }
-          }
-        )
-        .subscribe((status) => {
-          if (status === 'CHANNEL_ERROR') {
-            // Silent error handling
-            // Schedule reconnection
-            if (reconnectTimeoutRef.current) {
-              clearTimeout(reconnectTimeoutRef.current);
-            }
-            reconnectTimeoutRef.current = setTimeout(() => {
-              reconnectChannel();
-            }, 5000);
-          } else if (status === 'TIMED_OUT') {
-            // Silent timeout handling
-            // Schedule reconnection
-            if (reconnectTimeoutRef.current) {
-              clearTimeout(reconnectTimeoutRef.current);
-            }
-            reconnectTimeoutRef.current = setTimeout(() => {
-              reconnectChannel();
-            }, 5000);
-          }
-        });
-
-      channelRef.current = channel;
-    } catch (err) {
-      // Silent setup error
-    }
-  }, [table, filter, reconnectChannel]);
+  }, [setupChannel]); // Only depends on stable setupChannel
 
   // Initial setup
   useEffect(() => {
     if (!table) {
+      console.log('🔗 No table provided, skipping setup');
       return;
     }
 
+    console.log(`🔗 Initializing realtime for table: ${table}`);
     setupChannel();
 
     return () => {
+      console.log(`🔗 Cleaning up realtime for table: ${table}`);
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
       }
       if (channelRef.current) {
         try {
+          console.log(`🔗 Removing channel for ${table}`);
           supabase.removeChannel(channelRef.current);
         } catch (err) {
-          // Silent cleanup error
+          console.error(`🔗 Error removing channel for ${table}:`, err);
         }
         channelRef.current = null;
       }
     };
-  }, [table, filter, setupChannel]);
+  }, [table, filter]); // Removed setupChannel from dependencies to prevent re-subscription
 
   // App state handling for reconnection
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
+        console.log(`🔗 App became active, checking channel state for ${tableRef.current}`);
         // Check if channel is still active
         if (channelRef.current) {
           const status = channelRef.current.state;
+          console.log(`🔗 Current channel state: ${status}`);
           
           if (status === 'closed' || status === 'errored') {
+            console.log(`🔗 Channel is ${status}, reconnecting...`);
             reconnectChannel();
           }
         } else {
+          console.log('🔗 No active channel, setting up new one...');
           setupChannel();
         }
       }
@@ -176,7 +202,7 @@ export function useRealtime({
     return () => {
       subscription?.remove();
     };
-  }, [table, reconnectChannel, setupChannel]);
+  }, [reconnectChannel, setupChannel]); // Only depend on stable functions
 
   return channelRef.current;
 }

@@ -265,13 +265,6 @@ export default function CommunityScreen() {
     </TouchableOpacity>
   ), [theme, profile, user]);
 
-  // Memoized ListHeader for FlatList
-  const ListHeader = useMemo(() => (
-    <View>
-      {CreatePostPrompt}
-    </View>
-  ), [CreatePostPrompt]);
-
   // Optimized renderItem for FlatList
   const renderPost = useCallback(({ item: post }: { item: any }) => (
     <MemoizedPostCard post={post} />
@@ -280,6 +273,12 @@ export default function CommunityScreen() {
   // Optimized keyExtractor
   const keyExtractor = useCallback((item: any) => item.id, []);
 
+  // Memoized list header with create post prompt
+  const ListHeader = useMemo(() => (
+    <View>
+      {CreatePostPrompt}
+    </View>
+  ), [CreatePostPrompt]);
 
   return (
     <SafeAreaWrapper>
@@ -293,14 +292,14 @@ export default function CommunityScreen() {
         }
       />
 
-      <View style={{ flex: 1 }}>
-        {/* Community Filters */}
-        <CommunityFilters
-          filters={filters}
-          onFiltersChange={setFilters}
-          availableLocations={availableLocations}
-        />
+      {/* Community Filters - Moved to header area */}
+      <CommunityFilters
+        filters={filters}
+        onFiltersChange={setFilters}
+        availableLocations={availableLocations}
+      />
 
+      <View style={{ flex: 1 }}>
         {loading ? (
           <HomeScreenSkeleton loadingText="Loading community posts..." />
         ) : error ? (
