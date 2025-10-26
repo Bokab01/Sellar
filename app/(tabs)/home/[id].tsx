@@ -43,6 +43,7 @@ import { SvgXml } from 'react-native-svg';
 import { useProfile } from '@/hooks/useProfile';
 import { Heart, Share as ShareIcon, MessageCircle, Phone, PhoneCall, DollarSign, ArrowLeft, Package, MoreVertical, Edit, Trash2, Flag, BadgeCent, RefreshCw, Play, X } from 'lucide-react-native';
 import { getDisplayName } from '@/hooks/useDisplayName';
+import { UserDisplayName } from '@/components/UserDisplayName/UserDisplayName';
 import { ReportButton } from '@/components/ReportButton/ReportButton';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { CDNOptimizedVideo } from '@/components/OptimizedVideo/CDNOptimizedVideo';
@@ -1710,34 +1711,23 @@ export default function ListingDetailScreen() {
                 size="md"
               />
               <View style={{ flex: 1}}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, flexWrap: 'wrap' }}>
-                  <Text variant="bodySmall" style={{ fontWeight: '600' }}>
-                    {getDisplayName(listing.profiles, false).displayName}
-                  </Text>
-                  {/* ✅ PRO Badge after name using Badge component */}
-                  {listing.is_sellar_pro && (
-                    <Badge text="⭐ PRO" variant="primary" size="sm" />
-                  )}
+                {/* Name */}
+                <UserDisplayName
+                  profile={listing.profiles}
+                  variant="full"
+                  showBadge={false}
+                  textVariant="bodySmall"
+                />
+                
+                {/* Badges row - Below name, aligned to start */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, marginTop: theme.spacing.xs, flexWrap: 'wrap' }}>
                   <CompactUserBadges
+                    isSellarPro={listing.is_sellar_pro}
                     isBusinessUser={listing.profiles.is_business_user}
-                    isVerified={false}
+                    isVerified={listing.profiles?.is_verified}
                     isBusinessVerified={listing.profiles.is_business_verified}
                   />
                 </View>
-                
-                {/* Verification Badge - Below name */}
-                {listing.profiles?.is_verified && (
-                  <View style={{ 
-                    marginTop: theme.spacing.xs,
-                    flexDirection: 'row',
-                    alignItems: 'center'
-                  }}>
-                    <IdentityVerificationBadge
-                      size="xs"
-                      variant="compact"
-                    />
-                  </View>
-                )}
                 <View style={{ marginTop: theme.spacing.xs }}>
                   <CompactReviewSummary userId={listing.profiles.id} />
                 </View>
@@ -2591,7 +2581,7 @@ export default function ListingDetailScreen() {
           <Text variant="h4" color="secondary" style={{ textAlign: 'center', marginBottom: theme.spacing.md }}>
             {!listing?.profiles?.phone 
               ? 'This seller has not provided a phone number'
-              : `You are about to call ${listing.profiles?.first_name}`
+              : `You are about to call ${getDisplayName(listing.profiles, false).displayName}`
             }
           </Text>
           

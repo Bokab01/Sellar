@@ -13,6 +13,9 @@ interface PushMessage {
   body: string;
   data?: Record<string, any>;
   channelId?: string;
+  priority?: 'default' | 'normal' | 'high';
+  badge?: number;
+  _displayInForeground?: boolean;
 }
 
 interface NotificationQueue {
@@ -138,6 +141,9 @@ async function processNotifications(
           type: notification.notification_type,
         },
         channelId: getChannelId(notification.notification_type),
+        priority: 'high', // Ensure notifications are delivered in background
+        badge: 1, // Set badge count
+        _displayInForeground: true, // Show notification even when app is in foreground (iOS)
       }));
 
       // Send to Expo push service
@@ -168,8 +174,11 @@ async function filterTokensByPreferences(
 
   for (const token of deviceTokens) {
     try {
-      const { data: preferences } = await supabaseClient
+      const { data: preferencesArray } = await supabaseClient
         .rpc('get_user_notification_preferences', { p_user_id: token.user_id });
+
+      // RPC returns a table (array), get the first row
+      const preferences = preferencesArray && preferencesArray.length > 0 ? preferencesArray[0] : null;
 
       if (shouldSendNotification(preferences, notificationType)) {
         eligibleTokens.push(token);

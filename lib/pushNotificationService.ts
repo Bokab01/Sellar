@@ -258,6 +258,9 @@ class PushNotificationService {
           type: notification.type,
         },
         channelId: this.getChannelId(notification.type),
+        priority: 'high' as const, // Ensure notifications are delivered in background
+        badge: 1, // Set badge count
+        _displayInForeground: true, // Show notification even when app is in foreground (iOS)
       }));
 
       // Send to Expo push service

@@ -1,3 +1,0 @@
-[33m0756e19[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m Temporarily add google-services.json for EAS build
-[33m4800862[m Remove unused footer component and update UserProfile to exclude unnecessary icon import
-[33m90d72ac[m Update Firebase configuration and dependencies

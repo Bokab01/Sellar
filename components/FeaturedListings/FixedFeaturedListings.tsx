@@ -494,24 +494,10 @@ export function FixedFeaturedListings({
     );
   }
 
-  if (error) {
-    return (
-      <View style={{ padding: theme.spacing.lg }}>
-        <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
-          {error}
-        </Text>
-      </View>
-    );
-  }
-
-  if (listings.length === 0) {
-    return (
-      <View style={{ padding: theme.spacing.lg }}>
-        <Text variant="body" color="secondary" style={{ textAlign: 'center' }}>
-          No featured listings available
-        </Text>
-      </View>
-    );
+  // Don't show anything if there's an error or no listings
+  // This section should be invisible when empty, not show an empty state
+  if (error || listings.length === 0) {
+    return null;
   }
 
   const renderHeader = () => {

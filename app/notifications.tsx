@@ -3,7 +3,6 @@ import { View, ScrollView, TouchableOpacity, RefreshControl, Animated, FlatList 
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useNotificationStore } from '@/store/useNotificationStore';
-import { useAuthStore } from '@/store/useAuthStore';
 import { dbHelpers, supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
 import { formatNotificationTimestamp } from '@/utils/dateUtils';
@@ -57,8 +56,9 @@ export default function NotificationsScreen() {
   useEffect(() => {
     fetchNotifications();
   }, [fetchNotifications]);
-  
-  // Note: Real-time subscription is set up globally in app/_layout.tsx
+
+  // Note: Real-time subscription is now managed globally in app/_layout.tsx
+  // via useGlobalNotificationSubscription() hook
 
   // Animate bulk actions when selection changes
   useEffect(() => {

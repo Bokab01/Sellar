@@ -1,0 +1,2 @@
+export { TypingIndicator } from './TypingIndicator';
+

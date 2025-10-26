@@ -145,11 +145,23 @@ export default function WelcomeScreen() {
   return (
     <SafeAreaWrapper>
       <LinearGradient
-        colors={[
-          currentStepData.gradient[0] + '05',
-          currentStepData.gradient[1] + '08',
-          theme.colors.background,
-        ]}
+        colors={(function buildSafeColors() {
+          const toRgba = (hex: string, alpha: number) => {
+            if (!hex || typeof hex !== 'string') return theme.colors.background;
+            // If already rgba or named color, return as-is (alpha not applied)
+            if (hex.startsWith('rgb')) return hex;
+            if (hex === 'transparent') return 'rgba(0,0,0,0)';
+            const h = hex.replace('#', '');
+            const isShort = h.length === 3;
+            const r = parseInt(isShort ? h[0] + h[0] : h.substring(0, 2), 16) || 0;
+            const g = parseInt(isShort ? h[1] + h[1] : h.substring(2, 4), 16) || 0;
+            const b = parseInt(isShort ? h[2] + h[2] : h.substring(4, 6), 16) || 0;
+            return `rgba(${r},${g},${b},${alpha})`;
+          };
+          const g0 = toRgba(currentStepData.gradient?.[0] || '#000000', 0.02);
+          const g1 = toRgba(currentStepData.gradient?.[1] || '#000000', 0.03);
+          return [g0, g1, theme.colors.background];
+        })()}
         style={{ flex: 1 }}
         locations={[0, 0.3, 0.7]}
       >
@@ -200,11 +212,26 @@ export default function WelcomeScreen() {
                   }}
                 >
                   <LinearGradient
-                    colors={currentStepData.gradient as any}
+                    colors={(function buildSafeColors() {
+                      const toRgba = (hex: string) => {
+                        if (!hex || typeof hex !== 'string') return theme.colors.primary;
+                        if (hex.startsWith('rgb')) return hex;
+                        if (hex === 'transparent') return 'rgba(0,0,0,0)';
+                        const h = hex.replace('#', '');
+                        const isShort = h.length === 3;
+                        const r = parseInt(isShort ? h[0] + h[0] : h.substring(0, 2), 16) || 0;
+                        const g = parseInt(isShort ? h[1] + h[1] : h.substring(2, 4), 16) || 0;
+                        const b = parseInt(isShort ? h[2] + h[2] : h.substring(4, 6), 16) || 0;
+                        return `rgba(${r},${g},${b},1)`;
+                      };
+                      const c0 = toRgba(currentStepData.gradient?.[0] || theme.colors.primary);
+                      const c1 = toRgba(currentStepData.gradient?.[1] || theme.colors.primary);
+                      return [c0, c1];
+                    })()}
                     style={{
                       borderRadius: 100,
                       padding: theme.spacing['3xl'],
-                      ...theme.shadows.lg,
+                      
                     }}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
@@ -283,10 +310,25 @@ export default function WelcomeScreen() {
               <View style={{ gap: theme.spacing.sm }}>
                 {/* Primary Action with Gradient */}
                 <LinearGradient
-                  colors={currentStepData.gradient as any}
+                  colors={(function buildSafeColors() {
+                    const toRgba = (hex: string) => {
+                      if (!hex || typeof hex !== 'string') return theme.colors.primary;
+                      if (hex.startsWith('rgb')) return hex;
+                      if (hex === 'transparent') return 'rgba(0,0,0,0)';
+                      const h = hex.replace('#', '');
+                      const isShort = h.length === 3;
+                      const r = parseInt(isShort ? h[0] + h[0] : h.substring(0, 2), 16) || 0;
+                      const g = parseInt(isShort ? h[1] + h[1] : h.substring(2, 4), 16) || 0;
+                      const b = parseInt(isShort ? h[2] + h[2] : h.substring(4, 6), 16) || 0;
+                      return `rgba(${r},${g},${b},1)`;
+                    };
+                    const c0 = toRgba(currentStepData.gradient?.[0] || theme.colors.primary);
+                    const c1 = toRgba(currentStepData.gradient?.[1] || theme.colors.primary);
+                    return [c0, c1];
+                  })()}
                   style={{
                     borderRadius: theme.borderRadius.xl,
-                    ...theme.shadows.lg,
+                    overflow: 'hidden',
                   }}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
@@ -299,6 +341,11 @@ export default function WelcomeScreen() {
                     style={{ 
                       backgroundColor: 'transparent',
                       paddingVertical: theme.spacing.lg,
+                      elevation: 0,
+                      shadowColor: 'transparent',
+                      shadowOpacity: 0,
+                      shadowOffset: { width: 0, height: 0 },
+                      shadowRadius: 0,
                     }}
                   >
                     <View style={{

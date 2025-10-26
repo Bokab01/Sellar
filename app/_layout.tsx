@@ -29,8 +29,12 @@ import { setupAuthErrorInterceptor } from '@/lib/authErrorInterceptor';
 import { setupNetworkInterceptor } from '@/scripts/monitorBandwidth';
 import * as Sentry from '@sentry/react-native';
 import { usePresence } from '@/hooks/usePresence';
+import { useGlobalNotificationSubscription } from '@/hooks/useGlobalNotificationSubscription';
+import { useGlobalChatSubscription } from '@/hooks/useGlobalChatSubscription';
+import { InAppNotificationHandler } from '@/components/InAppNotificationHandler/InAppNotificationHandler';
+import { useRealtimeConnectionManager } from '@/hooks/useRealtimeConnectionManager';
 import { useNotificationStore } from '@/store/useNotificationStore';
-import { useAuthStore } from '@/store/useAuthStore';
+import { AppState, AppStateStatus } from 'react-native';
 
 // Suppress non-critical errors in development
 // This prevents metro bundler errors from causing rendering issues
@@ -88,25 +92,26 @@ function AppContent() {
   
   // Track user presence (online/offline status) globally
   usePresence();
-  
-  // Set up global real-time notification subscription
-  const { subscribeToNotifications, unsubscribeFromNotifications } = useNotificationStore();
-  
+  // Manage realtime reconnection globally (AppState, NetInfo, auth)
+  useRealtimeConnectionManager();
+
+  // Ensure unread notification count is initialized and kept fresh on resume
+  const { fetchNotifications } = useNotificationStore();
   useEffect(() => {
-    const { user, session } = useAuthStore.getState();
-    const userId = user?.id || session?.user?.id;
-
-    if (userId) {
-      console.log('🔔 [AppLayout] Setting up global real-time notification subscription for user:', userId);
-      subscribeToNotifications(userId);
-    }
-
-    // Cleanup on unmount (app closes)
-    return () => {
-      console.log('🔔 [AppLayout] Cleaning up global notification subscription');
-      unsubscribeFromNotifications();
-    };
-  }, [subscribeToNotifications, unsubscribeFromNotifications]);
+    fetchNotifications();
+    const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
+      if (state === 'active') {
+        fetchNotifications();
+      }
+    });
+    return () => sub.remove();
+  }, [fetchNotifications]);
+  
+  // Set up global notification real-time subscription
+  useGlobalNotificationSubscription();
+  
+  // Set up global chat real-time subscription for unread counts
+  useGlobalChatSubscription();
   
   // Splash screen management
   const { isAppReady, showCustomSplash, handleAppReady, handleAnimationComplete } = useSplashScreen();
@@ -280,6 +285,9 @@ function AppContent() {
       
       {/* Trial Ending Modal - Global */}
       <TrialEndingModal />
+      
+      {/* In-App Notification Handler - Global */}
+      <InAppNotificationHandler />
         </RewardsProvider>
       </FollowProvider>
     </AuthErrorBoundary>

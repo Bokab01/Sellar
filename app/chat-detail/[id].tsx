@@ -39,13 +39,16 @@ import {
 } from '@/components';
 import { Phone, Info, Eye, MessageCircle, EllipsisVertical } from 'lucide-react-native';
 import { getDisplayName } from '@/hooks/useDisplayName';
+import { UserDisplayName } from '@/components/UserDisplayName/UserDisplayName';
+import { useTypingIndicator } from '@/hooks/useTypingIndicator';
+import { TypingIndicator } from '@/components/TypingIndicator';
 
 export default function ChatScreen() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const { id: conversationId } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuthStore();
-  const { draftMessages, setDraftMessage, clearDraftMessage, markAsRead } = useChatStore();
+  const { draftMessages, setDraftMessage, clearDraftMessage, markAsRead, setActiveConversationId, typingUsers } = useChatStore();
   
   const { messages, loading, error, sendMessage, markMessagesAsRead, refresh: refreshMessages } = useMessages(conversationId!);
   
@@ -86,6 +89,16 @@ export default function ChatScreen() {
   const [typing, setTyping] = useState(false);
   const [existingTransaction, setExistingTransaction] = useState<any>(null);
   const [conversationDeleted, setConversationDeleted] = useState(false);
+  
+  // Typing indicator
+  const { onTyping, onStopTyping } = useTypingIndicator(conversationId!, otherUser?.id);
+  
+  // Debug typing users state
+  useEffect(() => {
+    if (conversationId) {
+      console.log('💬 Typing users for conversation:', conversationId, ':', typingUsers[conversationId]);
+    }
+  }, [typingUsers, conversationId]);
 
   // Transform messages for FlatList with date separators
   const transformedMessages = useMemo(() => {
@@ -167,6 +180,9 @@ export default function ChatScreen() {
   const setActiveConversation = async (convId: string) => {
     if (!user) return;
     
+    // Update the store immediately for in-app notification suppression
+    setActiveConversationId(convId);
+    
     try {
       await supabase
         .from('device_tokens')
@@ -183,6 +199,9 @@ export default function ChatScreen() {
   // Function to clear active conversation
   const clearActiveConversation = async () => {
     if (!user) return;
+    
+    // Clear the store immediately for in-app notification re-enabling
+    setActiveConversationId(null);
     
     try {
       await supabase
@@ -517,6 +536,7 @@ export default function ChatScreen() {
     const content = messageText.trim();
     setMessageText('');
     clearDraftMessage(conversationId!);
+    onStopTyping(); // Stop typing indicator when sending
 
     const { error } = await sendMessage(content);
     if (error) {
@@ -953,6 +973,31 @@ export default function ChatScreen() {
   };
 
   // Memoized message renderer
+  // Calculate message status (sent/delivered/read)
+  const getMessageStatus = useCallback((message: any): 'sending' | 'sent' | 'delivered' | 'read' | 'failed' => {
+    // If message has read_at, it's been read
+    if (message.read_at) {
+      console.log(`✅ Message ${message.id} has been read at ${message.read_at}`);
+      return 'read';
+    }
+    
+    // If message exists in DB (has created_at), it's at least sent
+    if (message.created_at && message.status !== 'failed') {
+      return 'sent';
+    }
+    
+    // Check status field
+    if (message.status === 'failed') {
+      return 'failed';
+    }
+    
+    if (message.status === 'sending') {
+      return 'sending';
+    }
+    
+    return 'sent';
+  }, []);
+
   const renderMessage = useCallback(({ item }: { item: any }) => {
     if (item.type === 'date-separator') {
       return (
@@ -967,6 +1012,7 @@ export default function ChatScreen() {
     const isOwn = message.sender_id === user?.id;
     const messageDate = new Date(message.created_at);
     const timestamp = formatChatTimestamp(messageDate);
+    const messageStatus = getMessageStatus(message);
     
     const safeMessageContent = String(message.content || '');
 
@@ -981,7 +1027,7 @@ export default function ChatScreen() {
             isOwn={isOwn}
             timestamp={timestamp}
             type={message.message_type}
-            status={message.status}
+            status={messageStatus}
             senderName={!isOwn ? getDisplayName(message.sender, false).displayName : undefined}
           />
         );
@@ -992,7 +1038,7 @@ export default function ChatScreen() {
         const buyerProfile = offer.buyer || message.sender;
         
         return (
-          <View key={message.id} style={{ paddingHorizontal: theme.spacing.lg }}>
+          <View key={message.id} style={{ paddingHorizontal: theme.spacing.sm }}>
             <OfferCard
               offer={{
                 id: offer.id,
@@ -1050,7 +1096,7 @@ export default function ChatScreen() {
           <View
             style={{
               backgroundColor: theme.colors.surfaceVariant,
-              paddingHorizontal: theme.spacing.lg,
+              paddingHorizontal: theme.spacing.sm,
               paddingVertical: theme.spacing.sm,
               borderRadius: theme.borderRadius.full,
               maxWidth: '80%',
@@ -1069,18 +1115,6 @@ export default function ChatScreen() {
           </View>
         </View>
       );
-    }
-
-    let messageStatus = message.status || 'sent';
-    
-    if (isOwn) {
-      if (message.read_at) {
-        messageStatus = 'read';
-      } else if (message.delivered_at) {
-        messageStatus = 'delivered';
-      } else {
-        messageStatus = 'sent';
-      }
     }
 
     return (
@@ -1104,7 +1138,7 @@ export default function ChatScreen() {
           : undefined}
       />
     );
-  }, [user, conversation, otherUser, theme, handleOfferAction, setCounteringOfferId, setShowCounterModal, setOfferAmount, setOfferMessage]);
+  }, [user, conversation, otherUser, theme, handleOfferAction, setCounteringOfferId, setShowCounterModal, setOfferAmount, setOfferMessage, getMessageStatus]);
 
   const keyExtractor = useCallback((item: any) => item.id, []);
 
@@ -1112,7 +1146,7 @@ export default function ChatScreen() {
     <View>
       {conversation?.listing && otherUser && (
         <View style={{
-          paddingHorizontal: theme.spacing.lg,
+          paddingHorizontal: theme.spacing.sm,
           paddingTop: theme.spacing.xl,
           paddingBottom: theme.spacing.md,
           alignItems: 'center',
@@ -1128,7 +1162,7 @@ export default function ChatScreen() {
         </View>
       )}
       {typing && (
-        <View style={{ paddingHorizontal: theme.spacing.lg, marginTop: theme.spacing.md }}>
+        <View style={{ paddingHorizontal: theme.spacing.sm, marginTop: theme.spacing.md }}>
           <View
             style={{
               backgroundColor: theme.colors.surfaceVariant,
@@ -1270,9 +1304,12 @@ export default function ChatScreen() {
         title={
           otherUser ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
-              <Text variant="body" style={{ fontWeight: '600', fontSize: 16 }}>
-                {getDisplayName(otherUser, false).displayName}
-              </Text>
+              <UserDisplayName
+                profile={otherUser}
+                variant="full"
+                showBadge={false}
+                textVariant="body"
+              />
               {/* ✅ PRO Badge after name */}
               {otherUser.is_sellar_pro && (
                 <Badge text="⭐ PRO" variant="primary" size="xs" />
@@ -1350,7 +1387,7 @@ export default function ChatScreen() {
               : conversation.listing.status === 'active'
               ? theme.colors.primary + '20'
               : theme.colors.border,
-            paddingHorizontal: theme.spacing.lg,
+            paddingHorizontal: theme.spacing.sm,
             paddingVertical: theme.spacing.md,
           }}
         >
@@ -1465,7 +1502,7 @@ export default function ChatScreen() {
             backgroundColor: theme.colors.surfaceVariant,
             borderBottomWidth: 1,
             borderBottomColor: theme.colors.border,
-            paddingHorizontal: theme.spacing.lg,
+            paddingHorizontal: theme.spacing.sm,
             paddingVertical: theme.spacing.md,
           }}
         >
@@ -1497,7 +1534,7 @@ export default function ChatScreen() {
           ref={scrollViewRef}
           style={{ flex: 1 }}
           contentContainerStyle={{
-            paddingHorizontal: theme.spacing.lg,
+            paddingHorizontal: theme.spacing.sm,
             paddingBottom: keyboardHeight,
           }}
         >
@@ -1527,18 +1564,33 @@ export default function ChatScreen() {
       {/* Message Input - Fixed at bottom */}
       <Animated.View
         style={{
-          flexDirection: 'row',
-          alignItems: 'flex-end',
           backgroundColor: theme.colors.surface,
           borderTopWidth: 1,
           borderTopColor: theme.colors.border,
-          paddingHorizontal: theme.spacing.lg,
-          paddingTop: theme.spacing.xs,
-          paddingBottom: Platform.OS === 'android' ? Math.max(insets.bottom, theme.spacing.sm) : theme.spacing.sm,
-          gap: theme.spacing.xs,
           transform: [{ translateY: inputContainerTranslateY }],
         }}
       >
+        {/* Typing Indicator */}
+        {conversationId && typingUsers[conversationId] && typingUsers[conversationId].length > 0 && otherUser && (
+          <TypingIndicator
+            userName={getDisplayName(otherUser, false).displayName}
+            style={{
+              borderBottomWidth: 1,
+              borderBottomColor: theme.colors.border,
+            }}
+          />
+        )}
+
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'flex-end',
+            paddingHorizontal: theme.spacing.sm,
+            paddingTop: theme.spacing.xs,
+            paddingBottom: Platform.OS === 'android' ? Math.max(insets.bottom, theme.spacing.sm) : theme.spacing.sm,
+            gap: theme.spacing.xs,
+          }}
+        >
         {/* Image Picker */}
         <ChatImagePicker
           onImageSelected={handleSendImage}
@@ -1548,7 +1600,14 @@ export default function ChatScreen() {
         {/* Message Input */}
         <MessageInput
           value={messageText}
-          onChangeText={setMessageText}
+          onChangeText={(text) => {
+            setMessageText(text);
+            if (text.trim()) {
+              onTyping(); // Trigger typing indicator when user types
+            } else {
+              onStopTyping(); // Stop typing when input is cleared
+            }
+          }}
           onSend={handleSendMessage}
           placeholder={conversation?.listing?.title 
             ? `Message about ${truncateText(String(conversation.listing.title))}...` 
@@ -1561,6 +1620,7 @@ export default function ChatScreen() {
           }}
           conversationId={conversationId}
         />
+        </View>
       </Animated.View>
 
       {/* Make Offer Modal */}

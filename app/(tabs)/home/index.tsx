@@ -1007,17 +1007,15 @@ export default function HomeScreen() {
     }
     
     return (
-      <View style={{ minHeight: 200 }}>
-        <Suspense fallback={<LoadingSkeleton width="100%" height={200} />}>
-          <CodeSplitting.FixedFeaturedListings
-            maxItems={8} // Reduced from 10 for better performance
-            layout="horizontal"
-            onViewAll={() => {
-              navigation.home.goToBusinessListings();
-            }}
-          />
-        </Suspense>
-      </View>
+      <Suspense fallback={<LoadingSkeleton width="100%" height={200} />}>
+        <CodeSplitting.FixedFeaturedListings
+          maxItems={8} // Reduced from 10 for better performance
+          layout="horizontal"
+          onViewAll={() => {
+            navigation.home.goToBusinessListings();
+          }}
+        />
+      </Suspense>
     );
   }, [showHeavySections, searchQuery, filters.categories, filters.location, filters.condition, filters.priceRange.min, filters.priceRange.max, theme.spacing.lg]);
 

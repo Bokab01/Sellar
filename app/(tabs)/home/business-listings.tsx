@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { View, ScrollView, RefreshControl, FlatList } from 'react-native';
+import { View, ScrollView, RefreshControl, FlatList, Linking } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { SafeAreaWrapper } from '@/components/Layout';
 import { useBottomTabBarSpacing } from '@/hooks/useBottomTabBarSpacing';
-import { AppHeader } from '@/components';
+import { AppHeader, AppModal, Button } from '@/components';
 import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
 import { EmptyState } from '@/components/EmptyState/EmptyState';
 import { BusinessProfile } from '@/components/BusinessProfile/BusinessProfile';
 import { BusinessListings } from '@/components/BusinessListings/BusinessListings';
 import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
-import { Building2 } from 'lucide-react-native';
+import { Building2, Phone, X } from 'lucide-react-native';
 import { useDisplayName, getDisplayName } from '@/hooks/useDisplayName';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -42,6 +42,8 @@ interface BusinessUser {
   phone?: string;
   isBusinessUser: boolean;
   isVerified?: boolean;
+  isSellarPro?: boolean;
+  isBusinessVerified?: boolean;
   listings: BusinessListing[];
 }
 
@@ -69,11 +71,34 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [visibleBusinesses, setVisibleBusinesses] = useState<number>(3); // Show only 3 initially
+  
+  // Call modal state
+  const [showCallModal, setShowCallModal] = useState(false);
+  const [selectedBusinessUser, setSelectedBusinessUser] = useState<BusinessUser | null>(null);
 
   // Helper function to get display name based on business settings
   const getBusinessDisplayName = useCallback((profile: any) => {
     if (!profile) return 'Business User';
-    return getDisplayName(profile, false).displayName;
+    
+    const displayInfo = getDisplayName(profile, false);
+    
+    // Return the full display name (will be split in BusinessProfile component if needed)
+    return displayInfo.displayName;
+  }, []);
+
+  // Helper function to check if user has Sellar Pro
+  const isSellarPro = useCallback((businessUser: any) => {
+    if (!businessUser.subscription_plans) return false;
+    
+    const planName = businessUser.subscription_plans?.name;
+    const status = businessUser.status;
+    const periodEnd = businessUser.current_period_end;
+    
+    return (
+      planName === 'Sellar Pro' &&
+      ['active', 'trialing', 'cancelled'].includes(status) &&
+      (!periodEnd || new Date(periodEnd) > new Date())
+    );
   }, []);
 
   const fetchBusinessListings = useCallback(async (isRefresh = false) => {
@@ -103,6 +128,9 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
           user_id,
           status,
           current_period_end,
+          subscription_plans!plan_id (
+            name
+          ),
           profiles!user_id (
             id,
             first_name,
@@ -116,7 +144,8 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
             business_name_priority,
             phone,
             location,
-            is_verified
+            is_verified,
+            verification_status
           )
         `)
         .in('status', ['active', 'cancelled'])
@@ -141,7 +170,8 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
             business_name_priority,
             phone,
             location,
-            is_verified
+            is_verified,
+            verification_status
           `)
           .eq('is_business', true)
           .not('id', 'in', `(${businessUserIds.join(',')})`);
@@ -168,7 +198,8 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
             business_name_priority,
             phone,
             location,
-            is_verified
+            is_verified,
+            verification_status
           `)
           .eq('is_business', true);
 
@@ -188,12 +219,14 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
           user_id: sub.user_id,
           status: sub.status,
           current_period_end: sub.current_period_end,
+          subscription_plans: sub.subscription_plans,
           profiles: sub.profiles
         })),
         ...(businessProfileUsers || []).map(profile => ({
           user_id: profile.id,
           status: 'profile_business', // Mark as profile-based business
           current_period_end: null,
+          subscription_plans: null,
           profiles: profile
         }))
       ];
@@ -216,7 +249,8 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
             business_name_priority,
             phone,
             location,
-            is_verified
+            is_verified,
+            verification_status
           `)
           .eq('is_business', true);
 
@@ -301,6 +335,8 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
             phone: (profile as any)?.phone,
             isBusinessUser: true,
             isVerified: (profile as any)?.is_verified,
+            isSellarPro: false, // Fallback users don't have subscription data
+            isBusinessVerified: (profile as any)?.verification_status === 'business_verified' || (profile as any)?.verification_status === 'verified',
             listings: transformedListings,
           };
         });
@@ -369,6 +405,8 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
           phone: (profile as any)?.phone,
           isBusinessUser: true,
           isVerified: (profile as any)?.is_verified,
+          isSellarPro: isSellarPro(businessUser),
+          isBusinessVerified: (profile as any)?.verification_status === 'business_verified' || (profile as any)?.verification_status === 'verified',
           listings: transformedListings,
         };
       });
@@ -397,7 +435,7 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [getBusinessDisplayName]);
+  }, [getBusinessDisplayName, isSellarPro]);
 
   useEffect(() => {
     fetchBusinessListings();
@@ -434,6 +472,18 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
       }
     } catch (error) {
       console.error('Error toggling favorite:', error);
+    }
+  };
+
+  const handleCallPress = (businessUser: BusinessUser) => {
+    setSelectedBusinessUser(businessUser);
+    setShowCallModal(true);
+  };
+
+  const handleConfirmCall = () => {
+    if (selectedBusinessUser?.phone) {
+      setShowCallModal(false);
+      Linking.openURL(`tel:${selectedBusinessUser.phone}`);
     }
   };
 
@@ -509,9 +559,7 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
                 <BusinessProfile
                   business={businessUser}
                   onMessagePress={user?.id !== businessUser.id ? () => router.push(`/profile/${businessUser.id}`) : undefined}
-                  onCallPress={user?.id !== businessUser.id && businessUser.phone ? () => {
-                    // Handle call functionality
-                  } : undefined}
+                  onCallPress={user?.id !== businessUser.id && businessUser.phone ? () => handleCallPress(businessUser) : undefined}
                 />
                 
                 {/* Business Listings */}
@@ -551,6 +599,47 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
           />
         )}
       </View>
+
+      {/* Call Modal */}
+      <AppModal
+        position="center"
+        visible={showCallModal}
+        onClose={() => setShowCallModal(false)}
+        title={!selectedBusinessUser?.phone ? "No Phone Number" : ``}
+        showCloseButton={true}
+      >
+        <View style={{ gap: theme.spacing.md, padding: theme.spacing.lg }}>
+          <Text variant="h4" color="secondary" style={{ textAlign: 'center', marginBottom: theme.spacing.md }}>
+            {!selectedBusinessUser?.phone 
+              ? 'This business has not provided a phone number'
+              : `You are about to call ${selectedBusinessUser.name}`
+            }
+          </Text>
+          
+          <View style={{ gap: theme.spacing.sm }}>
+            {selectedBusinessUser?.phone && (
+              <Button
+                variant="primary"
+                fullWidth
+                icon={<Phone size={18} color={theme.colors.primaryForeground} />}
+                onPress={handleConfirmCall}
+              >
+                Call
+              </Button>
+            )}
+            
+            <Button
+              variant="icon"
+              fullWidth
+              onPress={() => setShowCallModal(false)}
+              icon={<X size={18} color={theme.colors.error} />}
+              style={{ borderColor: theme.colors.error, borderWidth: 1 }}
+            >
+              Cancel
+            </Button>
+          </View>
+        </View>
+      </AppModal>
     </SafeAreaWrapper>
   );
 });

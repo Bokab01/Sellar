@@ -22,6 +22,7 @@ import {
   Toast,
   AppModal,
 } from '@/components';
+import { UserDisplayName } from '@/components/UserDisplayName/UserDisplayName';
 import { 
   User, 
   Settings, 
@@ -271,13 +272,13 @@ export default function MoreScreen() {
         },
         {
           title: 'Reviews & Ratings',
-          subtitle: `${profile?.total_reviews || 0} reviews • ${(profile?.rating || 0).toFixed(1)} rating`,
+          subtitle: 'View your reviews and rating history',
           icon: <Star size={20} color={theme.colors.warning} />,
           onPress: () => router.push('/reviews'),
         },
         {
           title: 'Transaction History',
-          subtitle: `${transactionCount} recent transactions`,
+          subtitle: 'View all your transactions',
           icon: <CreditCard size={20} color={theme.colors.text.primary} />,
           onPress: () => router.push('/transactions'),
         },
@@ -368,15 +369,21 @@ export default function MoreScreen() {
                 style={{ marginRight: theme.spacing.lg }}
               />
               <View style={{ flex: 1 }}>
+                {/* Name - First line (with business name if configured) */}
+                <View style={{ marginBottom: 4 }}>
+                  <UserDisplayName
+                    profile={profile}
+                    variant="full"
+                    showBadge={false}
+                    textVariant="h3"
+                    style={{ fontWeight: '600' }}
+                  />
+                </View>
+                
+                {/* Badges row - Below name, aligned to start */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, marginBottom: theme.spacing.xs, flexWrap: 'wrap' }}>
-                  <Text variant="h3" style={{ fontWeight: '600' }}>
-                    {fullName}
-                  </Text>
-                  {/* ✅ PRO Badge after name */}
-                  {profile?.is_sellar_pro && (
-                    <Badge text="⭐ PRO" variant="primary" size="sm" />
-                  )}
                   <CompactUserBadges
+                    isSellarPro={profile?.is_sellar_pro}
                     isBusinessUser={profile?.is_business_user}
                     isVerified={profile?.is_verified}
                     isBusinessVerified={profile?.is_business_verified}

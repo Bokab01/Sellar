@@ -62,6 +62,13 @@ export function UserDisplayName({
     );
   }
 
+  // Check if we need to split the name into two lines (for "Both Names" display)
+  const shouldSplitNames = displayInfo.isBusinessDisplay && 
+                          profile.business_name_priority === 'secondary' &&
+                          displayText.includes('•');
+  
+  const splitNames = shouldSplitNames ? displayText.split('•').map(s => s.trim()) : null;
+
   return (
     <View style={{
       flexDirection: 'row',
@@ -76,23 +83,47 @@ export function UserDisplayName({
           size={avatarSize as any}
         />
       )}
-      <Text 
-        variant={textVariant} 
-        color={color} 
-        style={[
-          displayInfo.isBusinessDisplay && {
-            fontWeight: '600',
-          },
-          style
-        ]}
-        numberOfLines={numberOfLines}
-      >
-        {getDisplayText()}
-      </Text>
+      
+      {shouldSplitNames && splitNames ? (
+        // Render two lines for "Both Names" display
+        <View style={{ flexDirection: 'column', gap: 2, marginBottom: theme.spacing.xs }}>
+          <Text 
+            variant={textVariant} 
+            color={color} 
+            style={style}
+            numberOfLines={1}
+          >
+            {splitNames[0]}
+          </Text>
+          <Text 
+            variant="caption"
+            color="muted"
+            style={[{ fontWeight: '600' }, style]}
+            numberOfLines={1}
+          >
+            {splitNames[1]}
+          </Text>
+        </View>
+      ) : (
+        // Single line display
+        <Text 
+          variant={textVariant} 
+          color={color} 
+          style={[
+            displayInfo.isBusinessDisplay && {
+              fontWeight: '600',
+            },
+            style
+          ]}
+          numberOfLines={numberOfLines}
+        >
+          {getDisplayText()}
+        </Text>
+      )}
       
       {showBadge && (
         <ExtraSmallUserBadges
-          isBusinessUser={displayInfo.showBusinessBadge}
+         /*  isBusinessUser={displayInfo.showBusinessBadge} */
           isVerified={profile.is_verified}
           isBusinessVerified={profile.verification_level === 'business'}
         />

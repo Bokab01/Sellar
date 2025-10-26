@@ -49,6 +49,13 @@ AppState.addEventListener('change', (nextAppState) => {
       // Check if we have an active session
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session) {
+          try {
+            // Ensure realtime uses the latest token after resume
+            const rt: any = (supabase as any).realtime;
+            if (rt?.setAuth) {
+              rt.setAuth(session.access_token);
+            }
+          } catch {}
           console.log('✅ Active session found, connection restored');
         } else {
           console.warn('⚠️ No active session found');

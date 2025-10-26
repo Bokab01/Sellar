@@ -11,6 +11,7 @@ import { Input } from '@/components/Input/Input';
 import { UserDisplayName } from '@/components/UserDisplayName/UserDisplayName';
 import { Rating } from '@/components/Rating/Rating';
 import { Badge } from '@/components/Badge/Badge';
+import { CompactUserBadges } from '@/components/UserBadgeSystem';
 import { ImageViewer } from '@/components/ImageViewer';
 import { useImageViewer } from '@/hooks/useImageViewer';
 import { PostImage, ThumbnailImage } from '@/components/ResponsiveImage/ResponsiveImage';
@@ -411,32 +412,39 @@ export function PostCard({
                 activeOpacity={isOwnPost || isOfficial ? 1 : 0.7}
                 disabled={isOwnPost || isOfficial}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs, flexWrap: 'wrap' }}>
-                  {isOfficial ? (
-                    <Text variant="body" style={{ fontWeight: '600' }}>
-                      {displayName}
-                    </Text>
-                  ) : (
-                    <UserDisplayName
-                      profile={post.author.profile}
-                      variant="full"
-                      showBadge={true}
-                      textVariant="body"
-                      style={{ fontWeight: '600' }}
-                    />
-                  )}
-                  
-                  {/* ✅ Official Badge */}
-                  {isOfficial && (
-                    <OfficialBadge variant="compact" size="sm" />
-                  )}
-                  
-                  {/* ✅ PRO Badge after name (only for non-official users) */}
-                  {!isOfficial && post.author.is_sellar_pro && (
-                    <Badge text="⭐ PRO" variant="primary" size="xs" />
-                  )}
-                </View>
+                {/* Name - First line */}
+                {isOfficial ? (
+                  <Text variant="body" style={{ fontWeight: '600' }}>
+                    {displayName}
+                  </Text>
+                ) : (
+                  <UserDisplayName
+                    profile={post.author.profile}
+                    variant="full"
+                    showBadge={true}
+                    textVariant="body"
+                    style={{ fontWeight: '600' }}
+                  />
+                )}
               </TouchableOpacity>
+              
+              {/* Badges row - Below name, aligned to start */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs, marginTop: 2, flexWrap: 'wrap' }}>
+                {/* ✅ Official Badge */}
+                {isOfficial && (
+                  <OfficialBadge variant="compact" size="sm" />
+                )}
+                
+                {/* ✅ User Badges (only for non-official users) */}
+                {!isOfficial && (
+                  <CompactUserBadges
+                    isSellarPro={post.author.is_sellar_pro}
+                    isBusinessUser={false}
+                    isVerified={post.author.isVerified}
+                    isBusinessVerified={false}
+                  />
+                )}
+              </View>
               
               {/* Rating Section */}
               {post.author.rating && post.author.rating > 0 && (

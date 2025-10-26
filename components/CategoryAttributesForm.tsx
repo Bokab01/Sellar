@@ -3,13 +3,16 @@ import {
   View,
   StyleSheet,
   ActivityIndicator,
+  TouchableOpacity,
+  ScrollView,
 } from 'react-native';
 import { Text } from '@/components/Typography/Text';
 import { Input } from '@/components/Input/Input';
-import { Picker } from '@react-native-picker/picker';
+import { AppModal } from '@/components/Modal/Modal';
 import Checkbox from 'expo-checkbox';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/theme/ThemeProvider';
+import { ChevronDown, Check } from 'lucide-react-native';
 
 // Types
 export interface CategoryAttribute {
@@ -52,6 +55,7 @@ export const CategoryAttributesForm: React.FC<CategoryAttributesFormProps> = ({
   const { theme } = useTheme();
   const [attributes, setAttributes] = useState<CategoryAttribute[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeSelectModal, setActiveSelectModal] = useState<string | null>(null);
 
   // ✅ FIX: Move fetchAttributes inside useEffect to avoid memory leak
   useEffect(() => {
@@ -137,8 +141,11 @@ export const CategoryAttributesForm: React.FC<CategoryAttributesFormProps> = ({
         );
 
       case 'select':
+        const selectedOption = attribute.options?.find(opt => opt.value === value);
+        const displayLabel = selectedOption?.label || attribute.placeholder || 'Select...';
+        
         return (
-          <View style={styles.fieldContainer}>
+          <View key={attribute.id} style={styles.fieldContainer}>
             <Text style={[styles.label, { color: theme.colors.text.primary }]}>
               {attribute.label}
               {attribute.is_required && <Text style={{ color: theme.colors.text.secondary }}> *</Text>}
@@ -148,35 +155,87 @@ export const CategoryAttributesForm: React.FC<CategoryAttributesFormProps> = ({
                 {attribute.help_text}
               </Text>
             )}
-            <View
+            
+            {/* Custom Select Button */}
+            <TouchableOpacity
+              onPress={() => setActiveSelectModal(attribute.slug)}
               style={[
-                styles.pickerContainer,
+                styles.selectButton,
                 {
                   backgroundColor: theme.colors.surface,
                   borderColor: hasError ? theme.colors.error : theme.colors.border,
+                  borderWidth: 1,
+                  borderRadius: theme.borderRadius.md,
+                  paddingHorizontal: theme.spacing.md,
+                  paddingVertical: theme.spacing.md,
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
                 },
               ]}
             >
-              <Picker
-                selectedValue={value || ''}
-                onValueChange={(itemValue) => onChange(attribute.slug, itemValue)}
-                style={[styles.picker, { color: theme.colors.text.primary }]}
+              <Text
+                style={{
+                  color: value ? theme.colors.text.primary : theme.colors.text.muted,
+                  fontSize: 16,
+                }}
               >
-                <Picker.Item label={attribute.placeholder || 'Select...'} value="" />
-                {attribute.options?.map((option) => (
-                  <Picker.Item
-                    key={option.value}
-                    label={option.label}
-                    value={option.value}
-                  />
-                ))}
-              </Picker>
-            </View>
+                {displayLabel}
+              </Text>
+              <ChevronDown size={20} color={theme.colors.text.muted} />
+            </TouchableOpacity>
+            
             {error && (
               <Text style={[styles.errorText, { color: theme.colors.error }]}>
                 {error}
               </Text>
             )}
+            
+            {/* Select Modal */}
+            <AppModal
+              visible={activeSelectModal === attribute.slug}
+              onClose={() => setActiveSelectModal(null)}
+              title={attribute.label}
+            >
+              <ScrollView style={{ maxHeight: 400 }}>
+                {attribute.options?.map((option) => {
+                  const isSelected = value === option.value;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={option.value}
+                      onPress={() => {
+                        onChange(attribute.slug, option.value);
+                        setActiveSelectModal(null);
+                      }}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingVertical: theme.spacing.md,
+                        paddingHorizontal: theme.spacing.lg,
+                        borderBottomWidth: 1,
+                        borderBottomColor: theme.colors.border,
+                        backgroundColor: isSelected ? theme.colors.primary + '10' : 'transparent',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          color: isSelected ? theme.colors.primary : theme.colors.text.primary,
+                          fontWeight: isSelected ? '600' : '400',
+                        }}
+                      >
+                        {option.label}
+                      </Text>
+                      {isSelected && (
+                        <Check size={20} color={theme.colors.primary} strokeWidth={3} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </AppModal>
           </View>
         );
 
@@ -377,15 +436,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 8,
   },
-  pickerContainer: {
-    borderWidth: 1,
-    borderRadius: 8,
-    overflow: 'hidden',
-    minHeight: 56,
-  },
-  picker: {
-    height: 56,
-    paddingVertical: 4,
+  selectButton: {
+    minHeight: 52,
   },
   checkboxGroup: {
     gap: 12,

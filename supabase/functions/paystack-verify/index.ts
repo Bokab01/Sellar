@@ -291,6 +291,24 @@ async function validatePaymentAmount(transaction: any, paystackData: any, supaba
 // Helper function to process successful payment
 async function processPayment(supabase: any, transaction: any, paystackData: any) {
   try {
+    // CRITICAL: Mark as processing immediately to prevent duplicate processing
+    const { data: lockResult, error: lockError } = await supabase
+      .from('paystack_transactions')
+      .update({ 
+        webhook_processed: true,
+        webhook_processed_at: new Date().toISOString(),
+      })
+      .eq('reference', transaction.reference)
+      .eq('webhook_processed', false) // Only update if not already processed
+      .select()
+      .single();
+
+    // If update didn't return a row, it means another process already processed this
+    if (lockError || !lockResult) {
+      console.log('⚠️ Payment already processed by another handler:', transaction.reference);
+      return; // Exit early - already processed
+    }
+
     // Process based on purchase type
     if (transaction.purchase_type === 'credit_package') {
       // Get the package details from database

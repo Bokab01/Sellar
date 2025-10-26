@@ -5,6 +5,7 @@ import { Text } from '@/components/Typography/Text';
 import { IdentityVerificationBadge, BusinessVerificationBadge } from '@/components/VerifiedBadge/VerifiedBadge';
 
 interface UserBadgeSystemProps {
+  isSellarPro?: boolean;
   isBusinessUser?: boolean;
   isVerified?: boolean;
   isBusinessVerified?: boolean;
@@ -15,6 +16,7 @@ interface UserBadgeSystemProps {
 }
 
 export function UserBadgeSystem({
+  isSellarPro = false,
   isBusinessUser = false,
   isVerified = false,
   isBusinessVerified = false,
@@ -26,7 +28,7 @@ export function UserBadgeSystem({
   const { theme } = useTheme();
 
   // Don't render anything if no badges should be shown
-  if (!isBusinessUser && !isVerified && !isBusinessVerified) {
+  if (!isSellarPro && !isBusinessUser && !isVerified && !isBusinessVerified) {
     return null;
   }
 
@@ -95,16 +97,19 @@ export function UserBadgeSystem({
   // Variant configurations
   const variantConfig = {
     compact: {
+      sellarPro: '⭐ PRO',
       pro: 'PRO',
       verified: '✓',
       business: '✓B',
     },
     full: {
+      sellarPro: '⭐ PRO SELLER',
       pro: 'PRO',
       verified: '✓ VERIFIED',
       business: '✓ BUSINESS',
     },
     default: {
+      sellarPro: '⭐ PRO',
       pro: 'PRO',
       verified: '✓',
       business: '✓B',
@@ -153,8 +158,16 @@ export function UserBadgeSystem({
       },
       style,
     ]}>
-      {/* Pro Badge */}
-      {isBusinessUser && (
+      {/* Sellar Pro Badge (takes priority over Business badge) */}
+      {isSellarPro && (
+        <BadgeComponent 
+          text={currentVariant.sellarPro || '⭐ PRO'} 
+          config={currentTheme.pro} 
+        />
+      )}
+      
+      {/* Business/Pro Badge (only show if not Sellar Pro) */}
+      {!isSellarPro && isBusinessUser && (
         <BadgeComponent 
           text={currentVariant.pro} 
           config={currentTheme.pro} 

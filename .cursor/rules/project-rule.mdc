@@ -1,5 +1,9 @@
 ---
 description: Always use custom components in the apps design system, use custom AppModal for any alert, and treat the sellar-admin dashboard and mobile app as independent repo
+Do not create a documentation unless it is really necessary and always ask first. Do not try to run sql command, I will do it manually.
 globs:
 alwaysApply: true
 ---
+
+
+

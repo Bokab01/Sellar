@@ -4,6 +4,8 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { Avatar, CompactReviewSummary } from '@/components';
 import { IdentityVerificationBadge } from '@/components/VerifiedBadge/VerifiedBadge';
+import { Badge } from '@/components/Badge/Badge';
+import { CompactUserBadges } from '@/components/UserBadgeSystem';
 import { Button } from '@/components/Button/Button';
 import { MessageCircle, Phone, MapPin } from 'lucide-react-native';
 import { router } from 'expo-router';
@@ -18,6 +20,8 @@ interface BusinessProfileProps {
     phone?: string;
     isBusinessUser: boolean;
     isVerified?: boolean; // ID verification status
+    isSellarPro?: boolean; // PRO status
+    isBusinessVerified?: boolean; // Business verification
   };
   onMessagePress?: () => void;
   onCallPress?: () => void;
@@ -117,33 +121,55 @@ export function BusinessProfile({
 
       {/* Business Info */}
       <View style={{ flex: 1 }}>
-        {/* Business Name */}
-        <Text 
-          variant="bodySmall" 
-          style={{ 
-            fontWeight: '600',
-            fontSize: 13,
-            marginBottom: 0,
-            color: theme.colors.text.primary,
-          }}
-          numberOfLines={1}
-        >
-          {business.name}
-        </Text>
-
-        {/* Verification Badge - Below name */}
-        {business.isVerified && (
-          <View style={{ 
-            marginTop: theme.spacing.xs,
-            flexDirection: 'row',
-            alignItems: 'center'
-          }}>
-            <IdentityVerificationBadge
-              size="xs"
-              variant="compact"
-            />
+        {/* Business Name - Handle split display for "Both Names" mode */}
+        {business.name.includes('•') ? (
+          <View style={{ flexDirection: 'column', gap: 2 }}>
+            <Text 
+              variant="bodySmall" 
+              style={{ 
+                fontWeight: '600',
+                fontSize: 13,
+                color: theme.colors.text.primary,
+              }}
+              numberOfLines={1}
+            >
+              {business.name.split('•')[0].trim()}
+            </Text>
+            <Text 
+              variant="caption"
+              style={{ 
+                fontWeight: '600',
+                color: theme.colors.text.muted,
+              }}
+              numberOfLines={1}
+            >
+              {business.name.split('•')[1].trim()}
+            </Text>
           </View>
+        ) : (
+          <Text 
+            variant="bodySmall" 
+            style={{ 
+              fontWeight: '600',
+              fontSize: 13,
+              marginBottom: 0,
+              color: theme.colors.text.primary,
+            }}
+            numberOfLines={1}
+          >
+            {business.name}
+          </Text>
         )}
+
+        {/* Badges row - Below name, aligned to start */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, marginTop: theme.spacing.xs, flexWrap: 'wrap' }}>
+          <CompactUserBadges
+            isSellarPro={business.isSellarPro}
+            isBusinessUser={business.isBusinessUser}
+            isVerified={business.isVerified}
+            isBusinessVerified={business.isBusinessVerified}
+          />
+        </View>
 
         {/* Rating - Below verification badge */}
         <View style={{ marginVertical: theme.spacing.xs }}>
@@ -155,8 +181,9 @@ export function BusinessProfile({
           <View style={{
             flexDirection: 'row',
             alignItems: 'center',
-            
+            marginTop: theme.spacing.xs,
           }}>
+            <MapPin size={12} color={theme.colors.text.muted} />
             <Text 
               variant="caption" 
               color="secondary"

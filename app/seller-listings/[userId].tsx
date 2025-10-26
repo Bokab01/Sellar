@@ -30,7 +30,12 @@ export default function SellerListingsScreen() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [error, setError] = useState<string | null>(null);
   
-  const { favorites, toggleFavorite } = useFavoritesStore();
+  const { 
+    favorites, 
+    toggleFavorite,
+    incrementListingFavoriteCount,
+    decrementListingFavoriteCount 
+  } = useFavoritesStore();
   
   // Check if current user is viewing their own listings
   const isOwnListings = user?.id === userId;
@@ -138,10 +143,42 @@ export default function SellerListingsScreen() {
     setRefreshing(false);
   }, [fetchSellerProfile, fetchSellerListings]);
 
-  // Handle favorite toggle
+  // Handle favorite toggle (with database save)
   const handleFavoriteToggle = useCallback(async (listingId: string) => {
-    await toggleFavorite(listingId);
-  }, [toggleFavorite]);
+    const isFavorited = favorites[listingId] || false;
+    
+    // Optimistic update
+    toggleFavorite(listingId);
+    if (isFavorited) {
+      decrementListingFavoriteCount(listingId);
+    } else {
+      incrementListingFavoriteCount(listingId);
+    }
+
+    // Save to database
+    try {
+      const { toggleFavorite: toggleFavoriteDB } = await import('@/lib/favoritesAndViews');
+      const result = await toggleFavoriteDB(listingId);
+      
+      if (result.error) {
+        // Revert on error
+        toggleFavorite(listingId);
+        if (isFavorited) {
+          incrementListingFavoriteCount(listingId);
+        } else {
+          decrementListingFavoriteCount(listingId);
+        }
+      }
+    } catch (error) {
+      // Revert on error
+      toggleFavorite(listingId);
+      if (isFavorited) {
+        incrementListingFavoriteCount(listingId);
+      } else {
+        decrementListingFavoriteCount(listingId);
+      }
+    }
+  }, [favorites, toggleFavorite, incrementListingFavoriteCount, decrementListingFavoriteCount]);
 
   // Handle listing press
   const handleListingPress = useCallback((listingId: string) => {

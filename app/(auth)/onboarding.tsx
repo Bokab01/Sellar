@@ -112,7 +112,23 @@ const AnimatedCard = ({ item, index, theme }: { item: MarketplaceItem; index: nu
         
         {/* Gradient Overlay */}
         <LinearGradient
-          colors={item.gradient as any}
+          colors={(function buildSafeColors() {
+            const toRgba = (hex: string, alpha = 1) => {
+              if (!hex || typeof hex !== 'string') return `rgba(0,0,0,${alpha})`;
+              if (hex.startsWith('rgb')) return hex;
+              if (hex === 'transparent') return 'rgba(0,0,0,0)';
+              const h = hex.replace('#', '');
+              const isShort = h.length === 3;
+              const r = parseInt(isShort ? h[0] + h[0] : h.substring(0, 2), 16) || 0;
+              const g = parseInt(isShort ? h[1] + h[1] : h.substring(2, 4), 16) || 0;
+              const b = parseInt(isShort ? h[2] + h[2] : h.substring(4, 6), 16) || 0;
+              return `rgba(${r},${g},${b},${alpha})`;
+            };
+            const c0 = toRgba(item.gradient?.[0] || '#000000', 0);
+            const c1 = toRgba(item.gradient?.[1] || theme.colors.primary, 0.8);
+            const c2 = toRgba(item.gradient?.[2] || theme.colors.primary, 0.95);
+            return [c0, c1, c2];
+          })()}
           style={{
             position: 'absolute',
             left: 0,

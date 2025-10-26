@@ -30,7 +30,7 @@ import { getDisplayName } from '@/hooks/useDisplayName';
 export default function InboxScreen() {
   const { theme } = useTheme();
   const { conversations, loading, error, refresh } = useConversations();
-  const { unreadCounts, markAsUnread, clearManuallyMarkedAsUnread } = useChatStore();
+  const { unreadCounts, markAsUnread, clearManuallyMarkedAsUnread, typingUsers } = useChatStore();
   const { isUserOnline, getTypingUsers } = usePresence();
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -346,8 +346,9 @@ export default function InboxScreen() {
         : conv.participant_1_profile;
       
       const lastMessage = conv.messages?.[0];
-      const typingUsers = getTypingUsers(conv.id);
-      const isOtherUserTyping = typingUsers.includes(otherParticipant?.id);
+      // Check if other user is typing using the typing store
+      const conversationTypingUsers = typingUsers[conv.id] || [];
+      const isOtherUserTyping = conversationTypingUsers.includes(otherParticipant?.id);
       
       // Get proper display name based on business settings
       const displayNameResult = getDisplayName(otherParticipant, false);
@@ -383,7 +384,7 @@ export default function InboxScreen() {
         is_sellar_pro: Boolean(otherParticipant?.is_sellar_pro), // ✅ Sellar Pro status
       };
     });
-  }, [conversations, unreadCounts, getTypingUsers, isUserOnline]);
+  }, [conversations, unreadCounts, typingUsers, isUserOnline]);
 
   const filteredConversations = useMemo(() => {
     return transformedConversations
@@ -450,6 +451,7 @@ export default function InboxScreen() {
               badge={conversation.is_sellar_pro ? { text: '⭐ PRO', variant: 'info' as const } : undefined}
               showChevron={!isSelectionMode}
               onPress={undefined}
+              isTyping={conversation.isTyping}
               style={{
                 backgroundColor: longPressedItem === conversation.id
                   ? theme.colors.primary + '15'

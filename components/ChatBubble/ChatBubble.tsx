@@ -93,14 +93,14 @@ export function ChatBubble({
       <View
         style={{
           alignItems: 'center',
-          marginVertical: theme.spacing.md,
+          marginVertical: theme.spacing.sm,
         }}
       >
         <View
           style={{
             backgroundColor: colors.backgroundColor,
-            paddingHorizontal: theme.spacing.lg,
-            paddingVertical: theme.spacing.sm,
+            paddingHorizontal: theme.spacing.md,
+            paddingVertical: theme.spacing.xs,
             borderRadius: theme.borderRadius.full,
             maxWidth: '80%',
           }}
@@ -125,8 +125,8 @@ export function ChatBubble({
       style={{
         flexDirection: 'row',
         justifyContent: isOwn ? 'flex-end' : 'flex-start',
-        marginVertical: theme.spacing.xs,
-        paddingHorizontal: theme.spacing.lg,
+        marginVertical: 2,
+        paddingHorizontal: theme.spacing.sm,
       }}
     >
       <TouchableOpacity
@@ -157,7 +157,7 @@ export function ChatBubble({
           style={{
             backgroundColor: colors.backgroundColor,
             borderRadius: theme.borderRadius.lg,
-            padding: theme.spacing.md,
+            padding: theme.spacing.sm,
             borderWidth: isOwn ? 0 : 1,
             borderColor: theme.colors.border,
             ...(!isOwn && theme.shadows.sm),
@@ -168,8 +168,8 @@ export function ChatBubble({
             variant="body"
             style={{
               color: colors.textColor,
-              lineHeight: 20,
-              marginBottom: theme.spacing.sm,
+              lineHeight: 18,
+              marginBottom: theme.spacing.xs,
             }}
           >
             {message}
@@ -177,7 +177,7 @@ export function ChatBubble({
 
           {/* Images */}
           {images && Array.isArray(images) && images.length > 0 && (
-            <View style={{ marginBottom: theme.spacing.sm }}>
+            <View style={{ marginBottom: theme.spacing.xs }}>
               {images.map((imageUrl, index) => (
                 <TouchableOpacity 
                   key={index} 
@@ -249,6 +249,7 @@ export function ChatBubble({
                 isDelivered={status === 'delivered' || status === 'read'}
                 size={12}
                 style={{ marginLeft: theme.spacing.sm }}
+                color="rgba(255,255,255,0.9)" // White color for visibility on primary background
               />
             )}
           </View>

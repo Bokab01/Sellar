@@ -213,18 +213,29 @@ export function useListingSubmission() {
         throw new Error(`Failed to create listing: ${createError.message}`);
       }
 
-      // Apply features if any were selected
+      // Apply features if any were selected (use purchase_feature RPC)
       if (selectedFeatures.length > 0 && newListing) {
         for (const feature of selectedFeatures) {
           try {
-            const { error: featureError } = await supabase.rpc('apply_listing_feature', {
-              p_listing_id: newListing.id,
+            const creditsToSpend = feature.credits || 0;
+            const metadata = { listing_id: newListing.id };
+            const { data: purchaseData, error: featureError } = await (supabase as any).rpc?.('purchase_feature', {
               p_user_id: userId,
-              p_feature_type: feature.key,
-            });
+              p_feature_key: feature.key,
+              p_credits: creditsToSpend,
+              p_metadata: metadata,
+            }) || { data: null, error: null };
 
             if (featureError) {
               console.error(`Failed to apply feature ${feature.name}:`, featureError);
+              continue;
+            }
+
+            // Validate DB function semantic success
+            const ok = Array.isArray(purchaseData) && purchaseData[0]?.success === true;
+            if (!ok) {
+              const dbMsg = Array.isArray(purchaseData) ? purchaseData[0]?.error : undefined;
+              console.error(`Feature ${feature.name} did not apply successfully.`, dbMsg || 'Unknown DB error');
             }
           } catch (featureError) {
             console.error(`Error applying feature ${feature.name}:`, featureError);

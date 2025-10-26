@@ -207,12 +207,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   subscribeToNotifications: (userId: string) => {
-    console.log('🔔 [Store] Setting up real-time subscription for notifications, user:', userId);
-    
     // Cleanup existing subscription
     const { realtimeChannel } = get();
     if (realtimeChannel) {
-      console.log('🔔 [Store] Removing existing notification subscription');
       supabase.removeChannel(realtimeChannel);
     }
 
@@ -228,16 +225,12 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          console.log('🔔 [Store] Real-time notification received:', payload.new);
-          
           const newNotification = payload.new as Notification;
           const { notifications, unreadCount } = get();
           
           // Add new notification to the top of the list
           const updatedNotifications = [newNotification, ...notifications];
           const newUnreadCount = !newNotification.is_read ? unreadCount + 1 : unreadCount;
-          
-          console.log('🔔 [Store] Updated notifications count:', updatedNotifications.length, 'Unread:', newUnreadCount);
           
           set({
             notifications: updatedNotifications,
@@ -254,8 +247,6 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          console.log('🔔 [Store] Real-time notification updated:', payload.new);
-          
           const updatedNotification = payload.new as Notification;
           const { notifications } = get();
           
@@ -280,8 +271,6 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          console.log('🔔 [Store] Real-time notification deleted:', payload.old);
-          
           const deletedId = payload.old.id as string;
           const { notifications } = get();
           
@@ -295,15 +284,12 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
           });
         }
       )
-      .subscribe((status) => {
-        console.log('🔔 [Store] Notification subscription status:', status);
-      });
+      .subscribe();
 
     set({ realtimeChannel: channel });
   },
 
   unsubscribeFromNotifications: () => {
-    console.log('🔔 [Store] Unsubscribing from notifications');
     const { realtimeChannel } = get();
     if (realtimeChannel) {
       supabase.removeChannel(realtimeChannel);

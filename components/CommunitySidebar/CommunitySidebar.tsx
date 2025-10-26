@@ -13,6 +13,7 @@ import { Button } from '@/components/Button/Button';
 import { LoadingSkeleton } from '@/components/LoadingSkeleton/LoadingSkeleton';
 import { Badge } from '@/components/Badge/Badge';
 import { CompactUserBadges } from '@/components/UserBadgeSystem';
+import { UserDisplayName } from '@/components/UserDisplayName/UserDisplayName';
 import { 
   Users, 
   UserPlus2, 
@@ -359,16 +360,27 @@ export function CommunitySidebar({ isVisible, onClose }: CommunitySidebarProps) 
                 size="md"
               />
               <View style={{ marginLeft: theme.spacing.md, flex: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs, flexWrap: 'wrap', marginBottom: theme.spacing.xs }}>
-                  <Text variant="body" style={{ fontWeight: '600' }}>
-                    {(profile?.first_name || user.user_metadata?.first_name || 'User')} {(profile?.last_name || user.user_metadata?.last_name || '')}
-                  </Text>
-                  <CompactUserBadges
-                    isBusinessUser={profile?.is_business}
-                    isVerified={profile?.is_verified}
-                    isBusinessVerified={profile?.verification_level === 'business'}
+                {/* Name - First line (with business name if configured) */}
+                <View style={{ marginBottom: 2 }}>
+                  <UserDisplayName
+                    profile={profile}
+                    variant="full"
+                    showBadge={false}
+                    textVariant="body"
+                    style={{ fontWeight: '600' }}
                   />
                 </View>
+                
+                {/* Badges row - Below name, aligned to start */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs, marginBottom: theme.spacing.xs, flexWrap: 'wrap' }}>
+                  <CompactUserBadges
+                    isSellarPro={(profile as any)?.is_sellar_pro}
+                    isBusinessUser={profile?.is_business}
+                    isVerified={profile?.is_verified}
+                    isBusinessVerified={false}
+                  />
+                </View>
+                
                 <Text variant="caption" color="muted">Your Profile</Text>
               </View>
             </View>

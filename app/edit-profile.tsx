@@ -30,8 +30,10 @@ import {
   Save,
   ChevronDown,
   ChevronUp,
-  Camera
+  Camera,
+  Check
 } from 'lucide-react-native';
+import { AppModal } from '@/components/Modal/Modal';
 import { 
   useProfile, 
   useUpdateProfile,
@@ -46,6 +48,7 @@ import { BusinessProfileSetupModal } from '@/components/BusinessProfileSetupModa
 import { validateName, validateUsername, validatePhoneNumber } from '@/utils/validation';
 import { checkMultipleUniqueness } from '@/utils/uniquenessValidation';
 import { storageHelpers } from '@/lib/storage';
+import { supabase } from '@/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { Image as ImageIcon } from 'lucide-react-native';
 
@@ -104,6 +107,34 @@ export default function EditProfileScreen() {
 
   const [avatar, setAvatar] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string>('');
+  
+  // Business types
+  const [businessTypes, setBusinessTypes] = useState<Array<{ id: string; name: string; slug: string }>>([]);
+  const [showBusinessTypeModal, setShowBusinessTypeModal] = useState(false);
+  const [loadingBusinessTypes, setLoadingBusinessTypes] = useState(false);
+
+  // Fetch business types from backend
+  useEffect(() => {
+    const fetchBusinessTypes = async () => {
+      setLoadingBusinessTypes(true);
+      try {
+        const { data, error } = await supabase
+          .from('business_types')
+          .select('id, name, slug')
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true });
+        
+        if (error) throw error;
+        setBusinessTypes(data || []);
+      } catch (error) {
+        console.error('Error fetching business types:', error);
+      } finally {
+        setLoadingBusinessTypes(false);
+      }
+    };
+    
+    fetchBusinessTypes();
+  }, []);
 
   // Initialize form with profile data
   useEffect(() => {
@@ -765,12 +796,39 @@ export default function EditProfileScreen() {
                     maxHeight={150}
                   />
 
-                  <Input
-                    label="Business Type"
-                    value={formData.business_type}
-                    onChangeText={(value) => updateFormField('business_type', value)}
-                    placeholder="e.g. Retail, Service, Manufacturing"
-                  />
+                  {/* Business Type Selector */}
+                  <View>
+                    <Text variant="bodySmall" style={{ 
+                      marginBottom: theme.spacing.sm,
+                      fontWeight: '500',
+                      color: theme.colors.text.primary,
+                    }}>
+                      Business Type
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setShowBusinessTypeModal(true)}
+                      style={{
+                        backgroundColor: theme.colors.surface,
+                        borderColor: theme.colors.border,
+                        borderWidth: 1,
+                        borderRadius: theme.borderRadius.md,
+                        paddingHorizontal: theme.spacing.md,
+                        paddingVertical: theme.spacing.md,
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        minHeight: 52,
+                      }}
+                    >
+                      <Text style={{
+                        color: formData.business_type ? theme.colors.text.primary : theme.colors.text.muted,
+                        fontSize: 16,
+                      }}>
+                        {formData.business_type || 'Select business type'}
+                      </Text>
+                      <ChevronDown size={20} color={theme.colors.text.muted} />
+                    </TouchableOpacity>
+                  </View>
 
                   <Input
                     label="Business Phone"
@@ -1279,6 +1337,63 @@ export default function EditProfileScreen() {
         onClose={() => setShowBusinessSetupModal(false)}
         onBusinessProfileCreated={handleBusinessProfileCreated}
       />
+      
+      {/* Business Type Selection Modal */}
+      <AppModal
+        visible={showBusinessTypeModal}
+        onClose={() => setShowBusinessTypeModal(false)}
+        title="Select Business Type"
+        position='bottom'
+      >
+        <ScrollView style={{ maxHeight: 500 }}>
+          {loadingBusinessTypes ? (
+            <View style={{ padding: theme.spacing.xl, alignItems: 'center' }}>
+              <Text variant="body" color="muted">Loading business types...</Text>
+            </View>
+          ) : businessTypes.length === 0 ? (
+            <View style={{ padding: theme.spacing.xl, alignItems: 'center' }}>
+              <Text variant="body" color="muted">No business types available</Text>
+            </View>
+          ) : (
+            businessTypes.map((type) => {
+              const isSelected = formData.business_type === type.name;
+              
+              return (
+                <TouchableOpacity
+                  key={type.id}
+                  onPress={() => {
+                    updateFormField('business_type', type.name);
+                    setShowBusinessTypeModal(false);
+                  }}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingVertical: theme.spacing.md,
+                    paddingHorizontal: theme.spacing.lg,
+                    borderBottomWidth: 1,
+                    borderBottomColor: theme.colors.border,
+                    backgroundColor: isSelected ? theme.colors.primary + '10' : 'transparent',
+                  }}
+                >
+                  <Text
+                    variant="body"
+                    style={{
+                      color: isSelected ? theme.colors.primary : theme.colors.text.primary,
+                      fontWeight: isSelected ? '600' : '400',
+                    }}
+                  >
+                    {type.name}
+                  </Text>
+                  {isSelected && (
+                    <Check size={20} color={theme.colors.primary} strokeWidth={3} />
+                  )}
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </ScrollView>
+      </AppModal>
 
       {/* Toast */}
       <Toast

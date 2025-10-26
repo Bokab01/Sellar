@@ -426,30 +426,27 @@ export function MediaViewer({
   const { theme } = useTheme();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [controlsVisible, setControlsVisible] = useState(true);
-
-  // ✅ FIX: Safety check for media array
-  if (!visible || !media || !Array.isArray(media) || media.length === 0) {
-    return null;
-  }
-
-  // Parse media items
-  const mediaItems: MediaItem[] = media.map(url => ({
+  // Always initialize hooks unconditionally to satisfy React Hooks rules
+  const safeMedia: string[] = Array.isArray(media) ? media : [];
+  const clampedInitialIndex = Math.min(Math.max(initialIndex, 0), Math.max(safeMedia.length - 1, 0));
+  const mediaItems: MediaItem[] = safeMedia.map(url => ({
     url,
     type: isVideoUrl(url) ? 'video' : 'image',
   }));
 
-  const translateX = useSharedValue(-initialIndex * screenWidth);
-  const savedTranslateX = useSharedValue(-initialIndex * screenWidth);
+  const translateX = useSharedValue(-clampedInitialIndex * screenWidth);
+  const savedTranslateX = useSharedValue(-clampedInitialIndex * screenWidth);
 
   // Reset to initial index when modal opens
   useEffect(() => {
     if (visible) {
-      setCurrentIndex(initialIndex);
-      translateX.value = -initialIndex * screenWidth;
-      savedTranslateX.value = -initialIndex * screenWidth;
+      const newIndex = clampedInitialIndex;
+      setCurrentIndex(newIndex);
+      translateX.value = -newIndex * screenWidth;
+      savedTranslateX.value = -newIndex * screenWidth;
       setControlsVisible(true);
     }
-  }, [visible, initialIndex]);
+  }, [visible, clampedInitialIndex]);
 
   const changeMedia = useCallback((newIndex: number) => {
     if (newIndex >= 0 && newIndex < mediaItems.length) {
@@ -514,13 +511,11 @@ export function MediaViewer({
     setControlsVisible((prev) => !prev);
   }, []);
 
-  if (!visible) return null;
-
   const currentMedia = mediaItems[currentIndex];
 
   return (
     <Modal
-      visible={visible}
+      visible={!!(visible && mediaItems.length > 0)}
       transparent
       animationType="fade"
       statusBarTranslucent

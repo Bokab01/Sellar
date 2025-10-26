@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, Component, ErrorInfo, ReactNode } from 'react';
-import { View, ScrollView, Alert, Pressable, BackHandler, Image, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Animated } from 'react-native';
+import { View, ScrollView, Alert, Pressable, BackHandler, Image, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -54,7 +54,7 @@ import { findCategoryById as findCategoryByIdUtil, DbCategory } from '@/utils/ca
 import { networkUtils } from '@/utils/networkUtils';
 import { reputationService } from '@/lib/reputationService';
 import { useListingForm, type ListingFormData, type SelectedFeature } from '@/hooks/useListingForm';
-import { useListingAutosave } from '@/hooks/useListingAutosave';
+import { useListingDraftStorage } from '@/hooks/useListingDraftStorage';
 import { useListingDraft } from '@/hooks/useListingDraft';
 import { useListingValidation } from '@/hooks/useListingValidation';
 import { useListingSubmission } from '@/hooks/useListingSubmission';
@@ -105,31 +105,34 @@ function CreateListingScreen() {
 
   // Local location state for dynamic location picker behavior
   const [location, setLocation] = useState(currentLocation || '');
+  const [isChangingLocation, setIsChangingLocation] = useState(false);
   
-  // Sync location state when currentLocation changes
+  // No local state needed - just use formData directly for controlled inputs
+  
+  // Sync location state when currentLocation changes (but not when user is manually changing it)
   React.useEffect(() => {
-    if (currentLocation && !location) {
+    if (currentLocation && !location && !isChangingLocation) {
       setLocation(currentLocation);
       // Also update form data to ensure validation works
       updateMultipleFields({ location: currentLocation });
     }
-  }, [currentLocation, location, updateMultipleFields]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentLocation, location, isChangingLocation]);
 
   // Initial load: if currentLocation exists and formData.location is empty, update it
   React.useEffect(() => {
     if (currentLocation && !formData.location) {
       updateMultipleFields({ location: currentLocation });
     }
-  }, [currentLocation, formData.location, updateMultipleFields]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentLocation, formData.location]);
   
-  // ✅ REFACTORED: Autosave logic using useListingAutosave hook
+  // ✅ REFACTORED: Manual save logic using useListingDraftStorage hook
   const {
-    isSaved,
-    autosaveOpacity,
     saveDraft: saveDraftToStorage,
     clearDraft: clearDraftFromStorage,
     loadDraft: loadDraftFromStorage,
-  } = useListingAutosave(formData, currentStep, user?.id);
+  } = useListingDraftStorage(formData, currentStep, user?.id);
   
   // ✅ REFACTORED: Draft modal management using useListingDraft hook
   const {
@@ -148,6 +151,24 @@ function CreateListingScreen() {
   
   // Category attributes state (needed for validation)
   const [categoryAttributes, setCategoryAttributes] = useState<any[]>([]);
+  
+  // ✅ Performance: Use ref to avoid recreating handleAttributeChange on every attribute update
+  const categoryAttributesRef = useRef(formData.categoryAttributes);
+  
+  // ✅ Performance: AbortController ref for category fetch
+  const categoryFetchAbortController = useRef<AbortController | null>(null);
+  
+  // Keep ref in sync with form data
+  useEffect(() => {
+    categoryAttributesRef.current = formData.categoryAttributes;
+  }, [formData.categoryAttributes]);
+  
+  // ✅ Cleanup: Abort pending requests on unmount
+  useEffect(() => {
+    return () => {
+      if (categoryFetchAbortController.current) categoryFetchAbortController.current.abort();
+    };
+  }, []);
   
   // ✅ REFACTORED: Validation logic using useListingValidation hook
   const {
@@ -315,15 +336,7 @@ function CreateListingScreen() {
     }, [formData, showExitConfirmation])
   );
 
-  // ✅ REFACTORED: Simplified wrapper - autosave and validation handled by hooks
-  const updateFormData = useCallback((updates: Partial<ListingFormData>) => {
-    // Update using hook (autosave and validation happen automatically)
-    updateMultipleFields(updates);
-    
-    // Update ref for immediate access
-    const newData = { ...formData, ...updates };
-      formDataRef.current = newData;
-  }, [updateMultipleFields, formData]);
+  // ✅ REMOVED: updateFormData wrapper (redundant - use updateMultipleFields directly)
 
   // ✅ REFACTORED: Use hook's validation
   const validateStep = useCallback((step: number): boolean => {
@@ -335,17 +348,15 @@ function CreateListingScreen() {
   // ✅ REFACTORED: Navigation functions using hook with autosave
   const goToNextStep = useCallback(() => {
     if (currentStep < STEPS.length - 1 && canProceed) {
-      saveDraft(formDataRef.current, false, true);
       nextStep(); // Use hook's nextStep
     }
-  }, [currentStep, canProceed, saveDraft, nextStep]);
+  }, [currentStep, canProceed, nextStep]);
 
   const goToPreviousStep = useCallback(() => {
     if (currentStep > 0) {
-      saveDraft(formDataRef.current, false, true);
       previousStep(); // Use hook's previousStep
     }
-  }, [currentStep, saveDraft, previousStep]);
+  }, [currentStep, previousStep]);
 
   const handleSubmit = async () => {
     // Check if payment is needed for additional listings first
@@ -673,6 +684,7 @@ function CreateListingScreen() {
   }, [formData.categoryId]);
 
   // Stable input handlers to prevent keyboard dismissal
+  // ✅ Update form state immediately (no debounce needed - validation is already debounced in hook)
   const handleTitleChange = useCallback((text: string) => {
     updateMultipleFields({ title: text });
   }, [updateMultipleFields]);
@@ -697,6 +709,15 @@ function CreateListingScreen() {
       return;
     }
     
+    // ✅ Performance: Abort any pending category fetch
+    if (categoryFetchAbortController.current) {
+      categoryFetchAbortController.current.abort();
+    }
+    
+    // Create new AbortController for this fetch
+    const abortController = new AbortController();
+    categoryFetchAbortController.current = abortController;
+    
     // Clear category attributes when category changes
     updateMultipleFields({ categoryId, categoryAttributes: {} });
     
@@ -705,30 +726,41 @@ function CreateListingScreen() {
       const { data, error } = await supabase
         .rpc('get_category_attributes', { p_category_id: categoryId });
       
+      // ✅ Check if this request was aborted
+      if (abortController.signal.aborted) {
+        console.log('Category fetch aborted (user switched categories)');
+        return;
+      }
+      
       if (!error && data) {
         setCategoryAttributes(Array.isArray(data) ? data : []);
       } else {
         console.warn('No category attributes found or error:', error);
         setCategoryAttributes([]);
       }
-    } catch (error) {
-      console.error('Error fetching category attributes:', error);
-      setCategoryAttributes([]);
+    } catch (error: any) {
+      // ✅ Don't log error if request was aborted
+      if (error?.name !== 'AbortError' && !abortController.signal.aborted) {
+        console.error('Error fetching category attributes:', error);
+        setCategoryAttributes([]);
+      }
     }
   }, [updateMultipleFields]);
 
+  // ✅ Performance: Use ref to avoid function recreation on every attribute change
   const handleCategoryAttributeChange = useCallback((slug: string, value: any) => {
     updateMultipleFields({ 
       categoryAttributes: { 
-        ...(formData.categoryAttributes || {}), 
+        ...(categoryAttributesRef.current || {}), // Use ref instead of state
         [slug]: value 
       } 
     });
-  }, [updateMultipleFields, formData.categoryAttributes]);
+  }, [updateMultipleFields]); // Now stable - only depends on updateMultipleFields
 
   const handleLocationSelect = useCallback((selectedLocation: string) => {
     setLocation(selectedLocation);
     updateMultipleFields({ location: selectedLocation });
+    setIsChangingLocation(false); // Reset the flag after location is selected
   }, [updateMultipleFields]);
 
   // Condition is now handled via category attributes, not separately
@@ -949,7 +981,11 @@ function CreateListingScreen() {
                   {location || currentLocation}
                 </Text>
                 <TouchableOpacity
-                  onPress={() => setLocation('')}
+                  onPress={() => {
+                    setIsChangingLocation(true);
+                    setLocation('');
+                    updateMultipleFields({ location: '' });
+                  }}
                   style={{
                     padding: theme.spacing.xs,
                     borderRadius: theme.borderRadius.sm,
@@ -958,7 +994,7 @@ function CreateListingScreen() {
                 >
                   <Text variant="bodySmall" color="muted">
                     Change
-                </Text>
+                  </Text>
                 </TouchableOpacity>
               </View>
               <Text variant="caption" color="muted" style={{ marginTop: theme.spacing.xs }}>
@@ -1490,25 +1526,6 @@ function CreateListingScreen() {
           }
         }}
         rightActions={[
-          // Autosave Indicator - Only shows "Saved"
-          <Animated.View
-            key="autosave-indicator"
-            style={{
-              opacity: autosaveOpacity,
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingHorizontal: theme.spacing.sm,
-              paddingVertical: theme.spacing.xs,
-              borderRadius: theme.borderRadius.full,
-              backgroundColor: theme.colors.success,
-              marginRight: theme.spacing.sm,
-            }}
-          >
-            <CheckCircle size={12} color="#555" style={{ marginRight: theme.spacing.xs }} />
-            <Text variant="caption" style={{ color: '#555', fontWeight: '600', fontSize: 11 }}>
-              Saved
-            </Text>
-          </Animated.View>,
           // Step Indicator
           <View
             key="step-indicator"
@@ -2275,31 +2292,30 @@ function CreateListingScreen() {
         </View>
       </AppModal>
 
-      {/* ✅ REFACTORED: Exit Confirmation Modal using hook */}
+      {/* ✅ REFACTORED: Exit Confirmation Modal (Manual Save Only) */}
       <AppModal
         visible={showExitModal}
         onClose={handleExitCancel}
-        title={!isSaved ? 'Unsaved Changes' : 'Draft Saved'}
+        title="Save Your Progress?"
         size="sm"
       >
         <View style={{ padding: theme.spacing.lg }}>
           <Text variant="body" color="secondary" style={{ marginBottom: theme.spacing.xl }}>
-            {!isSaved 
-              ? 'You have unsaved changes. Would you like to save them as a draft before leaving?'
-              : 'Your draft has been saved. Would you like to keep it or discard it?'}
+            Would you like to save your listing as a draft before leaving? You can continue editing it later.
           </Text>
           
           <View style={{ gap: theme.spacing.md }}>
             <Button
               variant="primary"
-              onPress={() => {
+              onPress={async () => {
+                // Explicitly save draft before exiting
+                await saveDraftToStorage();
                 handleExitConfirm(() => {
-                  // Hook handles autosave automatically
                   router.back();
                 });
               }}
             >
-              {!isSaved ? 'Save & Exit' : 'Keep Draft'}
+              Save & Exit
             </Button>
             
             <Button

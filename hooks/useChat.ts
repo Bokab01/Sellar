@@ -403,6 +403,7 @@ export function useMessages(conversationId: string) {
       return;
     }
 
+    console.log(`📖 Marking messages as read for conversation ${conversationId}...`);
 
     try {
       // Mark unread messages as read using read_at timestamp
@@ -422,6 +423,9 @@ export function useMessages(conversationId: string) {
         clearManuallyMarkedAsUnread(conversationId);
       } else {
         if (data && data.length > 0) {
+          console.log(`📖 Successfully marked ${data.length} messages as read:`, data.map(m => m.id));
+        } else {
+          console.log(`📖 No unread messages to mark as read`);
         }
         
         // Always update local unread count to 0 since we're marking messages as read

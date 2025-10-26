@@ -14,6 +14,7 @@ export function useListingValidation(
   const [validationResults, setValidationResults] = useState<Record<number, ValidationResult>>({});
   const [isValidating, setIsValidating] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
   const debouncedValidator = useRef(createDebouncedValidator(300));
 
   // Validate current step
@@ -46,6 +47,23 @@ export function useListingValidation(
     }
   }, [currentStep, formData, categoryAttributes, hasInteracted]);
 
+  // Track which fields have been touched
+  useEffect(() => {
+    setTouchedFields(prev => {
+      const newTouched = new Set(prev);
+      
+      // Mark fields as touched when they have data
+      if (formData.title) newTouched.add('title');
+      if (formData.description) newTouched.add('description');
+      if (formData.price) newTouched.add('price');
+      if (formData.images.length > 0) newTouched.add('images');
+      if (formData.categoryId) newTouched.add('categoryId');
+      if (formData.location) newTouched.add('location');
+      
+      return newTouched;
+    });
+  }, [formData.title, formData.description, formData.price, formData.images.length, formData.categoryId, formData.location]);
+
   // Auto-validate on form data change (only after first interaction)
   useEffect(() => {
     // Mark as interacted when form data changes (after mount)
@@ -69,12 +87,49 @@ export function useListingValidation(
     return result?.errors ? Object.values(result.errors) : [];
   }, [validationResults, currentStep]);
 
+  // Filter validation results to only show errors for touched fields
+  const getFilteredValidationResults = useCallback(() => {
+    const filtered: Record<number, ValidationResult> = {};
+    
+    Object.entries(validationResults).forEach(([step, result]) => {
+      const filteredErrors: Record<string, string> = {};
+      const filteredWarnings: Record<string, string> = {};
+      
+      // Only include errors/warnings for touched fields
+      if (result.errors) {
+        Object.entries(result.errors).forEach(([field, error]) => {
+          if (touchedFields.has(field)) {
+            filteredErrors[field] = error;
+          }
+        });
+      }
+      
+      if (result.warnings) {
+        Object.entries(result.warnings).forEach(([field, warning]) => {
+          if (touchedFields.has(field)) {
+            filteredWarnings[field] = warning;
+          }
+        });
+      }
+      
+      filtered[parseInt(step)] = {
+        ...result,
+        errors: filteredErrors,
+        warnings: filteredWarnings,
+        isValid: Object.keys(filteredErrors).length === 0, // Recalculate based on filtered errors
+      };
+    });
+    
+    return filtered;
+  }, [validationResults, touchedFields]);
+
   return {
-    validationResults,
+    validationResults: getFilteredValidationResults(),
     isValidating,
     validateCurrentStep,
     isStepValid,
     getCurrentStepErrors,
+    touchedFields,
   };
 }
 

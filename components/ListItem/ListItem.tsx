@@ -4,6 +4,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { Avatar } from '@/components/Avatar/Avatar';
 import { Badge } from '@/components/Badge/Badge';
+import { TypingDots } from '@/components/TypingDots';
 import { ChevronRight } from 'lucide-react-native';
 
 interface ListItemProps {
@@ -30,6 +31,7 @@ interface ListItemProps {
   };
   onPress?: () => void;
   style?: any;
+  isTyping?: boolean;
 }
 
 export function ListItem({
@@ -46,6 +48,7 @@ export function ListItem({
   toggle,
   onPress,
   style,
+  isTyping = false,
 }: ListItemProps) {
   const { theme } = useTheme();
 
@@ -138,14 +141,32 @@ export function ListItem({
         )}
 
         {description && (
-          <Text
-            variant="bodySmall"
-            color="muted"
-            numberOfLines={2}
-            style={{ lineHeight: 18 }}
-          >
-            {description}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {isTyping ? (
+              <>
+                <Text
+                  variant="bodySmall"
+                  style={{ 
+                    color: theme.colors.primary,
+                    fontStyle: 'italic',
+                    fontWeight: '500',
+                  }}
+                >
+                  typing
+                </Text>
+                <TypingDots size={4} />
+              </>
+            ) : (
+              <Text
+                variant="bodySmall"
+                color="muted"
+                numberOfLines={2}
+                style={{ lineHeight: 18, flex: 1 }}
+              >
+                {description}
+              </Text>
+            )}
+          </View>
         )}
       </View>
 

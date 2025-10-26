@@ -180,33 +180,10 @@ export function FeaturedListings({
     );
   }
 
+  // Don't show anything if there's an error or no listings
+  // This section should be invisible when empty, not show an empty state
   if (error || listings.length === 0) {
-    return (
-      <View style={{ padding: theme.spacing.lg }}>
-        {showHeader && (
-          <View style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: theme.spacing.lg,
-          }}>
-            <View>
-              <Text variant="h3" style={{ fontWeight: '600' }}>
-                Featured Sellar Pro Listings
-              </Text>
-              <Text variant="bodySmall" color="muted">
-                Premium listings from Pro sellers
-              </Text>
-            </View>
-          </View>
-        )}
-        <EmptyState
-          icon={<Crown size={48} color={theme.colors.text.muted} />}
-          title="No Featured Listings"
-          description="Check back soon for premium business listings"
-        />
-      </View>
-    );
+    return null;
   }
 
   const renderHeader = () => {

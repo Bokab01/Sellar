@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, ScrollView, TouchableOpacity, RefreshControl, Alert, Linking } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { supabase, dbHelpers } from '@/lib/supabase';
 import { useListings } from '@/hooks/useListings';
 import { useCommunityPosts } from '@/hooks/useCommunity';
+import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { getDisplayName } from '@/hooks/useDisplayName';
 import { useReviewStats } from '@/hooks/useReviews';
 import {
@@ -31,6 +32,7 @@ import {
   EnhancedReviewCard,
   AppModal,
 } from '@/components';
+import { UserBadgeSystem } from '@/components/UserBadgeSystem';
 import { ReputationDisplay } from '@/components/ReputationDisplay/ReputationDisplay';
 import { 
   MessageCircle, 
@@ -45,7 +47,10 @@ import {
   MessageSquare,
   Info,
   MoreVertical,
-  X
+  X,
+  Briefcase,
+  Mail,
+  Globe
 } from 'lucide-react-native';
 import { ReportButton } from '@/components/ReportButton/ReportButton';
 
@@ -99,6 +104,17 @@ export default function UserProfileScreen() {
 
   // Get review stats to conditionally show review summary
   const { stats: reviewStats } = useReviewStats(profileId || '');
+
+  // Get favorites store
+  const { 
+    favorites, 
+    toggleFavorite,
+    incrementListingFavoriteCount,
+    decrementListingFavoriteCount 
+  } = useFavoritesStore();
+
+  // Check if viewing own profile
+  const isOwnProfile = currentUser?.id === profileId;
 
   useEffect(() => {
     if (profileId) {
@@ -241,6 +257,43 @@ export default function UserProfileScreen() {
     }
   };
 
+  // Handle favorite toggle (with database save)
+  const handleFavoriteToggle = useCallback(async (listingId: string) => {
+    const isFavorited = favorites[listingId] || false;
+    
+    // Optimistic update
+    toggleFavorite(listingId);
+    if (isFavorited) {
+      decrementListingFavoriteCount(listingId);
+    } else {
+      incrementListingFavoriteCount(listingId);
+    }
+
+    // Save to database
+    try {
+      const { toggleFavorite: toggleFavoriteDB } = await import('@/lib/favoritesAndViews');
+      const result = await toggleFavoriteDB(listingId);
+      
+      if (result.error) {
+        // Revert on error
+        toggleFavorite(listingId);
+        if (isFavorited) {
+          incrementListingFavoriteCount(listingId);
+        } else {
+          decrementListingFavoriteCount(listingId);
+        }
+      }
+    } catch (error) {
+      // Revert on error
+      toggleFavorite(listingId);
+      if (isFavorited) {
+        incrementListingFavoriteCount(listingId);
+      } else {
+        decrementListingFavoriteCount(listingId);
+      }
+    }
+  }, [favorites, toggleFavorite, incrementListingFavoriteCount, decrementListingFavoriteCount]);
+
   const handleMessage = async () => {
     if (!currentUser) {
       Alert.alert('Sign In Required', 'Please sign in to send messages');
@@ -326,7 +379,6 @@ export default function UserProfileScreen() {
     );
   }
 
-  const isOwnProfile = currentUser?.id === profileId;
   const displayName = profile ? getDisplayName(profile, false).displayName : 'User';
 
   // Filter user's listings and posts
@@ -377,7 +429,9 @@ export default function UserProfileScreen() {
                   location={listing.location}
                   layout="grid"
                   fullWidth={true}
+                  isFavorited={favorites[listing.id] || false}
                   onPress={() => router.push(`/(tabs)/home/${listing.id}`)}
+                  onFavoritePress={isOwnProfile ? undefined : () => handleFavoriteToggle(listing.id)}
                 />
               ))}
             </Grid>
@@ -431,23 +485,48 @@ export default function UserProfileScreen() {
               style={{ marginBottom: theme.spacing.md }}
             /> */}
 
-            {/* Professional About Section */}
-            <View style={{
-              backgroundColor: theme.colors.surface,
-              borderRadius: theme.borderRadius.lg,
-              padding: theme.spacing.md,
-              ...theme.shadows.sm,
-            }}>
-              {profile.bio ? (
-                <View>
-                  <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
-                    About
-                  </Text>
-                  <Text variant="body" style={{ lineHeight: 24, color: theme.colors.text.primary }}>
-                    {profile.bio}
-                  </Text>
-                </View>
-              ) : (
+            {/* Personal Bio Section */}
+            {profile.bio && (
+              <View style={{
+                backgroundColor: theme.colors.surface,
+                borderRadius: theme.borderRadius.lg,
+                padding: theme.spacing.md,
+                ...theme.shadows.sm,
+              }}>
+                <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+                  About {profile.first_name}
+                </Text>
+                <Text variant="body" style={{ lineHeight: 24, color: theme.colors.text.primary }}>
+                  {profile.bio}
+                </Text>
+              </View>
+            )}
+
+            {/* Business Description Section */}
+            {profile.is_business && profile.business_description && (
+              <View style={{
+                backgroundColor: theme.colors.surface,
+                borderRadius: theme.borderRadius.lg,
+                padding: theme.spacing.md,
+                ...theme.shadows.sm,
+              }}>
+                <Text variant="h4" style={{ marginBottom: theme.spacing.md }}>
+                  About {profile.business_name || 'Business'}
+                </Text>
+                <Text variant="body" style={{ lineHeight: 24, color: theme.colors.text.primary }}>
+                  {profile.business_description}
+                </Text>
+              </View>
+            )}
+
+            {/* Empty State - when neither bio nor business description exists */}
+            {!profile.bio && !profile.business_description && (
+              <View style={{
+                backgroundColor: theme.colors.surface,
+                borderRadius: theme.borderRadius.lg,
+                padding: theme.spacing.md,
+                ...theme.shadows.sm,
+              }}>
                 <View style={{ alignItems: 'center', paddingVertical: theme.spacing.lg }}>
                   <Info size={32} color={theme.colors.text.muted} />
                   <Text variant="h4" style={{ marginTop: theme.spacing.sm, marginBottom: theme.spacing.xs }}>
@@ -460,8 +539,8 @@ export default function UserProfileScreen() {
                     }
                   </Text>
                 </View>
-              )}
-            </View>
+              </View>
+            )}
 
             {/* Professional Details Card */}
             <View style={{
@@ -589,6 +668,122 @@ export default function UserProfileScreen() {
                     </View>
                   </View>
                 )}
+
+                {/* Business Type */}
+                {profile.is_business && profile.business_type && (
+                  <View style={{ 
+                    flexDirection: 'row', 
+                    alignItems: 'center', 
+                    gap: theme.spacing.md,
+                    paddingVertical: theme.spacing.sm,
+                  }}>
+                    <View style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: theme.borderRadius.full,
+                      backgroundColor: theme.colors.primary + '15',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <Briefcase size={18} color={theme.colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text variant="bodySmall" color="secondary" style={{ marginBottom: 2 }}>
+                        Business Type
+                      </Text>
+                      <Text variant="body" style={{ fontWeight: '500' }}>
+                        {profile.business_type}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Business Phone */}
+                {profile.is_business && profile.business_phone && (
+                  <View style={{ 
+                    flexDirection: 'row', 
+                    alignItems: 'center', 
+                    gap: theme.spacing.md,
+                    paddingVertical: theme.spacing.sm,
+                  }}>
+                    <View style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: theme.borderRadius.full,
+                      backgroundColor: theme.colors.success + '15',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <Phone size={18} color={theme.colors.success} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text variant="bodySmall" color="secondary" style={{ marginBottom: 2 }}>
+                        Business Phone
+                      </Text>
+                      <Text variant="body" style={{ fontWeight: '500' }}>
+                        {profile.business_phone}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Business Email */}
+                {profile.is_business && profile.business_email && (
+                  <View style={{ 
+                    flexDirection: 'row', 
+                    alignItems: 'center', 
+                    gap: theme.spacing.md,
+                    paddingVertical: theme.spacing.sm,
+                  }}>
+                    <View style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: theme.borderRadius.full,
+                      backgroundColor: theme.colors.info + '15',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <Mail size={18} color={theme.colors.info} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text variant="bodySmall" color="secondary" style={{ marginBottom: 2 }}>
+                        Business Email
+                      </Text>
+                      <Text variant="body" style={{ fontWeight: '500' }}>
+                        {profile.business_email}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Business Website */}
+                {profile.is_business && profile.business_website && (
+                  <View style={{ 
+                    flexDirection: 'row', 
+                    alignItems: 'center', 
+                    gap: theme.spacing.md,
+                    paddingVertical: theme.spacing.sm,
+                  }}>
+                    <View style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: theme.borderRadius.full,
+                      backgroundColor: theme.colors.secondary + '15',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <Globe size={18} color={theme.colors.secondary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text variant="bodySmall" color="secondary" style={{ marginBottom: 2 }}>
+                        Website
+                      </Text>
+                      <Text variant="body" style={{ fontWeight: '500' }}>
+                        {profile.business_website}
+                      </Text>
+                    </View>
+                  </View>
+                )}
               </View>
             </View>
           </View>
@@ -698,21 +893,23 @@ export default function UserProfileScreen() {
             <View style={{ alignItems: 'center', marginBottom: theme.spacing.md }}>
               {/* Name and Rating */}
               <View style={{ alignItems: 'center', marginBottom: theme.spacing.sm }}>
-                {/* ✅ PRO Badge above name using Badge component */}
-                {profile.is_sellar_pro && (
-                  <Badge 
-                    text="⭐ PRO SELLER" 
-                    variant="primary"
-                    size="sm" 
-                    style={{ marginBottom: theme.spacing.sm, }}
-                  />
-                )}
                 <UserDisplayName
                   profile={profile}
                   variant="full"
-                  showBadge={true}
+                  showBadge={false}
                   textVariant="h2"
                   style={{ fontWeight: '600', marginBottom: theme.spacing.xs }}
+                />
+                
+                {/* Unified Badge System */}
+                <UserBadgeSystem
+                  isSellarPro={profile.is_sellar_pro}
+                  isBusinessUser={profile.is_business}
+                  isVerified={profile.is_verified}
+                  isBusinessVerified={profile.verification_status === 'business_verified' || profile.verification_status === 'verified'}
+                  size="medium"
+                  variant="default"
+                  style={{ marginBottom: theme.spacing.sm }}
                 />
                 
                 {/* Rating */}
@@ -912,7 +1109,7 @@ export default function UserProfileScreen() {
           <Text variant="h4" color="secondary" style={{ textAlign: 'center', marginBottom: theme.spacing.md }}>
             {!profile?.phone 
               ? 'This user has not provided a phone number'
-              : `You are about to call ${profile.first_name}`
+              : `You are about to call ${getDisplayName(profile, false).displayName}`
             }
           </Text>
           
@@ -937,8 +1134,6 @@ export default function UserProfileScreen() {
               onPress={() => setShowCallModal(false)}
               icon={<X size={18} color={theme.colors.error} />}
               style={{ borderColor: theme.colors.error, borderWidth: 1 }}
-              
-             
             >
               Cancel
             </Button>

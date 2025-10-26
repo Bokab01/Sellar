@@ -36,7 +36,6 @@ export function useRealtime({
   // Setup channel function - stable, doesn't depend on changing values
   const setupChannel = useCallback(async () => {
     if (channelRef.current) {
-      console.log(`🔗 Channel already exists for ${tableRef.current}, skipping setup`);
       return;
     }
 
@@ -46,7 +45,6 @@ export function useRealtime({
     try {
       // Create channel with unique name to avoid conflicts
       const channelName = `realtime-${currentTable}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      console.log(`🔗 Creating new channel: ${channelName}`, currentFilter ? `with filter: ${currentFilter}` : 'no filter');
       
       const channel = supabase
         .channel(channelName)
@@ -59,59 +57,32 @@ export function useRealtime({
             ...(currentFilter && { filter: currentFilter }),
           },
           (payload) => {
-            console.log(`🔗🔗🔗 [BASE REALTIME] ${currentTable} event received:`, {
-              eventType: payload.eventType,
-              table: payload.table,
-              schema: payload.schema,
-              new: payload.new ? { id: payload.new.id } : null,
-              filter: currentFilter,
-            });
-            
             try {
               switch (payload.eventType) {
                 case 'INSERT':
-                  console.log(`🔗 [BASE] Calling onInsert for ${currentTable}`);
                   callbacksRef.current.onInsert?.(payload.new);
                   break;
                 case 'UPDATE':
-                  console.log(`🔗 [BASE] Calling onUpdate for ${currentTable}`);
                   callbacksRef.current.onUpdate?.(payload.new);
                   break;
                 case 'DELETE':
-                  console.log(`🔗 [BASE] Calling onDelete for ${currentTable}`);
                   callbacksRef.current.onDelete?.(payload.old);
                   break;
               }
             } catch (err) {
-              console.error(`🔗 Error processing ${currentTable} event:`, err);
+              console.error(`❌ Error processing ${currentTable} event:`, err);
             }
           }
         )
         .subscribe((status) => {
-          console.log(`🔗 Channel ${channelName} status:`, status);
-          
-          if (status === 'SUBSCRIBED') {
-            console.log(`✅ Successfully subscribed to ${currentTable} changes`);
-          } else if (status === 'CHANNEL_ERROR') {
-            console.error(`❌ Channel error for ${currentTable}, scheduling reconnection`);
-            // Schedule reconnection
+          // Only reconnect on actual errors, not on CLOSED (which is normal cleanup)
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             if (reconnectTimeoutRef.current) {
               clearTimeout(reconnectTimeoutRef.current);
             }
             reconnectTimeoutRef.current = setTimeout(() => {
               reconnectChannel();
             }, 5000);
-          } else if (status === 'TIMED_OUT') {
-            console.error(`⏱️ Channel timeout for ${currentTable}, scheduling reconnection`);
-            // Schedule reconnection
-            if (reconnectTimeoutRef.current) {
-              clearTimeout(reconnectTimeoutRef.current);
-            }
-            reconnectTimeoutRef.current = setTimeout(() => {
-              reconnectChannel();
-            }, 5000);
-          } else if (status === 'CLOSED') {
-            console.warn(`🔒 Channel closed for ${currentTable}`);
           }
         });
 
@@ -125,7 +96,6 @@ export function useRealtime({
   const reconnectChannel = useCallback(async () => {
     if (isReconnectingRef.current) return;
     
-    console.log(`🔗 Reconnecting channel for ${tableRef.current}`);
     isReconnectingRef.current = true;
     
     try {
@@ -141,7 +111,7 @@ export function useRealtime({
       // Recreate the subscription
       await setupChannel();
     } catch (error) {
-      console.error(`🔗 Reconnection failed for ${tableRef.current}:`, error);
+      console.error(`❌ Reconnection failed for ${tableRef.current}:`, error);
       
       // Schedule another reconnection attempt
       if (reconnectTimeoutRef.current) {
@@ -159,25 +129,21 @@ export function useRealtime({
   // Initial setup
   useEffect(() => {
     if (!table) {
-      console.log('🔗 No table provided, skipping setup');
       return;
     }
 
-    console.log(`🔗 Initializing realtime for table: ${table}`);
     setupChannel();
 
     return () => {
-      console.log(`🔗 Cleaning up realtime for table: ${table}`);
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
       }
       if (channelRef.current) {
         try {
-          console.log(`🔗 Removing channel for ${table}`);
           supabase.removeChannel(channelRef.current);
         } catch (err) {
-          console.error(`🔗 Error removing channel for ${table}:`, err);
+          console.error(`❌ Error removing channel for ${table}:`, err);
         }
         channelRef.current = null;
       }
@@ -188,21 +154,16 @@ export function useRealtime({
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
-        console.log(`🔗 App became active, checking channel state for ${tableRef.current}`);
-        
         // Add a small delay to allow useAppResume to finish channel cleanup
         setTimeout(() => {
           // Check if channel is still active
           if (channelRef.current) {
             const status = channelRef.current.state;
-            console.log(`🔗 Current channel state: ${status}`);
             
             if (status === 'closed' || status === 'errored') {
-              console.log(`🔗 Channel is ${status}, reconnecting...`);
               reconnectChannel();
             }
           } else {
-            console.log('🔗 No active channel after resume, setting up new one...');
             setupChannel();
           }
         }, 1500); // Wait 1.5 seconds for useAppResume to finish
@@ -218,49 +179,35 @@ export function useRealtime({
     };
   }, [reconnectChannel, setupChannel]); // Only depend on stable functions
 
-  // Periodic health check to detect externally removed channels
-  useEffect(() => {
-    const healthCheckInterval = setInterval(() => {
-      // Only check if we expect to have a channel
-      if (tableRef.current && !channelRef.current) {
-        console.log(`🏥 Health check: Channel missing for ${tableRef.current}, recreating...`);
-        setupChannel();
-      } else if (channelRef.current) {
-        const status = channelRef.current.state;
-        if (status === 'closed' || status === 'errored') {
-          console.log(`🏥 Health check: Channel in bad state (${status}) for ${tableRef.current}, reconnecting...`);
-          reconnectChannel();
-        }
-      }
-    }, 5000); // Check every 5 seconds
+  // Periodic health check - DISABLED to prevent unnecessary reconnections
+  // Channels will naturally reconnect on app resume via AppState listener
+  // useEffect(() => {
+  //   const healthCheckInterval = setInterval(() => {
+  //     // Only check if we expect to have a channel
+  //     if (tableRef.current && !channelRef.current) {
+  //       setupChannel();
+  //     } else if (channelRef.current) {
+  //       const status = channelRef.current.state;
+  //       if (status === 'closed' || status === 'errored') {
+  //         reconnectChannel();
+  //       }
+  //     }
+  //   }, 5000); // Check every 5 seconds
 
-    return () => {
-      clearInterval(healthCheckInterval);
-    };
-  }, [setupChannel, reconnectChannel]);
+  //   return () => {
+  //     clearInterval(healthCheckInterval);
+  //   };
+  // }, [setupChannel, reconnectChannel]);
 
   return channelRef.current;
 }
 
 // Specific hooks for different features
 export function useChatRealtime(conversationId: string, onNewMessage: (message: any) => void) {
-  console.log('🔗 [useChatRealtime] Setting up chat real-time for conversation:', conversationId);
-  
-  if (!conversationId) {
-    console.warn('🔗 [useChatRealtime] No conversation ID provided, skipping subscription');
-  }
-  
   return useRealtime({
     table: conversationId ? 'messages' : '', // Only subscribe if we have a conversation ID
     filter: conversationId ? `conversation_id=eq.${conversationId}` : undefined,
     onInsert: async (payload) => {
-      console.log('🔗🔗🔗 [useChatRealtime] Real-time message INSERT received:', {
-        messageId: payload.id,
-        conversationId: payload.conversation_id,
-        senderId: payload.sender_id,
-        content: payload.content?.substring(0, 50),
-      });
-      
       // Fetch the complete message data with joins to ensure we have all related data
       try {
         const { data, error } = await supabase
@@ -274,32 +221,21 @@ export function useChatRealtime(conversationId: string, onNewMessage: (message: 
           .single();
         
         if (!error && data) {
-          console.log('🔗 [useChatRealtime] Fetched complete message data:', {
-            id: data.id,
-            hasSender: !!data.sender,
-            hasOffers: !!data.offers,
-          });
           onNewMessage(data);
         } else {
-          console.warn('🔗 [useChatRealtime] Failed to fetch complete message data:', error);
           // Fallback to the raw payload if fetch fails
           onNewMessage(payload);
         }
       } catch (err) {
-        console.error('🔗 [useChatRealtime] Error fetching message data:', err);
+        console.error('❌ Error fetching message data:', err);
         // Fallback to the raw payload if fetch fails
         onNewMessage(payload);
       }
     },
     onUpdate: async (payload) => {
-      console.log('🔗🔗🔗 [useChatRealtime] Real-time message UPDATE received:', {
-        messageId: payload.id,
-        conversationId: payload.conversation_id,
-      });
-      
       // Fetch the complete message data for updates as well (for read receipts, status changes, etc.)
       try {
-        const { data, error } = await supabase
+        const { data, error} = await supabase
           .from('messages')
           .select(`
             *,
@@ -310,15 +246,13 @@ export function useChatRealtime(conversationId: string, onNewMessage: (message: 
           .single();
         
         if (!error && data) {
-          console.log('🔗 [useChatRealtime] Fetched updated message data');
           onNewMessage(data);
         } else {
-          console.warn('🔗 [useChatRealtime] Failed to fetch updated message data:', error);
           // Fallback to the raw payload if fetch fails
           onNewMessage(payload);
         }
       } catch (err) {
-        console.error('🔗 [useChatRealtime] Error fetching updated message data:', err);
+        console.error('❌ Error fetching updated message data:', err);
         // Fallback to the raw payload if fetch fails
         onNewMessage(payload);
       }
@@ -327,20 +261,16 @@ export function useChatRealtime(conversationId: string, onNewMessage: (message: 
 }
 
 export function useConversationsRealtime(userId: string, onConversationUpdate: () => void) {
-  console.log('🔗 Setting up conversations real-time for user:', userId || '(no user)');
-  
   // Set up messages subscription to detect new messages in any conversation
   // Only subscribe if we have a valid userId
   const messagesSubscription = useRealtime({
     table: userId ? 'messages' : '', // Empty table prevents subscription
     // Listen for messages where user is participant
     onInsert: async (payload) => {
-      console.log('🔗 Real-time new message in conversations:', payload);
       // Trigger conversation list refresh
       onConversationUpdate();
     },
     onUpdate: async (payload) => {
-      console.log('🔗 Real-time message update in conversations:', payload);
       // Trigger conversation list refresh (for read status updates)
       onConversationUpdate();
     },
@@ -352,15 +282,12 @@ export function useConversationsRealtime(userId: string, onConversationUpdate: (
     table: userId ? 'conversations' : '', // Empty table prevents subscription
     filter: userId ? `participant1_id=eq.${userId},participant2_id=eq.${userId}` : undefined,
     onInsert: async (payload) => {
-      console.log('🔗 Real-time new conversation:', payload);
       onConversationUpdate();
     },
     onUpdate: async (payload) => {
-      console.log('🔗 Real-time conversation update:', payload);
       onConversationUpdate();
     },
     onDelete: async (payload) => {
-      console.log('🔗 Real-time conversation delete:', payload);
       onConversationUpdate();
     },
   });
@@ -369,16 +296,16 @@ export function useConversationsRealtime(userId: string, onConversationUpdate: (
 }
 
 export function useListingsRealtime(onListingUpdate: (listing: any) => void) {
-  console.log('🔗 Setting up listings real-time subscription');
+
   return useRealtime({
     table: 'listings',
     // Remove the filter to listen to all changes, then filter in the callback
     onInsert: async (payload) => {
-      console.log('🔗 Real-time listing insert:', payload);
+    
       
       // Only process active and reserved listings
       if (payload.status !== 'active' && payload.status !== 'reserved') {
-        console.log('🔗 Skipping non-active/reserved listing:', payload.status);
+      
         return;
       }
       
@@ -396,10 +323,10 @@ export function useListingsRealtime(onListingUpdate: (listing: any) => void) {
           .single();
         
         if (!error && data) {
-          console.log('🔗 Fetched complete listing data:', data);
+        
           onListingUpdate(data);
         } else {
-          console.warn('🔗 Failed to fetch complete listing data:', error);
+        
           // Fallback if the listing is active or reserved
           if (payload.status === 'active' || payload.status === 'reserved') {
             onListingUpdate(payload);
@@ -414,7 +341,7 @@ export function useListingsRealtime(onListingUpdate: (listing: any) => void) {
       }
     },
     onUpdate: async (payload) => {
-      console.log('🔗 Real-time listing update:', payload);
+    
       
       // Process active, reserved, and inactive listings (for removal)
       try {
@@ -432,15 +359,15 @@ export function useListingsRealtime(onListingUpdate: (listing: any) => void) {
             .single();
           
           if (!error && data) {
-            console.log('🔗 Fetched updated listing data:', data);
+          
             onListingUpdate(data);
           } else {
-            console.warn('🔗 Failed to fetch updated listing data:', error);
+          
             onListingUpdate(payload);
           }
         } else {
           // For inactive listings (sold, suspended, etc.), remove from UI
-          console.log('🔗 Listing became inactive, removing from UI:', payload.id, payload.status);
+        
           onListingUpdate({ ...payload, _shouldRemove: true });
         }
       } catch (err) {
@@ -449,7 +376,7 @@ export function useListingsRealtime(onListingUpdate: (listing: any) => void) {
       }
     },
     onDelete: (payload) => {
-      console.log('🔗 Real-time listing delete:', payload);
+    
       // Pass delete event to allow removal from UI
       onListingUpdate({ ...payload, _shouldRemove: true });
     },
@@ -461,7 +388,7 @@ export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
   const postsSubscription = useRealtime({
     table: 'posts',
     onInsert: async (payload) => {
-      console.log('🔗 Real-time post insert:', payload);
+    
       // Fetch the complete post data with joins for new posts
       try {
         const { data, error } = await supabase
@@ -475,10 +402,10 @@ export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
           .single();
         
         if (!error && data) {
-          console.log('🔗 Fetched complete post data:', data);
+        
           onPostUpdate(data);
         } else {
-          console.warn('🔗 Failed to fetch complete post data:', error);
+        
           // Fallback to the raw payload if fetch fails
           onPostUpdate(payload);
         }
@@ -489,7 +416,7 @@ export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
       }
     },
     onUpdate: async (payload) => {
-      console.log('🔗 Real-time post update:', payload);
+    
       // Fetch the complete post data with joins for updated posts
       try {
         const { data, error } = await supabase
@@ -503,10 +430,10 @@ export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
           .single();
         
         if (!error && data) {
-          console.log('🔗 Fetched updated post data:', data);
+        
           onPostUpdate(data);
         } else {
-          console.warn('🔗 Failed to fetch updated post data:', error);
+        
           // Fallback to the raw payload if fetch fails
           onPostUpdate(payload);
         }
@@ -517,7 +444,7 @@ export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
       }
     },
     onDelete: (payload) => {
-      console.log('🔗 Real-time post delete:', payload);
+    
       // For deletes, we just need to remove the post from the UI
       // The payload.old contains the deleted post data
       onPostUpdate({ ...payload, _deleted: true });
@@ -528,11 +455,11 @@ export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
   const commentsSubscription = useRealtime({
     table: 'comments',
     onInsert: async (payload) => {
-      console.log('🔗 Real-time comment insert for community feed:', payload);
+    
       // When a comment is added, refresh the affected post to get updated counts
       if (payload.post_id) {
         try {
-          console.log('🔗 Fetching updated post data for post_id:', payload.post_id);
+        
           const { data, error } = await supabase
             .from('posts')
             .select(`
@@ -544,10 +471,6 @@ export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
             .single();
           
           if (!error && data) {
-            console.log('🔗 Fetched post with updated comment count:', {
-              postId: data.id,
-              newCount: data.comments_count
-            });
             onPostUpdate(data);
           } else {
             console.error('🔗 Error fetching post after comment:', error);
@@ -558,7 +481,7 @@ export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
       }
     },
     onDelete: async (payload) => {
-      console.log('🔗 Real-time comment delete:', payload);
+    
       // When a comment is deleted, refresh the affected post to get updated counts
       if (payload.post_id) {
         try {
@@ -573,7 +496,7 @@ export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
             .single();
           
           if (!error && data) {
-            console.log('🔗 Fetched post with updated comment count after deletion:', data);
+          
             onPostUpdate(data);
           }
         } catch (err) {
@@ -587,7 +510,7 @@ export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
   const likesSubscription = useRealtime({
     table: 'likes',
     onInsert: async (payload) => {
-      console.log('🔗 Real-time like insert:', payload);
+    
       // When a like is added, refresh the affected post to get updated counts
       if (payload.post_id) {
         try {
@@ -602,7 +525,7 @@ export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
             .single();
           
           if (!error && data) {
-            console.log('🔗 Fetched post with updated like count:', data);
+          
             onPostUpdate(data);
           }
         } catch (err) {
@@ -611,7 +534,7 @@ export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
       }
     },
     onDelete: async (payload) => {
-      console.log('🔗 Real-time like delete:', payload);
+    
       // When a like is removed, refresh the affected post to get updated counts
       if (payload.post_id) {
         try {
@@ -626,7 +549,7 @@ export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
             .single();
           
           if (!error && data) {
-            console.log('🔗 Fetched post with updated like count after unlike:', data);
+          
             onPostUpdate(data);
           }
         } catch (err) {
@@ -640,20 +563,20 @@ export function useCommunityRealtime(onPostUpdate: (post: any) => void) {
 }
 
 export function useOffersRealtime(conversationId: string, onOfferUpdate: (offer: any) => void) {
-  console.log('🔗 Setting up offers real-time subscription for conversation:', conversationId);
+
   return useRealtime({
     table: 'offers',
     filter: `conversation_id=eq.${conversationId}`,
     onInsert: (payload) => {
-      console.log('🔗 Real-time offer insert:', payload);
+    
       onOfferUpdate(payload);
     },
     onUpdate: (payload) => {
-      console.log('🔗 Real-time offer update:', payload);
+    
       onOfferUpdate(payload);
     },
     onDelete: (payload) => {
-      console.log('🔗 Real-time offer delete:', payload);
+    
       onOfferUpdate({ ...payload, _deleted: true });
     },
   });
