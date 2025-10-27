@@ -56,18 +56,18 @@ export function useListingValidation(
       if (formData.title) newTouched.add('title');
       if (formData.description) newTouched.add('description');
       if (formData.price) newTouched.add('price');
-      if (formData.images.length > 0) newTouched.add('images');
+      if (formData.images && formData.images.length > 0) newTouched.add('images');
       if (formData.categoryId) newTouched.add('categoryId');
       if (formData.location) newTouched.add('location');
       
       return newTouched;
     });
-  }, [formData.title, formData.description, formData.price, formData.images.length, formData.categoryId, formData.location]);
+  }, [formData.title, formData.description, formData.price, formData.images?.length, formData.categoryId, formData.location]);
 
   // Auto-validate on form data change (only after first interaction)
   useEffect(() => {
     // Mark as interacted when form data changes (after mount)
-    const hasData = formData.title || formData.description || formData.price || formData.images.length > 0;
+    const hasData = formData.title || formData.description || formData.price || (formData.images && formData.images.length > 0);
     if (hasData && !hasInteracted) {
       setHasInteracted(true);
     }

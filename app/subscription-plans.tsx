@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Alert, Linking } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
@@ -22,7 +22,7 @@ import {
   AppModal,
 } from '@/components';
 import type { PaymentRequest } from '@/components';
-import { Building, Star, Crown, Check, Zap, ChartBar as BarChart, Headphones, Award, TrendingUp } from 'lucide-react-native';
+import { Building, Star, Crown, Check, Zap, ChartBar as BarChart, Headphones, Award, TrendingUp, ExternalLink } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Subscription plan type from database
@@ -407,6 +407,38 @@ export default function SubscriptionPlansScreen() {
                 </Button>
               )}
             </View>
+          )}
+
+          {/* Web Dashboard Access - Show for current subscribers (including trial) */}
+          {(currentPlan || isOnTrial) && (
+            <TouchableOpacity
+              onPress={() => Linking.openURL('https://dashboard.sellarghana.com')}
+              style={{
+                backgroundColor: theme.colors.primary + '10',
+                borderColor: theme.colors.primary,
+                borderWidth: 1,
+                borderRadius: theme.borderRadius.lg,
+                padding: theme.spacing.lg,
+                marginBottom: theme.spacing.xl,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, marginBottom: theme.spacing.xs }}>
+                  <BarChart size={20} color={theme.colors.primary} />
+                  <Text variant="h4" style={{ color: theme.colors.primary, fontWeight: '600' }}>
+                    Web Dashboard
+                  </Text>
+                </View>
+                <Text variant="bodySmall" color="secondary">
+                  Manage your listings and view analytics on desktop
+                </Text>
+              </View>
+              <ExternalLink size={24} color={theme.colors.primary} />
+            </TouchableOpacity>
           )}
 
           {/* Plans */}

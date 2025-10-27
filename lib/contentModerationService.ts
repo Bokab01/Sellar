@@ -76,12 +76,13 @@ class ContentModerationService {
     // Plus our custom Ghanaian words
 
     this.spamPatterns = [
-      /\b(buy now|click here|limited time|act now|free money|make money fast)\b/gi,
-      /\b(viagra|cialis|pharmacy|casino|lottery|winner)\b/gi,
-      /\b(urgent|congratulations|selected|winner|prize)\b/gi,
+      // Removed "buy now", "urgent", "limited time", "act now" - these are legitimate marketplace terms
+      /\b(free money|make money fast|get rich quick|work from home)\b/gi,
+      /\b(viagra|cialis|casino|lottery)\b/gi,
+      /\b(congratulations|you have won|claim your prize)\b/gi,
       /\$\d+|\d+\$|USD\d+|\d+USD/gi,
       /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g, // Credit card patterns
-      /\b(whatsapp|telegram|signal)\s*:?\s*\+?\d{10,}/gi, // Contact sharing
+      // Removed WhatsApp/Telegram patterns - these are legitimate contact methods in Ghana
       ...ghanaianScamPatterns, // Add Ghanaian-specific scam patterns
     ];
 
@@ -182,22 +183,21 @@ class ContentModerationService {
       const averageConfidence = flags.length > 0 ? totalConfidence / flags.length : 0;
       const highSeverityFlags = flags.filter(flag => flag.severity === 'high' || flag.severity === 'critical');
       
-      // Determine if manual review is required
-      if (highSeverityFlags.length > 0 || averageConfidence > 0.7) {
+      // Determine if manual review is required (more lenient for marketplace)
+      if (highSeverityFlags.length > 0 || averageConfidence > 0.85) { // Increased from 0.7 to 0.85
         requiresManualReview = true;
       }
 
-      // Determine suggested action
+      // Determine suggested action (more lenient thresholds for marketplace content)
       let suggestedAction: 'approve' | 'reject' | 'review' | 'flag' = 'approve';
       
       if (flags.length === 0) {
         suggestedAction = 'approve';
       } else if (requiresManualReview) {
         suggestedAction = 'review';
-      } else if (averageConfidence > 0.6) {
+      } else if (averageConfidence > 0.75) { // Increased from 0.6 to 0.75 - only reject very high confidence spam
         suggestedAction = 'reject';
-      } else if (averageConfidence > 0.2) {
-        // Lowered threshold from 0.5 to 0.2 to catch single profanity words
+      } else if (averageConfidence > 0.4) { // Increased from 0.2 to 0.4 - be less aggressive with flagging
         suggestedAction = 'flag';
       }
 
@@ -222,12 +222,13 @@ class ContentModerationService {
     } catch (error) {
       console.error('Content moderation error:', error);
       
-      // Default to manual review on error
+      // Fail-open approach: Allow content through if moderation fails (technical issues shouldn't block users)
+      // But flag for manual review to catch any missed issues
       return {
-        isApproved: false,
+        isApproved: true, // Changed from false - don't block user for technical errors
         confidence: 0,
         flags: [],
-        requiresManualReview: true,
+        requiresManualReview: true, // Still require manual review for safety
         suggestedAction: 'review',
       };
     }
@@ -352,26 +353,26 @@ class ContentModerationService {
     for (const pattern of this.spamPatterns) {
       if (pattern.test(content)) {
         reasons.push('Contains spam keywords');
-        confidence += 0.3;
+        confidence += 0.4; // Increased from 0.3 - need stronger signal
         break;
       }
     }
 
-    // Check for excessive capitalization
+    // Check for excessive capitalization (more lenient for marketplace listings)
     const capsRatio = (content.match(/[A-Z]/g) || []).length / content.length;
-    if (capsRatio > 0.5 && content.length > 20) {
+    if (capsRatio > 0.7 && content.length > 20) { // Increased from 0.5 to 0.7
       reasons.push('Excessive capitalization');
       confidence += 0.2;
     }
 
-    // Check for excessive punctuation
+    // Check for excessive punctuation (more lenient)
     const punctuationCount = (content.match(/[!?]{2,}/g) || []).length;
-    if (punctuationCount > 3) {
+    if (punctuationCount > 5) { // Increased from 3 to 5
       reasons.push('Excessive punctuation');
       confidence += 0.2;
     }
 
-    // Check for repeated words
+    // Check for repeated words (more lenient)
     const words = content.toLowerCase().split(/\s+/);
     const wordCounts = new Map<string, number>();
     
@@ -382,14 +383,14 @@ class ContentModerationService {
     }
 
     const maxRepeats = Math.max(...Array.from(wordCounts.values()));
-    if (maxRepeats > 5) {
+    if (maxRepeats > 8) { // Increased from 5 to 8
       reasons.push('Repeated words');
       confidence += 0.3;
     }
 
-    // Check for excessive emojis
+    // Check for excessive emojis (more lenient)
     const emojiCount = (content.match(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/gu) || []).length;
-    if (emojiCount > content.length * 0.1) {
+    if (emojiCount > content.length * 0.15) { // Increased from 0.1 to 0.15
       reasons.push('Excessive emojis');
       confidence += 0.2;
     }
@@ -398,8 +399,8 @@ class ContentModerationService {
     confidence = Math.min(0.9, confidence);
     
     let severity: 'low' | 'medium' | 'high' | 'critical' = 'low';
-    if (confidence > 0.7) severity = 'high';
-    else if (confidence > 0.4) severity = 'medium';
+    if (confidence > 0.8) severity = 'high'; // Increased from 0.7
+    else if (confidence > 0.5) severity = 'medium'; // Increased from 0.4
 
     return { detected, confidence, reasons, severity };
   }

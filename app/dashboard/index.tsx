@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, ScrollView, RefreshControl } from 'react-native';
+import { View, ScrollView, RefreshControl, TouchableOpacity, Linking } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuth } from '@/hooks/useAuth';
 import { useMonetizationStore } from '@/store/useMonetizationStore';
 import { useAnalytics, type QuickStats, type AnalyticsData } from '@/lib/analyticsService';
 import { router } from 'expo-router';
+import { ExternalLink, Monitor } from 'lucide-react-native';
 
 // Import dashboard components
 import { BusinessOverview } from '@/components/Dashboard/BusinessOverview';
 import { FreeUserDashboard } from '@/components/Dashboard/FreeUserDashboard';
-import { TrialBadge, Container, PaymentModal, Toast, TrialImpactCard, TrialOnboardingGuide } from '@/components';
+import { TrialBadge, Container, PaymentModal, Toast, TrialImpactCard, TrialOnboardingGuide, Text } from '@/components';
 import type { PaymentRequest } from '@/components';
 import { supabase } from '@/lib/supabase';
 
@@ -199,6 +200,43 @@ export default function DashboardOverviewScreen() {
                 />
               </View>
             )}
+          </Container>
+        )}
+
+        {/* Web Dashboard Access - Show for business users or trial users */}
+        {(isBusinessUser || isOnTrial) && (
+          <Container style={{ marginTop: theme.spacing.lg }}>
+            <TouchableOpacity
+              onPress={() => Linking.openURL('https://dashboard.sellarghana.com')}
+              style={{
+                backgroundColor: theme.colors.primary + '10',
+                borderColor: theme.colors.primary,
+                borderWidth: 1,
+                borderRadius: theme.borderRadius.lg,
+                padding: theme.spacing.xl,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, marginBottom: theme.spacing.sm }}>
+                  <Monitor size={24} color={theme.colors.primary} />
+                  <Text variant="h3" style={{ color: theme.colors.primary, fontWeight: '600' }}>
+                    Web Dashboard
+                  </Text>
+                </View>
+                <Text variant="body" color="secondary" style={{ marginBottom: theme.spacing.xs }}>
+                  Access advanced analytics and management tools on desktop
+                </Text>
+                <Text variant="bodySmall" style={{ color: theme.colors.primary, fontWeight: '600' }}>
+                  dashboard.sellarghana.com
+                </Text>
+              </View>
+              <ExternalLink size={28} color={theme.colors.primary} />
+            </TouchableOpacity>
           </Container>
         )}
 

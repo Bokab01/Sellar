@@ -34,7 +34,7 @@ export default function SearchResultsScreen() {
     categoryName?: string; 
   }>();
   const [searchQuery, setSearchQuery] = useState(initialQuery || '');
-  const [viewMode, setViewMode] = useState<ViewMode>('list'); // ✅ Default to list view
+  const [viewMode, setViewMode] = useState<ViewMode>('grid'); // ✅ Default to grid view
   const { 
     filters,
     setFilters,
@@ -492,8 +492,36 @@ export default function SearchResultsScreen() {
     </View>
   ), [hookFavorites, viewCounts, user?.id, handleFavoritePress, handleViewPress, theme.spacing]);
 
-  // Memoized grid item renderer
+  // Memoized grid item renderer (works for both grid and list modes)
   const renderGridItem = useCallback(({ item: product }: { item: any }) => (
+    <View style={{ flex: 1, paddingHorizontal: 2 }}>
+      <ProductCard
+        key={product.id}
+        image={product.image}
+        title={product.title}
+        price={product.price}
+        previousPrice={product.previous_price}
+        priceChangedAt={product.price_changed_at}
+        seller={product.seller}
+        badge={product.badge}
+        location={product.location}
+        layout="grid"
+        borderRadius={theme.borderRadius.sm}
+        fullWidth={true}
+        listingId={product.id}
+        isFavorited={hookFavorites[product.id] || false}
+        viewCount={viewCounts[product.id] || 0}
+        favoritesCount={product.favorites || 0}
+        onPress={() => router.push(`/(tabs)/home/${product.id}`)}
+        onFavoritePress={user?.id !== product.seller.id ? () => handleFavoritePress(product.id) : undefined}
+        onViewPress={() => handleViewPress(product.id)}
+        currentUserId={user?.id || ""}
+      />
+    </View>
+  ), [hookFavorites, viewCounts, user?.id, handleFavoritePress, handleViewPress]);
+
+  // Memoized list item renderer (same as grid but full width when in list mode)
+  const renderListItem = useCallback(({ item: product }: { item: any }) => (
     <ProductCard
       key={product.id}
       image={product.image}
@@ -505,7 +533,6 @@ export default function SearchResultsScreen() {
       badge={product.badge}
       location={product.location}
       layout="grid"
-      borderRadius={theme.borderRadius.sm}
       fullWidth={true}
       listingId={product.id}
       isFavorited={hookFavorites[product.id] || false}
@@ -517,45 +544,6 @@ export default function SearchResultsScreen() {
       currentUserId={user?.id || ""}
     />
   ), [hookFavorites, viewCounts, user?.id, handleFavoritePress, handleViewPress]);
-
-  // Memoized list item renderer
-  const renderListItem = useCallback(({ item: product }: { item: any }) => {
-    // ✅ Prepare badges for ListingListCard
-    const listBadges: Array<{ text: string; variant: 'primary' | 'success' | 'warning' | 'error' | 'info' | 'neutral' | 'secondary' }> = [];
-    
-    if (product.badge?.text && product.badge?.variant) {
-      listBadges.push({ 
-        text: String(product.badge.text), 
-        variant: String(product.badge.variant) as any
-      });
-    }
-
-    return (
-      <ProductCard
-        key={product.id}
-        variant="list"
-        shadowSize="sm"
-        listingId={String(product.id)}
-        image={Array.isArray(product.image) ? product.image[0] : String(product.image)}
-        title={String(product.title)}
-        price={product.price}
-        previousPrice={product.previous_price}
-        priceChangedAt={product.price_changed_at}
-        currency="GHS"
-        seller={product.seller}
-        status="active"
-        location={product.location}
-        viewCount={viewCounts[product.id] || 0}
-        favoritesCount={product.favorites || 0}
-        isFavorited={hookFavorites[product.id] || false}
-        badge={listBadges[0]}
-        badges={listBadges}
-        onPress={() => router.push(`/(tabs)/home/${product.id}`)}
-        onFavoritePress={user?.id !== product.seller.id ? () => handleFavoritePress(product.id) : undefined}
-        onViewPress={() => handleViewPress(product.id)}
-      />
-    );
-  }, [hookFavorites, viewCounts, user?.id, handleFavoritePress, handleViewPress]);
 
   // Optimized keyExtractor
   const keyExtractor = useCallback((item: any) => item.id, []);
@@ -740,17 +728,23 @@ export default function SearchResultsScreen() {
 
       {/* Results Grid/List */}
       <FlatList
-        data={viewMode === 'grid' ? (gridData as any) : (transformedProducts as any)}
-        renderItem={viewMode === 'grid' ? (renderGridRow as any) : (renderListItem as any)}
-        keyExtractor={(item: any, index: number) => viewMode === 'grid' ? `row-${index}` : keyExtractor(item)}
+        key={viewMode} // Force re-render when view mode changes
+        data={transformedProducts}
+        renderItem={renderGridItem}
+        keyExtractor={keyExtractor}
+        numColumns={viewMode === 'grid' ? 2 : 1}
         ListHeaderComponent={ListHeader}
+        columnWrapperStyle={viewMode === 'grid' ? { 
+          marginBottom: 4 
+        } : undefined}
         // ✅ Performance optimizations
         removeClippedSubviews={true}
         maxToRenderPerBatch={viewMode === 'grid' ? 5 : 10}
         windowSize={5}
         initialNumToRender={viewMode === 'grid' ? 5 : 10}
         updateCellsBatchingPeriod={50}
-            contentContainerStyle={{
+        contentContainerStyle={{
+          paddingHorizontal: 2,
           paddingBottom: theme.spacing.lg,
         }}
         showsVerticalScrollIndicator={false}

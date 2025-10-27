@@ -636,7 +636,7 @@ export default function MyListingsScreen() {
   // ✅ OPTIMIZED: Memoized render functions for FlatList
   // ✅ OPTIMIZED: Single grid card component
   const GridCard = ({ listing }: { listing: any }) => (
-    <View style={{ flex: 1, paddingHorizontal: theme.spacing.xs }}>
+    <View style={{ flex: 1, paddingHorizontal: 2 }}>
       <TouchableOpacity
         onLongPress={() => handleLongPress(listing.id)}
         delayLongPress={500}
@@ -735,6 +735,7 @@ export default function MyListingsScreen() {
     </View>
   );
 
+  // Same renderer for both modes (layout="grid", just changes numColumns)
   const renderListItem = useCallback(({ item: listing }: { item: any }) => (
     <View style={{ paddingHorizontal: theme.spacing.md, marginBottom: theme.spacing.sm }}>
       <TouchableOpacity
@@ -769,7 +770,8 @@ export default function MyListingsScreen() {
         }}>
           <ProductCard
             {...listing}
-            variant="list"
+            layout="grid"
+            fullWidth={true}
             previousPrice={listing.previous_price}
             priceChangedAt={listing.price_changed_at}
             onPress={() => {
@@ -846,15 +848,9 @@ export default function MyListingsScreen() {
     [viewMode]
   );
 
-  // ✅ OPTIMIZED: Render for grid with 2 columns
-  const renderGridRow = useCallback(({ item }: { item: any[] }) => (
-    <View style={{ flexDirection: 'row', paddingHorizontal: theme.spacing.sm, marginBottom: theme.spacing.sm }}>
-      {item.map((listing, idx) => listing ? (
-        <GridCard key={listing.id} listing={listing} />
-      ) : (
-        <View key={`empty-${idx}`} style={{ flex: 1 }} />
-      ))}
-    </View>
+  // ✅ OPTIMIZED: Render item for both grid and list modes
+  const renderGridItem = useCallback(({ item: listing }: { item: any }) => (
+    <GridCard listing={listing} />
   ), [theme, isSelectionMode, selectedListings, longPressedItem, handleLongPress, toggleListingSelection, handleToggleStatus, handleRelistListing, setSelectedListing, setShowDeleteModal]);
 
   // ✅ Group items into pairs for grid view
@@ -1108,9 +1104,14 @@ export default function MyListingsScreen() {
         ) : filteredListings.length > 0 ? (
           // ✅ OPTIMIZED: FlatList for virtualization and better performance
           <FlatList
-            data={viewMode === 'grid' ? (gridData as any) : (transformedListings as any)}
-            renderItem={viewMode === 'grid' ? (renderGridRow as any) : (renderListItem as any)}
-            keyExtractor={(item: any, index: number) => viewMode === 'grid' ? `row-${index}` : keyExtractor(item)}
+            key={viewMode} // Force re-render when view mode changes
+            data={transformedListings}
+            renderItem={renderGridItem}
+            keyExtractor={keyExtractor}
+            numColumns={viewMode === 'grid' ? 2 : 1}
+            columnWrapperStyle={viewMode === 'grid' ? { 
+              marginBottom: 4 
+            } : undefined}
             // ✅ Performance optimizations
             removeClippedSubviews={true}
             maxToRenderPerBatch={viewMode === 'grid' ? 5 : 10}
@@ -1118,6 +1119,7 @@ export default function MyListingsScreen() {
             initialNumToRender={viewMode === 'grid' ? 5 : 10}
             updateCellsBatchingPeriod={50}
             contentContainerStyle={{
+              paddingHorizontal: 2,
               paddingBottom: theme.spacing.xl,
             }}
             refreshControl={

@@ -178,171 +178,12 @@ export default function FavoritesScreen() {
     });
   }, [favorites]);
 
-  // ✅ Group items into pairs for grid view (same as my listings)
-  const gridData = useMemo(() => {
-    if (viewMode !== 'grid') return [];
-    const pairs = [];
-    for (let i = 0; i < transformedProducts.length; i += 2) {
-      pairs.push([transformedProducts[i], transformedProducts[i + 1]]);
-    }
-    return pairs;
-  }, [transformedProducts, viewMode]);
-
-  // ✅ Render grid row (pairs of items)
-  const renderGridRow = useCallback(({ item: pair }: { item: any[] }) => (
-    <View style={{ 
-      flexDirection: 'row', 
-      paddingHorizontal: 0,
-      marginBottom: theme.spacing.sm,
-      gap: theme.spacing.xs,
-    }}>
-      <View style={{ flex: 1 }}>
-        <View style={{ position: 'relative' }}>
-          <ProductCard
-            key={pair[0]?.id}
-            image={pair[0]?.image}
-            title={pair[0]?.title}
-            price={pair[0]?.price}
-            previousPrice={pair[0]?.previous_price}
-            priceChangedAt={pair[0]?.price_changed_at}
-            seller={pair[0]?.seller}
-            badge={pair[0]?.badge}
-            location={pair[0]?.location}
-            layout="grid"
-            fullWidth={false}
-            shadowSize="sm"
-            isFavorited={true}
-            onFavoritePress={() => handleToggleFavorite(pair[0]?.favoriteId, pair[0]?.title)}
-            onPress={() => router.push(`/(tabs)/home/${pair[0]?.id}`)}
-          />
-
-          {/* Status Indicator */}
-          {pair[0]?.status !== 'active' && (
-            <View
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'rgba(0,0,0,0.7)',
-                borderRadius: theme.borderRadius.lg,
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-            >
-              <Text variant="caption" style={{ color: 'white', fontWeight: '600' }}>
-                {pair[0]?.status === 'sold' ? 'SOLD' : pair[0]?.status?.toUpperCase()}
-              </Text>
-            </View>
-          )}
-
-          {/* Saved Date - Below card */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingHorizontal: theme.spacing.sm,
-              paddingVertical: theme.spacing.xs,
-              marginTop: theme.spacing.xs,
-              backgroundColor: theme.colors.primary + '10',
-              borderRadius: theme.borderRadius.sm,
-              gap: theme.spacing.xs,
-            }}
-          >
-            <Clock size={10} color={theme.colors.primary} />
-            <Text 
-              variant="caption" 
-              style={{ 
-                color: theme.colors.primary,
-                fontWeight: '600',
-                fontSize: 10,
-              }}
-            >
-              Saved {pair[0]?.savedAt}
-            </Text>
-          </View>
-        </View>
-      </View>
-      <View style={{ flex: 1 }}>
-        {pair[1] && (
-          <View style={{ position: 'relative' }}>
-            <ProductCard
-              key={pair[1]?.id}
-              image={pair[1]?.image}
-              title={pair[1]?.title}
-              price={pair[1]?.price}
-              previousPrice={pair[1]?.previous_price}
-              priceChangedAt={pair[1]?.price_changed_at}
-              seller={pair[1]?.seller}
-              badge={pair[1]?.badge}
-              location={pair[1]?.location}
-              layout="grid"
-              fullWidth={false}
-              shadowSize="sm"
-              isFavorited={true}
-              onFavoritePress={() => handleToggleFavorite(pair[1]?.favoriteId, pair[1]?.title)}
-              onPress={() => router.push(`/(tabs)/home/${pair[1]?.id}`)}
-            />
-
-            {/* Status Indicator */}
-            {pair[1]?.status !== 'active' && (
-              <View
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  backgroundColor: 'rgba(0,0,0,0.7)',
-                  borderRadius: theme.borderRadius.lg,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-              >
-                <Text variant="caption" style={{ color: 'white', fontWeight: '600' }}>
-                  {pair[1]?.status === 'sold' ? 'SOLD' : pair[1]?.status?.toUpperCase()}
-                </Text>
-              </View>
-            )}
-
-            {/* Saved Date - Below card */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingHorizontal: theme.spacing.sm,
-                paddingVertical: theme.spacing.xs,
-                marginTop: theme.spacing.xs,
-                backgroundColor: theme.colors.primary + '10',
-                borderRadius: theme.borderRadius.sm,
-                gap: theme.spacing.xs,
-              }}
-            >
-              <Clock size={10} color={theme.colors.primary} />
-              <Text 
-                variant="caption" 
-                style={{ 
-                  color: theme.colors.primary,
-                  fontWeight: '600',
-                  fontSize: 10,
-                }}
-              >
-                Saved {pair[1]?.savedAt}
-              </Text>
-            </View>
-          </View>
-        )}
-      </View>
-    </View>
-  ), [theme, handleToggleFavorite]);
-
-  // ✅ Render list item
-  const renderListItem = useCallback(({ item: product }: { item: any }) => (
-    <View style={{ marginBottom: theme.spacing.sm, paddingHorizontal: theme.spacing.lg }}>
+  // ✅ Single render function for both grid and list modes
+  const renderGridItem = useCallback(({ item: product }: { item: any }) => (
+    <View style={{ flex: 1, paddingHorizontal: 2 }}>
       <View style={{ position: 'relative' }}>
         <ProductCard
-          variant="list"
+          key={product.id}
           image={product.image}
           title={product.title}
           price={product.price}
@@ -351,6 +192,8 @@ export default function FavoritesScreen() {
           seller={product.seller}
           badge={product.badge}
           location={product.location}
+          layout="grid"
+          fullWidth={true}
           shadowSize="sm"
           isFavorited={true}
           onFavoritePress={() => handleToggleFavorite(product.favoriteId, product.title)}
@@ -378,49 +221,37 @@ export default function FavoritesScreen() {
           </View>
         )}
 
-        {/* Saved Date - Below list card with pro styling */}
+        {/* Saved Date - Below card */}
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: theme.spacing.md,
-            paddingVertical: theme.spacing.sm,
+            paddingHorizontal: theme.spacing.sm,
+            paddingVertical: theme.spacing.xs,
             marginTop: theme.spacing.xs,
             backgroundColor: theme.colors.primary + '10',
             borderRadius: theme.borderRadius.sm,
-            borderLeftWidth: 2,
-            borderLeftColor: theme.colors.primary,
+            gap: theme.spacing.xs,
           }}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
-            <Clock size={12} color={theme.colors.primary} />
-            <Text 
-              variant="caption" 
-              style={{ 
-                color: theme.colors.primary,
-                fontWeight: '600',
-              }}
-            >
-              Saved {product.savedAt}
-            </Text>
-          </View>
-          <View
-            style={{
-              backgroundColor: theme.colors.primary + '20',
-              paddingHorizontal: theme.spacing.sm,
-              paddingVertical: 2,
-              borderRadius: theme.borderRadius.xs,
+          <Clock size={10} color={theme.colors.primary} />
+          <Text 
+            variant="caption" 
+            style={{ 
+              color: theme.colors.primary,
+              fontWeight: '600',
+              fontSize: 10,
             }}
           >
-          </View>
+            Saved {product.savedAt}
+          </Text>
         </View>
       </View>
     </View>
   ), [theme, handleToggleFavorite]);
 
-  // ✅ Optimized keyExtractor
-  const keyExtractor = useCallback((item: any) => item.id, []);
+  // ✅ Key extractor for FlatList
+  const keyExtractor = useCallback((item: any) => item.id || String(Math.random()), []);
 
   if (loading) {
     return (
@@ -493,9 +324,14 @@ export default function FavoritesScreen() {
       <View style={{ flex: 1 }}>
         {transformedProducts.length > 0 ? (
           <FlatList
-            data={viewMode === 'grid' ? (gridData as any) : (transformedProducts as any)}
-            renderItem={viewMode === 'grid' ? (renderGridRow as any) : (renderListItem as any)}
-            keyExtractor={(item: any, index: number) => viewMode === 'grid' ? `row-${index}` : keyExtractor(item)}
+            key={viewMode} // Force re-render when view mode changes
+            data={transformedProducts}
+            renderItem={renderGridItem}
+            keyExtractor={keyExtractor}
+            numColumns={viewMode === 'grid' ? 2 : 1}
+            columnWrapperStyle={viewMode === 'grid' ? { 
+              marginBottom: 4 
+            } : undefined}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -510,6 +346,7 @@ export default function FavoritesScreen() {
             initialNumToRender={viewMode === 'grid' ? 5 : 10}
             updateCellsBatchingPeriod={50}
             contentContainerStyle={{
+              paddingHorizontal: 2,
               paddingBottom: theme.spacing.xl,
               paddingTop: theme.spacing.sm,
             }}

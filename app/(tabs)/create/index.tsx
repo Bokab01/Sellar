@@ -322,7 +322,7 @@ function CreateListingScreen() {
     useCallback(() => {
       const onBackPress = () => {
         // Show alert if there's any content (saved or unsaved)
-        const hasContent = formData.title?.trim() || formData.description?.trim() || formData.images.length > 0;
+        const hasContent = formData.title?.trim() || formData.description?.trim() || (formData.images && formData.images.length > 0);
         if (hasContent) {
           showExitConfirmation();
           return true;
@@ -854,7 +854,7 @@ function CreateListingScreen() {
         </View>
       )}
 
-      {formData.images.length === 0 && (
+      {(!formData.images || formData.images.length === 0) && (
         <View style={{
           backgroundColor: theme.colors.warning + '10',
           borderColor: theme.colors.warning,
@@ -901,7 +901,7 @@ function CreateListingScreen() {
       </View>
     </View>
     </View>
-  ), [formData.images, formData.title, formData.description, loading, uploadProgress, validationResults, theme, handleImagesChange, handleTitleChange, handleDescriptionChange]);
+  ), [formData.images?.length, formData.title, formData.description, loading, uploadProgress, validationResults, theme, handleImagesChange, handleTitleChange, handleDescriptionChange]);
 
   const CategoryStep = useMemo(() => {
     return (
@@ -1129,7 +1129,7 @@ function CreateListingScreen() {
         ...theme.shadows.md,
       }}>
         {/* Images Preview - Memory Optimized */}
-        {formData.images.length > 0 && (
+        {formData.images && formData.images.length > 0 && (
           <View style={{ marginBottom: theme.spacing.md }}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
@@ -1518,7 +1518,7 @@ function CreateListingScreen() {
         title="Sell an item"
         showBackButton
         onBackPress={() => {
-          const hasContent = formData.title?.trim() || formData.description?.trim() || formData.images.length > 0;
+          const hasContent = formData.title?.trim() || formData.description?.trim() || (formData.images && formData.images.length > 0);
           if (hasContent) {
             setShowExitModal(true);
           } else {
@@ -2539,6 +2539,41 @@ function CreateListingScreen() {
           </View>
         </View>
       </AppModal>
+
+      {/* Loading Overlay - Prevents user interaction during submission */}
+      {loading && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+        }}>
+          <View style={{
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.borderRadius.xl,
+            padding: theme.spacing.xl,
+            minWidth: 200,
+            alignItems: 'center',
+            gap: theme.spacing.md,
+            ...theme.shadows.lg,
+          }}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text variant="body" style={{ fontWeight: '600', textAlign: 'center' }}>
+              {uploadProgress > 0 && uploadProgress < 1 
+                ? `Uploading images...\n${Math.round(uploadProgress * 100)}%`
+                : 'Publishing your listing...'}
+            </Text>
+            <Text variant="caption" color="secondary" style={{ textAlign: 'center' }}>
+              Please wait, this may take a moment
+            </Text>
+          </View>
+        </View>
+      )}
 
     </SafeAreaWrapper>
   );

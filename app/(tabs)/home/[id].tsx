@@ -247,6 +247,7 @@ export default function ListingDetailScreen() {
   const [sellerListingsLoading, setSellerListingsLoading] = useState(false);
   const [similarListingsLoading, setSimilarListingsLoading] = useState(false);
   const [totalSellerListingsCount, setTotalSellerListingsCount] = useState(0);
+  const [showFullDescription, setShowFullDescription] = useState(false);
 
   // Media viewer (supports images and videos)
   const media = listing?.images || [];
@@ -2240,8 +2241,55 @@ export default function ListingDetailScreen() {
               Description
             </Text>
             <Text variant="body" style={{ lineHeight: 22 }}>
-              {listing.description?.split('\n\n📋')[0] || listing.description}
+              {(() => {
+                const description = listing.description?.split('\n\n📋')[0] || listing.description || '';
+                const lines = description.split('\n');
+                const isLongDescription = lines.length > 4 || description.length > 200;
+                
+                if (isLongDescription) {
+                  // Show first 4 lines or 200 characters, whichever comes first
+                  const truncatedLines = lines.slice(0, 4).join('\n');
+                  const truncated = truncatedLines.length > 200 
+                    ? truncatedLines.substring(0, 200) + '...'
+                    : truncatedLines + (lines.length > 4 ? '...' : '');
+                  
+                  return truncated;
+                }
+                
+                return description;
+              })()}
             </Text>
+            
+            {/* Read More Button */}
+            {(() => {
+              const description = listing.description?.split('\n\n📋')[0] || listing.description || '';
+              const lines = description.split('\n');
+              const isLongDescription = lines.length > 4 || description.length > 200;
+              
+              return isLongDescription ? (
+                <TouchableOpacity 
+                  onPress={() => setShowFullDescription(true)}
+                  style={{ 
+                    marginTop: theme.spacing.sm,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    alignSelf: 'flex-end',
+                    gap: 4,
+                  }}
+                >
+                  <Text 
+                    variant="body" 
+                    style={{ 
+                      color: theme.colors.primary, 
+                      fontWeight: '600',
+                    }}
+                  >
+                    Read More
+                  </Text>
+                  <Text style={{ color: theme.colors.primary }}>→</Text>
+                </TouchableOpacity>
+              ) : null;
+            })()}
           </View>
 
           {/* Action Buttons - Moved from bottom */}
@@ -2887,6 +2935,29 @@ export default function ListingDetailScreen() {
         <Text style={{ color: theme.colors.text.secondary, lineHeight: 22 }}>
           {moderationError}
         </Text>
+      </AppModal>
+
+      {/* Full Description Modal */}
+      <AppModal
+        visible={showFullDescription}
+        onClose={() => setShowFullDescription(false)}
+        title="Description"
+        size="lg"
+        position='bottom'
+      >
+        <ScrollView 
+          style={{ maxHeight: 600 }}
+          contentContainerStyle={{ 
+            paddingHorizontal: theme.spacing.sm, 
+            paddingTop: theme.spacing.sm,
+            paddingBottom: theme.spacing.xl + 20, // Extra padding for safe area
+          }}
+          showsVerticalScrollIndicator={true}
+        >
+          <Text variant="body" style={{ lineHeight: 22, color: theme.colors.text.primary }}>
+            {listing?.description?.split('\n\n📋')[0] || listing?.description || 'No description available'}
+          </Text>
+        </ScrollView>
       </AppModal>
 
       {/* Media Viewer (Images & Videos) */}

@@ -39,7 +39,7 @@ export const validateListingStep = (
   switch (step) {
     case 0: // Photos + Basic Info (merged)
       // Photos validation
-      if (formData.images.length === 0) {
+      if (!formData.images || formData.images.length === 0) {
         errors.images = 'At least one photo is required';
       } else if (formData.images.length < 3) {
         warnings.images = 'Adding more photos increases your chances of selling by 300%';
@@ -200,6 +200,23 @@ export const sanitizeInput = (input: string): string => {
     .trim()
     .replace(/\s+/g, ' ') // Replace multiple spaces with single space
     .replace(/[^\w\s\-.,!()&]/g, ''); // Remove special characters except allowed ones
+};
+
+// Sanitize description while preserving newlines and emojis
+export const sanitizeDescription = (input: string): string => {
+  return input
+    .trim()
+    // Normalize line breaks to \n
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    // Remove excessive consecutive newlines (more than 3)
+    .replace(/\n{4,}/g, '\n\n\n')
+    // Remove excessive spaces within lines (but preserve newlines)
+    .replace(/[^\S\n]+/g, ' ')
+    // Remove only truly dangerous characters (script injection, null bytes, etc.)
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    // Keep emojis, newlines, and common punctuation intact
+    .trim();
 };
 
 export const generateSEOFriendlyTitle = (title: string, category: string): string => {

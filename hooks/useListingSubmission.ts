@@ -6,6 +6,7 @@ import { networkUtils } from '@/utils/networkUtils';
 import { reputationService } from '@/lib/reputationService';
 import {
   sanitizeInput,
+  sanitizeDescription,
   generateSEOFriendlyTitle,
   extractKeywords,
 } from '@/utils/listingValidation';
@@ -94,7 +95,7 @@ export function useListingSubmission() {
 
       // Sanitize and optimize data
       const sanitizedTitle = sanitizeInput(formData.title || '');
-      const sanitizedDescription = sanitizeInput(formData.description || '');
+      const sanitizedDescription = sanitizeDescription(formData.description || ''); // Use sanitizeDescription to preserve newlines and emojis
       const seoTitle = generateSEOFriendlyTitle(sanitizedTitle, selectedCategory?.name || 'Uncategorized');
       const keywords = extractKeywords(sanitizedTitle, sanitizedDescription);
 
