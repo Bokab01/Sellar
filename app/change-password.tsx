@@ -162,7 +162,11 @@ export default function ChangePasswordScreen() {
 
   return (
     <SafeAreaWrapper>
-      <AppHeader title="Change Password" showBackButton />
+      <AppHeader 
+        title="Change Password" 
+        showBackButton 
+        onBackPress={() => router.back()}
+      />
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         <Container padding='sm'>
           <View

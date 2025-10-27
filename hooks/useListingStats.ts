@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { toggleFavorite, checkFavoriteStatus, trackListingView, getListingViewCount, getListingsStats } from '@/lib/favoritesAndViews';
+import { useFavoritesStore } from '@/store/useFavoritesStore';
 
 interface UseListingStatsOptions {
   listingId: string;
@@ -68,7 +69,16 @@ export function useListingStats({
       if (result.error) {
         setError(result.error);
       } else {
-        setIsFavorited(result.isFavorited);
+        const newFavoriteStatus = result.isFavorited;
+        setIsFavorited(newFavoriteStatus);
+        
+        // Update favorites count in global store
+        const { incrementListingFavoriteCount, decrementListingFavoriteCount } = useFavoritesStore.getState();
+        if (newFavoriteStatus) {
+          incrementListingFavoriteCount(listingId);
+        } else {
+          decrementListingFavoriteCount(listingId);
+        }
       }
     } catch (err) {
       setError('Failed to toggle favorite');

@@ -129,7 +129,7 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
   menuActions,
   borderRadius,
 }) {
-  const { theme } = useTheme();
+  const { theme, themeMode } = useTheme();
   const [showMenu, setShowMenu] = useState(false);
 
   // Handle different image formats for ImageViewer
@@ -200,6 +200,11 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
             overflow: 'hidden',
             marginBottom: theme.spacing.sm,
             padding: theme.spacing.sm,
+            // Add border in AMOLED mode for better card separation
+            ...(themeMode === 'amoled' && {
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+            }),
           }}
           activeOpacity={0.95}
         >
@@ -431,7 +436,12 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
           marginBottom: isGridLayout ? 0 : theme.spacing.md,
           height: cardHeight,
           width: cardWidth,
-          // Add custom border if provided
+          // Add border in AMOLED mode for better card separation
+          ...(themeMode === 'amoled' && {
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+          }),
+          // Add custom border if provided (overrides AMOLED border)
           ...(borderColor && {
             borderWidth: 1.5,
             borderColor: borderColor,

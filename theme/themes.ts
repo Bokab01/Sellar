@@ -156,8 +156,8 @@ export const darkTheme: Theme = {
     secondary: colorPalette.secondary[800],
     secondaryForeground: colorPalette.secondary[300],
     background: colorPalette.neutral[900],
-    surface: colorPalette.neutral[800],
-    surfaceVariant: colorPalette.neutral[800],
+    surface: '#1a1a1a', // Slightly lighter - good balance
+    surfaceVariant: '#1a1a1a',
     border: colorPalette.neutral[700],
     text: {
       primary: '#ffffff',
@@ -165,12 +165,12 @@ export const darkTheme: Theme = {
       muted: colorPalette.neutral[400],
       inverse: colorPalette.neutral[900],
     },
-    error: colorPalette.error[500],
+    error: colorPalette.error[400],
     errorForeground: '#ffffff',
-    success: colorPalette.success[500],
-    successForeground: '#ffffff',
-    warning: colorPalette.warning[500],
-    warningForeground: '#ffffff',
+    success: colorPalette.success[400], // #00ff00 - Neon green with dark text
+    successForeground: colorPalette.neutral[900], // Dark text for better contrast
+    warning: colorPalette.warning[400],
+    warningForeground: colorPalette.neutral[900],
     
     // Additional color properties that might be missing
     primaryContainer: colorPalette.primary[800],
@@ -182,7 +182,7 @@ export const darkTheme: Theme = {
     textSecondary: colorPalette.neutral[400],
     
     // Additional colors used in components
-    card: colorPalette.neutral[800],
+    card: '#1a1a1a', // Slightly lighter - matches surface
     purple: colorPalette.primary[400],
     onErrorContainer: '#ffffff',
     destructive: colorPalette.error[500],
@@ -228,19 +228,19 @@ export const amoledTheme: Theme = {
     background: colorPalette.neutral[900], // Pure black
     surface: colorPalette.neutral[900], // Pure black cards for AMOLED
     surfaceVariant: '#0A0A0A', // Slightly lighter than pure black
-    border: '#1A1A1A', // Very dark gray borders
+    border: '#2A2A2A', // Subtle but visible borders
     text: {
       primary: '#ffffff',
       secondary: colorPalette.neutral[300],
       muted: colorPalette.neutral[400],
       inverse: colorPalette.neutral[900],
     },
-    error: colorPalette.error[500],
+    error: colorPalette.error[400],
     errorForeground: '#ffffff',
-    success: colorPalette.success[500],
-    successForeground: '#ffffff',
-    warning: colorPalette.warning[500],
-    warningForeground: '#ffffff',
+    success: colorPalette.success[500], // #00ff00 - Neon green with dark text
+    successForeground: colorPalette.neutral[900], // Dark text for better contrast
+    warning: colorPalette.warning[400],
+    warningForeground: colorPalette.neutral[900],
     
     // Additional color properties
     primaryContainer: colorPalette.primary[800],
@@ -256,7 +256,7 @@ export const amoledTheme: Theme = {
     purple: colorPalette.primary[400],
     onErrorContainer: '#ffffff',
     destructive: colorPalette.error[500],
-    outline: '#1A1A1A',
+    outline: '#333333', // Subtle outline
     onPrimary: '#ffffff',
     info: colorPalette.primary[400],
   },

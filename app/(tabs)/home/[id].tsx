@@ -41,7 +41,7 @@ import { useListingStats } from '@/hooks/useListingStats';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { SvgXml } from 'react-native-svg';
 import { useProfile } from '@/hooks/useProfile';
-import { Heart, Share as ShareIcon, MessageCircle, Phone, PhoneCall, DollarSign, ArrowLeft, Package, MoreVertical, Edit, Trash2, Flag, BadgeCent, RefreshCw, Play, X } from 'lucide-react-native';
+import { Heart, Share as ShareIcon, MessageCircle, Phone, PhoneCall, DollarSign, ArrowLeft, Package, MoreVertical, Edit, Trash2, Flag, BadgeCent, RefreshCw, Play, X, MapPin } from 'lucide-react-native';
 import { getDisplayName } from '@/hooks/useDisplayName';
 import { UserDisplayName } from '@/components/UserDisplayName/UserDisplayName';
 import { ReportButton } from '@/components/ReportButton/ReportButton';
@@ -663,6 +663,11 @@ export default function ListingDetailScreen() {
 
   const incrementViewCount = async () => {
     try {
+      // Don't count views from the listing owner
+      if (user?.id && listing?.user_id === user.id) {
+        return;
+      }
+
       // Record view
       await supabase
         .from('listing_views')
@@ -1915,13 +1920,9 @@ export default function ListingDetailScreen() {
                 borderWidth: 1,
                 borderColor: theme.colors.primary + '30',
                 borderRadius: theme.borderRadius.full,
-                paddingHorizontal: theme.spacing.sm,
+                paddingHorizontal: theme.spacing.md,
                 paddingVertical: theme.spacing.sm,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: theme.spacing.xs,
               }}>
-                <Text style={{ fontSize: 14, color: theme.colors.primary }}>🔍</Text>
                 <Text 
                   variant="caption" 
                   style={{ 
@@ -1941,13 +1942,9 @@ export default function ListingDetailScreen() {
                   borderWidth: 1,
                   borderColor: theme.colors.success + '30',
                   borderRadius: theme.borderRadius.full,
-                  paddingHorizontal: theme.spacing.sm,
+                  paddingHorizontal: theme.spacing.md,
                   paddingVertical: theme.spacing.sm,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: theme.spacing.xs,
                 }}>
-                  <Text style={{ fontSize: 14, color: theme.colors.success }}>💰</Text>
                   <Text 
                     variant="caption" 
                     style={{ 
@@ -2364,9 +2361,12 @@ export default function ListingDetailScreen() {
             <Text variant="h4" style={{ marginBottom: theme.spacing.sm }}>
               Location
             </Text>
-            <Text variant="body" color="secondary">
-              📍 {listing.location}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+              <MapPin size={16} color={theme.colors.text.secondary} />
+              <Text variant="body" color="secondary">
+                {listing.location}
+              </Text>
+            </View>
           </View>
 
           {/* Listing Statistics Table */}

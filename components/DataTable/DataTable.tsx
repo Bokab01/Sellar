@@ -2,6 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components';
+import { Eye, Heart, Calendar, RefreshCw } from 'lucide-react-native';
 
 export interface DataTableRow {
   label: string;
@@ -158,21 +159,10 @@ export function ItemDetailsTable({
       icon: <Text style={{ fontSize: 16 }}>📂</Text>,
     },
     {
-      label: 'Condition',
-      value: listing.condition ? listing.condition.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) : 'N/A',
-      icon: <Text style={{ fontSize: 16 }}>🔍</Text>,
-    },
-    {
       label: 'Quantity Available',
       value: listing.quantity || 1,
       icon: <Text style={{ fontSize: 16 }}>📦</Text>,
       highlight: listing.quantity > 1,
-    },
-    {
-      label: 'Accepts Offers',
-      value: listing.accept_offers ? 'Yes' : 'No',
-      icon: <Text style={{ fontSize: 16 }}>💰</Text>,
-      highlight: listing.accept_offers,
     },
   ];
 
@@ -364,6 +354,8 @@ export function ListingStatsTable({
   compact?: boolean;
   style?: any;
 }) {
+  const { theme } = useTheme();
+  
   // Use real-time stats if provided, otherwise fall back to listing data
   const actualViewCount = viewCount !== undefined ? viewCount : (listing.views_count || 0);
   const actualFavoritesCount = favoritesCount !== undefined ? favoritesCount : (listing.favorites_count || 0);
@@ -372,12 +364,12 @@ export function ListingStatsTable({
     {
       label: 'Views',
       value: actualViewCount,
-      icon: <Text style={{ fontSize: 16 }}>👁️</Text>,
+      icon: <Eye size={16} color={theme.colors.text.secondary} />,
     },
     {
       label: 'Favorites',
       value: actualFavoritesCount,
-      icon: <Text style={{ fontSize: 16 }}>❤️</Text>,
+      icon: <Heart size={16} color={theme.colors.text.secondary} />,
     },
     {
       label: 'Listed Date',
@@ -386,7 +378,7 @@ export function ListingStatsTable({
         month: 'long',
         day: 'numeric'
       }),
-      icon: <Text style={{ fontSize: 16 }}>📅</Text>,
+      icon: <Calendar size={16} color={theme.colors.text.secondary} />,
     },
     {
       label: 'Last Updated',
@@ -395,7 +387,7 @@ export function ListingStatsTable({
         month: 'long',
         day: 'numeric'
       }),
-      icon: <Text style={{ fontSize: 16 }}>🔄</Text>,
+      icon: <RefreshCw size={16} color={theme.colors.text.secondary} />,
     },
   ];
 
