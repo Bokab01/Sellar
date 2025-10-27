@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
+import { useNavigationState } from '@react-navigation/native';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useChatStore } from '@/store/useChatStore';
 import { useInAppNotificationStore } from '@/store/useInAppNotificationStore';
+import { useBlockStore } from '@/store/useBlockStore';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
 /**
@@ -14,6 +16,13 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 export function useGlobalChatSubscription() {
   const { user } = useAuthStore();
   const channelRef = useRef<RealtimeChannel | null>(null);
+  
+  // Get current route to check if user is on inbox screen
+  const currentRoute = useNavigationState(state => {
+    if (!state) return null;
+    const route = state.routes[state.index];
+    return route?.name;
+  });
 
   useEffect(() => {
     if (!user?.id) {
@@ -57,6 +66,23 @@ export function useGlobalChatSubscription() {
             return;
           }
 
+          // CRITICAL: Block messages from blocked users
+          const { blockedUserIds } = useBlockStore.getState();
+          
+          console.log('🔍 [GlobalChat] New message received:', {
+            messageId: newMessage.id,
+            senderId: newMessage.sender_id,
+            conversationId: newMessage.conversation_id,
+            blockedUserIds: Array.from(blockedUserIds),
+            blockedUserIdsSize: blockedUserIds.size,
+            isBlocked: blockedUserIds.has(newMessage.sender_id),
+          });
+          
+          if (blockedUserIds.has(newMessage.sender_id)) {
+            console.log('🚫 [GlobalChat] BLOCKED message from blocked user:', newMessage.sender_id);
+            return; // Don't process messages from blocked users
+          }
+
           // Get the conversation to check if user is a participant
           const { data: conversation, error: convError } = await supabase
             .from('conversations')
@@ -78,7 +104,7 @@ export function useGlobalChatSubscription() {
           }
 
           // Increment unread count for this conversation
-          const { unreadCounts, setUnreadCount, activeConversationId } = useChatStore.getState();
+          const { unreadCounts, setUnreadCount, activeConversationId, setTypingUser } = useChatStore.getState();
           const currentCount = unreadCounts[newMessage.conversation_id] || 0;
           const newCount = currentCount + 1;
           
@@ -90,13 +116,27 @@ export function useGlobalChatSubscription() {
           });
           
           setUnreadCount(newMessage.conversation_id, newCount);
+          
+          // ✅ CRITICAL: Clear typing indicator for sender when message is sent
+          // This prevents "typing..." and "New message" showing at the same time
+          console.log('🛑 [GlobalChat] Clearing typing status for sender:', newMessage.sender_id);
+          setTypingUser(newMessage.conversation_id, newMessage.sender_id, false);
 
           // Show in-app notification ONLY if:
           // 1. App is in foreground
           // 2. User is NOT currently viewing this conversation
+          // 3. User is NOT on the inbox screen (they can see the update there)
           const isViewingThisChat = activeConversationId === newMessage.conversation_id;
+          const isOnInboxScreen = currentRoute === 'inbox' || currentRoute?.includes?.('inbox');
           
-          if (AppState.currentState === 'active' && !isViewingThisChat) {
+          console.log('🔔 [GlobalChat] Notification check:', {
+            isActive: AppState.currentState === 'active',
+            isViewingThisChat,
+            isOnInboxScreen,
+            currentRoute,
+          });
+          
+          if (AppState.currentState === 'active' && !isViewingThisChat && !isOnInboxScreen) {
             console.log('🔔 [GlobalChat] Showing in-app notification...');
             
             // Fetch sender info for notification

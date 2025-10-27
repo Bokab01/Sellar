@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from './useAuth';
 import { dbHelpers } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
@@ -19,6 +19,8 @@ export function useNewUserDetection() {
     loading: true,
     error: null,
   });
+  
+  const lastUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -34,6 +36,14 @@ export function useNewUserDetection() {
         }
         return;
       }
+      
+      // Skip if user ID hasn't changed (e.g., just password update)
+      if (lastUserIdRef.current === user.id && state.isNewUser !== null) {
+        console.log('🔄 Skipping profile refetch - user ID unchanged');
+        return;
+      }
+      
+      lastUserIdRef.current = user.id;
 
       try {
         if (isMounted) {

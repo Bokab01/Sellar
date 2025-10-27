@@ -3,6 +3,7 @@ import { dbHelpers, supabase } from '@/lib/supabase';
 import { useChatRealtime, useOffersRealtime, useConversationsRealtime } from './useRealtime';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useChatStore } from '@/store/useChatStore';
+import { useBlockStore } from '@/store/useBlockStore';
 
 export function useConversations() {
   const { user } = useAuthStore();
@@ -44,17 +45,49 @@ export function useConversations() {
         throw new Error(typeof conversationsResult.error === 'string' ? conversationsResult.error : (conversationsResult.error as any)?.message || 'Failed to load conversations');
       } else {
         console.log(`✅ Loaded ${conversationsResult.data?.length || 0} conversations`);
-        setConversations(conversationsResult.data || []);
+        
+        // Filter out conversations with blocked users
+        const { blockedUserIds } = useBlockStore.getState();
+        const conversations = conversationsResult.data || [];
+        const filteredConversations = conversations.filter((conv: any) => {
+          const otherUserId = conv.participant_1 === user.id ? conv.participant_2 : conv.participant_1;
+          return !blockedUserIds.has(otherUserId);
+        });
+        
+        console.log(`🛡️ Filtered ${conversations.length - filteredConversations.length} conversations from blocked users`);
+        setConversations(filteredConversations);
         
         // Update unread counts in the chat store
         const { setUnreadCount, unreadCounts, manuallyMarkedAsUnread, lastReadTimestamps } = useChatStore.getState();
         
+        // Filter unread counts to exclude blocked users
+        let filteredUnreadCounts: Record<string, number> = {};
+        
         if (unreadCountsResult.data) {
+          Object.entries(unreadCountsResult.data).forEach(([conversationId, count]) => {
+            // Find the conversation to check if other user is blocked
+            const conversation = conversations.find((c: any) => c.id === conversationId);
+            if (conversation) {
+              const otherUserId = conversation.participant_1 === user.id 
+                ? conversation.participant_2 
+                : conversation.participant_1;
+              
+              if (!blockedUserIds.has(otherUserId)) {
+                filteredUnreadCounts[conversationId] = Number(count);
+              } else {
+                console.log(`🚫 Ignoring unread count for blocked user: ${otherUserId}`);
+              }
+            }
+          });
+          
+          console.log(`📊 Unread counts after filtering blocked users:`, filteredUnreadCounts);
+          
           // Smart merge: only update counts for conversations that:
           // 1. Have unread messages in the database, OR
           // 2. Are not in the local state (new conversations)
           // 3. Are not manually marked as unread (preserve user's manual marking)
-          Object.entries(unreadCountsResult.data).forEach(([conversationId, count]) => {
+          // 4. Are NOT from blocked users
+          Object.entries(filteredUnreadCounts).forEach(([conversationId, count]) => {
             const countNum = Number(count);
             const currentLocalCount = unreadCounts[conversationId] || 0;
             const isManuallyMarked = manuallyMarkedAsUnread.has(conversationId);
@@ -91,9 +124,9 @@ export function useConversations() {
         
         // Clear counts for conversations that no longer have unread messages in database
         // But only if they're not manually marked as unread
-        const currentUnreadCounts = unreadCountsResult.data || {};
+        // Use filtered counts to respect blocked users
         Object.keys(unreadCounts).forEach(conversationId => {
-          if (!(conversationId in currentUnreadCounts) && !manuallyMarkedAsUnread.has(conversationId)) {
+          if (!(conversationId in filteredUnreadCounts) && !manuallyMarkedAsUnread.has(conversationId)) {
             setUnreadCount(conversationId, 0);
           }
         });
@@ -148,6 +181,7 @@ export function useMessages(conversationId: string) {
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { blockedUserIds } = useBlockStore();
 
   const fetchMessages = useCallback(async (retryCount = 0) => {
     const MAX_RETRIES = 2;
@@ -210,6 +244,22 @@ export function useMessages(conversationId: string) {
       hasJoins: !!newMessage.sender,
     });
     
+    // CRITICAL: Block messages from blocked users (final safety check)
+    const { blockedUserIds } = useBlockStore.getState();
+    
+    console.log('🔍 [handleNewMessage] Processing message:', {
+      messageId: newMessage.id,
+      senderId: newMessage.sender_id,
+      blockedUserIds: Array.from(blockedUserIds),
+      blockedUserIdsSize: blockedUserIds.size,
+      isBlocked: blockedUserIds.has(newMessage.sender_id),
+    });
+    
+    if (blockedUserIds.has(newMessage.sender_id)) {
+      console.log('🚫 [handleNewMessage] BLOCKED message from blocked user:', newMessage.sender_id);
+      return; // Don't process message from blocked user
+    }
+    
     // useChatRealtime now fetches complete message data with joins,
     // so we don't need to fetch again here
     
@@ -242,6 +292,16 @@ export function useMessages(conversationId: string) {
 
   // Real-time subscription
   useChatRealtime(conversationId, handleNewMessage);
+  
+  // Edge Case: Filter out messages from blocked users when they're blocked
+  useEffect(() => {
+    if (blockedUserIds.size > 0 && messages.length > 0) {
+      setMessages(prev => {
+        const filtered = prev.filter(msg => !blockedUserIds.has(msg.sender_id));
+        return filtered.length !== prev.length ? filtered : prev;
+      });
+    }
+  }, [blockedUserIds]);
   
   // Debug: Log whenever messages state changes
   useEffect(() => {

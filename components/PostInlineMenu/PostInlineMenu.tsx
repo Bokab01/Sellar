@@ -12,7 +12,8 @@ import {
   Edit3,
   ExternalLink,
   Eye,
-  EyeOff
+  EyeOff,
+  UserMinus
 } from 'lucide-react-native';
 
 interface PostInlineMenuProps {
@@ -25,6 +26,7 @@ interface PostInlineMenuProps {
   onShare?: () => void;
   onHide?: () => void;
   onViewPost?: () => void;
+  onBlock?: () => void;
   isHidden?: boolean;
 }
 
@@ -38,6 +40,7 @@ export function PostInlineMenu({
   onShare,
   onHide,
   onViewPost,
+  onBlock,
   isHidden = false,
 }: PostInlineMenuProps) {
   const { theme } = useTheme();
@@ -181,6 +184,11 @@ export function PostInlineMenu({
     onReport?.();
   };
 
+  const handleBlock = () => {
+    setShowMenu(false);
+    onBlock?.();
+  };
+
   const menuItems = [
     {
       icon: Copy,
@@ -217,6 +225,13 @@ export function PostInlineMenu({
       title: 'Report',
       onPress: handleReport,
       show: !isOwnPost,
+      destructive: true,
+    },
+    {
+      icon: UserMinus,
+      title: 'Block User',
+      onPress: handleBlock,
+      show: !isOwnPost && !!onBlock,
       destructive: true,
     },
     {

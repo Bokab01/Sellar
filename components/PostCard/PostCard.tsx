@@ -84,6 +84,7 @@ interface PostCardProps {
   onFollow?: () => void;
   onUnfollow?: () => void;
   onReport?: () => void;
+  onBlock?: () => void;
   hideViewPost?: boolean; // Hide "View Post" option when already on detail screen
   style?: any;
 }
@@ -99,6 +100,7 @@ export function PostCard({
   onFollow,
   onUnfollow,
   onReport,
+  onBlock,
   hideViewPost = false,
   style,
 }: PostCardProps) {
@@ -357,6 +359,7 @@ export function PostCard({
             onEdit={onEdit}
             onReport={handleReport}
             onShare={handleShare}
+            onBlock={onBlock}
             onViewPost={hideViewPost ? undefined : () => {
               router.push(`/(tabs)/community/${post.id}`);
             }}

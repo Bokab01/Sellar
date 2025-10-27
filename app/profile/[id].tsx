@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, ScrollView, TouchableOpacity, RefreshControl, Alert, Linking } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, ScrollView, TouchableOpacity, RefreshControl, Alert, Linking, StatusBar } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -50,7 +50,8 @@ import {
   X,
   Briefcase,
   Mail,
-  Globe
+  Globe,
+  Flag
 } from 'lucide-react-native';
 import { ReportButton } from '@/components/ReportButton/ReportButton';
 
@@ -83,6 +84,7 @@ export default function UserProfileScreen() {
   const [toastMessage, setToastMessage] = useState('');
   const [showCallModal, setShowCallModal] = useState(false);
   const [totalListingsCount, setTotalListingsCount] = useState(0);
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
 
   // Get user's listings
   const { 
@@ -341,6 +343,20 @@ export default function UserProfileScreen() {
     }
 
     setShowCallModal(true);
+  };
+
+  const handleReportUser = () => {
+    setShowOptionsMenu(false);
+    // Navigate to report screen with user details
+    router.push({
+      pathname: '/report',
+      params: {
+        targetType: 'user',
+        targetId: profileId,
+        targetName: displayName,
+        targetAvatar: profile?.avatar_url || ''
+      }
+    });
   };
 
   if (loading) {
@@ -857,6 +873,17 @@ export default function UserProfileScreen() {
         title="Profile"
         showBackButton
         onBackPress={() => router.back()}
+        rightActions={
+          currentUser && currentUser.id !== profileId ? [
+            <TouchableOpacity
+              key="options"
+              onPress={() => setShowOptionsMenu(true)}
+              style={{ padding: 8 }}
+            >
+              <MoreVertical size={24} color={theme.colors.primary} />
+            </TouchableOpacity>
+          ] : undefined
+        }
       />
 
       <ScrollView
@@ -993,32 +1020,6 @@ export default function UserProfileScreen() {
                   />
                 )}
 
-                {/* Report button - only show if not own profile */}
-                {!isOwnProfile && (
-                  <View style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: theme.borderRadius.lg,
-                    borderWidth: 1,
-                    borderColor: theme.colors.border,
-                    backgroundColor: theme.colors.surface,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}>
-                    <ReportButton
-                      targetType="user"
-                      targetId={profileId!}
-                      targetUser={{
-                        id: profileId!,
-                        name: displayName,
-                        avatar: profile.avatar_url
-                      }}
-                      variant="icon"
-                      size="md"
-                      style={{ padding: 0 }}
-                    />
-                  </View>
-                )}
               </View>
             )}
           </View>
@@ -1140,6 +1141,90 @@ export default function UserProfileScreen() {
           </View>
         </View>
       </AppModal>
+
+      {/* Popup Menu */}
+      {showOptionsMenu && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 2000,
+          }}
+        >
+          <TouchableOpacity
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+            }}
+            onPress={() => setShowOptionsMenu(false)}
+            activeOpacity={1}
+          />
+          <View
+            style={{
+              position: 'absolute',
+              top: 60,
+              right: theme.spacing.lg,
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.borderRadius.lg,
+              paddingVertical: theme.spacing.sm,
+              minWidth: 180,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+              elevation: 10,
+            }}
+          >
+            {/* Report Button */}
+            <TouchableOpacity
+              onPress={handleReportUser}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: theme.spacing.sm,
+                paddingHorizontal: theme.spacing.md,
+              }}
+            >
+              <Flag size={18} color={theme.colors.warning} style={{ marginRight: theme.spacing.sm }} />
+              <Text variant="body" style={{ color: theme.colors.warning, fontSize: 14 }}>
+                Report User
+              </Text>
+            </TouchableOpacity>
+
+            {/* Block User Button */}
+            <TouchableOpacity
+              onPress={() => {
+                setShowOptionsMenu(false);
+                router.push({
+                  pathname: '/block-user',
+                  params: {
+                    userId: profileId,
+                    userName: displayName,
+                    userAvatar: profile?.avatar_url || ''
+                  }
+                });
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: theme.spacing.sm,
+                paddingHorizontal: theme.spacing.md,
+              }}
+            >
+              <UserMinus size={18} color={theme.colors.destructive} style={{ marginRight: theme.spacing.sm }} />
+              <Text variant="body" style={{ color: theme.colors.destructive, fontSize: 14 }}>
+                Block User
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Toast */}
       <Toast

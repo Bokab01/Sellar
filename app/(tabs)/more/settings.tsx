@@ -36,6 +36,7 @@ import {
   Download,
   Lock,
   Users,
+  UserMinus,
   MessageCircle,
   ChevronDown
 } from 'lucide-react-native';
@@ -380,6 +381,12 @@ export default function SettingsScreen() {
           onPress: () => setShowSecurityDashboard(true),
         },
         {
+          title: 'Change Password',
+          subtitle: 'Update your account password',
+          icon: <Lock size={20} color={theme.colors.text.primary} />,
+          onPress: () => router.push('/change-password'),
+        },
+        {
           title: 'Two-Factor Authentication',
           subtitle: 'Add extra security to your account',
           icon: <Lock size={20} color={theme.colors.text.primary} />,
@@ -409,8 +416,8 @@ export default function SettingsScreen() {
         {
           title: 'Blocked Users',
           subtitle: 'Manage your blocked users list',
-          icon: <Users size={20} color={theme.colors.text.primary} />,
-          onPress: () => router.push('/(tabs)/more/settings'),
+          icon: <UserMinus size={20} color={theme.colors.destructive} />,
+          onPress: () => router.push('/blocked-users'),
         },
       ],
     },

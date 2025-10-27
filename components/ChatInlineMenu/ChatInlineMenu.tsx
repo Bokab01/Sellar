@@ -13,7 +13,8 @@ import {
   BellOff,
   Shield,
   Phone,
-  Eye
+  Eye,
+  UserMinus
 } from 'lucide-react-native';
 
 interface ChatInlineMenuProps {
@@ -90,21 +91,7 @@ export function ChatInlineMenu({
 
   const handleBlock = () => {
     setShowMenu(false);
-    Alert.alert(
-      'Block User',
-      `Are you sure you want to block ${otherUser?.first_name || 'this user'}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Block',
-          style: 'destructive',
-          onPress: () => {
-            onBlock?.();
-            Alert.alert('User Blocked', 'This user has been blocked successfully.');
-          },
-        },
-      ]
-    );
+    onBlock?.();
   };
 
 
@@ -207,8 +194,8 @@ export function ChatInlineMenu({
       destructive: true,
     },
     {
-      icon: Shield,
-      title: isBlocked ? 'Unblock' : 'Block',
+      icon: UserMinus,
+      title: 'Block User',
       onPress: handleBlock,
       show: true,
       destructive: true,

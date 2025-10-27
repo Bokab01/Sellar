@@ -48,7 +48,6 @@ export { Chip } from './Chip/Chip';
 export { PriceDisplay } from './PriceDisplay/PriceDisplay';
 export { AppModal, Modal } from './Modal/Modal';
 export { Toast } from './Toast/Toast';
-export { TypingDots } from './TypingDots';
 export { Stepper } from './Stepper/Stepper';
 
 // Moderation Components

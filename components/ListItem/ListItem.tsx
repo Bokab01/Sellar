@@ -1,15 +1,85 @@
-import React from 'react';
-import { View, TouchableOpacity } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, TouchableOpacity, Animated } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Text } from '@/components/Typography/Text';
 import { Avatar } from '@/components/Avatar/Avatar';
 import { Badge } from '@/components/Badge/Badge';
-import { TypingDots } from '@/components/TypingDots';
 import { ChevronRight } from 'lucide-react-native';
+
+// ✅ Animated typing dots component
+function TypingDots() {
+  const { theme } = useTheme();
+  const dot1Opacity = useRef(new Animated.Value(0.3)).current;
+  const dot2Opacity = useRef(new Animated.Value(0.3)).current;
+  const dot3Opacity = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animateDots = () => {
+      Animated.loop(
+        Animated.stagger(150, [
+          Animated.sequence([
+            Animated.timing(dot1Opacity, {
+              toValue: 1,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+            Animated.timing(dot1Opacity, {
+              toValue: 0.3,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+          ]),
+          Animated.sequence([
+            Animated.timing(dot2Opacity, {
+              toValue: 1,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+            Animated.timing(dot2Opacity, {
+              toValue: 0.3,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+          ]),
+          Animated.sequence([
+            Animated.timing(dot3Opacity, {
+              toValue: 1,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+            Animated.timing(dot3Opacity, {
+              toValue: 0.3,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+          ]),
+        ])
+      ).start();
+    };
+
+    animateDots();
+  }, [dot1Opacity, dot2Opacity, dot3Opacity]);
+
+  const dotStyle = {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.colors.primary,
+    marginHorizontal: 1,
+  };
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 2 }}>
+      <Animated.View style={[dotStyle, { opacity: dot1Opacity }]} />
+      <Animated.View style={[dotStyle, { opacity: dot2Opacity }]} />
+      <Animated.View style={[dotStyle, { opacity: dot3Opacity }]} />
+    </View>
+  );
+}
 
 interface ListItemProps {
   title: string;
-  subtitle?: string;
+  subtitle?: string | React.ReactNode;
   description?: string;
   avatar?: {
     source?: string;
@@ -22,6 +92,7 @@ interface ListItemProps {
     variant?: 'new' | 'sold' | 'featured' | 'discount' | 'success' | 'warning' | 'error' | 'info' | 'neutral';
   };
   unreadCount?: number;
+  isTyping?: boolean; // ✅ New: Typing indicator flag
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   showChevron?: boolean;
@@ -31,7 +102,6 @@ interface ListItemProps {
   };
   onPress?: () => void;
   style?: any;
-  isTyping?: boolean;
 }
 
 export function ListItem({
@@ -42,13 +112,13 @@ export function ListItem({
   timestamp,
   badge,
   unreadCount,
+  isTyping = false, // ✅ Default to false
   leftIcon,
   rightIcon,
   showChevron = false,
   toggle,
   onPress,
   style,
-  isTyping = false,
 }: ListItemProps) {
   const { theme } = useTheme();
 
@@ -130,18 +200,24 @@ export function ListItem({
         </View>
 
         {subtitle && (
-          <Text
-            variant="bodySmall"
-            color="secondary"
-            numberOfLines={1}
-            style={{ marginBottom: description ? theme.spacing.xs : 0 }}
-          >
-            {subtitle}
-          </Text>
+          typeof subtitle === 'string' ? (
+            <Text
+              variant="bodySmall"
+              color="secondary"
+              numberOfLines={1}
+              style={{ marginBottom: description ? theme.spacing.xs : 0 }}
+            >
+              {subtitle}
+            </Text>
+          ) : (
+            <View style={{ marginBottom: description ? theme.spacing.xs : 0 }}>
+              {subtitle}
+            </View>
+          )
         )}
 
         {description && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             {isTyping ? (
               <>
                 <Text
@@ -154,7 +230,7 @@ export function ListItem({
                 >
                   typing
                 </Text>
-                <TypingDots size={4} />
+                <TypingDots />
               </>
             ) : (
               <Text

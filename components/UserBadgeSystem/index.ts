@@ -1,1 +1,1 @@
-export { UserBadgeSystem, CompactUserBadges, FullUserBadges, DarkThemeUserBadges } from './UserBadgeSystem';
+export { UserBadgeSystem, CompactUserBadges, ExtraSmallUserBadges, FullUserBadges, DarkThemeUserBadges } from './UserBadgeSystem';

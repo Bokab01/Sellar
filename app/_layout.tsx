@@ -34,6 +34,7 @@ import { useGlobalChatSubscription } from '@/hooks/useGlobalChatSubscription';
 import { InAppNotificationHandler } from '@/components/InAppNotificationHandler/InAppNotificationHandler';
 import { useRealtimeConnectionManager } from '@/hooks/useRealtimeConnectionManager';
 import { useNotificationStore } from '@/store/useNotificationStore';
+import { useBlockedUsersLoader } from '@/hooks/useBlockedUsersLoader';
 import { AppState, AppStateStatus } from 'react-native';
 
 // Suppress non-critical errors in development
@@ -98,10 +99,19 @@ function AppContent() {
   // Ensure unread notification count is initialized and kept fresh on resume
   const { fetchNotifications } = useNotificationStore();
   useEffect(() => {
-    fetchNotifications();
+    // Initial fetch with timeout
+    const timeoutPromise = new Promise(resolve => setTimeout(resolve, 5000));
+    Promise.race([fetchNotifications(), timeoutPromise]).catch(err => {
+      console.warn('Initial fetchNotifications timed out or failed:', err);
+    });
+    
     const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
       if (state === 'active') {
-        fetchNotifications();
+        // Fetch on resume with timeout protection
+        const resumeTimeout = new Promise(resolve => setTimeout(resolve, 5000));
+        Promise.race([fetchNotifications(), resumeTimeout]).catch(err => {
+          console.warn('Resume fetchNotifications timed out or failed:', err);
+        });
       }
     });
     return () => sub.remove();
@@ -112,6 +122,9 @@ function AppContent() {
   
   // Set up global chat real-time subscription for unread counts
   useGlobalChatSubscription();
+  
+  // Load blocked users into store on app start
+  useBlockedUsersLoader();
   
   // Splash screen management
   const { isAppReady, showCustomSplash, handleAppReady, handleAnimationComplete } = useSplashScreen();
@@ -196,15 +209,18 @@ function AppContent() {
         // R2 Storage is now secure via Edge Functions (no client-side initialization needed)
         console.log('✅ R2 Storage ready - using secure Edge Functions for uploads');
 
-        // Initialize monetization data (credits and subscription)
+        // Initialize monetization data (credits and subscription) with timeout
         try {
           const { refreshCredits, refreshSubscription } = useMonetizationStore.getState();
-          await Promise.all([
+          const monetizationPromises = Promise.all([
             refreshCredits(),
             refreshSubscription(),
           ]);
+          const monetizationTimeout = new Promise((resolve) => setTimeout(resolve, 5000));
+          
+          await Promise.race([monetizationPromises, monetizationTimeout]);
         } catch (error) {
-          console.error('Failed to initialize monetization data:', error);
+          console.warn('Failed to initialize monetization data (continuing anyway):', error);
         }
 
       } catch (error) {

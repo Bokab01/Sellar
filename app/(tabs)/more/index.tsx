@@ -35,6 +35,7 @@ import {
   CreditCard, 
   CircleHelp as HelpCircle, 
   UserPlus2, 
+  UserMinus,
   LogOut, 
   Shield,
   Bell,
@@ -287,12 +288,12 @@ export default function MoreScreen() {
     {
       title: 'App & Support',
       items: [
-       /*  {
+        {
           title: 'Settings',
           subtitle: 'App preferences, privacy, and notifications',
           icon: <Settings size={20} color={theme.colors.text.primary} />,
           onPress: () => router.push('/(tabs)/more/settings'),
-        }, */
+        },
         /* {
           title: 'Notifications',
           subtitle: 'Manage your notification preferences',

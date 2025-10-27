@@ -1059,6 +1059,18 @@ export default function ListingDetailScreen() {
       return;
     }
 
+    // Check if user has blocked the seller or vice versa
+    const { data: blockCheck } = await supabase
+      .rpc('is_mutually_blocked', {
+        user_a: user.id,
+        user_b: listing.user_id
+      });
+
+    if (blockCheck) {
+      Alert.alert('Unavailable', 'This user is not available for messaging.');
+      return;
+    }
+
     // Track contact interaction
     if (listingId) {
       await trackInteraction(listingId, 'contact', {
@@ -1169,6 +1181,18 @@ export default function ListingDetailScreen() {
     if (sessionError || !session) {
       console.error('Session error:', sessionError);
       Alert.alert('Authentication Error', 'Please sign in again to make offers');
+      return;
+    }
+
+    // Check if user has blocked the seller or vice versa
+    const { data: blockCheck } = await supabase
+      .rpc('is_mutually_blocked', {
+        user_a: user.id,
+        user_b: listing.user_id
+      });
+
+    if (blockCheck) {
+      Alert.alert('Unavailable', 'This user is not available for offers.');
       return;
     }
 
@@ -1292,7 +1316,24 @@ export default function ListingDetailScreen() {
     }
   };
 
-  const handleCall = () => {
+  const handleCall = async () => {
+    if (!user) {
+      Alert.alert('Sign In Required', 'Please sign in to call the seller');
+      return;
+    }
+
+    // Check if user has blocked the seller or vice versa
+    const { data: blockCheck } = await supabase
+      .rpc('is_mutually_blocked', {
+        user_a: user.id,
+        user_b: listing.user_id
+      });
+
+    if (blockCheck) {
+      Alert.alert('Unavailable', 'This user is not available for calls.');
+      return;
+    }
+
     setShowCallModal(true);
   };
 
@@ -1562,6 +1603,34 @@ export default function ListingDetailScreen() {
                 </Text>
               </TouchableOpacity>
             )}
+
+            {/* Block Seller Button - Only for other users' listings */}
+            {!isOwnListing && (
+              <TouchableOpacity
+                onPress={() => {
+                  setShowMenu(false);
+                  router.push({
+                    pathname: '/block-user',
+                    params: {
+                      userId: listing.profiles?.id,
+                      userName: getDisplayName(listing.profiles, false).displayName,
+                      userAvatar: listing.profiles?.avatar_url || ''
+                    }
+                  });
+                }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: theme.spacing.sm,
+                  paddingHorizontal: theme.spacing.md,
+                }}
+              >
+                <Flag size={18} color={theme.colors.destructive} style={{ marginRight: theme.spacing.sm }} />
+                <Text variant="body" style={{ color: theme.colors.destructive, fontSize: 14 }}>
+                  Block Seller
+                </Text>
+              </TouchableOpacity>
+            )}
         </View>
       </View>
       )}
@@ -1750,7 +1819,6 @@ export default function ListingDetailScreen() {
                     paddingHorizontal: theme.spacing.md,
                     paddingVertical: theme.spacing.sm,
                     borderRadius: theme.borderRadius.xl,
-                    marginRight: theme.spacing.sm,
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: theme.spacing.xs,

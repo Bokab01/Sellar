@@ -27,6 +27,8 @@ import {
   MessageInput,
 } from '@/components';
 import { MessageCircle, MoreVertical } from 'lucide-react-native';
+import { getDisplayName } from '@/hooks/useDisplayName';
+import { useBlockStore } from '@/store/useBlockStore';
 
 export default function PostDetailScreen() {
   const { theme } = useTheme();
@@ -34,6 +36,7 @@ export default function PostDetailScreen() {
   const { postId } = useLocalSearchParams<{ postId: string }>();
   const { user } = useAuthStore();
   const { contentBottomPadding } = useBottomTabBarSpacing();
+  const { blockedUserIds } = useBlockStore();
   
   const [post, setPost] = useState<any>(null);
   const [comments, setComments] = useState<any[]>([]);
@@ -195,9 +198,15 @@ export default function PostDetailScreen() {
       if (fetchError) {
         console.error('Failed to fetch comments:', fetchError);
       } else {
+        // Filter out comments from blocked users (O(1) lookup with Set)
+        const filteredComments = (data || []).filter((comment: any) => {
+          const authorId = comment.user_id || comment.profiles?.id;
+          return !blockedUserIds.has(authorId);
+        });
+        
         // Fetch replies for each comment
         const commentsWithReplies = await Promise.all(
-          (data || []).map(async (comment) => {
+          filteredComments.map(async (comment) => {
             const { data: replies } = await supabase
               .from('comments')
               .select(`
@@ -218,9 +227,15 @@ export default function PostDetailScreen() {
               .eq('parent_id', comment.id)
               .order('created_at', { ascending: true });
 
+            // Filter out replies from blocked users (O(1) lookup with Set)
+            const filteredReplies = (replies || []).filter((reply: any) => {
+              const replyAuthorId = reply.user_id || reply.profiles?.id;
+              return !blockedUserIds.has(replyAuthorId);
+            });
+
             return {
               ...comment,
-              replies: replies || [],
+              replies: filteredReplies,
             };
           })
         );
@@ -267,6 +282,14 @@ export default function PostDetailScreen() {
             .single();
 
           if (!error && data) {
+            // Check if comment is from a blocked user (O(1) lookup with Set)
+            const authorId = data.user_id || data.profiles?.id;
+            if (blockedUserIds.has(authorId)) {
+              // Remove comment from list if user is blocked
+              setComments(prev => prev.filter(comment => comment.id !== data.id));
+              return;
+            }
+            
             setComments(prev => {
               const exists = prev.find(comment => comment.id === data.id);
               if (exists) {
@@ -285,7 +308,7 @@ export default function PostDetailScreen() {
 
       fetchCompleteComment();
     }
-  }, [postId]);
+  }, [postId, blockedUserIds]);
 
   // Set up real-time subscriptions
   useRealtime({
@@ -832,6 +855,17 @@ export default function PostDetailScreen() {
               onShare={() => {}}
               onReport={() => {
                 // The PostCard will handle the report modal internally
+              }}
+              onBlock={() => {
+                // Navigate to block user screen
+                router.push({
+                  pathname: '/block-user',
+                  params: {
+                    userId: post.profiles?.id || post.user_id,
+                    userName: getDisplayName(post.profiles, false).displayName,
+                    userAvatar: post.profiles?.avatar_url || ''
+                  }
+                });
               }}
               hideViewPost={true}
             />

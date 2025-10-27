@@ -45,12 +45,14 @@ export function useTypingIndicator(conversationId: string, otherUserId?: string)
     });
 
     // Broadcast typing status (in-memory, super fast)
+    // Include conversation_id so global subscriptions can route to the right conversation
     channelRef.current.send({
       type: 'broadcast',
       event: 'typing',
       payload: {
         user_id: user.id,
         is_typing: isTyping,
+        conversation_id: conversationId,
         timestamp: now,
       },
     });
@@ -77,14 +79,40 @@ export function useTypingIndicator(conversationId: string, otherUserId?: string)
 
   // User stopped typing (e.g., sent message)
   const onStopTyping = useCallback(() => {
-    console.log('🛑 Stopping typing indicator');
+    console.log('🛑 Stopping typing indicator for conversation:', conversationId);
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = null;
     }
     isTypingRef.current = false;
-    broadcastTyping(false);
-  }, [broadcastTyping]);
+    
+    // Force immediate broadcast without throttle check
+    if (!user || !conversationId || !channelRef.current) {
+      console.log('❌ Cannot broadcast stop typing - missing:', {
+        hasUser: !!user,
+        hasConversationId: !!conversationId,
+        hasChannel: !!channelRef.current,
+      });
+      return;
+    }
+    
+    console.log('📤 [FORCE] Broadcasting stop typing:', { 
+      user_id: user.id, 
+      conversationId 
+    });
+    
+    // Send immediately without throttle
+    channelRef.current.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: {
+        user_id: user.id,
+        is_typing: false,
+        conversation_id: conversationId,
+        timestamp: Date.now(),
+      },
+    });
+  }, [user, conversationId]);
 
   // Set up broadcast channel for typing indicators
   useEffect(() => {
@@ -173,7 +201,7 @@ export function useTypingIndicator(conversationId: string, otherUserId?: string)
 
     // Cleanup
     return () => {
-      console.log('🧹 Cleaning up typing channel');
+      console.log('🧹 Cleaning up typing channel for conversation:', conversationId);
       
       // Clear typing status on unmount
       if (isTypingRef.current && channelRef.current) {
@@ -183,9 +211,17 @@ export function useTypingIndicator(conversationId: string, otherUserId?: string)
           payload: {
             user_id: user?.id,
             is_typing: false,
+            conversation_id: conversationId,
             timestamp: Date.now(),
           },
         });
+      }
+      
+      // ✅ CRITICAL: Clear typing status from store when unmounting
+      // This prevents stale typing indicators when navigating away
+      if (conversationId && otherUserId) {
+        console.log('🧹 Clearing typing status from store for:', otherUserId, 'in conversation:', conversationId);
+        setTypingUser(conversationId, otherUserId, false);
       }
       
       if (channelRef.current) {

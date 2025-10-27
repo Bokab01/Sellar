@@ -65,8 +65,8 @@ export function usePresence() {
 
           console.log('🟢 [usePresence] Updating profile to online for user:', user.id);
           
-          // Update database online status
-          const { error } = await supabase
+          // Update database online status with timeout protection
+          const updatePromise = supabase
             .from('profiles')
             .update({ 
               is_online: true, 
@@ -74,8 +74,14 @@ export function usePresence() {
             })
             .eq('id', user.id);
           
+          const timeoutPromise = new Promise<{ error: any }>((resolve) => 
+            setTimeout(() => resolve({ error: { message: 'Presence update timeout' } }), 3000)
+          );
+          
+          const { error } = await Promise.race([updatePromise, timeoutPromise]);
+          
           if (error) {
-            console.error('🟢 [usePresence] Error updating online status:', error);
+            console.warn('🟢 [usePresence] Error updating online status (non-critical):', error.message);
           } else {
             console.log('🟢 [usePresence] Successfully updated to online');
           }

@@ -214,6 +214,17 @@ export default function CommunityScreen() {
         onReport={() => {
           // TODO: Implement report functionality
         }}
+        onBlock={() => {
+          // Navigate to block user screen
+          router.push({
+            pathname: '/block-user',
+            params: {
+              userId: post.author.id,
+              userName: post.author.profile ? getDisplayName(post.author.profile, false).displayName : post.author.name,
+              userAvatar: post.author.avatar || ''
+            }
+          });
+        }}
       />
     );
   }, [isFollowing, handleEditPost, handleDeletePost, handleFollow, handleUnfollow]);

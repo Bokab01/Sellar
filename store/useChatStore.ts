@@ -10,6 +10,7 @@ interface ChatState {
   // Typing indicators
   typingUsers: Record<string, string[]>; // conversationId -> userIds
   setTypingUser: (conversationId: string, userId: string, isTyping: boolean) => void;
+  clearTypingForUser: (userId: string) => void; // Clear typing for a user across all conversations
   
   // Unread counts
   unreadCounts: Record<string, number>; // conversationId -> count
@@ -59,6 +60,23 @@ export const useChatStore = create<ChatState>()(
         [conversationId]: newTyping,
       },
     });
+  },
+  
+  // Edge Case 3: Clear typing indicator for a blocked user across all conversations
+  clearTypingForUser: (userId) => {
+    const { typingUsers } = get();
+    const newTypingUsers: Record<string, string[]> = {};
+    
+    // Remove userId from all conversations
+    Object.keys(typingUsers).forEach(conversationId => {
+      const filtered = typingUsers[conversationId].filter(id => id !== userId);
+      if (filtered.length > 0) {
+        newTypingUsers[conversationId] = filtered;
+      }
+    });
+    
+    set({ typingUsers: newTypingUsers });
+    console.log('🧹 Cleared typing indicator for user:', userId);
   },
   
   // Unread counts

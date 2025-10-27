@@ -237,6 +237,9 @@ export const dbHelpers = {
       `)
       .order('created_at', { ascending: false });
 
+    // Note: Blocked users filtering is done client-side for security (prevents SQL injection)
+    // The blockedUserIds will be used to filter the results after fetching
+
     if (options.userId) {
       query = query.eq('user_id', options.userId);
     }
@@ -702,16 +705,31 @@ export const dbHelpers = {
   async getConversations(userId: string) {
     try {
       // Get conversations with basic data first (only those with messages)
-      const { data: conversations, error: convError } = await db.conversations
+      // Filter out conversations that have been soft-deleted by this user
+      const { data: allConversations, error: convError } = await db.conversations
         .select('*')
         .or(`participant_1.eq.${userId},participant_2.eq.${userId}`)
         .not('last_message_at', 'is', null) // Only show conversations with at least one message
         .order('last_message_at', { ascending: false });
-
+      
       if (convError) {
         console.error('❌ Error fetching conversations:', convError);
         return { data: null, error: convError };
       }
+      
+      // Filter out soft-deleted conversations for this user
+      const conversations = allConversations?.filter((conv: any) => {
+        const isParticipant1 = conv.participant_1 === userId;
+        const isParticipant2 = conv.participant_2 === userId;
+        
+        if (isParticipant1 && conv.deleted_for_participant_1) {
+          return false; // Hide if deleted by participant 1
+        }
+        if (isParticipant2 && conv.deleted_for_participant_2) {
+          return false; // Hide if deleted by participant 2
+        }
+        return true; // Show conversation
+      }) || [];
 
       if (!conversations || conversations.length === 0) {
         return { data: [], error: null };
@@ -937,6 +955,9 @@ export const dbHelpers = {
         .in('status', ['active', 'reserved']); // Get active and reserved listings (reserved = offer accepted, pending transaction)
       
       console.log('📊 Query will fetch listings with status: active, reserved');
+
+      // Note: Blocked users filtering is done client-side for security (prevents SQL injection)
+      // The blockedUserIds will be used to filter the results after fetching
 
       // Apply filters
       if (options.userId) {

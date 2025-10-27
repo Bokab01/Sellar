@@ -40,6 +40,7 @@ import {
 import { Phone, Info, Eye, MessageCircle, EllipsisVertical } from 'lucide-react-native';
 import { getDisplayName } from '@/hooks/useDisplayName';
 import { UserDisplayName } from '@/components/UserDisplayName/UserDisplayName';
+import { ExtraSmallUserBadges } from '@/components/UserBadgeSystem';
 import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 import { TypingIndicator } from '@/components/TypingIndicator';
 
@@ -524,6 +525,7 @@ export default function ChatScreen() {
     // Refresh to get the new transaction
     checkExistingTransaction(conversation?.listing?.id);
   };
+
 
   const handleTransactionUpdated = () => {
     // Refresh to get the updated transaction
@@ -1028,7 +1030,6 @@ export default function ChatScreen() {
             timestamp={timestamp}
             type={message.message_type}
             status={messageStatus}
-            senderName={!isOwn ? getDisplayName(message.sender, false).displayName : undefined}
           />
         );
       }
@@ -1083,7 +1084,6 @@ export default function ChatScreen() {
           key={message.id}
           message={message}
           isOwn={isOwn}
-          senderName={!isOwn ? getDisplayName(message.sender, false).displayName : undefined}
           senderPhone={message.sender?.phone}
           timestamp={timestamp}
         />
@@ -1125,7 +1125,6 @@ export default function ChatScreen() {
         timestamp={timestamp}
         type={message.message_type}
         status={messageStatus}
-        senderName={!isOwn ? getDisplayName(message.sender || otherUser, false).displayName : undefined}
         images={message.message_type === 'image' && message.images ? 
           (() => {
             try {
@@ -1303,16 +1302,24 @@ export default function ChatScreen() {
       <AppHeader
         title={
           otherUser ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+            <View style={{ width: '100%' }}>
               <UserDisplayName
                 profile={otherUser}
                 variant="full"
                 showBadge={false}
                 textVariant="body"
+                numberOfLines={1}
               />
-              {/* ✅ PRO Badge after name */}
-              {otherUser.is_sellar_pro && (
-                <Badge text="⭐ PRO" variant="primary" size="xs" />
+              {/* ✅ Unified badge system - Extra Small for compact header */}
+              {(otherUser.is_sellar_pro || otherUser.is_business || otherUser.verification_status) && (
+                <View style={{ marginTop: 2 }}>
+                  <ExtraSmallUserBadges
+                    isSellarPro={Boolean(otherUser.is_sellar_pro)}
+                    isBusinessUser={Boolean(otherUser.is_business)}
+                    isVerified={otherUser.verification_status === 'verified' || otherUser.verification_status === 'business_verified'}
+                    isBusinessVerified={otherUser.verification_status === 'business_verified'}
+                  />
+                </View>
               )}
             </View>
           ) : 'Chat'
@@ -1359,7 +1366,16 @@ export default function ChatScreen() {
             conversationId={conversationId!}
             otherUser={otherUser}
             conversation={conversation}
-            onBlock={() => {}}
+            onBlock={() => {
+              router.push({
+                pathname: '/block-user',
+                params: {
+                  userId: otherUser.id,
+                  userName: getDisplayName(otherUser, false).displayName,
+                  userAvatar: otherUser.avatar_url || ''
+                }
+              });
+            }}
             onDelete={() => {}}
             onArchive={() => {}}
             onMute={() => {}}

@@ -208,14 +208,19 @@ export function useAuth() {
         setLoading(false);
 
         // Update user online status only if we have a valid session
-        if (session?.user) {
+        // Skip for USER_UPDATED events (e.g., password changes) to prevent unnecessary profile fetches
+        if (session?.user && event !== 'USER_UPDATED') {
           try {
-            await dbHelpers.updateProfile(session.user.id, {
+            // Add timeout protection to prevent hanging (3 second timeout)
+            const updatePromise = dbHelpers.updateProfile(session.user.id, {
               is_online: true,
               last_seen: new Date().toISOString(),
             });
+            const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 3000));
+            
+            await Promise.race([updatePromise, timeoutPromise]);
           } catch (error) {
-            console.warn('Failed to update user online status:', error);
+            console.warn('Failed to update user online status (non-critical):', error);
             // Don't throw error for non-critical profile updates
           }
         }

@@ -9,6 +9,7 @@ import { router } from 'expo-router';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { useMultipleListingStats } from '@/hooks/useListingStats';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useBlockStore } from '@/store/useBlockStore';
 
 interface FeaturedListing {
   id: string;
@@ -48,6 +49,7 @@ export function FixedFeaturedListings({
 }: FixedFeaturedListingsProps) {
   const { theme } = useTheme();
   const { user } = useAuthStore();
+  const { blockedUserIds } = useBlockStore();
   const [listings, setListings] = useState<FeaturedListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -339,9 +341,15 @@ export function FixedFeaturedListings({
           };
         }) || [];
 
+        // Filter out blocked users (lazy evaluation: skip if no blocked users)
+        const filteredListings = blockedUserIds.size === 0
+          ? transformedListings
+          : transformedListings.filter(listing => 
+              !blockedUserIds.has(listing.seller.id)
+            );
 
         if (isMounted) {
-          setListings(transformedListings);
+          setListings(filteredListings);
         }
       } catch (err) {
         // Handle error silently
@@ -361,7 +369,7 @@ export function FixedFeaturedListings({
     return () => {
       isMounted = false;
     };
-  }, [maxItems]); // Only depend on maxItems, which should be stable
+  }, [maxItems, blockedUserIds.size]); // Refetch when blocked users change
 
   const handleListingPress = (listingId: string) => {
     router.push(`/(tabs)/home/${listingId}`);

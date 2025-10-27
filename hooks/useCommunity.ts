@@ -7,6 +7,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { addProfileRefreshListener } from './useProfile';
 import { useRealtimeConnection } from './useRealtimeConnection';
 import { contentModerationService } from '@/lib/contentModerationService';
+import { useBlockStore } from '@/store/useBlockStore';
 
 export function useCommunityPosts(options: { 
   following?: boolean; 
@@ -25,6 +26,9 @@ export function useCommunityPosts(options: {
   const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasInitialDataRef = useRef(false);
   const forceReconnectRef = useRef<(() => void) | null>(null);
+  
+  // Get blocked user IDs from store
+  const { blockedUserIds } = useBlockStore();
 
   // Monitor real-time connection
   const { isConnected, isReconnecting, forceReconnect } = useRealtimeConnection({
@@ -83,7 +87,13 @@ export function useCommunityPosts(options: {
       if (fetchError) {
         setError(fetchError.message);
       } else {
-        setPosts(data || []);
+        // Client-side filtering for security (prevents SQL injection)
+        // Using Set for O(1) lookup performance
+        const filteredData = (data || []).filter((post: any) => {
+          const authorId = post.user_id || post.profiles?.id;
+          return !blockedUserIds.has(authorId);
+        });
+        setPosts(filteredData);
         hasInitialDataRef.current = true;
       }
     } catch (err) {
@@ -98,14 +108,18 @@ export function useCommunityPosts(options: {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [options.following, options.userId, options.limit, options.postType, options.location]);
+  }, [options.following, options.userId, options.limit, options.postType, options.location, blockedUserIds.size]);
 
   // Real-time updates
   const handleRealtimeUpdate = useCallback((newPost: any) => {
     React.startTransition(() => {
       setPosts(prev => {
-        // Handle deleted posts
-        if (newPost._deleted) {
+        // Check if post is from a blocked user (O(1) lookup with Set)
+        const authorId = newPost.user_id || newPost.profiles?.id;
+        const isBlocked = blockedUserIds.has(authorId);
+        
+        // Handle deleted posts OR posts from blocked users
+        if (newPost._deleted || isBlocked) {
           return prev.filter(item => item.id !== newPost.id);
         }
         
@@ -113,11 +127,12 @@ export function useCommunityPosts(options: {
         if (exists) {
           return prev.map(item => item.id === newPost.id ? newPost : item);
         } else {
+          // Add new post (only if not from blocked user)
           return [newPost, ...prev];
         }
       });
     });
-  }, []);
+  }, [blockedUserIds]);
 
   const { postsSubscription, commentsSubscription, likesSubscription } = useOptimizedCommunityRealtime(handleRealtimeUpdate);
 

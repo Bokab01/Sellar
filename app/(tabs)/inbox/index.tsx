@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { View, ScrollView, RefreshControl, TouchableOpacity, Alert, Animated, FlatList } from 'react-native';
+import { View, RefreshControl, TouchableOpacity, Alert, Animated, FlatList } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useConversations } from '@/hooks/useChat';
@@ -7,6 +7,7 @@ import { usePresence } from '@/hooks/usePresence';
 import { useChatStore } from '@/store/useChatStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useAppResume } from '@/hooks/useAppResume';
+import { useGlobalTypingSubscription } from '@/hooks/useGlobalTypingSubscription';
 import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -17,11 +18,10 @@ import {
   ListItem,
   EmptyState,
   ErrorState,
-  ChatListSkeleton,
   HomeScreenSkeleton,
   Button,
-  Badge,
 } from '@/components';
+import { ExtraSmallUserBadges } from '@/components/UserBadgeSystem';
 import { MessageCircle, Plus, Users, CheckSquare, Square, Trash2, Mail, MailOpen, X } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { formatConversationTimestamp } from '@/utils/dateUtils';
@@ -30,12 +30,16 @@ import { getDisplayName } from '@/hooks/useDisplayName';
 export default function InboxScreen() {
   const { theme } = useTheme();
   const { conversations, loading, error, refresh } = useConversations();
-  const { unreadCounts, markAsUnread, clearManuallyMarkedAsUnread, typingUsers } = useChatStore();
+  const { unreadCounts, typingUsers, markAsUnread, clearManuallyMarkedAsUnread } = useChatStore();
   const { isUserOnline, getTypingUsers } = usePresence();
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const lastRefreshTime = useRef<number>(0);
   const REFRESH_COOLDOWN = 5000; // 5 seconds cooldown between refreshes
+
+  // ✅ Subscribe to typing events for all conversations
+  const conversationIds = useMemo(() => conversations.map(conv => conv.id), [conversations]);
+  useGlobalTypingSubscription(conversationIds);
 
   // App resume handling - refresh conversations when app comes back from background
   const { isRefreshing, isReconnecting } = useAppResume({
@@ -171,7 +175,7 @@ export default function InboxScreen() {
 
     Alert.alert(
       'Delete Conversations',
-      `Are you sure you want to delete ${selectedConversations.size} conversation${selectedConversations.size > 1 ? 's' : ''}? This action cannot be undone.`,
+      `Are you sure you want to delete ${selectedConversations.size} conversation${selectedConversations.size > 1 ? 's' : ''}? This will remove ${selectedConversations.size > 1 ? 'them' : 'it'} from your inbox.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -179,37 +183,44 @@ export default function InboxScreen() {
           style: 'destructive',
           onPress: async () => {
             setBulkActionLoading(prev => ({ ...prev, delete: true }));
+            const { user } = useAuthStore.getState();
+            
+            if (!user) {
+              Alert.alert('Error', 'User not authenticated');
+              setBulkActionLoading(prev => ({ ...prev, delete: false }));
+              return;
+            }
+            
             try {
+              // Soft delete each conversation using the RPC function
+              const deletePromises = Array.from(selectedConversations).map(convId =>
+                supabase.rpc('soft_delete_conversation', {
+                  conversation_id: convId,
+                  user_id: user.id,
+                })
+              );
+
+              const results = await Promise.all(deletePromises);
               
-              // Check if these conversations exist
-              const { data: existingConversations, error: checkError } = await supabase
-                .from('conversations')
-                .select('id, participant_1, participant_2')
-                .in('id', Array.from(selectedConversations));
-
-
-              const { data, error } = await supabase
-                .from('conversations')
-                .delete()
-                .in('id', Array.from(selectedConversations))
-                .select();
-
-
-              if (error) {
-                Alert.alert('Error', 'Failed to delete conversations');
-                console.error('Bulk delete error:', error);
-              } else {
-                
-                // Clear local unread counts for deleted conversations
-                const { setUnreadCount } = useChatStore.getState();
-                Array.from(selectedConversations).forEach(convId => {
-                  setUnreadCount(convId, 0);
-                });
-                
-                clearSelection();
-                setIsSelectionMode(false);
-                await refresh(true); // Skip loading state
+              // Check for errors
+              const errors = results.filter(r => r.error);
+              if (errors.length > 0) {
+                console.error('Some deletions failed:', errors);
+                Alert.alert(
+                  'Partial Success',
+                  `${selectedConversations.size - errors.length} conversation(s) deleted. ${errors.length} failed.`
+                );
               }
+              
+              // Clear local unread counts for deleted conversations
+              const { setUnreadCount } = useChatStore.getState();
+              Array.from(selectedConversations).forEach(convId => {
+                setUnreadCount(convId, 0);
+              });
+              
+              clearSelection();
+              setIsSelectionMode(false);
+              await refresh(true); // Skip loading state
             } catch (err) {
               Alert.alert('Error', 'An unexpected error occurred');
               console.error('Bulk delete error:', err);
@@ -346,9 +357,19 @@ export default function InboxScreen() {
         : conv.participant_1_profile;
       
       const lastMessage = conv.messages?.[0];
-      // Check if other user is typing using the typing store
+      
+      // ✅ Check if other user is typing from the store
       const conversationTypingUsers = typingUsers[conv.id] || [];
       const isOtherUserTyping = conversationTypingUsers.includes(otherParticipant?.id);
+      
+      // Debug typing status
+      if (isOtherUserTyping) {
+        console.log(`💬 [Inbox] User typing in conversation ${conv.id}:`, {
+          conversationId: conv.id,
+          otherUserId: otherParticipant?.id,
+          typingUsers: conversationTypingUsers,
+        });
+      }
       
       // Get proper display name based on business settings
       const displayNameResult = getDisplayName(otherParticipant, false);
@@ -381,7 +402,12 @@ export default function InboxScreen() {
         } : null,
         isTyping: isOtherUserTyping,
         lastMessage: lastMessage, // Include lastMessage for filtering
-        is_sellar_pro: Boolean(otherParticipant?.is_sellar_pro), // ✅ Sellar Pro status
+        // Badge data for unified system
+        isSellarPro: Boolean(otherParticipant?.is_sellar_pro),
+        isBusinessUser: Boolean(otherParticipant?.is_business),
+        isVerified: otherParticipant?.verification_status === 'verified' || 
+                    otherParticipant?.verification_status === 'business_verified',
+        isBusinessVerified: otherParticipant?.verification_status === 'business_verified',
       };
     });
   }, [conversations, unreadCounts, typingUsers, isUserOnline]);
@@ -443,15 +469,33 @@ export default function InboxScreen() {
           >
             <ListItem
               title={String(conversation.title)}
-              subtitle={conversation.listing?.title ? String(conversation.listing.title) : undefined}
+              subtitle={
+                <View style={{ marginTop: -2 }}>
+                  {/* ✅ Unified badge system - Extra Small for compact list */}
+                  {(conversation.isSellarPro || conversation.isBusinessUser || conversation.isVerified) && (
+                    <View style={{ marginBottom: 4 }}>
+                      <ExtraSmallUserBadges
+                        isSellarPro={conversation.isSellarPro}
+                        isBusinessUser={conversation.isBusinessUser}
+                        isVerified={conversation.isVerified}
+                        isBusinessVerified={conversation.isBusinessVerified}
+                      />
+                    </View>
+                  )}
+                  {conversation.listing?.title && (
+                    <Text variant="bodySmall" color="secondary" numberOfLines={1}>
+                      {String(conversation.listing.title)}
+                    </Text>
+                  )}
+                </View>
+              }
               description={String(conversation.description)}
               timestamp={conversation.timestamp}
               unreadCount={conversation.unreadCount}
               avatar={conversation.avatar}
-              badge={conversation.is_sellar_pro ? { text: '⭐ PRO', variant: 'info' as const } : undefined}
+              isTyping={conversation.isTyping} // ✅ Pass typing indicator flag
               showChevron={!isSelectionMode}
               onPress={undefined}
-              isTyping={conversation.isTyping}
               style={{
                 backgroundColor: longPressedItem === conversation.id
                   ? theme.colors.primary + '15'

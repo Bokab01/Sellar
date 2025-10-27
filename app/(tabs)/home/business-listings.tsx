@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 import { Building2, Phone, X } from 'lucide-react-native';
 import { useDisplayName, getDisplayName } from '@/hooks/useDisplayName';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useBlockStore } from '@/store/useBlockStore';
 
 interface BusinessListing {
   id: string;
@@ -64,6 +65,7 @@ const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 const BusinessListingsScreen = memo(function BusinessListingsScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
+  const { blockedUserIds } = useBlockStore();
   const { contentBottomPadding } = useBottomTabBarSpacing();
   const [businessUsers, setBusinessUsers] = useState<BusinessUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -416,9 +418,16 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
       const loadTime = endTime - startTime;
       const dataSize = JSON.stringify(businessUsersWithListings).length;
 
+      // Filter out blocked users (lazy evaluation: skip if no blocked users)
+      const filteredBusinessUsers = blockedUserIds.size === 0
+        ? businessUsersWithListings
+        : businessUsersWithListings.filter(businessUser => 
+            !blockedUserIds.has(businessUser.id)
+          );
+
       // Cache the result with performance metrics
       businessListingsCache.set(cacheKey, {
-        data: businessUsersWithListings,
+        data: filteredBusinessUsers,
         timestamp: Date.now(),
         performance: {
           loadTime,
@@ -427,7 +436,7 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
         }
       });
 
-      setBusinessUsers(businessUsersWithListings);
+      setBusinessUsers(filteredBusinessUsers);
     } catch (err) {
       console.error('Error fetching business listings:', err);
       setError('Failed to load business listings');
@@ -435,7 +444,7 @@ const BusinessListingsScreen = memo(function BusinessListingsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [getBusinessDisplayName, isSellarPro]);
+  }, [getBusinessDisplayName, isSellarPro, blockedUserIds.size]);
 
   useEffect(() => {
     fetchBusinessListings();

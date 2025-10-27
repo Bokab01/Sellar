@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { useBlockStore } from '@/store/useBlockStore';
 
 interface UseRealtimeOptions {
   table: string;
@@ -208,6 +209,22 @@ export function useChatRealtime(conversationId: string, onNewMessage: (message: 
     table: conversationId ? 'messages' : '', // Only subscribe if we have a conversation ID
     filter: conversationId ? `conversation_id=eq.${conversationId}` : undefined,
     onInsert: async (payload) => {
+      // Edge Case: Block messages from blocked users
+      // Get latest blockedUserIds from store (avoid stale closure)
+      const { blockedUserIds } = useBlockStore.getState();
+      
+      console.log('🔍 [useChatRealtime] New message received:', {
+        messageId: payload.id,
+        senderId: payload.sender_id,
+        blockedUserIds: Array.from(blockedUserIds),
+        isBlocked: blockedUserIds.has(payload.sender_id),
+      });
+      
+      if (blockedUserIds.has(payload.sender_id)) {
+        console.log('🚫 [useChatRealtime] BLOCKED message from blocked user:', payload.sender_id);
+        return; // Don't process messages from blocked users
+      }
+      
       // Fetch the complete message data with joins to ensure we have all related data
       try {
         const { data, error } = await supabase
@@ -221,6 +238,12 @@ export function useChatRealtime(conversationId: string, onNewMessage: (message: 
           .single();
         
         if (!error && data) {
+          // Double-check sender isn't blocked (get latest state again)
+          const { blockedUserIds: latestBlockedIds } = useBlockStore.getState();
+          if (latestBlockedIds.has(data.sender_id)) {
+            console.log('🚫 Blocked message from blocked user (post-fetch):', data.sender_id);
+            return;
+          }
           onNewMessage(data);
         } else {
           // Fallback to the raw payload if fetch fails

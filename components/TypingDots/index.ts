@@ -1,2 +1,0 @@
-export { TypingDots } from './TypingDots';
-

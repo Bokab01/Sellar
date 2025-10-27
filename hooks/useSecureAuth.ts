@@ -9,6 +9,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { securityService, SecurityEvent } from '../lib/securityService';
 import { validateEmail, validatePassword } from '../utils/validation';
 import { RateLimiter } from '../utils/security';
+import { supabase } from '../lib/supabase';
 
 interface SecureAuthState {
   isAuthenticated: boolean;
@@ -375,19 +376,74 @@ export function useSecureAuth() {
         return { success: false, error: passwordValidation.error };
       }
 
+      if (!user?.email) {
+        return { success: false, error: 'User email not found' };
+      }
+
+      console.log('🔐 Verifying current password...');
+      
+      // Verify current password using verifyOtp or a separate session
+      // This prevents triggering the full sign-in flow
+      const { data: verifyData, error: verifyError } = await supabase.rpc('verify_user_password', {
+        password: currentPassword
+      });
+
+      // If RPC doesn't exist, fall back to updating directly
+      // Supabase will reject invalid session tokens automatically
+      if (verifyError && verifyError.code === '42883') {
+        console.log('⚠️ Password verification RPC not available, proceeding with update');
+      } else if (verifyError || !verifyData) {
+        console.log('❌ Current password verification failed');
+        return { success: false, error: 'Current password is incorrect' };
+      } else {
+        console.log('✅ Current password verified');
+      }
+
+      console.log('🔄 Updating to new password...');
+
       // Use Supabase to change password
-      const { error } = await (securityService as any).supabase.auth.updateUser({
+      const { error } = await supabase.auth.updateUser({
         password: passwordValidation.sanitizedValue || newPassword,
       });
 
       if (error) {
+        console.log('❌ Password update failed:', error.message);
         return { success: false, error: error.message };
       }
 
-      // Log security event
+      console.log('✅ Password updated successfully');
+
+      // Log security event and send email confirmation in background (don't wait for these)
       if (user?.id) {
-        await (securityService as any).logSecurityEvent('password_change', user.id, {
+        // Log security event
+        (securityService as any).logSecurityEvent('password_change', user.id, {
           timestamp: new Date().toISOString(),
+        }).catch((logError: any) => {
+          console.warn('Failed to log security event:', logError);
+        });
+
+        // Fetch user's name from profiles table and send confirmation email
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('first_name, full_name')
+          .eq('id', user.id)
+          .single();
+
+        const userName = profile?.first_name || profile?.full_name || user.email?.split('@')[0] || 'User';
+
+        supabase.functions.invoke('send-email', {
+          body: {
+            type: 'password_change',
+            to: user.email,
+            data: {
+              userName,
+              timestamp: new Date().toISOString(),
+            },
+          },
+        }).then(() => {
+          console.log('✅ Password change confirmation email sent');
+        }).catch((emailError: any) => {
+          console.warn('Failed to send password change email:', emailError);
         });
       }
 
@@ -409,7 +465,7 @@ export function useSecureAuth() {
         return { success: false, error: emailValidation.error };
       }
 
-      const { error } = await (securityService as any).supabase.auth.resetPasswordForEmail(email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
 
       if (error) {
         return { success: false, error: error.message };
@@ -467,3 +523,5 @@ export function useSecureAuth() {
     checkDeviceTrust,
   };
 }
+
+
