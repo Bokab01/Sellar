@@ -83,6 +83,11 @@ interface ProductCardProps {
     destructive?: boolean;
   }>;
   borderRadius?: number; // NEW: Custom border radius
+  boostBadge?: { // NEW: Boost badge for boosted listings
+    icon: string;
+    label: string;
+    color: string;
+  } | null;
 }
 
 const ProductCard = memo<ProductCardProps>(function ProductCard({
@@ -128,6 +133,7 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
   borderColor,
   menuActions,
   borderRadius,
+  boostBadge,
 }) {
   const { theme, themeMode } = useTheme();
   const [showMenu, setShowMenu] = useState(false);
@@ -529,6 +535,35 @@ const ProductCard = memo<ProductCardProps>(function ProductCard({
               text={badge.text} 
               size="sm" // Always use small size for better space efficiency
             />
+          </View>
+        )}
+
+        {/* Boost Badge */}
+        {boostBadge && (
+          <View style={{
+            position: 'absolute',
+            bottom: theme.spacing.xs,
+            left: theme.spacing.xs,
+            backgroundColor: boostBadge.color + '20',
+            borderWidth: 1,
+            borderColor: boostBadge.color + '40',
+            borderRadius: theme.borderRadius.sm,
+            paddingHorizontal: theme.spacing.xs,
+            paddingVertical: 3,
+            flexDirection: 'row',
+            alignItems: 'center',
+            zIndex: 2,
+          }}>
+            <Text style={{ fontSize: 10, marginRight: 2 }}>
+              {boostBadge.icon}
+            </Text>
+            <Text style={{ 
+              fontSize: 10, 
+              fontWeight: '600',
+              color: boostBadge.color,
+            }}>
+              {boostBadge.label.toUpperCase()}
+            </Text>
           </View>
         )}
 

@@ -16,6 +16,9 @@ export interface ListingFormData {
   quantity: number;
   acceptOffers: boolean;
   location: string;
+  
+  // Deposit (Pro Sellers Only)
+  requiresDeposit?: boolean;
 }
 
 export interface SelectedFeature {
@@ -36,6 +39,7 @@ const INITIAL_FORM_DATA: ListingFormData = {
   quantity: 1,
   acceptOffers: true,
   location: '',
+  requiresDeposit: false,
 };
 
 export function useListingForm() {

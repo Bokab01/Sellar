@@ -107,7 +107,6 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
         padding: theme.spacing.lg,
         marginBottom: theme.spacing.md,
         opacity: (!canAfford && !isBusinessPlan) ? 0.6 : 1,
-        ...theme.shadows.sm,
       }}
       activeOpacity={0.8}
     >

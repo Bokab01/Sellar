@@ -26,6 +26,10 @@ export interface OfferActionResult {
   newOfferId?: string;
   reservationId?: string;
   notificationsSent?: number;
+  requiresDeposit?: boolean;
+  isProSeller?: boolean;
+  depositDeadline?: string;
+  message?: string;
 }
 
 export interface CounterOfferData {
@@ -41,7 +45,9 @@ export interface OfferRejectionData {
 
 class OfferStateMachine {
   /**
-   * Accept an offer and create listing reservation
+   * Accept an offer (Unified with deposit system)
+   * - Regular sellers: Offer accepted, listing stays active
+   * - Pro sellers with deposits: Buyer must pay deposit to reserve
    */
   async acceptOffer(
     offerId: string,
@@ -49,88 +55,31 @@ class OfferStateMachine {
     acceptanceMessage?: string
   ): Promise<OfferActionResult> {
     try {
-      // Start transaction
-      const { data: offer, error: fetchError } = await supabase
-        .from('offers')
-        .select(`
-          *,
-          listings!inner(id, title, price, user_id, status)
-        `)
-        .eq('id', offerId)
-        .eq('seller_id', sellerId)
-        .eq('status', 'pending')
-        .single();
-
-      if (fetchError || !offer) {
-        return { success: false, error: 'Offer not found or already processed' };
-      }
-
-      // Check if offer has expired
-      if (new Date(offer.expires_at) < new Date()) {
-        await this.expireOffer(offerId);
-        return { success: false, error: 'Offer has expired' };
-      }
-
-      // Check if listing is still available
-      if (offer.listings.status !== 'active') {
-        return { success: false, error: 'Listing is no longer available' };
-      }
-
-      // Update offer status to accepted
-      const { error: updateError } = await supabase
-        .from('offers')
-        .update({
-          status: 'accepted',
-          response_message: acceptanceMessage,
-          responded_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', offerId);
-
-      if (updateError) {
-        return { success: false, error: 'Failed to accept offer' };
-      }
-
-      // Create listing reservation
-      const reservationResult = await this.createListingReservation(
-        offer.listing_id,
-        offer.buyer_id,
-        offerId,
-        offer.amount
-      );
-
-      if (!reservationResult.success) {
-        // Rollback offer acceptance
-        await supabase
-          .from('offers')
-          .update({ status: 'pending', responded_at: null })
-          .eq('id', offerId);
-        
-        return { success: false, error: reservationResult.error };
-      }
-
-      // Reject all other pending offers for this listing
-      await this.rejectCompetingOffers(offer.listing_id, offerId);
-
-      // Send notifications
-      await this.sendOfferNotification(offerId, 'accepted', {
-        buyerId: offer.buyer_id,
-        sellerId: offer.seller_id,
-        listingTitle: offer.listings.title,
-        amount: offer.amount,
-        currency: offer.currency,
+      // Use new accept_offer_v2 RPC
+      const { data, error } = await supabase.rpc('accept_offer_v2', {
+        p_offer_id: offerId,
+        p_seller_id: sellerId,
+        p_acceptance_message: acceptanceMessage,
       });
+
+      if (error) {
+        console.error('Accept offer RPC error:', error);
+        return { success: false, error: error.message || 'Failed to accept offer' };
+      }
 
       // Log offer activity
       await this.logOfferActivity(offerId, 'accepted', sellerId, {
         acceptance_message: acceptanceMessage,
-        reservation_id: reservationResult.reservationId,
+        requires_deposit: data.requires_deposit,
+        is_pro_seller: data.is_pro_seller,
       });
 
       return {
         success: true,
-        reservationId: reservationResult.reservationId,
-        notificationsSent: 2, // buyer and seller
+        requiresDeposit: data.requires_deposit,
+        isProSeller: data.is_pro_seller,
+        depositDeadline: data.deposit_deadline,
+        message: data.message,
       };
     } catch (error: any) {
       console.error('Accept offer error:', error);

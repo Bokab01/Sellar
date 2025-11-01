@@ -32,6 +32,9 @@ import {
   SimpleCallbackRequestButton,
   QuickEditModal,
   IdentityVerificationBadge,
+  DepositCommitmentModal,
+  StockAvailabilityCard,
+  OfferAcceptedBanner,
 } from '@/components';
 
 // Lazy load heavy MediaViewer component (supports images and videos)
@@ -41,12 +44,13 @@ import { useListingStats } from '@/hooks/useListingStats';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import { SvgXml } from 'react-native-svg';
 import { useProfile } from '@/hooks/useProfile';
-import { Heart, Share as ShareIcon, MessageCircle, Phone, PhoneCall, DollarSign, ArrowLeft, Package, MoreVertical, Edit, Trash2, Flag, BadgeCent, RefreshCw, Play, X, MapPin } from 'lucide-react-native';
+import { Heart, Share as ShareIcon, MessageCircle, Phone, PhoneCall, DollarSign, ArrowLeft, Package, MoreVertical, Edit, Trash2, Flag, BadgeCent, RefreshCw, Play, X, MapPin, Info } from 'lucide-react-native';
 import { getDisplayName } from '@/hooks/useDisplayName';
 import { UserDisplayName } from '@/components/UserDisplayName/UserDisplayName';
 import { ReportButton } from '@/components/ReportButton/ReportButton';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { CDNOptimizedVideo } from '@/components/OptimizedVideo/CDNOptimizedVideo';
+import { PaystackProvider, usePaystack, PaystackProps } from 'react-native-paystack-webview';
 
 // Helper function to detect if URL is a video
 const isVideoUrl = (url: string): boolean => {
@@ -180,9 +184,42 @@ function MediaItemVideo({ videoUrl, isActive, width, height, theme, onPress }: M
   );
 }
 
+// Paystack Payment Component
+interface PaystackPaymentComponentProps {
+  amount: number;
+  email: string;
+  reference: string;
+  onSuccess: (response: any) => void;
+  onCancel: () => void;
+}
+
+function PaystackPaymentComponent({ 
+  amount, 
+  email, 
+  reference, 
+  onSuccess, 
+  onCancel 
+}: PaystackPaymentComponentProps) {
+  const { popup } = usePaystack();
+
+  React.useEffect(() => {
+    if (popup) {
+      popup.checkout({
+        email,
+        amount,
+        reference,
+        onSuccess,
+        onCancel,
+      });
+    }
+  }, [popup, email, amount, reference, onSuccess, onCancel]);
+
+  return null; // This component doesn't render anything visible
+}
+
 export default function ListingDetailScreen() {
   const { theme } = useTheme();
-  const { id: listingId } = useLocalSearchParams<{ id: string }>();
+  const { id: listingId, offer_id: offerIdParam } = useLocalSearchParams<{ id: string; offer_id?: string }>();
   const { user } = useAuthStore();
   const { profile } = useProfile();
   const { trackInteraction } = useRecommendations();
@@ -194,6 +231,9 @@ export default function ListingDetailScreen() {
   const [isFavorited, setIsFavorited] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const imageScrollViewRef = React.useRef<FlatList<string>>(null);
+  
+  // Accepted offer state (from navigation params)
+  const [acceptedOffer, setAcceptedOffer] = useState<any>(null);
   
   // Contact modals
   const [showContactModal, setShowContactModal] = useState(false);
@@ -239,6 +279,16 @@ export default function ListingDetailScreen() {
   
   // Popup menu
   const [showMenu, setShowMenu] = useState(false);
+
+  // Deposit flow state
+  const [showDepositModal, setShowDepositModal] = useState(false);
+  const [showDepositInfoModal, setShowDepositInfoModal] = useState(false);
+  const [showDepositErrorModal, setShowDepositErrorModal] = useState(false);
+  const [depositErrorMessage, setDepositErrorMessage] = useState('');
+  const [payingDeposit, setPayingDeposit] = useState(false);
+  const [paystackReference, setPaystackReference] = useState<string | null>(null);
+  const [paystackAmount, setPaystackAmount] = useState(2000); // in pesewas
+  const [showPaystackModal, setShowPaystackModal] = useState(false);
 
   // Related items state
   const [activeRelatedTab, setActiveRelatedTab] = useState<'seller' | 'similar'>('seller');
@@ -497,6 +547,7 @@ export default function ListingDetailScreen() {
           checkIfFavorited(),
           checkCallbackStatus(),
           checkPendingOffer(),
+          fetchAcceptedOffer(), // Fetch offer if navigating from chat
         ]);
         // Don't increment view count on focus refresh
       } else {
@@ -602,6 +653,27 @@ export default function ListingDetailScreen() {
     }
   }, [listingId]);
 
+  // Fetch accepted offer details if offer_id provided
+  const fetchAcceptedOffer = useCallback(async () => {
+    if (!offerIdParam || !user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('offers')
+        .select('*')
+        .eq('id', offerIdParam)
+        .eq('buyer_id', user.id)
+        .eq('status', 'accepted')
+        .single();
+
+      if (!error && data) {
+        setAcceptedOffer(data);
+      }
+    } catch (err) {
+      console.error('Error fetching offer:', err);
+    }
+  }, [offerIdParam, user]);
+
   const checkIfFavorited = async () => {
     if (!user) return;
 
@@ -682,6 +754,162 @@ export default function ListingDetailScreen() {
     } catch (err) {
       // Silent fail for analytics
     }
+  };
+
+  // Deposit payment handlers
+  const handleInitiateDeposit = async (quantity: number = 1) => {
+    try {
+      setPayingDeposit(true);
+      setShowDepositModal(false);
+
+      // 🔍 COMPREHENSIVE CHECKS BEFORE PAYMENT
+
+      // 1. Re-fetch listing to check current availability
+      const { data: freshListing, error: fetchError } = await supabase
+        .from('listings')
+        .select('status, quantity, reserved_quantity, requires_deposit')
+        .eq('id', listingId)
+        .single();
+
+      if (fetchError || !freshListing) {
+        throw new Error('Unable to verify listing availability. Please try again.');
+      }
+
+      // 2. Check listing status
+      if (freshListing.status !== 'active') {
+        throw new Error('This listing is no longer available.');
+      }
+
+      // 3. Check if deposits are still required
+      if (!freshListing.requires_deposit) {
+        throw new Error('This listing no longer requires a deposit.');
+      }
+
+      // 4. Check quantity availability
+      const availableQuantity = freshListing.quantity - (freshListing.reserved_quantity || 0);
+      if (availableQuantity < quantity) {
+        throw new Error(`Only ${availableQuantity} unit(s) available. ${freshListing.reserved_quantity > 0 ? 'Some units have been reserved by other buyers.' : ''}`);
+      }
+
+      // 5. If this is from an accepted offer, verify offer is still valid
+      if (acceptedOffer || offerIdParam) {
+        const offerId = acceptedOffer?.id || offerIdParam;
+        const { data: freshOffer, error: offerError } = await supabase
+          .from('offers')
+          .select('status, awaiting_deposit, deposit_deadline')
+          .eq('id', offerId)
+          .single();
+
+        if (offerError || !freshOffer) {
+          throw new Error('Unable to verify offer status. Please try again.');
+        }
+
+        if (freshOffer.status !== 'accepted') {
+          throw new Error('This offer is no longer valid.');
+        }
+
+        if (!freshOffer.awaiting_deposit) {
+          throw new Error('This offer no longer requires a deposit.');
+        }
+
+        if (freshOffer.deposit_deadline && new Date(freshOffer.deposit_deadline) < new Date()) {
+          throw new Error('The deposit deadline for this offer has passed.');
+        }
+      }
+
+      // 6. Check for existing deposits by this buyer for this listing
+      const { data: existingDeposits, error: depositCheckError } = await supabase
+        .from('listing_deposits')
+        .select('id, status')
+        .eq('listing_id', listingId)
+        .eq('buyer_id', user?.id)
+        .in('status', ['pending', 'paid']);
+
+      if (!depositCheckError && existingDeposits && existingDeposits.length > 0) {
+        throw new Error('You already have an active deposit for this listing. Check "My Orders" for details.');
+      }
+
+      // ✅ All checks passed - Initialize deposit payment
+      const { data, error } = await supabase.rpc('initialize_deposit', {
+        p_listing_id: listingId,
+        p_buyer_id: user?.id,
+        p_reserved_quantity: quantity,
+        p_conversation_id: null,
+        p_offer_id: acceptedOffer?.id || offerIdParam || null,
+      });
+
+      if (error) throw error;
+
+      // Store reference, amount and open Paystack
+      setPaystackReference(data.reference);
+      // Convert pesewas back to cedis for Paystack (Paystack expects amount in major currency unit)
+      setPaystackAmount(data.amount / 100); // Convert from pesewas to cedis
+      setShowPaystackModal(true);
+    } catch (error: any) {
+      console.error('Error initializing deposit:', error);
+      
+      // Provide user-friendly error messages
+      let errorMessage = error.message || 'Failed to initialize deposit payment';
+      
+      if (error.message?.includes('maximum of 3 active deposit commitments')) {
+        errorMessage = 'You can only have 3 active deposits at a time. Complete or cancel your existing deposits to continue.\n\nView your deposits in "My Orders" from the menu.';
+      } else if (error.message?.includes('deposit privileges are temporarily suspended')) {
+        errorMessage = 'Your deposit access has been temporarily suspended. Please complete your pending transactions or contact support.';
+      } else if (error.message?.includes('cannot commit to your own listing')) {
+        errorMessage = 'You cannot pay a deposit for your own listing.';
+      } else if (error.message?.includes('Not enough units available')) {
+        errorMessage = 'Not enough units available. Other buyers may have reserved some units.';
+      } else if (error.message?.includes('Offer not found or not awaiting deposit')) {
+        errorMessage = 'This offer is no longer valid or has already been processed.';
+      } else if (error.message?.includes('Deposit deadline has passed')) {
+        errorMessage = 'The 24-hour deposit window for this offer has expired.';
+      }
+      
+      setDepositErrorMessage(errorMessage);
+      setShowDepositErrorModal(true);
+      setPayingDeposit(false);
+    }
+  };
+
+  const handlePaystackSuccess = async (response: any) => {
+    try {
+      setShowPaystackModal(false);
+
+      // Verify payment
+      const { data, error } = await supabase.rpc('verify_deposit_payment', {
+        p_reference: response.reference || paystackReference,
+      });
+
+      if (error) throw error;
+
+      // Show success message
+      Alert.alert(
+        'Deposit Paid! 🎉',
+        'Your ₵20 deposit has been received. Please contact the seller to arrange meetup.',
+        [
+          {
+            text: 'View Deposit',
+            onPress: () => router.push(`/deposit-confirmation/${data.deposit_id}` as any),
+          },
+          {
+            text: 'Contact Seller',
+            onPress: () => setShowContactModal(true),
+          },
+        ]
+      );
+    } catch (error: any) {
+      console.error('Error verifying deposit:', error);
+      Alert.alert('Verification Error', error.message || 'Failed to verify payment');
+    } finally {
+      setPayingDeposit(false);
+    }
+  };
+
+  const handlePaystackCancel = () => {
+    setShowPaystackModal(false);
+    setPayingDeposit(false);
+    setPaystackReference(null);
+    showErrorToast('Payment cancelled');
   };
 
   // Memoize fetchRelatedItems to prevent unnecessary calls
@@ -1760,6 +1988,14 @@ export default function ListingDetailScreen() {
             </View>
           )}
         </View>
+        {/* Offer Accepted Banner - Show if buyer navigated from accepted offer */}
+        {acceptedOffer && acceptedOffer.awaiting_deposit && acceptedOffer.buyer_id === user?.id && (
+          <OfferAcceptedBanner
+            depositDeadline={acceptedOffer.deposit_deadline}
+            onPayDeposit={() => setShowDepositModal(true)}
+          />
+        )}
+
         {/* Seller Profile - Moved to top */}
         {listing.profiles && (
           <TouchableOpacity
@@ -1881,6 +2117,138 @@ export default function ListingDetailScreen() {
                 </TouchableOpacity>
               )}
             </View>
+
+            {/* Stock Availability Display - For bulk items */}
+            <StockAvailabilityCard
+              quantity={listing.quantity}
+              reservedQuantity={listing.reserved_quantity}
+              style={{ marginTop: theme.spacing.sm }}
+            />
+
+            {/* Out of Stock Banner - For bulk items with 0 available */}
+            {!isOwnListing && listing.quantity > 1 && (listing.quantity - (listing.reserved_quantity || 0)) === 0 && listing.status !== 'sold' && (
+              <View
+                style={{
+                  backgroundColor: theme.colors.error + '15',
+                  borderWidth: 1,
+                  borderColor: theme.colors.error + '30',
+                  borderRadius: theme.borderRadius.md,
+                  padding: theme.spacing.md,
+                  marginTop: theme.spacing.sm,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: theme.spacing.md,
+                }}
+              >
+                <View style={{
+                  backgroundColor: theme.colors.error + '20',
+                  borderRadius: theme.borderRadius.full,
+                  padding: theme.spacing.sm,
+                }}>
+                  <Text style={{ fontSize: 20 }}>❌</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text variant="body" style={{ 
+                    fontWeight: '600', 
+                    color: theme.colors.error,
+                    marginBottom: theme.spacing.xs 
+                  }}>
+                    Out of Stock
+                  </Text>
+                  <Text variant="bodySmall" style={{ color: theme.colors.text.secondary }}>
+                    All {listing.quantity} units are currently reserved. Add to favorites to get notified when available.
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Reserved by Others Banner - For single items or full reservation */}
+            {!isOwnListing && listing.status === 'reserved' && listing.reserved_for !== user?.id && listing.quantity === 1 && (
+              <View
+                style={{
+                  backgroundColor: theme.colors.warning + '15',
+                  borderWidth: 1,
+                  borderColor: theme.colors.warning + '30',
+                  borderRadius: theme.borderRadius.md,
+                  padding: theme.spacing.md,
+                  marginTop: theme.spacing.sm,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: theme.spacing.md,
+                }}
+              >
+                <View style={{
+                  backgroundColor: theme.colors.warning + '20',
+                  borderRadius: theme.borderRadius.full,
+                  padding: theme.spacing.sm,
+                }}>
+                  <Text style={{ fontSize: 20 }}>🔒</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text variant="body" style={{ 
+                    fontWeight: '600', 
+                    color: theme.colors.warning,
+                    marginBottom: theme.spacing.xs 
+                  }}>
+                    Currently Reserved
+                  </Text>
+                  <Text variant="bodySmall" style={{ color: theme.colors.text.secondary }}>
+                    This item is reserved by another buyer. It will become available if the reservation expires.
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Deposit Required Badge with Button */}
+            {listing.requires_deposit && !isOwnListing && (
+              <View style={{
+                backgroundColor: theme.colors.primary + '10',
+                padding: theme.spacing.md,
+                borderRadius: theme.borderRadius.md,
+                marginTop: theme.spacing.md,
+                borderWidth: 1,
+                borderColor: theme.colors.primary + '30',
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing.sm }}>
+                  <Text style={{ fontSize: 20, marginRight: theme.spacing.sm }}>🔒</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="bodySmall" style={{ fontWeight: '600', color: theme.colors.primary }}>
+                      ₵20 Sellar Secure Deposit
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setShowDepositInfoModal(true)}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 14,
+                      backgroundColor: theme.colors.primary + '20',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Info size={16} color={theme.colors.primary} />
+                  </TouchableOpacity>
+                </View>
+                <Text variant="caption" color="secondary" style={{ marginBottom: theme.spacing.md, lineHeight: 18 }}>
+                  Show commitment • Protected by Sellar Secure • Auto-refund after 3 days
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setShowDepositModal(true)}
+                  style={{
+                    backgroundColor: theme.colors.success,
+                    borderRadius: theme.borderRadius.md,
+                    paddingVertical: theme.spacing.md,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text variant="button" style={{ color: '#FFF', fontWeight: '700' }}>
+                    Secure This Item
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Professional Badge Section */}
             <View style={{ 
@@ -2293,7 +2661,15 @@ export default function ListingDetailScreen() {
           </View>
 
           {/* Action Buttons - Moved from bottom */}
-          {!isOwnListing && listing.status !== 'sold' && listing.status !== 'reserved' && (
+          {!isOwnListing && listing.status !== 'sold' && (() => {
+            // Check availability for bulk items and reserved status
+            const availableQuantity = listing.quantity - (listing.reserved_quantity || 0);
+            const isOutOfStock = listing.quantity > 1 && availableQuantity === 0;
+            const isReservedByOthers = listing.status === 'reserved' && listing.reserved_for !== user?.id;
+            
+            // Show actions only if available
+            return !isOutOfStock && !isReservedByOthers;
+          })() && (
             <View style={{ marginBottom: theme.spacing.lg }}>
               <View style={{ gap: theme.spacing.md }}>
                 {/* Make an Offer Button */}
@@ -2936,6 +3312,220 @@ export default function ListingDetailScreen() {
           {moderationError}
         </Text>
       </AppModal>
+
+      {/* Deposit Commitment Modal */}
+      <DepositCommitmentModal
+        visible={showDepositModal}
+        onClose={() => setShowDepositModal(false)}
+        onConfirm={handleInitiateDeposit}
+        listingTitle={listing?.title || ''}
+        availableQuantity={listing?.available_quantity || listing?.quantity || 1}
+        loading={payingDeposit}
+      />
+
+      {/* Deposit Info Modal */}
+      <AppModal
+        visible={showDepositInfoModal}
+        onClose={() => setShowDepositInfoModal(false)}
+        title="About Sellar Secure"
+        size="md"
+        position="bottom"
+      >
+        <View style={{ padding: theme.spacing.lg }}>
+          {/* What is Sellar Secure */}
+          <View style={{ marginBottom: theme.spacing.lg }}>
+            <Text variant="h4" style={{ marginBottom: theme.spacing.sm, color: theme.colors.primary }}>
+              🔒 What is Sellar Secure?
+            </Text>
+            <Text variant="body" style={{ lineHeight: 22, color: theme.colors.text.secondary }}>
+              Sellar Secure is our commitment deposit system that protects both buyers and sellers. It ensures serious transactions and reduces no-shows.
+            </Text>
+          </View>
+
+          {/* How It Works */}
+          <View style={{ marginBottom: theme.spacing.lg }}>
+            <Text variant="h4" style={{ marginBottom: theme.spacing.sm, color: theme.colors.primary }}>
+              💡 How It Works
+            </Text>
+            <View style={{ gap: theme.spacing.md }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                <View style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 12,
+                  backgroundColor: theme.colors.success + '20',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: theme.spacing.sm,
+                }}>
+                  <Text variant="caption" style={{ color: theme.colors.success, fontWeight: '700' }}>1</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text variant="bodySmall" style={{ fontWeight: '600', marginBottom: 4 }}>Pay ₵20 Deposit</Text>
+                  <Text variant="caption" color="secondary" style={{ lineHeight: 18 }}>
+                    Shows the seller you're committed to buying
+                  </Text>
+                </View>
+              </View>
+
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                <View style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 12,
+                  backgroundColor: theme.colors.success + '20',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: theme.spacing.sm,
+                }}>
+                  <Text variant="caption" style={{ color: theme.colors.success, fontWeight: '700' }}>2</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text variant="bodySmall" style={{ fontWeight: '600', marginBottom: 4 }}>Meet & Inspect</Text>
+                  <Text variant="caption" color="secondary" style={{ lineHeight: 18 }}>
+                    Contact seller, arrange meetup, and inspect the item
+                  </Text>
+                </View>
+              </View>
+
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                <View style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 12,
+                  backgroundColor: theme.colors.success + '20',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: theme.spacing.sm,
+                }}>
+                  <Text variant="caption" style={{ color: theme.colors.success, fontWeight: '700' }}>3</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text variant="bodySmall" style={{ fontWeight: '600', marginBottom: 4 }}>Confirm Purchase</Text>
+                  <Text variant="caption" color="secondary" style={{ lineHeight: 18 }}>
+                    After buying, confirm to release ₵20 to seller
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Your Protection */}
+          <View style={{ marginBottom: theme.spacing.lg }}>
+            <Text variant="h4" style={{ marginBottom: theme.spacing.sm, color: theme.colors.primary }}>
+              🛡️ Your Protection
+            </Text>
+            <View style={{ 
+              backgroundColor: theme.colors.surface,
+              padding: theme.spacing.md,
+              borderRadius: theme.borderRadius.md,
+              gap: theme.spacing.sm,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ marginRight: theme.spacing.xs }}>⏱️</Text>
+                <Text variant="caption" style={{ flex: 1, lineHeight: 18 }}>
+                  <Text style={{ fontWeight: '600' }}>3-Day Window:</Text> Complete transaction within 3 days
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ marginRight: theme.spacing.xs }}>💰</Text>
+                <Text variant="caption" style={{ flex: 1, lineHeight: 18 }}>
+                  <Text style={{ fontWeight: '600' }}>Auto-Refund:</Text> Get refund if not confirmed in 3 days
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ marginRight: theme.spacing.xs }}>❌</Text>
+                <Text variant="caption" style={{ flex: 1, lineHeight: 18 }}>
+                  <Text style={{ fontWeight: '600' }}>Cancel Anytime:</Text> Both parties can agree to cancel
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Important Note */}
+          <View style={{
+            backgroundColor: theme.colors.warning + '10',
+            padding: theme.spacing.md,
+            borderRadius: theme.borderRadius.md,
+            borderWidth: 1,
+            borderColor: theme.colors.warning + '30',
+          }}>
+            <Text variant="caption" style={{ lineHeight: 18, color: theme.colors.text.secondary }}>
+              <Text style={{ fontWeight: '700' }}>Important:</Text> The ₵20 deposit is NOT the item price. Pay the full item price to the seller during meetup. The deposit ensures both parties are serious about the transaction.
+            </Text>
+          </View>
+
+          <Button
+            variant="primary"
+            onPress={() => setShowDepositInfoModal(false)}
+            style={{ marginTop: theme.spacing.lg }}
+          >
+            Got It
+          </Button>
+        </View>
+      </AppModal>
+
+      {/* Deposit Error Modal */}
+      <AppModal
+        visible={showDepositErrorModal}
+        onClose={() => setShowDepositErrorModal(false)}
+        title="Unable to Proceed"
+        size="md"
+        position="center"
+      >
+        <View style={{ padding: theme.spacing.lg }}>
+          <View style={{
+            backgroundColor: theme.colors.error + '10',
+            padding: theme.spacing.md,
+            borderRadius: theme.borderRadius.md,
+            marginBottom: theme.spacing.lg,
+            alignItems: 'center',
+          }}>
+            <Text style={{ fontSize: 48, marginBottom: theme.spacing.sm }}>⚠️</Text>
+            <Text variant="body" style={{ lineHeight: 22, textAlign: 'center' }}>
+              {depositErrorMessage}
+            </Text>
+          </View>
+
+          {depositErrorMessage.includes('My Orders') && (
+            <Button
+              variant="primary"
+              onPress={() => {
+                setShowDepositErrorModal(false);
+                router.push('/my-orders');
+              }}
+              style={{ marginBottom: theme.spacing.sm }}
+            >
+              View My Orders
+            </Button>
+          )}
+
+          <Button
+            variant="outline"
+            onPress={() => setShowDepositErrorModal(false)}
+            style={{ marginBottom: theme.spacing.sm }}
+          >
+            Close
+          </Button>
+        </View>
+      </AppModal>
+
+      {/* Paystack Payment Modal */}
+      {showPaystackModal && paystackReference && user && (
+        <PaystackProvider
+          publicKey={process.env.EXPO_PUBLIC_PAYSTACK_PUBLIC_KEY || ''}
+          currency="GHS"
+          defaultChannels={['mobile_money', 'card']}
+        >
+          <PaystackPaymentComponent
+            amount={paystackAmount}
+            email={user.email || ''}
+            reference={paystackReference}
+            onSuccess={handlePaystackSuccess}
+            onCancel={handlePaystackCancel}
+          />
+        </PaystackProvider>
+      )}
 
       {/* Full Description Modal */}
       <AppModal

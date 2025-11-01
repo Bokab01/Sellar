@@ -273,10 +273,13 @@ function CreateListingScreen() {
     }
   }, [user]);
 
-  useEffect(() => {
-    checkListingLimits();
-    loadDraft();
-  }, [checkListingLimits, loadDraft]);
+  // Use useFocusEffect instead of useEffect to only load draft when screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      checkListingLimits();
+      loadDraft();
+    }, [checkListingLimits, loadDraft])
+  );
 
   // ✅ REFACTORED: Simplified saveDraft wrapper (AsyncStorage only - hook handles this automatically)
   // Database draft saving removed for better performance
@@ -431,23 +434,8 @@ function CreateListingScreen() {
           
         }
         
-        // Deduct credits for features if any were selected
-        if (featureCredits > 0) {
-          const featureResult = await spendCredits(featureCredits, 'Listing features', {
-            referenceType: 'listing_creation',
-            features: selectedFeatures.map(f => ({ key: f.key, name: f.name, credits: f.credits })),
-          });
-          
-          if (!featureResult.success) {
-            // Refund listing fee if feature payment fails
-            if (listingFee > 0) {
-              // TODO: Implement refund logic
-            }
-            Alert.alert('Error', featureResult.error || 'Failed to process feature payment');
-            return;
-          }
-          
-        }
+        // NOTE: Feature credits are deducted by the purchase_feature RPC in useListingSubmission
+        // No need to deduct here to avoid double charging
       }
       
       // ✅ REFACTORED: Create the listing using hook
@@ -1080,11 +1068,67 @@ function CreateListingScreen() {
           </Text>
         )}
       </View>
+
+            {/* Deposit Toggle (Pro Sellers Only) */}
+            {hasBusinessPlan() && (
+              <View style={{ 
+                backgroundColor: theme.colors.primary + '10',
+                padding: theme.spacing.md,
+                borderRadius: theme.borderRadius.md,
+                borderWidth: 1,
+                borderColor: theme.colors.primary + '30',
+              }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.sm }}>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="body" style={{ fontWeight: '600', marginBottom: 4 }}>
+                      🔒 Require ₵20 Deposit
+                    </Text>
+                    <Text variant="bodySmall" color="secondary">
+                      Buyers pay ₵20 deposit to show commitment. Released after meetup confirmation.
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => updateMultipleFields({ requiresDeposit: !formData.requiresDeposit })}
+                    style={{
+                      width: 50,
+                      height: 30,
+                      borderRadius: 15,
+                      backgroundColor: formData.requiresDeposit ? theme.colors.primary : theme.colors.border,
+                      justifyContent: 'center',
+                      paddingHorizontal: 2,
+                      marginLeft: theme.spacing.md,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: 13,
+                        backgroundColor: '#FFF',
+                        transform: [{ translateX: formData.requiresDeposit ? 20 : 0 }],
+                      }}
+                    />
+                  </TouchableOpacity>
+                </View>
+                {formData.requiresDeposit && (
+                  <View style={{
+                    backgroundColor: theme.colors.success + '15',
+                    padding: theme.spacing.sm,
+                    borderRadius: theme.borderRadius.sm,
+                    marginTop: theme.spacing.sm,
+                  }}>
+                    <Text variant="caption" style={{ color: theme.colors.success }}>
+                      ✓ Pro Feature Active • Reduces no-shows by 90%
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
     </View>
         </View>
       </View>
     );
-  }, [formData.categoryId, formData.location, formData.categoryAttributes, formData.price, formData.quantity, formData.acceptOffers, selectedCategory, validationResults, theme, handleCategorySelect, handleLocationSelect, handleCategoryAttributeChange, handlePriceChange, handleQuantityChange, handleAcceptOffersChange, currentLocation, location]);
+  }, [formData.categoryId, formData.location, formData.categoryAttributes, formData.price, formData.quantity, formData.acceptOffers, formData.requiresDeposit, selectedCategory, validationResults, theme, handleCategorySelect, handleLocationSelect, handleCategoryAttributeChange, handlePriceChange, handleQuantityChange, handleAcceptOffersChange, currentLocation, location, hasBusinessPlan, updateMultipleFields]);
 
   // DetailsStep merged into CategoryStep above
 
@@ -1498,7 +1542,7 @@ function CreateListingScreen() {
         </View>
       )}
     </View>
-  ), [formData, selectedCategory, theme, hasUnlimitedListings, userListingsCount, getMaxListings, balance]);
+  ), [formData, selectedCategory, theme, hasUnlimitedListings, userListingsCount, getMaxListings, balance, selectedFeatures]);
 
   const renderStepContent = () => {
     switch (currentStep) {

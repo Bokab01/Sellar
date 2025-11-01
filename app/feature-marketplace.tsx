@@ -39,6 +39,12 @@ interface ListingFeature {
   category: string;
   pro_benefit: string | null;
   is_active: boolean;
+  headline?: string | null;
+  tagline?: string | null;
+  visibility_boost?: string | null;
+  how_it_works?: Array<{ step: number; title: string; description: string }> | null;
+  value_proposition?: string | null;
+  ghs_equivalent?: number | null;
 }
 
 // Combined Feature Modal Component
@@ -941,7 +947,7 @@ export default function FeatureMarketplaceScreen() {
                       size="md"
                     />
                     <Text variant="bodySmall" color="muted">
-                      ≈ GHS {((hasBusinessPlan() ? 0 : infoFeature.credits) * 0.167).toFixed(2)}
+                      ≈ GHS {hasBusinessPlan() ? '0.00' : (infoFeature.ghs_equivalent || (infoFeature.credits * 0.167)).toFixed(2)}
                     </Text>
                   </View>
                 </View>
@@ -956,20 +962,28 @@ export default function FeatureMarketplaceScreen() {
                   borderLeftColor: theme.colors.success,
                 }}>
                   <Text variant="h4" style={{ color: theme.colors.success, marginBottom: theme.spacing.xs }}>
-                    {infoFeature.key === 'pulse_boost_24h' && '⚡ Get 2-3x More Views in 24 Hours!'}
-                    {infoFeature.key === 'mega_pulse_7d' && '🚀 Dominate Your Category for a Week!'}
-                    {infoFeature.key === 'category_spotlight_3d' && '🎯 Be Featured in Your Category!'}
-                    {infoFeature.key === 'ad_refresh' && '🔄 Move to Top Instantly!'}
-                    {infoFeature.key === 'listing_highlight' && '✨ Stand Out with Golden Border!'}
-                    {infoFeature.key === 'urgent_badge' && '🔥 Create Urgency, Sell Faster!'}
+                    {infoFeature.headline || (
+                      <>
+                        {infoFeature.key === 'pulse_boost_24h' && '⚡ Get 2-3x More Views in 24 Hours!'}
+                        {infoFeature.key === 'mega_pulse_7d' && '🚀 Dominate Your Category for a Week!'}
+                        {infoFeature.key === 'category_spotlight_3d' && '🎯 Be Featured in Your Category!'}
+                        {infoFeature.key === 'ad_refresh' && '🔄 Move to Top Instantly!'}
+                        {infoFeature.key === 'listing_highlight' && '✨ Stand Out with Golden Border!'}
+                        {infoFeature.key === 'urgent_badge' && '🔥 Create Urgency, Sell Faster!'}
+                      </>
+                    )}
                   </Text>
                   <Text variant="bodySmall" color="secondary">
-                    {infoFeature.key === 'pulse_boost_24h' && 'Most sellers see 2-3x more views within the first 24 hours'}
-                    {infoFeature.key === 'mega_pulse_7d' && 'Stay at the top of search results for an entire week'}
-                    {infoFeature.key === 'category_spotlight_3d' && 'Your listing appears in the featured section of your category'}
-                    {infoFeature.key === 'ad_refresh' && 'Perfect for quick visibility boost when you need it most'}
-                    {infoFeature.key === 'listing_highlight' && 'Listings with highlights get 40% more engagement'}
-                    {infoFeature.key === 'urgent_badge' && 'Urgent badges increase response rates by 60%'}
+                    {infoFeature.tagline || (
+                      <>
+                        {infoFeature.key === 'pulse_boost_24h' && 'Most sellers see 2-3x more views within the first 24 hours'}
+                        {infoFeature.key === 'mega_pulse_7d' && 'Stay at the top of search results for an entire week'}
+                        {infoFeature.key === 'category_spotlight_3d' && 'Your listing appears in the featured section of your category'}
+                        {infoFeature.key === 'ad_refresh' && 'Perfect for quick visibility boost when you need it most'}
+                        {infoFeature.key === 'listing_highlight' && 'Listings with highlights get 40% more engagement'}
+                        {infoFeature.key === 'urgent_badge' && 'Urgent badges increase response rates by 60%'}
+                      </>
+                    )}
                   </Text>
                 </View>
 
@@ -990,16 +1004,10 @@ export default function FeatureMarketplaceScreen() {
                         {infoFeature.duration_hours ? `${infoFeature.duration_hours} hours` : 'Instant'}
                       </Text>
                     </View>
-                    {infoFeature.key === 'pulse_boost_24h' && (
+                    {infoFeature.visibility_boost && (
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                         <Text variant="bodySmall" color="secondary">Visibility Boost:</Text>
-                        <Text variant="bodySmall" style={{ fontWeight: '600', color: theme.colors.success }}>2-3x Higher</Text>
-                      </View>
-                    )}
-                    {infoFeature.key === 'mega_pulse_7d' && (
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text variant="bodySmall" color="secondary">Visibility Boost:</Text>
-                        <Text variant="bodySmall" style={{ fontWeight: '600', color: theme.colors.success }}>5x Higher</Text>
+                        <Text variant="bodySmall" style={{ fontWeight: '600', color: theme.colors.success }}>{infoFeature.visibility_boost}</Text>
                       </View>
                     )}
                   </View>
@@ -1120,57 +1128,29 @@ export default function FeatureMarketplaceScreen() {
                     ⚙️ How It Works:
                   </Text>
                   <View style={{ gap: theme.spacing.md }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                      <View style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: 14,
-                        backgroundColor: theme.colors.primary,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginRight: theme.spacing.md,
-                      }}>
-                        <Text variant="caption" style={{ color: theme.colors.primaryForeground, fontWeight: '700' }}>1</Text>
+                    {(infoFeature.how_it_works && Array.isArray(infoFeature.how_it_works) ? infoFeature.how_it_works : [
+                      { step: 1, title: 'Select Your Listing', description: 'Choose which listing you want to boost' },
+                      { step: 2, title: 'Instant Activation', description: 'Feature activates immediately after purchase' },
+                      { step: 3, title: 'Watch Results Roll In', description: 'Track views and inquiries in real-time' }
+                    ]).map((step) => (
+                      <View key={step.step} style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                        <View style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 14,
+                          backgroundColor: theme.colors.primary,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginRight: theme.spacing.md,
+                        }}>
+                          <Text variant="caption" style={{ color: theme.colors.primaryForeground, fontWeight: '700' }}>{step.step}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text variant="body" style={{ fontWeight: '600', marginBottom: 4 }}>{step.title}</Text>
+                          <Text variant="bodySmall" color="secondary">{step.description}</Text>
+                        </View>
                       </View>
-                      <View style={{ flex: 1 }}>
-                        <Text variant="body" style={{ fontWeight: '600', marginBottom: 4 }}>Select Your Listing</Text>
-                        <Text variant="bodySmall" color="secondary">Choose which listing you want to boost</Text>
-                      </View>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                      <View style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: 14,
-                        backgroundColor: theme.colors.primary,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginRight: theme.spacing.md,
-                      }}>
-                        <Text variant="caption" style={{ color: theme.colors.primaryForeground, fontWeight: '700' }}>2</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text variant="body" style={{ fontWeight: '600', marginBottom: 4 }}>Instant Activation</Text>
-                        <Text variant="bodySmall" color="secondary">Feature activates immediately after purchase</Text>
-                      </View>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                      <View style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: 14,
-                        backgroundColor: theme.colors.primary,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginRight: theme.spacing.md,
-                      }}>
-                        <Text variant="caption" style={{ color: theme.colors.primaryForeground, fontWeight: '700' }}>3</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text variant="body" style={{ fontWeight: '600', marginBottom: 4 }}>Watch Results Roll In</Text>
-                        <Text variant="bodySmall" color="secondary">Track views and inquiries in real-time</Text>
-                      </View>
-                    </View>
+                    ))}
                   </View>
                 </View>
 
@@ -1187,12 +1167,16 @@ export default function FeatureMarketplaceScreen() {
                     💰 Why It's Worth It:
                   </Text>
                   <Text variant="body" color="secondary" style={{ lineHeight: 22 }}>
-                    {infoFeature.key === 'pulse_boost_24h' && 'Sell faster, get your money quicker! When your listing gets more views, you find buyers faster. The small credit cost pays for itself when you sell even just one day earlier.'}
-                    {infoFeature.key === 'mega_pulse_7d' && 'Stay at the top for a whole week! Your listing will be seen by more people every single day. Perfect for expensive items that take time to sell, like cars, phones, or furniture.'}
-                    {infoFeature.key === 'category_spotlight_3d' && 'Get featured in your category! When people browse your category, they see your listing first. More eyes on your listing means more buyers reaching out to you.'}
-                    {infoFeature.key === 'ad_refresh' && 'Your listing dropped down? Bring it back to the top instantly! No need to wait days for people to see your item again. Perfect for quick visibility.'}
-                    {infoFeature.key === 'listing_highlight' && 'Make your listing shine! The special golden border makes people notice your listing among hundreds of others. It catches attention and gets more clicks.'}
-                    {infoFeature.key === 'urgent_badge' && 'Make buyers act fast! The urgent badge tells buyers "don\'t wait, this might be gone soon!" People respond quicker when they think they might miss out.'}
+                    {infoFeature.value_proposition || (
+                      <>
+                        {infoFeature.key === 'pulse_boost_24h' && 'Sell faster, get your money quicker! When your listing gets more views, you find buyers faster. The small credit cost pays for itself when you sell even just one day earlier.'}
+                        {infoFeature.key === 'mega_pulse_7d' && 'Stay at the top for a whole week! Your listing will be seen by more people every single day. Perfect for expensive items that take time to sell, like cars, phones, or furniture.'}
+                        {infoFeature.key === 'category_spotlight_3d' && 'Get featured in your category! When people browse your category, they see your listing first. More eyes on your listing means more buyers reaching out to you.'}
+                        {infoFeature.key === 'ad_refresh' && 'Your listing dropped down? Bring it back to the top instantly! No need to wait days for people to see your item again. Perfect for quick visibility.'}
+                        {infoFeature.key === 'listing_highlight' && 'Make your listing shine! The special golden border makes people notice your listing among hundreds of others. It catches attention and gets more clicks.'}
+                        {infoFeature.key === 'urgent_badge' && 'Make buyers act fast! The urgent badge tells buyers "don\'t wait, this might be gone soon!" People respond quicker when they think they might miss out.'}
+                      </>
+                    )}
                   </Text>
                 </View>
 

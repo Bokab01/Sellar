@@ -272,6 +272,12 @@ export default function MoreScreen() {
           onPress: () => router.push('/my-listings'),
         },
         {
+          title: 'My Orders',
+          subtitle: 'Track your buy and sell orders',
+          icon: <ShoppingCart size={20} color={theme.colors.primary} />,
+          onPress: () => router.push('/my-orders'),
+        },
+        {
           title: 'Reviews & Ratings',
           subtitle: 'View your reviews and rating history',
           icon: <Star size={20} color={theme.colors.warning} />,

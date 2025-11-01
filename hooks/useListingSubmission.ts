@@ -144,7 +144,8 @@ export function useListingSubmission() {
         attributes: formData.categoryAttributes || {},
         seo_title: seoTitle,
         keywords: keywords,
-        status: 'active'
+        status: 'active',
+        requires_deposit: formData.requiresDeposit || false,
       };
 
       // Content moderation check

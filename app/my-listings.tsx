@@ -4,7 +4,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useListings } from '@/hooks/useListings';
 import { dbHelpers, supabase } from '@/lib/supabase';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useMultipleListingStats } from '@/hooks/useListingStats';
 import { useFavoritesStore } from '@/store/useFavoritesStore';
 import * as Haptics from 'expo-haptics';
@@ -24,7 +24,7 @@ import {
   Toast,
   Grid,
 } from '@/components';
-import { Package, Plus, Edit, Eye, EyeOff, Trash2, TrendingUp, Clock, CircleCheck as CheckCircle, Circle as XCircle, Pause, Check, X, MoreHorizontal, SquareCheckBig, RefreshCw, LayoutGrid, List } from 'lucide-react-native';
+import { Package, Plus, Edit, Eye, EyeOff, Trash2, TrendingUp, Clock, CircleCheck as CheckCircle, Circle as XCircle, Pause, Check, X, MoreHorizontal, SquareCheckBig, RefreshCw, LayoutGrid, List, Zap } from 'lucide-react-native';
 
 type ListingStatus = 'all' | 'active' | 'sold' | 'draft' | 'expired' | 'suspended' | 'hidden';
 type ViewMode = 'grid' | 'list';
@@ -150,6 +150,7 @@ export default function MyListingsScreen() {
           category_id,
           condition,
           quantity,
+          reserved_quantity,
           location,
           images,
           accept_offers,
@@ -200,10 +201,51 @@ export default function MyListingsScreen() {
     }
   }, [fetchMyListings]);
 
+  // Refresh listings when screen comes into focus (e.g., after applying boost)
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        fetchMyListings();
+      }
+    }, [user, fetchMyListings])
+  );
+
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchMyListings();
     setRefreshing(false);
+  };
+
+  // Check if listing has active boosts
+  const checkForActiveBoosts = (listing: any): boolean => {
+    const now = new Date();
+    return (
+      (listing.boost_until && new Date(listing.boost_until) > now) ||
+      (listing.highlight_until && new Date(listing.highlight_until) > now) ||
+      (listing.urgent_until && new Date(listing.urgent_until) > now) ||
+      (listing.spotlight_until && new Date(listing.spotlight_until) > now)
+    );
+  };
+
+  // Get active boost details for badge (matches web app)
+  const getActiveBoostDetails = (listing: any) => {
+    const now = new Date();
+    
+    // Priority order: Urgent > Spotlight > Boosted > Highlighted (matches web)
+    if (listing.urgent_until && new Date(listing.urgent_until) > now) {
+      return { icon: '🔥', label: 'Urgent', color: '#FF4444' };
+    }
+    if (listing.spotlight_until && new Date(listing.spotlight_until) > now) {
+      return { icon: '🎯', label: 'Spotlight', color: '#8B5CF6' };
+    }
+    if (listing.boost_until && new Date(listing.boost_until) > now) {
+      return { icon: '⚡', label: 'Boosted', color: '#FF6B35' };
+    }
+    if (listing.highlight_until && new Date(listing.highlight_until) > now) {
+      return { icon: '✨', label: 'Highlighted', color: '#FFD700' };
+    }
+    
+    return null;
   };
 
   const handleDeleteListing = async () => {
@@ -631,6 +673,13 @@ export default function MyListingsScreen() {
     // ✅ Use real-time counts from hooks instead of stale DB columns
     views: viewCounts[listing.id] || listing.views_count || 0,
     favorites: listingFavoriteCounts[listing.id] ?? listing.favorites_count ?? 0,
+    // ✅ Include boost fields
+    boost_until: listing.boost_until,
+    boost_score: listing.boost_score,
+    highlight_until: listing.highlight_until,
+    urgent_until: listing.urgent_until,
+    spotlight_until: listing.spotlight_until,
+    spotlight_category_id: listing.spotlight_category_id,
   })), [filteredListings, user, viewCounts, listingFavoriteCounts]);
 
   // ✅ OPTIMIZED: Memoized render functions for FlatList
@@ -674,6 +723,7 @@ export default function MyListingsScreen() {
           fullWidth={true}
           previousPrice={listing.previous_price}
           priceChangedAt={listing.price_changed_at}
+          boostBadge={getActiveBoostDetails(listing)}
             onPress={() => {
               if (isSelectionMode) {
                 toggleListingSelection(listing.id);
@@ -682,22 +732,43 @@ export default function MyListingsScreen() {
               }
             }}
             onFavoritePress={undefined}
-            menuActions={!isSelectionMode && !(listing.status === 'hidden' && !listing.hidden_by_seller) ? [
-              ...(listing.status === 'sold' ? [{
-                label: 'Relist',
-                icon: <RefreshCw size={18} color={theme.colors.primary} />,
-                onPress: () => handleRelistListing(listing.id),
-              }] : [{
-                label: 'Edit',
-                icon: <Edit size={18} color={theme.colors.text.primary} />,
-                onPress: () => router.push(`/edit-listing/${listing.id}` as any),
-              }]),
-              {
+            menuActions={!isSelectionMode && !(listing.status === 'hidden' && !listing.hidden_by_seller) ? (() => {
+              const hasActiveBoost = checkForActiveBoosts(listing);
+              const menuItems = [];
+              
+              // Edit or Relist
+              if (listing.status === 'sold') {
+                menuItems.push({
+                  label: 'Relist',
+                  icon: <RefreshCw size={18} color={theme.colors.primary} />,
+                  onPress: () => handleRelistListing(listing.id),
+                });
+              } else {
+                menuItems.push({
+                  label: 'Edit',
+                  icon: <Edit size={18} color={theme.colors.text.primary} />,
+                  onPress: () => router.push(`/edit-listing/${listing.id}` as any),
+                });
+              }
+              
+              // Boost (only for active listings without active boosts)
+              if (listing.status === 'active' && !hasActiveBoost) {
+                menuItems.push({
+                  label: 'Boost',
+                  icon: <Zap size={18} color={theme.colors.warning} />,
+                  onPress: () => router.push('/feature-marketplace' as any),
+                });
+              }
+              
+              // Hide/Show
+              menuItems.push({
                 label: listing.status === 'active' ? 'Hide' : 'Show',
                 icon: listing.status === 'active' ? <EyeOff size={18} color={theme.colors.warning} /> : <Eye size={18} color={theme.colors.success} />,
                 onPress: () => handleToggleStatus(listing.id, listing.status),
-              },
-              {
+              });
+              
+              // Delete
+              menuItems.push({
                 label: 'Delete',
                 icon: <Trash2 size={18} color={theme.colors.error} />,
                 onPress: () => {
@@ -705,10 +776,41 @@ export default function MyListingsScreen() {
                   setShowDeleteModal(true);
                 },
                 destructive: true,
-              },
-            ] : undefined}
+              });
+              
+              return menuItems;
+            })() : undefined}
           />
         </View>
+
+        {/* Bulk Reservation Indicator - Grid View */}
+        {listing.quantity > 1 && listing.reserved_quantity > 0 && (
+          <View
+            style={{
+              position: 'absolute',
+              bottom: theme.spacing.sm,
+              left: theme.spacing.sm,
+              right: theme.spacing.sm,
+              backgroundColor: theme.colors.warning + 'E6',
+              borderRadius: theme.borderRadius.md,
+              paddingVertical: theme.spacing.xs,
+              paddingHorizontal: theme.spacing.sm,
+              zIndex: 5,
+            }}
+          >
+            <Text
+              variant="caption"
+              style={{
+                color: theme.colors.surface,
+                fontWeight: '700',
+                textAlign: 'center',
+              }}
+            >
+              🔒 {listing.reserved_quantity}/{listing.quantity} Reserved
+            </Text>
+          </View>
+        )}
+
         {isSelectionMode && (
           <TouchableOpacity
             style={{
@@ -774,6 +876,7 @@ export default function MyListingsScreen() {
             fullWidth={true}
             previousPrice={listing.previous_price}
             priceChangedAt={listing.price_changed_at}
+            boostBadge={getActiveBoostDetails(listing)}
             onPress={() => {
               if (isSelectionMode) {
                 toggleListingSelection(listing.id);
@@ -782,22 +885,43 @@ export default function MyListingsScreen() {
               }
             }}
             onFavoritePress={undefined}
-            menuActions={!isSelectionMode && !(listing.status === 'hidden' && !listing.hidden_by_seller) ? [
-              ...(listing.status === 'sold' ? [{
-                label: 'Relist',
-                icon: <RefreshCw size={18} color={theme.colors.primary} />,
-                onPress: () => handleRelistListing(listing.id),
-              }] : [{
-                label: 'Edit',
-                icon: <Edit size={18} color={theme.colors.text.primary} />,
-                onPress: () => router.push(`/edit-listing/${listing.id}` as any),
-              }]),
-              {
+            menuActions={!isSelectionMode && !(listing.status === 'hidden' && !listing.hidden_by_seller) ? (() => {
+              const hasActiveBoost = checkForActiveBoosts(listing);
+              const menuItems = [];
+              
+              // Edit or Relist
+              if (listing.status === 'sold') {
+                menuItems.push({
+                  label: 'Relist',
+                  icon: <RefreshCw size={18} color={theme.colors.primary} />,
+                  onPress: () => handleRelistListing(listing.id),
+                });
+              } else {
+                menuItems.push({
+                  label: 'Edit',
+                  icon: <Edit size={18} color={theme.colors.text.primary} />,
+                  onPress: () => router.push(`/edit-listing/${listing.id}` as any),
+                });
+              }
+              
+              // Boost (only for active listings without active boosts)
+              if (listing.status === 'active' && !hasActiveBoost) {
+                menuItems.push({
+                  label: 'Boost',
+                  icon: <Zap size={18} color={theme.colors.warning} />,
+                  onPress: () => router.push('/feature-marketplace' as any),
+                });
+              }
+              
+              // Hide/Show
+              menuItems.push({
                 label: listing.status === 'active' ? 'Hide' : 'Show',
                 icon: listing.status === 'active' ? <EyeOff size={18} color={theme.colors.warning} /> : <Eye size={18} color={theme.colors.success} />,
                 onPress: () => handleToggleStatus(listing.id, listing.status),
-              },
-              {
+              });
+              
+              // Delete
+              menuItems.push({
                 label: 'Delete',
                 icon: <Trash2 size={18} color={theme.colors.error} />,
                 onPress: () => {
@@ -805,10 +929,41 @@ export default function MyListingsScreen() {
                   setShowDeleteModal(true);
                 },
                 destructive: true,
-              },
-            ] : undefined}
+              });
+              
+              return menuItems;
+            })() : undefined}
           />
         </View>
+
+        {/* Bulk Reservation Indicator - List View */}
+        {listing.quantity > 1 && listing.reserved_quantity > 0 && (
+          <View
+            style={{
+              position: 'absolute',
+              bottom: theme.spacing.sm,
+              left: theme.spacing.sm,
+              right: theme.spacing.sm,
+              backgroundColor: theme.colors.warning + 'E6',
+              borderRadius: theme.borderRadius.md,
+              paddingVertical: theme.spacing.xs,
+              paddingHorizontal: theme.spacing.sm,
+              zIndex: 5,
+            }}
+          >
+            <Text
+              variant="caption"
+              style={{
+                color: theme.colors.surface,
+                fontWeight: '700',
+                textAlign: 'center',
+              }}
+            >
+              🔒 {listing.reserved_quantity}/{listing.quantity} Reserved
+            </Text>
+          </View>
+        )}
+
         {isSelectionMode && (
           <TouchableOpacity
             style={{
@@ -833,7 +988,7 @@ export default function MyListingsScreen() {
         )}
       </TouchableOpacity>
     </View>
-  ), [theme, longPressedItem, isSelectionMode, selectedListings, handleLongPress, toggleListingSelection, handleToggleStatus, handleRelistListing, setSelectedListing, setShowDeleteModal]);
+  ), [theme, longPressedItem, isSelectionMode, selectedListings, handleLongPress, toggleListingSelection, handleToggleStatus, handleRelistListing, setSelectedListing, setShowDeleteModal, checkForActiveBoosts, getActiveBoostDetails]);
 
   // ✅ OPTIMIZED: Key extractor
   const keyExtractor = useCallback((item: any) => item.id, []);

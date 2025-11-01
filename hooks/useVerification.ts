@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './useAuth';
+import { storageHelpers } from '@/lib/storage';
 
 // Types for verification system
 export interface VerificationRequest {
@@ -292,10 +293,6 @@ export function useVerificationDocuments() {
       if (!session) {
         throw new Error('No authenticated session found');
       }
-      
-
-      // Import storageHelpers dynamically to avoid circular imports
-      const { storageHelpers } = await import('@/lib/storage');
       
       // Use the same upload method as listings and posts
       let uploadResult;

@@ -5,10 +5,16 @@ interface PaystackInitializeRequest {
   amount: number; // in pesewas
   email: string;
   reference: string;
-  purpose: 'credit_purchase' | 'subscription' | 'feature_purchase';
+  purpose: 'credit_purchase' | 'subscription' | 'feature_purchase' | 'deposit';
   purpose_id: string;
   channels?: string[];
-  callback_url?: string; // ← Added optional callback_url
+  callback_url?: string;
+  // Deposit-specific fields
+  listing_id?: string;
+  buyer_id?: string;
+  reserved_quantity?: number;
+  conversation_id?: string;
+  offer_id?: string;
 }
 
 Deno.serve(async (req: Request) => {

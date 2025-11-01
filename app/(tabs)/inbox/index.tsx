@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { View, RefreshControl, TouchableOpacity, Alert, Animated, FlatList } from 'react-native';
+import { View, RefreshControl, TouchableOpacity, Alert, Animated, FlatList, Image } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useConversations } from '@/hooks/useChat';
@@ -482,11 +482,7 @@ export default function InboxScreen() {
                       />
                     </View>
                   )}
-                  {conversation.listing?.title && (
-                    <Text variant="bodySmall" color="secondary" numberOfLines={1}>
-                      {String(conversation.listing.title)}
-                    </Text>
-                  )}
+                  {/* Removed listing title from subtitle - now shown in banner below */}
                 </View>
               }
               description={String(conversation.description)}
@@ -527,7 +523,7 @@ export default function InboxScreen() {
             marginHorizontal: theme.spacing.lg,
             marginTop: -theme.spacing.sm,
             marginBottom: theme.spacing.sm,
-            padding: theme.spacing.md,
+            padding: theme.spacing.sm,
             borderRadius: theme.borderRadius.md,
             borderTopLeftRadius: 0,
             borderTopRightRadius: 0,
@@ -535,25 +531,40 @@ export default function InboxScreen() {
             borderColor: theme.colors.border,
           }}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text 
-              variant="caption" 
-              color="muted"
-              numberOfLines={1}
-              style={{ flex: 1, marginRight: theme.spacing.sm }}
-            >
-              💼 {String(conversation.listing.title)}
-            </Text>
-            <Text 
-              variant="caption" 
-              style={{ 
-                color: theme.colors.primary, 
-                fontWeight: '600',
-                flexShrink: 0
-              }}
-            >
-              GHS {(conversation.listing.price || 0).toLocaleString()}
-            </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+            {/* Listing Image */}
+            {conversation.listing.image && (
+              <Image
+                source={{ uri: conversation.listing.image }}
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: theme.borderRadius.sm,
+                  backgroundColor: theme.colors.surface,
+                }}
+                resizeMode="cover"
+              />
+            )}
+            {/* Listing Info */}
+            <View style={{ flex: 1 }}>
+              <Text 
+                variant="caption" 
+                color="muted"
+                numberOfLines={1}
+                style={{ marginBottom: 2 }}
+              >
+                {String(conversation.listing.title)}
+              </Text>
+              <Text 
+                variant="caption" 
+                style={{ 
+                  color: theme.colors.primary, 
+                  fontWeight: '600',
+                }}
+              >
+                GHS {(conversation.listing.price || 0).toLocaleString()}
+              </Text>
+            </View>
           </View>
         </View>
       )}

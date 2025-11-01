@@ -37,7 +37,7 @@ import {
   TransactionCompletionButton,
   CallbackMessage,
 } from '@/components';
-import { Phone, Info, Eye, MessageCircle, EllipsisVertical } from 'lucide-react-native';
+import { Phone, Info, Eye, MessageCircle, EllipsisVertical, Handshake } from 'lucide-react-native';
 import { getDisplayName } from '@/hooks/useDisplayName';
 import { UserDisplayName } from '@/components/UserDisplayName/UserDisplayName';
 import { ExtraSmallUserBadges } from '@/components/UserBadgeSystem';
@@ -79,10 +79,18 @@ export default function ChatScreen() {
   const [moderationError, setModerationError] = useState('');
   const [showModerationModal, setShowModerationModal] = useState(false);
   const [renderKey, setRenderKey] = useState(0);
+  const [isUserScrolled, setIsUserScrolled] = useState(false);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
   
   const scrollViewRef = useRef<KeyboardAwareScrollView>(null);
   const flatListRef = useRef<FlatList>(null);
   const inputContainerTranslateY = useRef(new Animated.Value(0)).current;
+  const previousMessageCountRef = useRef(messages.length);
+  const scrollYRef = useRef(0);
+  const contentHeightRef = useRef(0);
+  const layoutHeightRef = useRef(0);
+  const bounceAnim = useRef(new Animated.Value(0)).current;
 
   // Get conversation details
   const [conversation, setConversation] = useState<any>(null);
@@ -159,6 +167,105 @@ export default function ChatScreen() {
     });
   }, [messages]);
 
+  // Bounce animation for new messages indicator
+  useEffect(() => {
+    if (hasNewMessages) {
+      // Start bouncing animation
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(bounceAnim, {
+            toValue: -10,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(bounceAnim, {
+            toValue: 0,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      // Stop animation and reset
+      bounceAnim.setValue(0);
+    }
+  }, [hasNewMessages, bounceAnim]);
+
+  // Smart scroll behavior - only auto-scroll if user is at bottom
+  useEffect(() => {
+    if (messages.length > previousMessageCountRef.current) {
+      // New messages arrived - check if user is at bottom
+      const distanceFromBottom = contentHeightRef.current - scrollYRef.current - layoutHeightRef.current;
+      // Increase threshold to 200px to be more conservative
+      const isAtBottom = distanceFromBottom < 200;
+      
+      console.log('📩 New message arrived:', {
+        isAtBottom,
+        distanceFromBottom: Math.round(distanceFromBottom),
+        isUserScrolledState: isUserScrolled,
+        scrollY: Math.round(scrollYRef.current),
+        contentHeight: Math.round(contentHeightRef.current),
+        layoutHeight: Math.round(layoutHeightRef.current)
+      });
+      
+      if (!isAtBottom && distanceFromBottom > 200) {
+        // User is scrolled up significantly, show indicator instead of auto-scrolling
+        console.log('📩 ✋ PREVENTING AUTO-SCROLL - User is scrolled up - showing indicator only');
+        setHasNewMessages(true);
+        setIsUserScrolled(true); // Ensure state is updated
+        // DO NOT SCROLL - just show indicator
+        return; // Exit early to prevent any scroll
+      } else {
+        // User is at bottom, auto-scroll
+        console.log('📩 ✅ ALLOWING AUTO-SCROLL - User at bottom');
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd(true);
+        }, 100);
+      }
+    }
+    previousMessageCountRef.current = messages.length;
+  }, [messages.length]);
+
+  // Scroll to bottom function
+  const scrollToBottom = () => {
+    scrollViewRef.current?.scrollToEnd(true);
+    setHasNewMessages(false);
+    setIsUserScrolled(false);
+  };
+
+  // Handle scroll event to detect user scroll position
+  const handleScroll = (event: any) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    scrollYRef.current = contentOffset.y;
+    contentHeightRef.current = contentSize.height;
+    layoutHeightRef.current = layoutMeasurement.height;
+    
+    // Check if user is near bottom (within 150px threshold for better UX)
+    const distanceFromBottom = contentSize.height - contentOffset.y - layoutMeasurement.height;
+    const isAtBottom = distanceFromBottom < 150;
+    
+    const wasScrolled = isUserScrolled;
+    const newScrollState = !isAtBottom;
+    
+    // Only update state if it changed to avoid unnecessary re-renders
+    if (wasScrolled !== newScrollState) {
+      console.log('📜 Scroll state changed:', { 
+        wasScrolled, 
+        newScrollState, 
+        distanceFromBottom: Math.round(distanceFromBottom),
+        scrollY: Math.round(contentOffset.y),
+        contentHeight: Math.round(contentSize.height)
+      });
+      setIsUserScrolled(newScrollState);
+    }
+    
+    // If user scrolls to bottom, clear new messages indicator
+    if (isAtBottom && hasNewMessages) {
+      console.log('📜 User scrolled to bottom - clearing new messages indicator');
+      setHasNewMessages(false);
+    }
+  };
+
   useEffect(() => {
     if (conversationId && !conversationDeleted) {
       fetchConversationDetails();
@@ -167,6 +274,12 @@ export default function ChatScreen() {
       
       // Set active conversation to prevent notifications while user is viewing this chat
       setActiveConversation(conversationId);
+      
+      // Initial scroll to bottom after a short delay to ensure content is loaded
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd(false); // Instant scroll on first load
+        setIsUserScrolled(false); // Mark as not scrolled initially
+      }, 500);
     }
     
     // Cleanup: Clear active conversation when leaving this screen
@@ -346,14 +459,7 @@ export default function ChatScreen() {
     }
   }, [messageText, conversationId, setDraftMessage]); // Removed draftMessages from dependencies to prevent loops
 
-  useEffect(() => {
-    // Auto-scroll to bottom when new messages arrive
-    if (messages.length > 0) {
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd(true);
-      }, 100);
-    }
-  }, [messages.length]);
+  // NOTE: Removed old auto-scroll effect here - now handled by smart scroll logic above
 
   // Update last seen text
   useEffect(() => {
@@ -380,18 +486,24 @@ export default function ChatScreen() {
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
       setIsKeyboardVisible(true);
-      // Scroll to bottom when keyboard appears
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd(true);
-      }, 100);
+      // Only scroll if user is near bottom (respect scroll state)
+      const distanceFromBottom = contentHeightRef.current - scrollYRef.current - layoutHeightRef.current;
+      if (distanceFromBottom < 200) {
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd(true);
+        }, 100);
+      }
     });
     
     const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
       setIsKeyboardVisible(false);
-      // Scroll to bottom when keyboard disappears
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd(true);
-      }, 100);
+      // Only scroll if user is near bottom (respect scroll state)
+      const distanceFromBottom = contentHeightRef.current - scrollYRef.current - layoutHeightRef.current;
+      if (distanceFromBottom < 200) {
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd(true);
+        }, 100);
+      }
     });
 
     return () => {
@@ -550,6 +662,9 @@ export default function ChatScreen() {
         showErrorToast('Failed to send message');
       }
       setMessageText(content); // Restore message on error
+    } else {
+      // Always scroll to bottom after sending
+      setTimeout(() => scrollToBottom(), 100);
     }
   };
 
@@ -559,6 +674,9 @@ export default function ChatScreen() {
       const { error } = await sendMessage('📷 Image', 'image', [imageUrl]);
       if (error) {
         showErrorToast('Failed to send image');
+      } else {
+        // Always scroll to bottom after sending
+        setTimeout(() => scrollToBottom(), 100);
       }
     } catch (err) {
       showErrorToast('Failed to send image');
@@ -657,72 +775,64 @@ export default function ChatScreen() {
         throw new Error('User not authenticated');
       }
 
-      // Use direct Supabase query instead of the helper function
-      
-      const newStatus = action === 'accept' ? 'accepted' : 'rejected';
-      
-      // First, check if the offer exists
-      const { data: existingOffer, error: checkError } = await supabase
-        .from('offers')
-        .select('id, status, buyer_id, seller_id')
-        .eq('id', offerId)
-        .single();
-      
-      
-      if (checkError || !existingOffer) {
-        throw new Error(`Offer not found: ${checkError?.message || 'Offer does not exist'}`);
-      }
-      
-      // Check user permissions
-      
-      if (user.id !== existingOffer.buyer_id && user.id !== existingOffer.seller_id) {
-        throw new Error('You do not have permission to update this offer. Only the buyer or seller can update it.');
-      }
-      
-      
-      // Direct update using Supabase client
-      const { data, error } = await supabase
-        .from('offers')
-        .update({ 
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', offerId)
-        .select();
-      
-      
-      if (error) {
-        console.error('🎯 Direct update error:', error);
-        throw new Error(`Database error: ${error.message}`);
-      }
-      
-      if (!data || data.length === 0) {
-        console.error('🎯 No rows updated:', { offerId, newStatus });
-        throw new Error('No offer was updated. The offer may not exist or you may not have permission to update it.');
-      }
-      
-
-      // If offer was accepted, handle the acceptance flow
       if (action === 'accept') {
-        await handleOfferAcceptance(offerId, data[0]);
-      }
+        // Use new accept_offer_v2 RPC for unified offer + deposit system
+        const { data, error } = await supabase.rpc('accept_offer_v2', {
+          p_offer_id: offerId,
+          p_seller_id: user.id,
+          p_acceptance_message: null,
+        });
 
-      // Refresh messages to show updated offer status
-      setTimeout(() => {
-        refreshMessages();
-      }, 500); // Small delay to ensure database update is complete
+        if (error) {
+          console.error('🎯 Accept offer error:', error);
+          throw new Error(error.message || 'Failed to accept offer');
+        }
 
-      // Send a neutral system message that works for both users
-      let systemMessage = '';
-      if (action === 'accept') {
-        systemMessage = `✅ Offer accepted! Please coordinate to complete the transaction within 48 hours.`;
+        // Check if deposit is required (Pro seller with requires_deposit = true)
+        if (data.requires_deposit) {
+          // Send system message about deposit requirement
+          await sendMessage(
+            `✅ Offer accepted! The buyer must pay a ₵20 Sellar Secure deposit within 24 hours to reserve this item.`,
+            'system'
+          );
+          showSuccessToast('Offer accepted! Buyer will be notified to pay deposit.');
+        } else {
+          // Regular seller - no deposit required, listing stays active
+          await sendMessage(
+            `✅ Offer accepted! Please coordinate to complete the transaction.`,
+            'system'
+          );
+          showSuccessToast('Offer accepted!');
+        }
+
+        // Refresh messages
+        setTimeout(() => {
+          refreshMessages();
+        }, 500);
+
       } else {
-        systemMessage = `❌ Offer declined.`;
+        // Reject offer
+        const { error } = await supabase
+          .from('offers')
+          .update({ 
+            status: 'rejected',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', offerId)
+          .select();
+        
+        if (error) {
+          throw new Error(`Failed to reject offer: ${error.message}`);
+        }
+
+        await sendMessage(`❌ Offer declined.`, 'system');
+        showSuccessToast('Offer declined');
+
+        // Refresh messages
+        setTimeout(() => {
+          refreshMessages();
+        }, 500);
       }
-      
-      await sendMessage(systemMessage, 'system');
-      
-      showSuccessToast(action === 'accept' ? 'Offer accepted!' : 'Offer declined');
       
     } catch (err) {
       console.error('🎯 Error in handleOfferAction:', err);
@@ -1073,6 +1183,69 @@ export default function ChatScreen() {
               onMessage={() => {}}
               showActions={offer.status === 'pending'}
             />
+
+            {/* Pay Deposit Button for Accepted Offers (Buyer Only) */}
+            {offer.status === 'accepted' && 
+             offer.awaiting_deposit === true && 
+             isUserBuyer && (
+              <View style={{ marginTop: theme.spacing.sm }}>
+                <View
+                  style={{
+                    backgroundColor: theme.colors.success + '10',
+                    borderRadius: theme.borderRadius.md,
+                    padding: theme.spacing.md,
+                    borderWidth: 2,
+                    borderColor: theme.colors.success + '30',
+                  }}
+                >
+                  <Text
+                    variant="bodySmall"
+                    style={{
+                      color: theme.colors.success,
+                      fontWeight: '600',
+                      marginBottom: theme.spacing.xs,
+                      textAlign: 'center',
+                    }}
+                  >
+                    🎉 Offer Accepted!
+                  </Text>
+                  <Text
+                    variant="caption"
+                    style={{
+                      color: theme.colors.text.secondary,
+                      textAlign: 'center',
+                      marginBottom: theme.spacing.sm,
+                      lineHeight: 18,
+                    }}
+                  >
+                    Secure this item with a ₵20 deposit
+                    {offer.deposit_deadline && (
+                      <Text style={{ fontWeight: '600', color: theme.colors.warning }}>
+                        {' '}before {new Date(offer.deposit_deadline).toLocaleString([], {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </Text>
+                    )}
+                  </Text>
+                  <Button
+                    variant="primary"
+                    onPress={() => {
+                      // Navigate to listing with offer context
+                      router.push({
+                        pathname: `/(tabs)/home/${conversation?.listing_id}`,
+                        params: { offer_id: offer.id }
+                      } as any);
+                    }}
+                    fullWidth
+                  >
+                    Pay ₵20 Deposit
+                  </Button>
+                </View>
+              </View>
+            )}
           </View>
         );
       }
@@ -1143,23 +1316,6 @@ export default function ChatScreen() {
 
   const ListFooter = useMemo(() => (
     <View>
-      {conversation?.listing && otherUser && (
-        <View style={{
-          paddingHorizontal: theme.spacing.sm,
-          paddingTop: theme.spacing.xl,
-          paddingBottom: theme.spacing.md,
-          alignItems: 'center',
-        }}>
-          <TransactionCompletionButton
-            conversationId={conversationId!}
-            otherUser={otherUser}
-            listing={conversation.listing}
-            existingTransaction={existingTransaction}
-            onTransactionCreated={handleTransactionCreated}
-            onTransactionUpdated={handleTransactionUpdated}
-          />
-        </View>
-      )}
       {typing && (
         <View style={{ paddingHorizontal: theme.spacing.sm, marginTop: theme.spacing.md }}>
           <View
@@ -1178,7 +1334,7 @@ export default function ChatScreen() {
         </View>
       )}
     </View>
-  ), [conversation, otherUser, conversationId, existingTransaction, handleTransactionCreated, handleTransactionUpdated, typing, theme]);
+  ), [otherUser, typing, theme]);
 
   // Show loading state if conversation was deleted
   if (conversationDeleted) {
@@ -1344,6 +1500,39 @@ export default function ChatScreen() {
           ) : undefined
         }
         rightActions={[
+          // Transaction button - always show if there's a listing (users can complete transactions outside app)
+          conversation?.listing && (
+            <View key="transaction-btn" style={{ position: 'relative' }}>
+              <Button
+                variant="icon"
+                icon={<Handshake size={20} color={theme.colors.text.primary} />}
+                onPress={() => setShowTransactionModal(true)}
+              />
+              {/* Badge for action needed - only show if transaction exists and needs action */}
+              {existingTransaction && (() => {
+                // Show badge if not fully confirmed yet
+                if (!existingTransaction.buyer_confirmed_at || !existingTransaction.seller_confirmed_at) return true;
+                
+                // Show badge if both confirmed but user hasn't left review
+                const hasLeftReview = existingTransaction.reviews?.some((review: any) => 
+                  review.reviewer_id === user?.id
+                );
+                return !hasLeftReview;
+              })() && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: 4,
+                    right: 4,
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: theme.colors.error,
+                  }}
+                />
+              )}
+            </View>
+          ),
           otherUser?.phone && (
             <Button
               key="call-user"
@@ -1425,81 +1614,118 @@ export default function ChatScreen() {
                   borderRadius: theme.borderRadius.sm,
                   overflow: 'hidden',
                   backgroundColor: theme.colors.surfaceVariant,
-                  opacity: conversation?.listing?.status === 'active' ? 1 : 0.5,
+                  position: 'relative',
                 }}
               >
-                {conversation?.listing?.images && conversation.listing.images.length > 0 ? (
-                  <Image
-                    source={{ uri: conversation.listing.images[0] }}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                    }}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <View
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      backgroundColor: !conversation?.listing ? theme.colors.error : theme.colors.primary,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Eye size={16} color={theme.colors.primaryForeground} />
-                  </View>
-                )}
+                {(() => {
+                  // Use listing data if available, otherwise use snapshot
+                  const listingImages = conversation?.listing?.images || 
+                    (conversation?.listing_images ? 
+                      (typeof conversation.listing_images === 'string' ? JSON.parse(conversation.listing_images) : conversation.listing_images) 
+                      : []);
+                  const isDeleted = !conversation?.listing?.id;
+                  const isSold = conversation?.listing?.status === 'sold';
+
+                  return listingImages && listingImages.length > 0 ? (
+                    <>
+                      <Image
+                        source={{ uri: listingImages[0] }}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                        }}
+                        resizeMode="cover"
+                        blurRadius={isDeleted || isSold ? 8 : 0}
+                      />
+                      {(isDeleted || isSold) && (
+                        <View
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Text style={{ fontSize: 18 }}>{isDeleted ? '🗑️' : '✅'}</Text>
+                        </View>
+                      )}
+                    </>
+                  ) : (
+                    <View
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        backgroundColor: isDeleted ? theme.colors.error : theme.colors.primary,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Eye size={16} color={theme.colors.primaryForeground} />
+                    </View>
+                  );
+                })()}
               </View>
               
               <View style={{ flex: 1 }}>
-                {!conversation?.listing ? (
-                  // Deleted listing
-                  <>
-                    <Text variant="bodySmall" style={{ 
-                      fontWeight: '600', 
-                      color: theme.colors.error,
-                    }}>
-                      💼 Listing Unavailable
-                    </Text>
-                    <Text variant="caption" style={{ 
-                      color: theme.colors.text.muted, 
-                      marginTop: theme.spacing.xs,
-                    }}>
-                      ⚠️ This listing has been removed
-                    </Text>
-                  </>
-                ) : (
-                  // Active or sold listing
-                  <>
-                    <Text variant="bodySmall" style={{ 
-                      fontWeight: '600', 
-                      color: conversation.listing.status === 'sold' 
-                        ? theme.colors.text.secondary
-                        : conversation.listing.status === 'active'
-                        ? theme.colors.primary
-                        : theme.colors.text.muted
-                    }}>
-                      {conversation.listing.title}
-                    </Text>
-                    {conversation.listing.status === 'sold' && (
-                      <Text variant="caption" style={{ 
-                        color: theme.colors.text.muted, 
-                        marginTop: theme.spacing.xs,
-                        fontWeight: '500',
-                      }}>
-                        ✅ This item has been sold
-                      </Text>
-                    )}
-                    {conversation.listing.status === 'active' && conversation.listing.price && (
-                      <PriceDisplay
-                        amount={conversation.listing.price}
-                        size="sm"
-                        style={{ marginTop: theme.spacing.xs }}
-                      />
-                    )}
-                  </>
-                )}
+                {(() => {
+                  // Use listing data if available, otherwise use snapshot
+                  const listingTitle = conversation?.listing?.title || conversation?.listing_title || 'Unknown Listing';
+                  const listingPrice = conversation?.listing?.price || conversation?.listing_price;
+                  const isDeleted = !conversation?.listing?.id;
+                  const isSold = conversation?.listing?.status === 'sold';
+                  const isActive = conversation?.listing?.status === 'active';
+
+                  return (
+                    <>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs, marginBottom: theme.spacing.xs }}>
+                        <Text variant="bodySmall" style={{ 
+                          fontWeight: '600', 
+                          color: isDeleted 
+                            ? theme.colors.error
+                            : isSold
+                            ? theme.colors.text.secondary
+                            : isActive
+                            ? theme.colors.primary
+                            : theme.colors.text.muted,
+                          flex: 1,
+                        }} numberOfLines={1}>
+                          {listingTitle}
+                        </Text>
+                        {isDeleted && (
+                          <Badge text="Deleted" variant="neutral" size="sm" />
+                        )}
+                        {isSold && (
+                          <Badge text="Sold" variant="success" size="sm" />
+                        )}
+                      </View>
+                      {isDeleted && (
+                        <Text variant="caption" style={{ 
+                          color: theme.colors.text.muted,
+                        }}>
+                          This listing has been removed
+                        </Text>
+                      )}
+                      {isSold && (
+                        <Text variant="caption" style={{ 
+                          color: theme.colors.text.muted,
+                          fontWeight: '500',
+                        }}>
+                          ✅ This item has been sold
+                        </Text>
+                      )}
+                      {isActive && listingPrice && (
+                        <PriceDisplay
+                          amount={listingPrice}
+                          size="sm"
+                        />
+                      )}
+                    </>
+                  );
+                })()}
               </View>
               {conversation?.listing?.status === 'active' && (
                 <Text variant="caption" style={{ color: theme.colors.primary }}>
@@ -1553,6 +1779,8 @@ export default function ChatScreen() {
             paddingHorizontal: theme.spacing.sm,
             paddingBottom: keyboardHeight,
           }}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
         >
           {messages.length === 0 ? (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
@@ -1571,11 +1799,49 @@ export default function ChatScreen() {
                   {renderMessage({ item })}
                 </React.Fragment>
               ))}
+              
               {ListFooter}
             </View>
           )}
         </KeyboardAwareScrollView>
       </TouchableWithoutFeedback>
+
+      {/* New Messages Indicator - Shown when user scrolled up and new message arrives */}
+      {hasNewMessages && (
+        <Animated.View
+          style={{
+            position: 'absolute',
+            bottom: isKeyboardVisible ? keyboardHeight + 80 : 100,
+            alignSelf: 'center',
+            zIndex: 1000,
+            transform: [{ translateY: bounceAnim }],
+          }}
+        >
+          <TouchableOpacity
+            onPress={scrollToBottom}
+            style={{
+              backgroundColor: theme.colors.primary,
+              paddingHorizontal: theme.spacing.md,
+              paddingVertical: theme.spacing.sm,
+              borderRadius: theme.borderRadius.full,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: theme.spacing.xs,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 3.84,
+              elevation: 5,
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '600' }}>
+              New messages
+            </Text>
+            <Text style={{ color: '#FFFFFF', fontSize: 16 }}>↓</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
 
       {/* Message Input - Fixed at bottom */}
       <Animated.View
@@ -1779,6 +2045,33 @@ export default function ChatScreen() {
         <Text style={{ color: theme.colors.text.secondary, lineHeight: 22 }}>
           {moderationError}
         </Text>
+      </AppModal>
+
+      {/* Transaction Modal */}
+      <AppModal
+        visible={showTransactionModal}
+        onClose={() => setShowTransactionModal(false)}
+        title="Transaction"
+        size="lg"
+      >
+        <View style={{ paddingVertical: theme.spacing.md }}>
+          {conversation?.listing && otherUser && (
+            <TransactionCompletionButton
+              conversationId={conversationId!}
+              otherUser={otherUser}
+              listing={conversation.listing}
+              existingTransaction={existingTransaction}
+              onTransactionCreated={(transactionId) => {
+                handleTransactionCreated(transactionId);
+                setShowTransactionModal(false);
+              }}
+              onTransactionUpdated={() => {
+                handleTransactionUpdated();
+                setShowTransactionModal(false);
+              }}
+            />
+          )}
+        </View>
       </AppModal>
     </SafeAreaWrapper>
   );

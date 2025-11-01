@@ -116,6 +116,26 @@ async function validatePaymentAmount(transaction: any, paystackData: any) {
       );
     }
   }
+  
+  // For deposits, validate fixed ₵20 amount
+  if (transaction.purchase_type === 'deposit') {
+    const expectedAmount = 2000; // ₵20 in pesewas
+    const actualAmount = paystackData.amount;
+    
+    if (actualAmount !== expectedAmount) {
+      console.error('💀 FRAUD ALERT (Webhook): Deposit amount mismatch!', {
+        expected: expectedAmount,
+        actual: actualAmount,
+        difference: actualAmount - expectedAmount,
+      });
+      
+      throw new Error(
+        `Deposit payment mismatch. Expected ₵20 but received ₵${actualAmount / 100}.`
+      );
+    }
+    
+    console.log('✅ Webhook deposit amount validated: ₵20');
+  }
 }
 
 async function processSuccessfulPayment(supabase: any, paymentData: any) {
@@ -202,6 +222,17 @@ async function processSuccessfulPayment(supabase: any, paymentData: any) {
       } else {
         console.log('Subscription activated successfully');
       }
+    } else if (transaction.purchase_type === 'deposit') {
+      // Verify deposit payment using our RPC
+      const { data: depositData, error: depositError } = await supabase.rpc('verify_deposit_payment', {
+        p_reference: reference,
+      });
+
+      if (depositError) {
+        console.error('Failed to verify deposit payment:', depositError);
+      } else {
+        console.log('Deposit payment verified successfully:', depositData);
+      }
     }
 
     // Create notification with purchase-specific details
@@ -237,6 +268,10 @@ async function processSuccessfulPayment(supabase: any, paymentData: any) {
     } else if (transaction.purchase_type === 'subscription') {
       notificationData.title = 'Payment Successful! 🎉';
       notificationData.body = `Your subscription has been activated successfully! Thank you for using Sellar!`;
+    } else if (transaction.purchase_type === 'deposit') {
+      notificationData.title = 'Deposit Paid! 🔒';
+      notificationData.body = `Your ₵${amount} deposit has been received. Contact the seller to arrange meetup.`;
+      notificationData.data.deposit_id = transaction.purchase_id;
     } else {
       notificationData.title = 'Payment Successful';
       notificationData.body = `Your payment of GHS ${amount} has been processed successfully. Thank you for using Sellar!`;
@@ -284,6 +319,11 @@ async function processFailedPayment(supabase: any, paymentData: any) {
         .from('user_subscriptions')
         .update({ status: 'cancelled' })
         .eq('id', transaction.purchase_id);
+    } else if (transaction.purchase_type === 'deposit') {
+      await supabase
+        .from('listing_deposits')
+        .update({ status: 'failed' })
+        .eq('paystack_reference', reference);
     }
 
     // Create notification
