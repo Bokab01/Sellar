@@ -19,6 +19,12 @@ export interface ListingFormData {
   
   // Deposit (Pro Sellers Only)
   requiresDeposit?: boolean;
+  
+  // Pickup Options (Pro Sellers with Physical Shop)
+  pickupAvailable?: boolean;
+  pickupLocationOverride?: string;
+  pickupPreparationTime?: number; // in minutes
+  pickupInstructions?: string;
 }
 
 export interface SelectedFeature {
@@ -40,6 +46,10 @@ const INITIAL_FORM_DATA: ListingFormData = {
   acceptOffers: true,
   location: '',
   requiresDeposit: false,
+  pickupAvailable: false,
+  pickupLocationOverride: '',
+  pickupPreparationTime: 30, // default 30 minutes
+  pickupInstructions: '',
 };
 
 export function useListingForm() {

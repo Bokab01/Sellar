@@ -482,7 +482,20 @@ export default function InboxScreen() {
                       />
                     </View>
                   )}
-                  {/* Removed listing title from subtitle - now shown in banner below */}
+                  {/* Online status indicator */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <View
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 4,
+                        backgroundColor: conversation.isOnline ? theme.colors.success : theme.colors.text.muted,
+                      }}
+                    />
+                    <Text variant="caption" color="muted">
+                      {conversation.isOnline ? 'Online' : 'Offline'}
+                    </Text>
+                  </View>
                 </View>
               }
               description={String(conversation.description)}

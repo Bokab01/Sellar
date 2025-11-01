@@ -44,6 +44,19 @@ export interface Database {
           business_website?: string | null;
           display_business_name?: boolean;
           business_name_priority?: 'primary' | 'secondary' | 'hidden';
+          // Physical shop fields
+          business_address?: string | null;
+          business_address_line_2?: string | null;
+          business_city?: string | null;
+          business_state?: string | null;
+          business_postal_code?: string | null;
+          business_latitude?: number | null;
+          business_longitude?: number | null;
+          business_map_verified?: boolean;
+          business_directions_note?: string | null;
+          accepts_pickup?: boolean;
+          accepts_walkin?: boolean;
+          has_physical_shop?: boolean;
           // Additional fields
           account_type?: string;
           verification_status?: string;
@@ -90,6 +103,19 @@ export interface Database {
           business_website?: string | null;
           display_business_name?: boolean;
           business_name_priority?: 'primary' | 'secondary' | 'hidden';
+          // Physical shop fields
+          business_address?: string | null;
+          business_address_line_2?: string | null;
+          business_city?: string | null;
+          business_state?: string | null;
+          business_postal_code?: string | null;
+          business_latitude?: number | null;
+          business_longitude?: number | null;
+          business_map_verified?: boolean;
+          business_directions_note?: string | null;
+          accepts_pickup?: boolean;
+          accepts_walkin?: boolean;
+          has_physical_shop?: boolean;
           // Additional fields
           account_type?: string;
           verification_status?: string;
@@ -136,6 +162,19 @@ export interface Database {
           business_website?: string | null;
           display_business_name?: boolean;
           business_name_priority?: 'primary' | 'secondary' | 'hidden';
+          // Physical shop fields
+          business_address?: string | null;
+          business_address_line_2?: string | null;
+          business_city?: string | null;
+          business_state?: string | null;
+          business_postal_code?: string | null;
+          business_latitude?: number | null;
+          business_longitude?: number | null;
+          business_map_verified?: boolean;
+          business_directions_note?: string | null;
+          accepts_pickup?: boolean;
+          accepts_walkin?: boolean;
+          has_physical_shop?: boolean;
           // Additional fields
           account_type?: string;
           verification_status?: string;
@@ -173,6 +212,41 @@ export interface Database {
           created_at?: string;
         };
       };
+      business_photos: {
+        Row: {
+          id: string;
+          user_id: string;
+          photo_url: string;
+          photo_type: 'storefront' | 'interior' | 'product_display' | 'team' | 'general';
+          caption: string | null;
+          display_order: number;
+          is_primary: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          photo_url: string;
+          photo_type?: 'storefront' | 'interior' | 'product_display' | 'team' | 'general';
+          caption?: string | null;
+          display_order?: number;
+          is_primary?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          photo_url?: string;
+          photo_type?: 'storefront' | 'interior' | 'product_display' | 'team' | 'general';
+          caption?: string | null;
+          display_order?: number;
+          is_primary?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       listings: {
         Row: {
           id: string;
@@ -195,6 +269,10 @@ export interface Database {
           highlight_until: string | null;
           urgent_until: string | null;
           spotlight_until: string | null;
+          pickup_available: boolean;
+          pickup_location_override: string | null;
+          pickup_preparation_time: number;
+          pickup_instructions: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -219,6 +297,10 @@ export interface Database {
           highlight_until?: string | null;
           urgent_until?: string | null;
           spotlight_until?: string | null;
+          pickup_available?: boolean;
+          pickup_location_override?: string | null;
+          pickup_preparation_time?: number;
+          pickup_instructions?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -243,6 +325,10 @@ export interface Database {
           highlight_until?: string | null;
           urgent_until?: string | null;
           spotlight_until?: string | null;
+          pickup_available?: boolean;
+          pickup_location_override?: string | null;
+          pickup_preparation_time?: number;
+          pickup_instructions?: string | null;
           created_at?: string;
           updated_at?: string;
         };

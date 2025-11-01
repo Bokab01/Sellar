@@ -33,6 +33,14 @@ export interface UserProfile {
   business_description?: string;
   business_registration_number?: string;
   business_address?: string;
+  business_address_line_2?: string;
+  business_city?: string;
+  business_state?: string;
+  business_postal_code?: string;
+  business_latitude?: number;
+  business_longitude?: number;
+  business_directions_note?: string;
+  business_map_verified?: boolean;
   business_phone?: string;
   business_email?: string;
   business_website?: string;
@@ -40,6 +48,11 @@ export interface UserProfile {
   business_employee_count?: string;
   business_services?: string[];
   business_coverage_areas?: string[];
+  
+  // Physical Shop
+  has_physical_shop?: boolean;
+  accepts_pickup?: boolean;
+  accepts_walkin?: boolean;
   
   // Contact Preferences
   preferred_contact_method?: 'app' | 'phone' | 'email' | 'whatsapp';

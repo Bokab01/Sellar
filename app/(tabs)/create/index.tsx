@@ -36,6 +36,7 @@ import {
   Toast,
   AppModal,
   Badge,
+  PickupOptionsSection,
 } from '@/components';
 import { CategoryAttributesForm } from '@/components/CategoryAttributesForm';
 import { ListingFeatureSelector } from '@/components/ListingFeatureSelector/ListingFeatureSelector';
@@ -58,6 +59,7 @@ import { useListingDraftStorage } from '@/hooks/useListingDraftStorage';
 import { useListingDraft } from '@/hooks/useListingDraft';
 import { useListingValidation } from '@/hooks/useListingValidation';
 import { useListingSubmission } from '@/hooks/useListingSubmission';
+import { useProfile } from '@/hooks/useProfile';
 
 const STEPS = [
   {
@@ -88,6 +90,7 @@ function CreateListingScreen() {
   const { user } = useAuthStore();
   const { currentLocation } = useAppStore();
   const { balance, getMaxListings, spendCredits, hasUnlimitedListings, refreshCredits, hasBusinessPlan } = useMonetizationStore();
+  const { profile } = useProfile();
   
   // ✅ REFACTORED: Form state using useListingForm hook
   const {
@@ -1124,11 +1127,27 @@ function CreateListingScreen() {
                 )}
               </View>
             )}
+
+            {/* Pickup Options (Pro Sellers with Physical Shop) */}
+            {hasBusinessPlan() && profile?.has_physical_shop && (
+              <PickupOptionsSection
+                pickupAvailable={formData.pickupAvailable || false}
+                pickupLocationOverride={formData.pickupLocationOverride}
+                pickupPreparationTime={formData.pickupPreparationTime}
+                pickupInstructions={formData.pickupInstructions}
+                onPickupAvailableChange={(value) => updateMultipleFields({ pickupAvailable: value })}
+                onPickupLocationOverrideChange={(value) => updateMultipleFields({ pickupLocationOverride: value })}
+                onPickupPreparationTimeChange={(value) => updateMultipleFields({ pickupPreparationTime: value })}
+                onPickupInstructionsChange={(value) => updateMultipleFields({ pickupInstructions: value })}
+                shopAddress={profile?.business_address || undefined}
+                hasPhysicalShop={true}
+              />
+            )}
     </View>
         </View>
       </View>
     );
-  }, [formData.categoryId, formData.location, formData.categoryAttributes, formData.price, formData.quantity, formData.acceptOffers, formData.requiresDeposit, selectedCategory, validationResults, theme, handleCategorySelect, handleLocationSelect, handleCategoryAttributeChange, handlePriceChange, handleQuantityChange, handleAcceptOffersChange, currentLocation, location, hasBusinessPlan, updateMultipleFields]);
+  }, [formData.categoryId, formData.location, formData.categoryAttributes, formData.price, formData.quantity, formData.acceptOffers, formData.requiresDeposit, formData.pickupAvailable, formData.pickupLocationOverride, formData.pickupPreparationTime, formData.pickupInstructions, selectedCategory, validationResults, theme, handleCategorySelect, handleLocationSelect, handleCategoryAttributeChange, handlePriceChange, handleQuantityChange, handleAcceptOffersChange, currentLocation, location, hasBusinessPlan, updateMultipleFields, profile]);
 
   // DetailsStep merged into CategoryStep above
 

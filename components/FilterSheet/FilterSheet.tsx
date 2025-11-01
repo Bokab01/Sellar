@@ -16,7 +16,9 @@ import {
   MapPin, 
   ArrowUpDown, 
   CheckCircle,
-  X
+  X,
+  Store,
+  Clock
 } from 'lucide-react-native';
 
 interface FilterOptions {
@@ -25,6 +27,10 @@ interface FilterOptions {
   condition: string[];
   location: string;
   sortBy: string;
+  pickupAvailable?: boolean;
+  shopsNearMe?: boolean;
+  openNow?: boolean;
+  distanceRadius?: number; // in km
 }
 
 interface FilterSheetProps {
@@ -111,7 +117,7 @@ export function FilterSheet({
 
   const sortOptions = [
     'Newest First', 'Price: Low to High', 'Price: High to Low',
-    'Most Popular', 'Nearest First'
+    'Most Popular', 'Nearest First', 'Distance'
   ];
 
   const handleCategoryToggle = (category: string) => {
@@ -148,6 +154,10 @@ export function FilterSheet({
       condition: [],
       location: '',
       sortBy: 'Newest First',
+      pickupAvailable: false,
+      shopsNearMe: false,
+      openNow: false,
+      distanceRadius: undefined,
     };
     setLocalFilters(clearedFilters);
     onClearFilters();
@@ -346,6 +356,146 @@ export function FilterSheet({
               }
               placeholder="Select city or region"
             />
+          </View>
+
+          {/* Physical Shop Options */}
+          <View>
+            <View style={{ 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              marginBottom: theme.spacing.lg,
+              gap: theme.spacing.sm 
+            }}>
+              <View style={{
+                backgroundColor: theme.colors.primary + '15',
+                borderRadius: theme.borderRadius.md,
+                padding: theme.spacing.sm,
+              }}>
+                <Store size={18} color={theme.colors.primary} />
+              </View>
+              <Text variant="h4" style={{ fontWeight: '600', color: theme.colors.text.primary }}>
+                Physical Shop Options
+              </Text>
+            </View>
+            
+            <View style={{ gap: theme.spacing.md }}>
+              {/* Pickup Available Toggle */}
+              <View style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                backgroundColor: theme.colors.surfaceVariant,
+                padding: theme.spacing.md,
+                borderRadius: theme.borderRadius.md,
+              }}>
+                <View style={{ flex: 1 }}>
+                  <Text variant="body" style={{ fontWeight: '600', marginBottom: 2 }}>
+                    Pickup Available
+                  </Text>
+                  <Text variant="caption" color="muted">
+                    Show listings with pickup option
+                  </Text>
+                </View>
+                <Chip
+                  text={localFilters.pickupAvailable ? 'Yes' : 'No'}
+                  variant="filter"
+                  selected={localFilters.pickupAvailable || false}
+                  onPress={() => 
+                    setLocalFilters(prev => ({ ...prev, pickupAvailable: !prev.pickupAvailable }))
+                  }
+                />
+              </View>
+
+              {/* Open Now Toggle */}
+              <View style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                backgroundColor: theme.colors.surfaceVariant,
+                padding: theme.spacing.md,
+                borderRadius: theme.borderRadius.md,
+              }}>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+                    <Clock size={16} color={theme.colors.success} />
+                    <Text variant="body" style={{ fontWeight: '600' }}>
+                      Open Now
+                    </Text>
+                  </View>
+                  <Text variant="caption" color="muted" style={{ marginTop: 2 }}>
+                    Show only shops currently open
+                  </Text>
+                </View>
+                <Chip
+                  text={localFilters.openNow ? 'Yes' : 'No'}
+                  variant="filter"
+                  selected={localFilters.openNow || false}
+                  onPress={() => 
+                    setLocalFilters(prev => ({ ...prev, openNow: !prev.openNow }))
+                  }
+                />
+              </View>
+
+              {/* Shops Near Me with Distance Radius */}
+              <View style={{ 
+                backgroundColor: theme.colors.surfaceVariant,
+                padding: theme.spacing.md,
+                borderRadius: theme.borderRadius.md,
+                gap: theme.spacing.sm,
+              }}>
+                <View style={{ 
+                  flexDirection: 'row', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                }}>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="body" style={{ fontWeight: '600', marginBottom: 2 }}>
+                      Shops Near Me
+                    </Text>
+                    <Text variant="caption" color="muted">
+                      Filter by distance from your location
+                    </Text>
+                  </View>
+                  <Chip
+                    text={localFilters.shopsNearMe ? 'On' : 'Off'}
+                    variant="filter"
+                    selected={localFilters.shopsNearMe || false}
+                    onPress={() => 
+                      setLocalFilters(prev => ({ 
+                        ...prev, 
+                        shopsNearMe: !prev.shopsNearMe,
+                        distanceRadius: !prev.shopsNearMe ? 10 : undefined // Default 10km
+                      }))
+                    }
+                  />
+                </View>
+                
+                {/* Distance Radius Selector (only show when Shops Near Me is enabled) */}
+                {localFilters.shopsNearMe && (
+                  <View style={{ 
+                    flexDirection: 'row', 
+                    flexWrap: 'wrap', 
+                    gap: theme.spacing.sm,
+                    marginTop: theme.spacing.sm,
+                    paddingTop: theme.spacing.sm,
+                    borderTopWidth: 1,
+                    borderTopColor: theme.colors.border,
+                  }}>
+                    {[1, 5, 10, 20, 50].map((radius) => (
+                      <Chip
+                        key={radius}
+                        text={`${radius} km`}
+                        variant="filter"
+                        selected={localFilters.distanceRadius === radius}
+                        onPress={() => 
+                          setLocalFilters(prev => ({ ...prev, distanceRadius: radius }))
+                        }
+                      />
+                    ))}
+                  </View>
+                )}
+              </View>
+            </View>
           </View>
 
           {/* Sort By */}

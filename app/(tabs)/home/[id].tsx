@@ -51,6 +51,8 @@ import { ReportButton } from '@/components/ReportButton/ReportButton';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { CDNOptimizedVideo } from '@/components/OptimizedVideo/CDNOptimizedVideo';
 import { PaystackProvider, usePaystack, PaystackProps } from 'react-native-paystack-webview';
+import { PickupOptionBanner, ShopBadge } from '@/components/PhysicalShop';
+import { useShopData } from '@/hooks/useShopData';
 
 // Helper function to detect if URL is a video
 const isVideoUrl = (url: string): boolean => {
@@ -231,6 +233,9 @@ export default function ListingDetailScreen() {
   const [isFavorited, setIsFavorited] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const imageScrollViewRef = React.useRef<FlatList<string>>(null);
+  
+  // Get shop data for pickup option
+  const { shopData } = useShopData(listing?.user_id || '');
   
   // Accepted offer state (from navigation params)
   const [acceptedOffer, setAcceptedOffer] = useState<any>(null);
@@ -2076,6 +2081,18 @@ export default function ListingDetailScreen() {
           </TouchableOpacity>
         )}
 
+        {/* Pickup Option Banner */}
+        {!isOwnListing && listing.pickup_available && shopData && (
+          <View style={{ paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.md }}>
+            <PickupOptionBanner
+              shopName={shopData.business_name}
+              address={shopData.business_address}
+              preparationTime={listing.pickup_preparation_time}
+              pickupInstructions={listing.pickup_instructions}
+              onViewShop={() => router.push(`/profile/${listing.user_id}`)}
+            />
+          </View>
+        )}
 
         <View style={{ paddingHorizontal: theme.spacing.lg }}>
           {/* Title and Price */}

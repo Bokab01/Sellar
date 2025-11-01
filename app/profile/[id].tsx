@@ -54,6 +54,8 @@ import {
   Flag
 } from 'lucide-react-native';
 import { ReportButton } from '@/components/ReportButton/ReportButton';
+import { ShopInfoCard, ShopHoursModal, ShopBadge } from '@/components/PhysicalShop';
+import { useShopData } from '@/hooks/useShopData';
 
 // Helper function to format response time expectation
 const formatResponseTime = (responseTime: string): string => {
@@ -85,6 +87,10 @@ export default function UserProfileScreen() {
   const [showCallModal, setShowCallModal] = useState(false);
   const [totalListingsCount, setTotalListingsCount] = useState(0);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [showShopHoursModal, setShowShopHoursModal] = useState(false);
+
+  // Get shop data if user has physical shop
+  const { shopData, isOpen, todayHours } = useShopData(profileId || '');
 
   // Get user's listings
   const { 
@@ -532,6 +538,35 @@ export default function UserProfileScreen() {
                 <Text variant="body" style={{ lineHeight: 24, color: theme.colors.text.primary }}>
                   {profile.business_description}
                 </Text>
+              </View>
+            )}
+
+            {/* Physical Shop Section */}
+            {shopData && (
+              <View>
+                <View style={{ 
+                  flexDirection: 'row', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  marginBottom: theme.spacing.md,
+                }}>
+                  <Text variant="h4">Physical Shop</Text>
+                  <ShopBadge size="small" />
+                </View>
+                
+                <ShopInfoCard
+                  shopName={shopData.business_name}
+                  address={shopData.business_address}
+                  city={shopData.business_city}
+                  state={shopData.business_state}
+                  phone={shopData.business_phone}
+                  directionsNote={shopData.business_directions_note}
+                  latitude={shopData.business_latitude}
+                  longitude={shopData.business_longitude}
+                  isOpen={isOpen}
+                  todayHours={todayHours || undefined}
+                  onViewHours={shopData.business_hours ? () => setShowShopHoursModal(true) : undefined}
+                />
               </View>
             )}
 
@@ -1233,6 +1268,17 @@ export default function UserProfileScreen() {
         variant="success"
         onHide={() => setShowToast(false)}
       />
+
+      {/* Shop Hours Modal */}
+      {shopData && shopData.business_hours && (
+        <ShopHoursModal
+          visible={showShopHoursModal}
+          onClose={() => setShowShopHoursModal(false)}
+          shopName={shopData.business_name}
+          businessHours={shopData.business_hours}
+          address={`${shopData.business_address}${shopData.business_city ? ', ' + shopData.business_city : ''}`}
+        />
+      )}
     </SafeAreaWrapper>
   );
 }

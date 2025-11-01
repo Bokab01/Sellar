@@ -322,4 +322,7 @@ export { OfflineIndicator, CompactOfflineIndicator } from './OfflineIndicator/Of
 // Escrow System Components
 export { DepositCommitmentModal } from './DepositCommitmentModal/DepositCommitmentModal';
 export { StockAvailabilityCard } from './StockAvailabilityCard/StockAvailabilityCard';
+
+// Physical Shop Components
+export { PickupOptionsSection } from './PickupOptionsSection';
 export { OfferAcceptedBanner } from './OfferAcceptedBanner/OfferAcceptedBanner';

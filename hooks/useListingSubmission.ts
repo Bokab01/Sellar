@@ -146,6 +146,11 @@ export function useListingSubmission() {
         keywords: keywords,
         status: 'active',
         requires_deposit: formData.requiresDeposit || false,
+        // Pickup options (Pro sellers with physical shop)
+        pickup_available: formData.pickupAvailable || false,
+        pickup_location_override: formData.pickupLocationOverride || null,
+        pickup_preparation_time: formData.pickupPreparationTime || 30,
+        pickup_instructions: formData.pickupInstructions || null,
       };
 
       // Content moderation check
@@ -268,10 +273,56 @@ export function useListingSubmission() {
     }
   }, []);
 
+  // Apply features to an existing listing
+  const applyFeaturesToListing = useCallback(async (
+    listingId: string,
+    features: SelectedFeature[]
+  ): Promise<boolean> => {
+    if (!features || features.length === 0) {
+      return true;
+    }
+
+    try {
+      for (const feature of features) {
+        try {
+          const { data: purchaseData, error: featureError } = await supabase.rpc('purchase_feature', {
+            p_feature_key: feature.key,
+            p_listing_id: listingId,
+            p_credits: feature.credits,
+            p_metadata: {
+              listing_id: listingId,
+              feature_name: feature.name,
+            },
+          });
+
+          if (featureError) {
+            console.error(`Failed to apply feature ${feature.name}:`, featureError);
+            continue;
+          }
+
+          // Validate DB function semantic success
+          const ok = Array.isArray(purchaseData) && purchaseData[0]?.success === true;
+          if (!ok) {
+            const dbMsg = Array.isArray(purchaseData) ? purchaseData[0]?.error : undefined;
+            console.error(`Feature ${feature.name} did not apply successfully.`, dbMsg || 'Unknown DB error');
+          }
+        } catch (featureError) {
+          console.error(`Error applying feature ${feature.name}:`, featureError);
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error applying features to listing:', error);
+      return false;
+    }
+  }, []);
+
   return {
     loading,
     uploadProgress,
     submitListing,
+    applyFeaturesToListing,
     setLoading,
     setUploadProgress,
     isMountedRef,

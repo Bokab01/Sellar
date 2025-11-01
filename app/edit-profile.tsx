@@ -74,6 +74,7 @@ export default function EditProfileScreen() {
     contact: false,
     professional: false,
     business: false,
+    shop: false,
     privacy: false,
   });
 
@@ -1011,6 +1012,154 @@ export default function EditProfileScreen() {
                       View Business Plans
                     </Button>
                   )}
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Physical Shop Section - Pro Sellers Only */}
+          {renderCollapsibleSection(
+            'shop',
+            'Physical Shop',
+            <Building size={20} color={theme.colors.primary} />,
+            <View style={{ gap: theme.spacing.lg }}>
+              {hasBusinessPlan() ? (
+                <>
+                  {profile?.has_physical_shop ? (
+                    <View style={{ gap: theme.spacing.md }}>
+                      {/* Shop Status */}
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: theme.spacing.sm,
+                        padding: theme.spacing.md,
+                        backgroundColor: theme.colors.success + '20',
+                        borderRadius: theme.borderRadius.md,
+                        borderLeftWidth: 4,
+                        borderLeftColor: theme.colors.success,
+                      }}>
+                        <CheckCircle size={20} color={theme.colors.success} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontWeight: '600', color: theme.colors.success }}>
+                            Physical Shop Active
+                          </Text>
+                          <Text style={{ fontSize: 12, color: theme.colors.text.secondary, marginTop: 2 }}>
+                            {profile.business_name || 'Your shop'} is visible to buyers
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Quick Shop Info */}
+                      {profile.business_address && (
+                        <View style={{
+                          padding: theme.spacing.md,
+                          backgroundColor: theme.colors.surfaceVariant,
+                          borderRadius: theme.borderRadius.md,
+                          gap: theme.spacing.sm,
+                        }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+                            <MapPin size={16} color={theme.colors.text.secondary} />
+                            <Text style={{ fontSize: 12, color: theme.colors.text.secondary }}>
+                              {profile.business_address}
+                            </Text>
+                          </View>
+                          {profile.business_phone && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+                              <Phone size={16} color={theme.colors.text.secondary} />
+                              <Text style={{ fontSize: 12, color: theme.colors.text.secondary }}>
+                                {profile.business_phone}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      )}
+
+                      {/* Edit Shop Button */}
+                      <Button
+                        variant="outline"
+                        onPress={() => router.push('/setup-physical-shop')}
+                        icon={<Edit3 size={16} color={theme.colors.primary} />}
+                      >
+                        Edit Shop Information
+                      </Button>
+                    </View>
+                  ) : (
+                    <View style={{
+                      backgroundColor: theme.colors.surfaceVariant,
+                      borderRadius: theme.borderRadius.lg,
+                      padding: theme.spacing.xl,
+                      borderWidth: 1,
+                      borderColor: theme.colors.border,
+                      alignItems: 'center',
+                      gap: theme.spacing.md,
+                    }}>
+                      <Building size={48} color={theme.colors.primary} />
+                      <Text style={{ fontSize: 18, fontWeight: '600', textAlign: 'center' }}>
+                        Setup Your Physical Shop
+                      </Text>
+                      <Text style={{ color: theme.colors.text.secondary, textAlign: 'center' }}>
+                        Let buyers visit you in person! Add your shop location, hours, and photos.
+                      </Text>
+                      
+                      <View style={{
+                        backgroundColor: theme.colors.primary + '10',
+                        padding: theme.spacing.md,
+                        borderRadius: theme.borderRadius.md,
+                        width: '100%',
+                        gap: theme.spacing.xs,
+                      }}>
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: theme.colors.primary }}>
+                          ✨ Benefits:
+                        </Text>
+                        <Text style={{ fontSize: 12, color: theme.colors.text.secondary }}>
+                          • Increase foot traffic to your store
+                        </Text>
+                        <Text style={{ fontSize: 12, color: theme.colors.text.secondary }}>
+                          • Build trust with shop photos
+                        </Text>
+                        <Text style={{ fontSize: 12, color: theme.colors.text.secondary }}>
+                          • Show business hours & location
+                        </Text>
+                        <Text style={{ fontSize: 12, color: theme.colors.text.secondary }}>
+                          • Enable pickup & walk-in options
+                        </Text>
+                      </View>
+
+                      <Button
+                        variant="primary"
+                        onPress={() => router.push('/setup-physical-shop')}
+                        icon={<Plus size={16} color="#FFFFFF" />}
+                      >
+                        Setup Physical Shop
+                      </Button>
+                    </View>
+                  )}
+                </>
+              ) : (
+                <View style={{
+                  backgroundColor: theme.colors.surfaceVariant,
+                  borderRadius: theme.borderRadius.lg,
+                  padding: theme.spacing.xl,
+                  borderWidth: 1,
+                  borderColor: theme.colors.border,
+                  alignItems: 'center',
+                  gap: theme.spacing.md,
+                }}>
+                  <Crown size={48} color={theme.colors.warning} />
+                  <Text style={{ fontSize: 18, fontWeight: '600', textAlign: 'center' }}>
+                    Sellar Pro Feature
+                  </Text>
+                  <Text style={{ color: theme.colors.text.secondary, textAlign: 'center' }}>
+                    Physical shop features are exclusive to Sellar Pro sellers. Upgrade to showcase your store!
+                  </Text>
+                  
+                  <Button
+                    variant="secondary"
+                    onPress={() => router.push('/sellar-pro' as any)}
+                    icon={<Crown size={16} color={theme.colors.primary} />}
+                  >
+                    Upgrade to Sellar Pro
+                  </Button>
                 </View>
               )}
             </View>

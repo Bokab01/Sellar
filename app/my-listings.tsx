@@ -24,6 +24,9 @@ import {
   Toast,
   Grid,
 } from '@/components';
+import { ListingFeatureSelector } from '@/components/ListingFeatureSelector/ListingFeatureSelector';
+import { useMonetizationStore } from '@/store/useMonetizationStore';
+import { useListingSubmission } from '@/hooks/useListingSubmission';
 import { Package, Plus, Edit, Eye, EyeOff, Trash2, TrendingUp, Clock, CircleCheck as CheckCircle, Circle as XCircle, Pause, Check, X, MoreHorizontal, SquareCheckBig, RefreshCw, LayoutGrid, List, Zap } from 'lucide-react-native';
 
 type ListingStatus = 'all' | 'active' | 'sold' | 'draft' | 'expired' | 'suspended' | 'hidden';
@@ -32,6 +35,8 @@ type ViewMode = 'grid' | 'list';
 export default function MyListingsScreen() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
+  const { balance, spendCredits, hasBusinessPlan } = useMonetizationStore();
+  const { applyFeaturesToListing } = useListingSubmission();
   
   const [activeTab, setActiveTab] = useState<ListingStatus>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('list'); // ✅ Default to list view
@@ -40,6 +45,7 @@ export default function MyListingsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showHideModal, setShowHideModal] = useState(false);
+  const [showBoostModal, setShowBoostModal] = useState(false);
   const [selectedListing, setSelectedListing] = useState<any>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -225,6 +231,29 @@ export default function MyListingsScreen() {
       (listing.urgent_until && new Date(listing.urgent_until) > now) ||
       (listing.spotlight_until && new Date(listing.spotlight_until) > now)
     );
+  };
+
+  // Check if additional boosts can be applied (based on feature compatibility rules)
+  const canApplyMoreBoosts = (listing: any): boolean => {
+    const now = new Date();
+    const hasBoost = listing.boost_until && new Date(listing.boost_until) > now;
+    const hasHighlight = listing.highlight_until && new Date(listing.highlight_until) > now;
+    const hasUrgent = listing.urgent_until && new Date(listing.urgent_until) > now;
+    const hasSpotlight = listing.spotlight_until && new Date(listing.spotlight_until) > now;
+
+    // Can't apply multiple boost features (pulse_boost_24h OR mega_pulse_7d)
+    // Can't apply multiple highlights
+    // Can't apply multiple urgent badges
+    // Can't apply multiple spotlights
+    // BUT these can be stacked together (e.g., boost + highlight + urgent + spotlight)
+    
+    // If has all types, can't add more
+    if (hasBoost && hasHighlight && hasUrgent && hasSpotlight) {
+      return false;
+    }
+    
+    // If missing at least one type, can add more
+    return true;
   };
 
   // Get active boost details for badge (matches web app)
@@ -556,6 +585,34 @@ export default function MyListingsScreen() {
     }
   };
 
+  // Handle applying features to listing
+  const handleApplyFeatures = async (features: any[]) => {
+    if (!selectedListing) return;
+
+    try {
+      setProcessing(true);
+      
+      // Apply features to the listing using the hook
+      const success = await applyFeaturesToListing(selectedListing.id, features);
+      
+      if (success) {
+        setToastMessage('Features applied successfully!');
+        setShowToast(true);
+        setShowBoostModal(false);
+        setSelectedListing(null);
+        
+        // Refresh listings to show updated boost status
+        await fetchMyListings();
+      } else {
+        Alert.alert('Error', 'Failed to apply features to listing');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to apply features');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   // Animate bulk actions when selection changes
   useEffect(() => {
     if (isSelectionMode) {
@@ -733,7 +790,7 @@ export default function MyListingsScreen() {
             }}
             onFavoritePress={undefined}
             menuActions={!isSelectionMode && !(listing.status === 'hidden' && !listing.hidden_by_seller) ? (() => {
-              const hasActiveBoost = checkForActiveBoosts(listing);
+              const canAddBoosts = canApplyMoreBoosts(listing);
               const menuItems = [];
               
               // Edit or Relist
@@ -751,12 +808,15 @@ export default function MyListingsScreen() {
                 });
               }
               
-              // Boost (only for active listings without active boosts)
-              if (listing.status === 'active' && !hasActiveBoost) {
+              // Boost (only for active listings that can apply more features)
+              if (listing.status === 'active' && canAddBoosts) {
                 menuItems.push({
                   label: 'Boost',
                   icon: <Zap size={18} color={theme.colors.warning} />,
-                  onPress: () => router.push('/feature-marketplace' as any),
+                  onPress: () => {
+                    setSelectedListing(listing);
+                    setShowBoostModal(true);
+                  },
                 });
               }
               
@@ -886,7 +946,7 @@ export default function MyListingsScreen() {
             }}
             onFavoritePress={undefined}
             menuActions={!isSelectionMode && !(listing.status === 'hidden' && !listing.hidden_by_seller) ? (() => {
-              const hasActiveBoost = checkForActiveBoosts(listing);
+              const canAddBoosts = canApplyMoreBoosts(listing);
               const menuItems = [];
               
               // Edit or Relist
@@ -904,12 +964,15 @@ export default function MyListingsScreen() {
                 });
               }
               
-              // Boost (only for active listings without active boosts)
-              if (listing.status === 'active' && !hasActiveBoost) {
+              // Boost (only for active listings that can apply more features)
+              if (listing.status === 'active' && canAddBoosts) {
                 menuItems.push({
                   label: 'Boost',
                   icon: <Zap size={18} color={theme.colors.warning} />,
-                  onPress: () => router.push('/feature-marketplace' as any),
+                  onPress: () => {
+                    setSelectedListing(listing);
+                    setShowBoostModal(true);
+                  },
                 });
               }
               
@@ -1372,6 +1435,17 @@ export default function MyListingsScreen() {
           </View>
         </View>
       </AppModal>
+
+      {/* Boost Feature Selector Modal */}
+      <ListingFeatureSelector
+        visible={showBoostModal}
+        onClose={() => {
+          setShowBoostModal(false);
+          setSelectedListing(null);
+        }}
+        onFeaturesSelected={handleApplyFeatures}
+        listingTitle={selectedListing?.title || ''}
+      />
 
       {/* Toast */}
       <Toast
